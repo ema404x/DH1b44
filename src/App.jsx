@@ -5,7 +5,15 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-// Add page imports here
+import AppLayout from '@/components/layout/AppLayout';
+import Dashboard from '@/pages/Dashboard';
+import Projects from '@/pages/Projects';
+import WorkOrders from '@/pages/WorkOrders';
+import Clients from '@/pages/Clients';
+import Employees from '@/pages/Employees';
+import Inventory from '@/pages/Inventory';
+import Quotes from '@/pages/Quotes';
+import Invoices from '@/pages/Invoices';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -33,7 +41,16 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
-      {/* Add your page Route elements here */}
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/proyectos" element={<Projects />} />
+        <Route path="/ordenes" element={<WorkOrders />} />
+        <Route path="/clientes" element={<Clients />} />
+        <Route path="/empleados" element={<Employees />} />
+        <Route path="/inventario" element={<Inventory />} />
+        <Route path="/presupuestos" element={<Quotes />} />
+        <Route path="/facturacion" element={<Invoices />} />
+      </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
