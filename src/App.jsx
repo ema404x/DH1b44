@@ -14,6 +14,7 @@ import Employees from '@/pages/Employees';
 import Inventory from '@/pages/Inventory';
 import Quotes from '@/pages/Quotes';
 import Invoices from '@/pages/Invoices';
+import Finanzas from '@/pages/Finanzas';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -50,6 +51,7 @@ const AuthenticatedApp = () => {
         <Route path="/inventario" element={<Inventory />} />
         <Route path="/presupuestos" element={<Quotes />} />
         <Route path="/facturacion" element={<Invoices />} />
+        <Route path="/finanzas" element={<Finanzas />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

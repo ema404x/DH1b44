@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  HardHat
+  HardHat, TrendingUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,7 @@ const navItems = [
   { label: 'Inventario', icon: Package, path: '/inventario' },
   { label: 'Presupuestos', icon: FileText, path: '/presupuestos' },
   { label: 'Facturación', icon: Receipt, path: '/facturacion' },
+  { label: 'Finanzas', icon: TrendingUp, path: '/finanzas' },
 ];
 
 export default function Sidebar() {
