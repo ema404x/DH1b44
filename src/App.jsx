@@ -15,6 +15,7 @@ import Inventory from '@/pages/Inventory';
 import Quotes from '@/pages/Quotes';
 import Invoices from '@/pages/Invoices';
 import Finanzas from '@/pages/Finanzas';
+import Presupuestos from '@/pages/Presupuestos';
 import Informes from '@/pages/Informes';
 
 const AuthenticatedApp = () => {
@@ -51,6 +52,7 @@ const AuthenticatedApp = () => {
         <Route path="/empleados" element={<Employees />} />
         <Route path="/inventario" element={<Inventory />} />
         <Route path="/presupuestos" element={<Quotes />} />
+        <Route path="/presupuestos-obra" element={<Presupuestos />} />
         <Route path="/facturacion" element={<Invoices />} />
         <Route path="/finanzas" element={<Finanzas />} />
         <Route path="/informes" element={<Informes />} />
