@@ -1,0 +1,48 @@
+{
+  "name": "Notification",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "error",
+        "success"
+      ],
+      "default": "info"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "ot",
+        "stock",
+        "pago",
+        "mantenimiento",
+        "vencimiento",
+        "sistema"
+      ],
+      "default": "sistema"
+    },
+    "read": {
+      "type": "boolean",
+      "default": false
+    },
+    "link_path": {
+      "type": "string"
+    },
+    "entity_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "message"
+  ]
+}

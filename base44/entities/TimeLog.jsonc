@@ -1,0 +1,43 @@
+{
+  "name": "TimeLog",
+  "type": "object",
+  "properties": {
+    "work_order_id": {
+      "type": "string"
+    },
+    "work_order_title": {
+      "type": "string"
+    },
+    "employee_id": {
+      "type": "string"
+    },
+    "employee_name": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "hours": {
+      "type": "number"
+    },
+    "description": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "extra",
+        "guardia"
+      ],
+      "default": "normal"
+    }
+  },
+  "required": [
+    "work_order_id",
+    "employee_name",
+    "date",
+    "hours"
+  ]
+}

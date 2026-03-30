@@ -3,22 +3,44 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  HardHat, TrendingUp, ClipboardCheck, Calculator
+  HardHat, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navItems = [
-  { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
-  { label: 'Proyectos', icon: FolderKanban, path: '/proyectos' },
-  { label: 'Órdenes de Trabajo', icon: ClipboardList, path: '/ordenes' },
-  { label: 'Clientes', icon: Users, path: '/clientes' },
-  { label: 'Empleados', icon: UserCog, path: '/empleados' },
-  { label: 'Inventario', icon: Package, path: '/inventario' },
-  { label: 'Presupuestos', icon: FileText, path: '/presupuestos' },
-  { label: 'Facturación', icon: Receipt, path: '/facturacion' },
-  { label: 'Finanzas', icon: TrendingUp, path: '/finanzas' },
-  { label: 'Presupuestos Obra', icon: Calculator, path: '/presupuestos-obra' },
-  { label: 'Informes', icon: ClipboardCheck, path: '/informes' },
+const navGroups = [
+  {
+    label: 'General',
+    items: [
+      { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
+      { label: 'Calendario', icon: CalendarDays, path: '/calendario' },
+    ]
+  },
+  {
+    label: 'Operaciones',
+    items: [
+      { label: 'Proyectos', icon: FolderKanban, path: '/proyectos' },
+      { label: 'Órdenes de Trabajo', icon: ClipboardList, path: '/ordenes' },
+      { label: 'Activos & Equipos', icon: Cpu, path: '/activos' },
+      { label: 'Informes', icon: ClipboardCheck, path: '/informes' },
+    ]
+  },
+  {
+    label: 'Comercial',
+    items: [
+      { label: 'Clientes', icon: Users, path: '/clientes' },
+      { label: 'Presupuestos', icon: FileText, path: '/presupuestos' },
+      { label: 'Presupuestos Obra', icon: Calculator, path: '/presupuestos-obra' },
+      { label: 'Facturación', icon: Receipt, path: '/facturacion' },
+      { label: 'Finanzas', icon: TrendingUp, path: '/finanzas' },
+    ]
+  },
+  {
+    label: 'Recursos',
+    items: [
+      { label: 'Empleados', icon: UserCog, path: '/empleados' },
+      { label: 'Inventario', icon: Package, path: '/inventario' },
+    ]
+  },
 ];
 
 export default function Sidebar() {
@@ -48,23 +70,34 @@ export default function Sidebar() {
         )}
       </div>
 
-      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            onClick={() => setMobileOpen(false)}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-              collapsed && "justify-center px-2",
-              isActive(item.path)
-                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+      <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-4">
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            {!collapsed && (
+              <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+                {group.label}
+              </div>
             )}
-          >
-            <item.icon className="h-[18px] w-[18px] flex-shrink-0" />
-            {!collapsed && <span>{item.label}</span>}
-          </Link>
+            <div className="space-y-0.5">
+              {group.items.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                    collapsed && "justify-center px-2",
+                    isActive(item.path)
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  )}
+                >
+                  <item.icon className="h-[17px] w-[17px] flex-shrink-0" />
+                  {!collapsed && <span>{item.label}</span>}
+                </Link>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 

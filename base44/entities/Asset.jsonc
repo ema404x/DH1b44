@@ -1,0 +1,102 @@
+{
+  "name": "Asset",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del activo/equipo"
+    },
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo interno"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "equipo_electrico",
+        "equipo_mecanico",
+        "instalacion_hvac",
+        "instalacion_sanitaria",
+        "estructura",
+        "vehiculo",
+        "herramienta",
+        "otro"
+      ],
+      "default": "equipo_mecanico"
+    },
+    "brand": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "serial_number": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "project_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "operativo",
+        "en_mantenimiento",
+        "fuera_de_servicio",
+        "baja"
+      ],
+      "default": "operativo"
+    },
+    "criticality": {
+      "type": "string",
+      "enum": [
+        "baja",
+        "media",
+        "alta",
+        "critica"
+      ],
+      "default": "media"
+    },
+    "purchase_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "warranty_expiry": {
+      "type": "string",
+      "format": "date"
+    },
+    "last_maintenance": {
+      "type": "string",
+      "format": "date"
+    },
+    "next_maintenance": {
+      "type": "string",
+      "format": "date"
+    },
+    "maintenance_frequency_days": {
+      "type": "number",
+      "default": 90
+    },
+    "purchase_cost": {
+      "type": "number"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "name",
+    "type"
+  ]
+}
