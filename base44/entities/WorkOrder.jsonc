@@ -1,0 +1,147 @@
+{
+  "name": "WorkOrder",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo de la orden de trabajo"
+    },
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo de la OT"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "project_name": {
+      "type": "string"
+    },
+    "asset_name": {
+      "type": "string",
+      "description": "Activo/equipo asociado"
+    },
+    "location": {
+      "type": "string",
+      "description": "Ubicaci\u00f3n del trabajo"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "mantenimiento_preventivo",
+        "mantenimiento_correctivo",
+        "instalacion",
+        "inspeccion",
+        "reparacion",
+        "emergencia"
+      ],
+      "default": "mantenimiento_correctivo"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pendiente",
+        "asignada",
+        "en_progreso",
+        "en_espera",
+        "completada",
+        "cancelada"
+      ],
+      "default": "pendiente"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "baja",
+        "media",
+        "alta",
+        "urgente"
+      ],
+      "default": "media"
+    },
+    "description": {
+      "type": "string"
+    },
+    "assigned_to": {
+      "type": "string"
+    },
+    "assigned_name": {
+      "type": "string"
+    },
+    "scheduled_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "completed_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "estimated_hours": {
+      "type": "number"
+    },
+    "actual_hours": {
+      "type": "number"
+    },
+    "checklist": {
+      "type": "array",
+      "description": "Lista de tareas de la OT",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean",
+            "default": false
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "photos": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "URLs de fotos adjuntas"
+    },
+    "signature_url": {
+      "type": "string",
+      "description": "URL de firma digital"
+    },
+    "signature_name": {
+      "type": "string",
+      "description": "Nombre de quien firm\u00f3"
+    },
+    "materials_used": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "material_name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit_cost": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "type",
+    "status"
+  ]
+}

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  HardHat, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu
+  Wrench, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu, Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -60,12 +60,12 @@ export default function Sidebar() {
         collapsed && "justify-center px-2"
       )}>
         <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-          <HardHat className="h-5 w-5 text-primary-foreground" />
+          <Zap className="h-5 w-5 text-primary-foreground" />
         </div>
         {!collapsed && (
           <div className="flex flex-col">
             <span className="text-lg font-bold text-white tracking-tight">DH1</span>
-            <span className="text-[10px] text-sidebar-foreground/60 uppercase tracking-widest">ERP Obras</span>
+            <span className="text-[10px] text-sidebar-foreground/60 uppercase tracking-widest">CMMS & Obras</span>
           </div>
         )}
       </div>
