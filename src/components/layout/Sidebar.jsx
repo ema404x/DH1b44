@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  Wrench, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu, Zap
+  Wrench, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu, Zap, BarChart2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,7 @@ const navGroups = [
       { label: 'Órdenes de Trabajo', icon: ClipboardList, path: '/ordenes' },
       { label: 'Activos & Equipos', icon: Cpu, path: '/activos' },
       { label: 'Informes', icon: ClipboardCheck, path: '/informes' },
+      { label: 'Reportes & KPIs', icon: BarChart2, path: '/reportes' },
     ]
   },
   {

@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { X, Save, Loader2, MapPin, User, Calendar, Clock, FileText } from 'lucide-react';
-import StatusBadge from '@/components/shared/StatusBadge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign } from 'lucide-react';
 import WorkOrderChecklist from './WorkOrderChecklist';
 import WorkOrderPhotos from './WorkOrderPhotos';
 import WorkOrderSignature from './WorkOrderSignature';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import WorkOrderMaterials from './WorkOrderMaterials';
+import WorkOrderTimeLogs from './WorkOrderTimeLogs';
+import WorkOrderCostSummary from './WorkOrderCostSummary';
 
 const priorityColors = {
   baja: 'bg-slate-100 text-slate-600',
@@ -29,6 +29,12 @@ export default function WorkOrderDetailPanel({ order, onClose }) {
   const [data, setData] = useState({ ...order });
   const queryClient = useQueryClient();
 
+  const { data: timeLogs = [] } = useQuery({
+    queryKey: ['timelogs', order.id],
+    queryFn: () => base44.entities.TimeLog.filter({ work_order_id: order.id }),
+    enabled: !!order.id,
+  });
+
   const saveMutation = useMutation({
     mutationFn: (d) => base44.entities.WorkOrder.update(order.id, d),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workorders'] }),
@@ -40,25 +46,25 @@ export default function WorkOrderDetailPanel({ order, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="flex-1 bg-black/40" onClick={onClose} />
-      <div className="w-full max-w-xl bg-card shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-2xl bg-card shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-border">
+        <div className="flex items-start justify-between p-5 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex-1 min-w-0 pr-4">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-xs font-mono text-muted-foreground">{data.code || 'OT'}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full ${priorityColors[data.priority]}`}>{data.priority}</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{typeLabels[data.type]}</span>
             </div>
             <h2 className="text-lg font-bold leading-tight">{data.title}</h2>
-            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
               {data.asset_name && <span className="flex items-center gap-1"><FileText className="h-3 w-3" />{data.asset_name}</span>}
               {data.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{data.location}</span>}
             </div>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1"><X className="h-5 w-5" /></button>
         </div>
 
-        {/* Quick status & fields */}
+        {/* Quick fields */}
         <div className="p-4 border-b border-border bg-muted/30">
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -67,7 +73,7 @@ export default function WorkOrderDetailPanel({ order, onClose }) {
                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {['pendiente','asignada','en_progreso','en_espera','completada','cancelada'].map(s => (
-                    <SelectItem key={s} value={s} className="text-xs capitalize">{s.replace('_',' ')}</SelectItem>
+                    <SelectItem key={s} value={s} className="text-xs capitalize">{s.replace(/_/g,' ')}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -83,60 +89,94 @@ export default function WorkOrderDetailPanel({ order, onClose }) {
           </div>
         </div>
 
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {data.description && (
-            <div>
-              <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Descripción</p>
-              <p className="text-sm text-foreground/80 leading-relaxed">{data.description}</p>
-            </div>
-          )}
+        {/* Tabs body */}
+        <div className="flex-1 overflow-y-auto">
+          <Tabs defaultValue="trabajo" className="h-full flex flex-col">
+            <TabsList className="mx-4 mt-3 flex-shrink-0 grid grid-cols-5 h-8">
+              <TabsTrigger value="trabajo" className="text-[10px] gap-1"><CheckSquare className="h-3 w-3" />Trabajo</TabsTrigger>
+              <TabsTrigger value="materiales" className="text-[10px] gap-1"><Package className="h-3 w-3" />Materiales</TabsTrigger>
+              <TabsTrigger value="horas" className="text-[10px] gap-1"><Clock className="h-3 w-3" />Horas</TabsTrigger>
+              <TabsTrigger value="media" className="text-[10px] gap-1"><Camera className="h-3 w-3" />Media</TabsTrigger>
+              <TabsTrigger value="costos" className="text-[10px] gap-1"><DollarSign className="h-3 w-3" />Costos</TabsTrigger>
+            </TabsList>
 
-          <WorkOrderChecklist
-            checklist={data.checklist || []}
-            onChange={val => set('checklist', val)}
-          />
-
-          <hr className="border-border" />
-
-          <WorkOrderPhotos
-            photos={data.photos || []}
-            onChange={val => set('photos', val)}
-          />
-
-          <hr className="border-border" />
-
-          <WorkOrderSignature
-            signatureUrl={data.signature_url}
-            signatureName={data.signature_name}
-            onChange={({ signatureUrl, signatureName }) => {
-              setData(prev => ({ ...prev, signature_url: signatureUrl, signature_name: signatureName }));
-            }}
-          />
-
-          <hr className="border-border" />
-
-          <div>
-            <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Horas</p>
-            <div className="grid grid-cols-2 gap-3">
+            {/* Trabajo */}
+            <TabsContent value="trabajo" className="flex-1 overflow-y-auto p-5 space-y-5 mt-0">
+              {data.description && (
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Descripción</p>
+                  <p className="text-sm text-foreground/80 leading-relaxed">{data.description}</p>
+                </div>
+              )}
+              <WorkOrderChecklist checklist={data.checklist || []} onChange={val => set('checklist', val)} />
+              <hr className="border-border" />
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Estimadas</p>
-                <Input type="number" value={data.estimated_hours || ''} onChange={e => set('estimated_hours', parseFloat(e.target.value))} className="text-sm" />
+                <p className="text-xs font-semibold uppercase text-muted-foreground mb-3">Tiempo Estimado</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Horas estimadas</p>
+                    <Input type="number" value={data.estimated_hours || ''} onChange={e => set('estimated_hours', parseFloat(e.target.value))} className="text-sm" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Horas reales</p>
+                    <Input type="number" value={data.actual_hours || ''} onChange={e => set('actual_hours', parseFloat(e.target.value))} className="text-sm" />
+                  </div>
+                </div>
               </div>
+              <hr className="border-border" />
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Reales</p>
-                <Input type="number" value={data.actual_hours || ''} onChange={e => set('actual_hours', parseFloat(e.target.value))} className="text-sm" />
+                <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Notas</p>
+                <textarea
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm min-h-[70px] resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Notas del trabajo..."
+                  value={data.notes || ''}
+                  onChange={e => set('notes', e.target.value)}
+                />
               </div>
-            </div>
-          </div>
+            </TabsContent>
+
+            {/* Materiales */}
+            <TabsContent value="materiales" className="flex-1 overflow-y-auto p-5 mt-0">
+              <WorkOrderMaterials materials={data.materials_used || []} onChange={val => set('materials_used', val)} />
+            </TabsContent>
+
+            {/* Horas */}
+            <TabsContent value="horas" className="flex-1 overflow-y-auto p-5 mt-0">
+              <WorkOrderTimeLogs workOrderId={order.id} workOrderTitle={order.title} />
+            </TabsContent>
+
+            {/* Media */}
+            <TabsContent value="media" className="flex-1 overflow-y-auto p-5 space-y-5 mt-0">
+              <WorkOrderPhotos photos={data.photos || []} onChange={val => set('photos', val)} />
+              <hr className="border-border" />
+              <WorkOrderSignature
+                signatureUrl={data.signature_url}
+                signatureName={data.signature_name}
+                onChange={({ signatureUrl, signatureName }) => {
+                  setData(prev => ({ ...prev, signature_url: signatureUrl, signature_name: signatureName }));
+                }}
+              />
+            </TabsContent>
+
+            {/* Costos */}
+            <TabsContent value="costos" className="flex-1 overflow-y-auto p-5 mt-0">
+              <WorkOrderCostSummary
+                materials={data.materials_used || []}
+                timeLogs={timeLogs}
+                estimatedHours={data.estimated_hours}
+                actualHours={data.actual_hours}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border">
-          <Button className="w-full gap-2" onClick={save} disabled={saveMutation.isPending}>
+        <div className="p-4 border-t border-border flex gap-2">
+          <Button className="flex-1 gap-2" onClick={save} disabled={saveMutation.isPending}>
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Guardar Cambios
           </Button>
+          <Button variant="outline" onClick={onClose}>Cerrar</Button>
         </div>
       </div>
     </div>

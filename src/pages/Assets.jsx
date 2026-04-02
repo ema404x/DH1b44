@@ -7,13 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Search, Plus, Wrench, AlertTriangle, CheckCircle2, Clock, Pencil, Trash2, Cpu, Zap, Wind, Droplets, Car, Hammer, Building, ChevronRight } from 'lucide-react';
-import { format, differenceInDays, isPast, addDays } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Search, Plus, Wrench, Clock, Pencil, Trash2, Cpu, Zap, Wind, Droplets, Car, Hammer, Building, History } from 'lucide-react';
+import { differenceInDays, isPast } from 'date-fns';
 import PageHeader from '@/components/shared/PageHeader';
+import AssetHistory from '@/components/assets/AssetHistory';
 
 const typeLabels = { equipo_electrico:'Eléctrico', equipo_mecanico:'Mecánico', instalacion_hvac:'HVAC', instalacion_sanitaria:'Sanitario', estructura:'Estructura', vehiculo:'Vehículo', herramienta:'Herramienta', otro:'Otro' };
 const typeIcons = { equipo_electrico: Zap, equipo_mecanico: Wrench, instalacion_hvac: Wind, instalacion_sanitaria: Droplets, estructura: Building, vehiculo: Car, herramienta: Hammer, otro: Cpu };
@@ -170,55 +171,73 @@ export default function Assets() {
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editing ? 'Editar Activo' : 'Nuevo Activo'}</DialogTitle></DialogHeader>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 grid grid-cols-3 gap-3">
-              <div className="col-span-2 space-y-1.5"><Label className="text-xs">Nombre *</Label><Input value={form.name} onChange={e => set('name', e.target.value)} /></div>
-              <div className="space-y-1.5"><Label className="text-xs">Código</Label><Input value={form.code} onChange={e => set('code', e.target.value)} /></div>
-            </div>
-            <div className="space-y-1.5"><Label className="text-xs">Tipo</Label>
-              <Select value={form.type} onValueChange={v => set('type', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{Object.entries(typeLabels).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5"><Label className="text-xs">Estado</Label>
-              <Select value={form.status} onValueChange={v => set('status', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="operativo">Operativo</SelectItem>
-                  <SelectItem value="en_mantenimiento">En Mantenimiento</SelectItem>
-                  <SelectItem value="fuera_de_servicio">Fuera de Servicio</SelectItem>
-                  <SelectItem value="baja">Baja</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5"><Label className="text-xs">Marca</Label><Input value={form.brand} onChange={e => set('brand', e.target.value)} /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Modelo</Label><Input value={form.model} onChange={e => set('model', e.target.value)} /></div>
-            <div className="space-y-1.5"><Label className="text-xs">N° Serie</Label><Input value={form.serial_number} onChange={e => set('serial_number', e.target.value)} /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Criticidad</Label>
-              <Select value={form.criticality} onValueChange={v => set('criticality', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="baja">Baja</SelectItem><SelectItem value="media">Media</SelectItem>
-                  <SelectItem value="alta">Alta</SelectItem><SelectItem value="critica">Crítica</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-2 space-y-1.5"><Label className="text-xs">Ubicación</Label><Input value={form.location} onChange={e => set('location', e.target.value)} /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Último Mantenimiento</Label><Input type="date" value={form.last_maintenance || ''} onChange={e => set('last_maintenance', e.target.value)} /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Próximo Mantenimiento</Label><Input type="date" value={form.next_maintenance || ''} onChange={e => set('next_maintenance', e.target.value)} /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Frecuencia (días)</Label><Input type="number" value={form.maintenance_frequency_days} onChange={e => set('maintenance_frequency_days', parseInt(e.target.value) || 90)} /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Costo de Adquisición</Label><Input type="number" value={form.purchase_cost} onChange={e => set('purchase_cost', parseFloat(e.target.value) || 0)} /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Fecha Compra</Label><Input type="date" value={form.purchase_date || ''} onChange={e => set('purchase_date', e.target.value)} /></div>
-            <div className="space-y-1.5"><Label className="text-xs">Garantía hasta</Label><Input type="date" value={form.warranty_expiry || ''} onChange={e => set('warranty_expiry', e.target.value)} /></div>
-            <div className="col-span-2 space-y-1.5"><Label className="text-xs">Notas</Label><Textarea rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} /></div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending}>Guardar</Button>
-          </DialogFooter>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{editing ? `${editing.name}` : 'Nuevo Activo'}</DialogTitle>
+          </DialogHeader>
+
+          <Tabs defaultValue="datos" className="flex-1 overflow-hidden flex flex-col">
+            <TabsList className="flex-shrink-0">
+              <TabsTrigger value="datos">Datos del Activo</TabsTrigger>
+              {editing && <TabsTrigger value="historial" className="gap-1.5"><History className="h-3.5 w-3.5" />Historial OTs</TabsTrigger>}
+            </TabsList>
+
+            <TabsContent value="datos" className="flex-1 overflow-y-auto mt-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 grid grid-cols-3 gap-3">
+                  <div className="col-span-2 space-y-1.5"><Label className="text-xs">Nombre *</Label><Input value={form.name} onChange={e => set('name', e.target.value)} /></div>
+                  <div className="space-y-1.5"><Label className="text-xs">Código</Label><Input value={form.code} onChange={e => set('code', e.target.value)} /></div>
+                </div>
+                <div className="space-y-1.5"><Label className="text-xs">Tipo</Label>
+                  <Select value={form.type} onValueChange={v => set('type', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{Object.entries(typeLabels).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5"><Label className="text-xs">Estado</Label>
+                  <Select value={form.status} onValueChange={v => set('status', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="operativo">Operativo</SelectItem>
+                      <SelectItem value="en_mantenimiento">En Mantenimiento</SelectItem>
+                      <SelectItem value="fuera_de_servicio">Fuera de Servicio</SelectItem>
+                      <SelectItem value="baja">Baja</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5"><Label className="text-xs">Marca</Label><Input value={form.brand} onChange={e => set('brand', e.target.value)} /></div>
+                <div className="space-y-1.5"><Label className="text-xs">Modelo</Label><Input value={form.model} onChange={e => set('model', e.target.value)} /></div>
+                <div className="space-y-1.5"><Label className="text-xs">N° Serie</Label><Input value={form.serial_number} onChange={e => set('serial_number', e.target.value)} /></div>
+                <div className="space-y-1.5"><Label className="text-xs">Criticidad</Label>
+                  <Select value={form.criticality} onValueChange={v => set('criticality', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="baja">Baja</SelectItem><SelectItem value="media">Media</SelectItem>
+                      <SelectItem value="alta">Alta</SelectItem><SelectItem value="critica">Crítica</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2 space-y-1.5"><Label className="text-xs">Ubicación</Label><Input value={form.location} onChange={e => set('location', e.target.value)} /></div>
+                <div className="space-y-1.5"><Label className="text-xs">Último Mantenimiento</Label><Input type="date" value={form.last_maintenance || ''} onChange={e => set('last_maintenance', e.target.value)} /></div>
+                <div className="space-y-1.5"><Label className="text-xs">Próximo Mantenimiento</Label><Input type="date" value={form.next_maintenance || ''} onChange={e => set('next_maintenance', e.target.value)} /></div>
+                <div className="space-y-1.5"><Label className="text-xs">Frecuencia (días)</Label><Input type="number" value={form.maintenance_frequency_days} onChange={e => set('maintenance_frequency_days', parseInt(e.target.value) || 90)} /></div>
+                <div className="space-y-1.5"><Label className="text-xs">Costo de Adquisición</Label><Input type="number" value={form.purchase_cost} onChange={e => set('purchase_cost', parseFloat(e.target.value) || 0)} /></div>
+                <div className="space-y-1.5"><Label className="text-xs">Fecha Compra</Label><Input type="date" value={form.purchase_date || ''} onChange={e => set('purchase_date', e.target.value)} /></div>
+                <div className="space-y-1.5"><Label className="text-xs">Garantía hasta</Label><Input type="date" value={form.warranty_expiry || ''} onChange={e => set('warranty_expiry', e.target.value)} /></div>
+                <div className="col-span-2 space-y-1.5"><Label className="text-xs">Notas</Label><Textarea rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} /></div>
+              </div>
+              <div className="flex gap-2 mt-4 pb-2">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+                <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending}>Guardar</Button>
+              </div>
+            </TabsContent>
+
+            {editing && (
+              <TabsContent value="historial" className="flex-1 overflow-y-auto mt-3 px-1">
+                <AssetHistory assetName={editing.name} />
+              </TabsContent>
+            )}
+          </Tabs>
         </DialogContent>
       </Dialog>
     </div>
