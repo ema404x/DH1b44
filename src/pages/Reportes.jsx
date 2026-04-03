@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { BarChart2, TrendingUp, Clock, Package, Wrench, CheckCircle2, AlertTriangle, Download, Filter } from 'lucide-react';
+import { BarChart2, TrendingUp, Clock, Package, Wrench, CheckCircle2, AlertTriangle, Download, Filter, FileText } from 'lucide-react';
+import { exportKPIsPDF } from '@/utils/exportPDF';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 import PageHeader from '@/components/shared/PageHeader';
@@ -172,7 +173,10 @@ export default function Reportes() {
               </Select>
             </div>
             <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={exportCSV}>
-              <Download className="h-3.5 w-3.5" /> Exportar CSV
+              <Download className="h-3.5 w-3.5" /> CSV
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs border-red-300 text-red-700 hover:bg-red-50" onClick={() => exportKPIsPDF({ orders: filteredOrders, timeLogs, materials, assets, dateFrom, dateTo })}>
+              <FileText className="h-3.5 w-3.5" /> PDF KPIs
             </Button>
           </div>
         </CardContent>

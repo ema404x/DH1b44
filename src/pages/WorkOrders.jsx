@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Search, Plus, ClipboardList, User, Calendar, MapPin,
-  AlertTriangle, CheckCircle2, Clock, Zap, Wrench, Eye, Trash2
+  AlertTriangle, CheckCircle2, Clock, Zap, Wrench, Eye, Trash2, FileText
 } from 'lucide-react';
+import { exportOTsPDF } from '@/utils/exportPDF';
 import { format, isPast, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import EmptyState from '@/components/shared/EmptyState';
@@ -250,9 +251,14 @@ export default function WorkOrders() {
           <h1 className="text-2xl font-bold tracking-tight">Órdenes de Trabajo</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{orders.length} órdenes en total</p>
         </div>
-        <Button className="gap-2 shadow-sm" onClick={() => setNewDialogOpen(true)}>
-          <Plus className="h-4 w-4" /> Nueva OT
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5 border-red-300 text-red-700 hover:bg-red-50" onClick={() => exportOTsPDF(filtered, null, null)}>
+            <FileText className="h-3.5 w-3.5" /> PDF
+          </Button>
+          <Button className="gap-2 shadow-sm" onClick={() => setNewDialogOpen(true)}>
+            <Plus className="h-4 w-4" /> Nueva OT
+          </Button>
+        </div>
       </div>
 
       {/* Stats row */}

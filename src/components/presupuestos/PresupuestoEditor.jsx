@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import RubroSection from '@/components/presupuestos/RubroSection';
 import PresupuestoResumen from '@/components/presupuestos/PresupuestoResumen';
 import { generatePresupuestoPDF } from '@/components/presupuestos/presupuestoPDF';
+import { exportPresupuestoExcel } from '@/utils/exportExcel';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -125,7 +126,10 @@ export default function PresupuestoEditor({ presupuesto, precario, onSave, onCan
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => generatePresupuestoPDF(form)}>
-            <Download className="h-3.5 w-3.5 mr-1" /> Exportar PDF
+            <Download className="h-3.5 w-3.5 mr-1" /> PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportPresupuestoExcel(form)} className="border-emerald-400 text-emerald-700 hover:bg-emerald-50">
+            <Download className="h-3.5 w-3.5 mr-1" /> Excel Ministerio
           </Button>
           {form.estado === 'aprobado' && !form.factura_id && (
             <Button variant="outline" size="sm" className="border-emerald-500 text-emerald-700 hover:bg-emerald-50" onClick={handleGenerateInvoice}>

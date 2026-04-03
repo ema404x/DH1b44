@@ -23,6 +23,7 @@ const navGroups = [
       { label: 'Activos & Equipos', icon: Cpu, path: '/activos' },
       { label: 'Informes', icon: ClipboardCheck, path: '/informes' },
       { label: 'Reportes & KPIs', icon: BarChart2, path: '/reportes' },
+      { label: 'Automatizaciones', icon: Zap, path: '/automatizaciones' },
     ]
   },
   {

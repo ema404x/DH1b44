@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Search, FolderKanban, MapPin, Calendar, Trash2, Pencil } from 'lucide-react';
+import { Search, FolderKanban, MapPin, Calendar, Trash2, Pencil, FileText } from 'lucide-react';
+import { exportProyectosPDF } from '@/utils/exportPDF';
 import { format } from 'date-fns';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -66,7 +67,12 @@ export default function Projects() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Proyectos" subtitle="Gestión de obras y proyectos" actionLabel="Nuevo Proyecto" onAction={() => { setEditing(null); setDialogOpen(true); }} />
+      <div className="flex items-center justify-between mb-0">
+        <PageHeader title="Proyectos" subtitle="Gestión de obras y proyectos" actionLabel="Nuevo Proyecto" onAction={() => { setEditing(null); setDialogOpen(true); }} />
+        <Button variant="outline" size="sm" className="gap-1.5 border-red-300 text-red-700 hover:bg-red-50 -mt-8 mr-1 hidden sm:flex" onClick={() => exportProyectosPDF(filtered)}>
+          <FileText className="h-3.5 w-3.5" /> PDF
+        </Button>
+      </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
