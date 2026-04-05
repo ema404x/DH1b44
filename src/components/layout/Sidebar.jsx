@@ -57,17 +57,28 @@ export default function Sidebar() {
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
+      {/* Logo */}
       <div className={cn(
-        "flex items-center gap-3 px-4 py-5 border-b border-sidebar-border",
+        "flex items-center gap-3 px-4 py-5 border-b border-white/10",
         collapsed && "justify-center px-2"
       )}>
-        <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-          <Zap className="h-5 w-5 text-primary-foreground" />
+        {/* DH1 Logo: azul + amarillo minimalista */}
+        <div className="flex-shrink-0 flex items-center justify-center h-9 w-9">
+          <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-9 w-9">
+            {/* Fondo redondeado azul */}
+            <rect width="36" height="36" rx="8" fill="#1A56DB"/>
+            {/* Letra D - azul más claro */}
+            <path d="M7 10h5c3.866 0 7 2.91 7 6.5S15.866 23 12 23H7V10z" fill="#60A5FA"/>
+            {/* Letra H */}
+            <path d="M20 10h2.5v5h4V10H29v13h-2.5v-5.5h-4V23H20V10z" fill="white"/>
+            {/* Acento amarillo "1" */}
+            <rect x="30" y="10" width="3" height="13" rx="1.5" fill="#FBBF24"/>
+          </svg>
         </div>
         {!collapsed && (
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-white tracking-tight">DH1</span>
-            <span className="text-[10px] text-sidebar-foreground/60 uppercase tracking-widest">CMMS & Obras</span>
+            <span className="text-base font-bold text-white tracking-tight leading-tight">DH1</span>
+            <span className="text-[10px] text-white/50 uppercase tracking-widest">CMMS & Obras</span>
           </div>
         )}
       </div>
@@ -128,7 +139,7 @@ export default function Sidebar() {
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-64 bg-sidebar-background">
+          <div className="absolute left-0 top-0 bottom-0 w-64" style={{ background: 'linear-gradient(180deg, #0f1c2e 0%, #132038 60%, #0d1a2b 100%)' }}>
             <button
               onClick={() => setMobileOpen(false)}
               className="absolute top-4 right-4 text-sidebar-foreground/60 hover:text-white"
@@ -142,9 +153,9 @@ export default function Sidebar() {
 
       {/* Desktop sidebar */}
       <aside className={cn(
-        "hidden lg:flex flex-col bg-sidebar-background border-r border-sidebar-border transition-all duration-300 flex-shrink-0",
+        "hidden lg:flex flex-col border-r border-white/10 transition-all duration-300 flex-shrink-0",
         collapsed ? "w-[68px]" : "w-60"
-      )}>
+      )} style={{ background: 'linear-gradient(180deg, #0f1c2e 0%, #132038 60%, #0d1a2b 100%)' }}>
         {sidebarContent}
       </aside>
     </>
