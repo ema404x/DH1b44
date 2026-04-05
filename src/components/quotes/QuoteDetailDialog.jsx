@@ -5,8 +5,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Save, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Save, Loader2, Download, FileSpreadsheet } from 'lucide-react';
 import StatusBadge from '@/components/shared/StatusBadge';
+import { exportQuotePDF, exportQuoteExcel } from '@/utils/exportQuote';
 
 export default function QuoteDetailDialog({ quote, onClose }) {
   const [items, setItems] = useState([]);
@@ -118,7 +119,15 @@ export default function QuoteDetailDialog({ quote, onClose }) {
             </div>
           </div>
 
-          <div className="flex justify-end pt-4">
+          <div className="flex items-center justify-between pt-4">
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => exportQuotePDF({ ...quote, items, tax_rate: taxRate })} className="gap-1.5">
+                <Download className="h-3.5 w-3.5" /> PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportQuoteExcel({ ...quote, items, tax_rate: taxRate })} className="gap-1.5 border-emerald-400 text-emerald-700 hover:bg-emerald-50">
+                <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+              </Button>
+            </div>
             <Button onClick={handleSave} disabled={updateMutation.isPending} className="gap-2">
               {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Guardar Presupuesto
