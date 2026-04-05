@@ -5,6 +5,29 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import React from 'react';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+          <div className="max-w-md w-full text-center space-y-4">
+            <div className="text-5xl">⚠️</div>
+            <h1 className="text-xl font-bold text-foreground">Ocurrió un error</h1>
+            <p className="text-sm text-muted-foreground">{this.state.error?.message || 'Error inesperado'}</p>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium">
+              Recargar página
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import AppLayout from '@/components/layout/AppLayout';
 import Dashboard from '@/pages/Dashboard';
 import Projects from '@/pages/Projects';
@@ -73,14 +96,16 @@ const AuthenticatedApp = () => {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClientInstance}>
-      <Router>
-        <AuthProvider>
-          <AuthenticatedApp />
-          <Toaster />
-        </AuthProvider>
-      </Router>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClientInstance}>
+        <Router>
+          <AuthProvider>
+            <AuthenticatedApp />
+            <Toaster />
+          </AuthProvider>
+        </Router>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
