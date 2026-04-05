@@ -2,21 +2,23 @@ import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-// ── Brand colors ─────────────────────────────────────────────────────────────
+// ── Brand colors Mejores (gris + rojo) ───────────────────────────────────────
 const C = {
-  navy:    [10, 24, 52],        // #0A1834 - dark navy header
-  navyMid: [18, 42, 90],        // mid navy
-  blue:    [37, 99, 235],       // primary blue
-  blueLt:  [219, 234, 254],     // light blue tint
-  accent:  [16, 185, 129],      // emerald accent
-  gold:    [245, 158, 11],      // gold/amber
+  dark:    [60,  60,  60],      // gris oscuro (texto principal, logo)
+  navyMid: [60,  60,  60],      // alias → dark
+  navy:    [60,  60,  60],      // alias → dark
+  red:     [192, 57,  43],      // rojo Mejores
+  blue:    [192, 57,  43],      // alias → red
+  accent:  [90,  90,  90],      // gris medio
+  blueLt:  [245, 235, 233],     // rojo muy claro
+  gold:    [192, 57,  43],      // alias → red
   white:   [255, 255, 255],
-  offWht:  [248, 250, 252],
-  gray1:   [30,  40,  60],      // dark text
-  gray2:   [80,  90, 110],      // medium text
-  gray3:   [140, 150, 170],     // muted text
-  gray4:   [220, 225, 235],     // lines/borders
-  rowAlt:  [247, 249, 253],     // alternate row
+  offWht:  [250, 250, 250],
+  gray1:   [50,  50,  50],      // texto oscuro
+  gray2:   [100, 100, 100],     // texto medio
+  gray3:   [160, 160, 160],     // texto muted
+  gray4:   [220, 220, 220],     // líneas/bordes
+  rowAlt:  [247, 247, 247],     // fila alternada
 };
 
 const fmt = (n) =>
@@ -39,38 +41,33 @@ const COL = PAGE_W - MARGIN * 2;
 
 // ── HEADER COVER ──────────────────────────────────────────────────────────────
 function drawHeader(doc, form) {
-  // Background band
-  fill(doc, C.navy); doc.rect(0, 0, PAGE_W, 50, 'F');
+  // ── Fondo blanco con línea roja inferior
+  fill(doc, C.white); doc.rect(0, 0, PAGE_W, 52, 'F');
+  fill(doc, C.red); doc.rect(0, 49, PAGE_W, 3, 'F');
 
-  // Decorative stripe (accent)
-  fill(doc, C.blue); doc.rect(0, 48, PAGE_W, 2, 'F');
-  fill(doc, C.accent); doc.rect(0, 50, PAGE_W, 1, 'F');
+  // ── Logo vectorial Mejores (rectangulos gris+rojo)
+  const lx = MARGIN, ly = 8;
+  fill(doc, C.accent); doc.rect(lx, ly, 5, 10, 'F');          // bloque izquierdo gris
+  fill(doc, C.red);    doc.rect(lx + 6, ly, 9, 4.5, 'F');     // bloque derecho arriba rojo
+  fill(doc, C.accent); doc.rect(lx + 6, ly + 5.5, 9, 4.5, 'F'); // bloque derecho abajo gris
+  fill(doc, C.red);    doc.circle(lx + 24, ly + 1, 1, 'F');   // punto rojo acento
 
-  // ── Logo / brand left side
-  // Circle logo mark
-  fill(doc, C.blue);
-  doc.circle(MARGIN + 7, 17, 7, 'F');
-  fill(doc, C.accent);
-  doc.circle(MARGIN + 7, 17, 4, 'F');
-  fill(doc, C.white);
-  doc.circle(MARGIN + 7, 17, 1.5, 'F');
-
-  // Company name
-  bold(doc); doc.setFontSize(18); rgb(doc, C.white);
-  doc.text('MEJORES', MARGIN + 17, 16);
+  bold(doc); doc.setFontSize(20); rgb(doc, C.dark);
+  doc.text('Mejores', lx + 17, ly + 9);
   normal(doc); doc.setFontSize(7); rgb(doc, C.gray3);
-  doc.text('Mantenimiento y Construcción Escolar', MARGIN + 17, 21);
-  doc.text('info@mejores.com.ar  ·  +54 (11) 4000-0000', MARGIN + 17, 26);
+  doc.text('en mantenimiento, obras y servicios', lx + 17, ly + 13.5);
+  doc.setFontSize(6.5);
+  doc.text('info@mejores.com.ar  ·  +54 (11) 4000-0000', lx + 17, ly + 17.5);
 
   // Divider (vertical)
-  draw(doc, C.gray3); doc.setLineWidth(0.3);
-  doc.line(PAGE_W / 2, 8, PAGE_W / 2, 43);
+  draw(doc, C.gray4); doc.setLineWidth(0.3);
+  doc.line(PAGE_W / 2, 6, PAGE_W / 2, 46);
 
   // ── Document info right side
-  bold(doc); doc.setFontSize(14); rgb(doc, C.white);
+  bold(doc); doc.setFontSize(14); rgb(doc, C.dark);
   doc.text('PRESUPUESTO DE OBRA', PAGE_W - MARGIN, 16, { align: 'right' });
 
-  const estadoColor = { borrador: C.gray3, enviado: C.blue, aprobado: C.accent, rechazado: [220,38,38], facturado: C.gold };
+  const estadoColor = { borrador: C.gray3, enviado: C.accent, aprobado: [60,140,60], rechazado: C.red, facturado: C.dark };
   const estadoLabels = { borrador:'BORRADOR', enviado:'ENVIADO', aprobado:'APROBADO', rechazado:'RECHAZADO', facturado:'FACTURADO' };
   const stColor = estadoColor[form.estado] || C.gray3;
 
@@ -79,7 +76,7 @@ function drawHeader(doc, form) {
   bold(doc); doc.setFontSize(7); rgb(doc, C.white);
   doc.text(estadoLabels[form.estado] || (form.estado || '').toUpperCase(), PAGE_W - MARGIN - 18, 25.5, { align: 'center' });
 
-  normal(doc); doc.setFontSize(7.5); rgb(doc, C.gray4);
+  normal(doc); doc.setFontSize(7.5); rgb(doc, C.gray2);
   doc.text(`Código:  ${form.codigo || '—'}`, PAGE_W - MARGIN, 31.5, { align: 'right' });
   doc.text(`Emisión: ${fmtDate(form.fecha_emision)}`, PAGE_W - MARGIN, 37, { align: 'right' });
   doc.text(`Validez: ${fmtDate(form.fecha_validez)}`, PAGE_W - MARGIN, 42, { align: 'right' });
@@ -223,11 +220,11 @@ function drawResumen(doc, form, rubros, y) {
 
   // TOTAL bar
   y += 2;
-  fill(doc, C.navy); doc.rect(bx, y, bw, 11, 'F');
-  fill(doc, C.accent); doc.rect(bx, y, 3, 11, 'F');
+  fill(doc, C.dark); doc.rect(bx, y, bw, 11, 'F');
+  fill(doc, C.red); doc.rect(bx, y, 3, 11, 'F');
   bold(doc); doc.setFontSize(8.5); rgb(doc, C.white);
   doc.text('TOTAL', bx + 6, y + 7);
-  doc.setFontSize(11); rgb(doc, C.gold);
+  doc.setFontSize(11); rgb(doc, C.white);
   doc.text(fmt(total), PAGE_W - MARGIN - 1, y + 7, { align: 'right' });
 
   return y + 16;
@@ -281,15 +278,12 @@ function drawFooters(doc, form) {
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
-    fill(doc, C.navy); doc.rect(0, 287, PAGE_W, 10, 'F');
-    normal(doc); doc.setFontSize(6.5); rgb(doc, C.gray3);
-    doc.text('MEJORES — Mantenimiento y Construcción Escolar  ·  info@mejores.com.ar', MARGIN, 293);
-    rgb(doc, C.gray3);
+    fill(doc, C.red); doc.rect(0, 287, PAGE_W, 10, 'F');
+    normal(doc); doc.setFontSize(6.5); rgb(doc, C.white);
+    doc.text('MEJORES — en mantenimiento, obras y servicios  ·  info@mejores.com.ar', MARGIN, 293);
     doc.text(`${form.codigo || 'PRESUPUESTO'}  ·  Pág. ${i} / ${pages}`, PAGE_W - MARGIN, 293, { align: 'right' });
-    // Top accent bar on continuation pages
     if (i > 1) {
-      fill(doc, C.navy); doc.rect(0, 0, PAGE_W, 6, 'F');
-      fill(doc, C.blue); doc.rect(0, 6, PAGE_W, 1, 'F');
+      fill(doc, C.red); doc.rect(0, 0, PAGE_W, 3, 'F');
     }
   }
 }

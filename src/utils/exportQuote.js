@@ -12,19 +12,22 @@ const fmtDate = (d) => {
   try { return d ? format(new Date(d), 'dd/MM/yyyy', { locale: es }) : '—'; } catch { return d || '—'; }
 };
 
+// Paleta Mejores: gris oscuro + rojo + blanco
 const C = {
-  navy:   [10, 24, 52],
-  blue:   [37, 99, 235],
-  blueLt: [219, 234, 254],
-  accent: [16, 185, 129],
-  gold:   [245, 158, 11],
+  dark:   [60, 60, 60],
+  red:    [192, 57, 43],
   white:  [255, 255, 255],
-  offWht: [248, 250, 252],
-  gray1:  [30, 40, 60],
-  gray2:  [80, 90, 110],
-  gray3:  [140, 150, 170],
-  gray4:  [220, 225, 235],
-  rowAlt: [247, 249, 253],
+  offWht: [250, 250, 250],
+  gray1:  [50, 50, 50],
+  gray2:  [100, 100, 100],
+  gray3:  [160, 160, 160],
+  gray4:  [220, 220, 220],
+  rowAlt: [247, 247, 247],
+  // aliases
+  get navy() { return this.dark; },
+  get blue() { return this.red; },
+  get accent() { return [90,90,90]; },
+  get gold() { return this.red; },
 };
 
 // ── PDF ───────────────────────────────────────────────────────────────────────
@@ -33,34 +36,40 @@ export function exportQuotePDF(quote) {
   const W = 210, M = 14, COL = W - M * 2;
   let y = 0;
 
-  // ── Header
-  doc.setFillColor(...C.navy); doc.rect(0, 0, W, 50, 'F');
-  doc.setFillColor(...C.blue); doc.rect(0, 48, W, 2, 'F');
-  doc.setFillColor(...C.accent); doc.rect(0, 50, W, 1, 'F');
+  // ── Header: fondo blanco con línea roja inferior
+  doc.setFillColor(...C.white); doc.rect(0, 0, W, 52, 'F');
+  doc.setFillColor(...C.red); doc.rect(0, 49, W, 3, 'F');
 
-  // Logo mark
-  doc.setFillColor(...C.blue); doc.circle(M + 7, 17, 7, 'F');
-  doc.setFillColor(...C.accent); doc.circle(M + 7, 17, 4, 'F');
-  doc.setFillColor(...C.white); doc.circle(M + 7, 17, 1.5, 'F');
+  // ── Logo vectorial Mejores
+  const lx = M, ly = 8;
+  doc.setFillColor(90,90,90); doc.rect(lx, ly, 5, 10, 'F');          // gris grande izq
+  doc.setFillColor(...C.red);  doc.rect(lx+6, ly, 9, 4.5, 'F');      // rojo arriba der
+  doc.setFillColor(90,90,90);  doc.rect(lx+6, ly+5.5, 9, 4.5, 'F'); // gris abajo der
+  doc.setFillColor(...C.red);  doc.circle(lx+24, ly+1, 1, 'F');      // punto rojo
 
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(...C.white);
-  doc.text('MEJORES', M + 17, 16);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(...C.dark);
+  doc.text('Mejores', lx + 17, ly + 9);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...C.gray3);
-  doc.text('Mantenimiento y Construcción Escolar', M + 17, 21);
-  doc.text('info@mejores.com.ar  ·  +54 (11) 4000-0000', M + 17, 26);
+  doc.text('en mantenimiento, obras y servicios', lx + 17, ly + 13.5);
+  doc.setFontSize(6.5);
+  doc.text('info@mejores.com.ar  ·  +54 (11) 4000-0000', lx + 17, ly + 17.5);
+
+  // Divisor vertical
+  doc.setDrawColor(...C.gray4); doc.setLineWidth(0.3);
+  doc.line(W/2, 6, W/2, 46);
 
   // Right info
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(...C.white);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(...C.dark);
   doc.text('PRESUPUESTO', W - M, 16, { align: 'right' });
 
-  const estadoColor = { borrador: C.gray3, enviado: C.blue, aprobado: C.accent, rechazado: [220,38,38], vencido: C.gold };
+  const estadoColor = { borrador: C.gray3, enviado: [90,90,90], aprobado: [60,140,60], rechazado: C.red, vencido: [140,100,0] };
   const stColor = estadoColor[quote.status] || C.gray3;
   doc.setFillColor(...stColor);
   doc.roundedRect(W - M - 30, 21, 30, 6.5, 1, 1, 'F');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...C.white);
   doc.text((quote.status || '').toUpperCase(), W - M - 15, 25.5, { align: 'center' });
 
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...C.gray4);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...C.gray2);
   doc.text(`Código: ${quote.code || '—'}`, W - M, 32, { align: 'right' });
   doc.text(`Emisión: ${fmtDate(new Date())}`, W - M, 37, { align: 'right' });
   doc.text(`Válido hasta: ${fmtDate(quote.valid_until)}`, W - M, 42, { align: 'right' });
@@ -68,9 +77,9 @@ export function exportQuotePDF(quote) {
   y = 58;
 
   // ── Client info
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...C.blue);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...C.red);
   doc.text('DATOS DEL PRESUPUESTO', M, y);
-  doc.setDrawColor(...C.blue); doc.setLineWidth(0.5);
+  doc.setDrawColor(...C.red); doc.setLineWidth(0.5);
   doc.line(M, y + 1.5, M + 60, y + 1.5);
   y += 5;
 
@@ -90,7 +99,7 @@ export function exportQuotePDF(quote) {
   y += 4;
 
   // ── Items table header
-  doc.setFillColor(18, 42, 90); doc.rect(M, y, COL, 6.5, 'F');
+  doc.setFillColor(...C.dark); doc.rect(M, y, COL, 6.5, 'F');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...C.white);
   doc.text('DESCRIPCIÓN', M + 2, y + 4.2);
   doc.text('CANT.', M + 118, y + 4.2, { align: 'right' });
@@ -135,7 +144,7 @@ export function exportQuotePDF(quote) {
   const total = subtotal + iva;
 
   const bx = M + 80, bw = COL - 80;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...C.navy);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...C.dark);
   doc.text('RESUMEN', bx, y);
   y += 5;
 
@@ -150,18 +159,18 @@ export function exportQuotePDF(quote) {
   });
 
   y += 2;
-  doc.setFillColor(...C.navy); doc.rect(bx, y, bw, 11, 'F');
-  doc.setFillColor(...C.accent); doc.rect(bx, y, 3, 11, 'F');
+  doc.setFillColor(...C.dark); doc.rect(bx, y, bw, 11, 'F');
+  doc.setFillColor(...C.red); doc.rect(bx, y, 3, 11, 'F');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...C.white);
   doc.text('TOTAL', bx + 6, y + 7);
-  doc.setFontSize(11); doc.setTextColor(...C.gold);
+  doc.setFontSize(11); doc.setTextColor(...C.white);
   doc.text(fmt(total), W - M - 1, y + 7, { align: 'right' });
   y += 16;
 
   // Notes
   if (quote.notes) {
     if (y + 20 > 275) { doc.addPage(); y = 14; }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...C.blue);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...C.red);
     doc.text('NOTAS Y CONDICIONES', M, y);
     y += 4;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...C.gray2);
@@ -174,10 +183,11 @@ export function exportQuotePDF(quote) {
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
-    doc.setFillColor(...C.navy); doc.rect(0, 287, W, 10, 'F');
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...C.gray3);
-    doc.text('MEJORES — Mantenimiento y Construcción Escolar  ·  info@mejores.com.ar', M, 293);
+    doc.setFillColor(...C.red); doc.rect(0, 287, W, 10, 'F');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...C.white);
+    doc.text('MEJORES — en mantenimiento, obras y servicios  ·  info@mejores.com.ar', M, 293);
     doc.text(`${quote.code || 'PRESUPUESTO'}  ·  Pág. ${i} / ${pages}`, W - M, 293, { align: 'right' });
+    if (i > 1) { doc.setFillColor(...C.red); doc.rect(0, 0, W, 3, 'F'); }
   }
 
   doc.save(`${quote.code || 'presupuesto'}_MEJORES.pdf`);
