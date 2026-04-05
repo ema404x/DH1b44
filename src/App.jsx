@@ -1,3 +1,4 @@
+import React from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -5,29 +6,6 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-import React from 'react';
-
-class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
-  static getDerivedStateFromError(error) { return { hasError: true, error }; }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-          <div className="max-w-md w-full text-center space-y-4">
-            <div className="text-5xl">⚠️</div>
-            <h1 className="text-xl font-bold text-foreground">Ocurrió un error</h1>
-            <p className="text-sm text-muted-foreground">{this.state.error?.message || 'Error inesperado'}</p>
-            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium">
-              Recargar página
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 import AppLayout from '@/components/layout/AppLayout';
 import Dashboard from '@/pages/Dashboard';
 import Projects from '@/pages/Projects';
@@ -45,10 +23,31 @@ import Calendario from '@/pages/Calendario';
 import Reportes from '@/pages/Reportes';
 import Automatizaciones from '@/pages/Automatizaciones';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+          <div className="max-w-md w-full text-center space-y-4">
+            <div className="text-5xl">⚠️</div>
+            <h1 className="text-xl font-bold">Ocurrió un error</h1>
+            <p className="text-sm text-muted-foreground">{this.state.error?.message || 'Error inesperado'}</p>
+            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium">
+              Recargar página
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
-  // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
@@ -57,18 +56,15 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // Handle authentication errors
   if (authError) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
       navigateToLogin();
       return null;
     }
   }
 
-  // Render the main app
   return (
     <Routes>
       <Route element={<AppLayout />}>
@@ -93,7 +89,6 @@ const AuthenticatedApp = () => {
   );
 };
 
-
 function App() {
   return (
     <ErrorBoundary>
@@ -109,4 +104,4 @@ function App() {
   );
 }
 
-export default App
+export default App;
