@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { User, LogOut, Settings, ChevronDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { LogOut, ChevronDown, UserCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function UserMenu() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => base44.auth.me() });
 
   const initials = user?.full_name
@@ -28,17 +29,25 @@ export default function UserMenu() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-11 z-50 w-52 bg-card border border-border rounded-xl shadow-2xl py-2 overflow-hidden">
-            <div className="px-3 py-2 border-b border-border mb-1">
-              <div className="text-sm font-semibold truncate">{user?.full_name}</div>
+          <div className="absolute right-0 top-11 z-50 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1.5 overflow-hidden">
+            <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 mb-1">
+              <div className="text-sm font-semibold truncate text-foreground">{user?.full_name || 'Usuario'}</div>
               <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
-              <div className="text-[10px] text-primary font-medium mt-0.5 uppercase tracking-wide">{user?.role}</div>
+              <span className="inline-block mt-1 text-[10px] bg-primary/10 text-primary font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide">{user?.role || 'user'}</span>
             </div>
             <button
-              onClick={() => { base44.auth.logout(); setOpen(false); }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-left"
+              onClick={() => { navigate('/empleados'); setOpen(false); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left text-foreground"
             >
-              <LogOut className="h-4 w-4" />
+              <UserCircle className="h-4 w-4 text-muted-foreground" />
+              Mi perfil
+            </button>
+            <div className="mx-2 my-1 border-t border-slate-100 dark:border-slate-800" />
+            <button
+              onClick={() => { base44.auth.logout(); setOpen(false); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-destructive transition-colors text-left text-foreground"
+            >
+              <LogOut className="h-4 w-4 text-muted-foreground" />
               Cerrar sesión
             </button>
           </div>

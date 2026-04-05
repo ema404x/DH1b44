@@ -2,10 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCheck, AlertTriangle, Info, CheckCircle2, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { differenceInDays, isPast, parseISO } from 'date-fns';
+import { isPast, parseISO } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 const typeIcons = {
   info: Info,
@@ -20,9 +19,17 @@ const typeColors = {
   error: 'text-red-500',
 };
 
+const systemAlertPaths = {
+  'ot-overdue': '/ordenes',
+  'stock-low': '/inventario',
+  'maint-overdue': '/activos',
+  'invoice-overdue': '/facturacion',
+};
+
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: notifications = [] } = useQuery({
     queryKey: ['notifications'],
@@ -82,7 +89,7 @@ export default function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-11 z-50 w-80 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
+          <div className="absolute right-0 top-11 z-50 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div>
                 <h3 className="font-semibold text-sm">Notificaciones</h3>
@@ -99,11 +106,20 @@ export default function NotificationBell() {
               )}
               {allNotifs.map((n) => {
                 const Icon = typeIcons[n.type] || Info;
+                const isSystem = typeof n.id === 'string' && n.id.includes('-overdue') || n.id === 'stock-low';
+                const handleClick = () => {
+                  if (isSystem) {
+                    const path = systemAlertPaths[n.id];
+                    if (path) { navigate(path); setOpen(false); }
+                  } else if (n.id) {
+                    markReadMutation.mutate(n.id);
+                  }
+                };
                 return (
                   <div
                     key={n.id}
-                    className={cn('flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors', !n.read && 'bg-primary/3')}
-                    onClick={() => n.id && !n.id.includes('-') && markReadMutation.mutate(n.id)}
+                    className={cn('flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer', !n.read && 'bg-primary/5')}
+                    onClick={handleClick}
                   >
                     <div className={`mt-0.5 flex-shrink-0 ${typeColors[n.type]}`}>
                       <Icon className="h-4 w-4" />
