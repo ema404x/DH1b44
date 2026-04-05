@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign } from 'lucide-react';
+import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle } from 'lucide-react';
 import WorkOrderChecklist from './WorkOrderChecklist';
 import WorkOrderPhotos from './WorkOrderPhotos';
 import WorkOrderSignature from './WorkOrderSignature';
 import WorkOrderMaterials from './WorkOrderMaterials';
 import WorkOrderTimeLogs from './WorkOrderTimeLogs';
 import WorkOrderCostSummary from './WorkOrderCostSummary';
+import { exportWorkOrderPDF } from '@/utils/exportWorkOrderPDF';
 
 const priorityColors = {
   baja: 'bg-slate-100 text-slate-600',
@@ -41,6 +42,17 @@ export default function WorkOrderDetailPanel({ order, onClose }) {
   });
 
   const set = (key, val) => setData(prev => ({ ...prev, [key]: val }));
+
+  // Checklist completion check
+  const checklist = data.checklist || [];
+  const pendingTasks = checklist.filter(t => !t.completed);
+  const checklistBlocked = checklist.length > 0 && pendingTasks.length > 0;
+
+  const handleStatusChange = (v) => {
+    if (v === 'completada' && checklistBlocked) return; // blocked by checklist
+    set('status', v);
+  };
+
   const save = () => saveMutation.mutate(data);
 
   return (
@@ -69,14 +81,21 @@ export default function WorkOrderDetailPanel({ order, onClose }) {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <p className="text-[10px] uppercase text-muted-foreground mb-1">Estado</p>
-              <Select value={data.status} onValueChange={v => set('status', v)}>
+              <Select value={data.status} onValueChange={handleStatusChange}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {['pendiente','asignada','en_progreso','en_espera','completada','cancelada'].map(s => (
-                    <SelectItem key={s} value={s} className="text-xs capitalize">{s.replace(/_/g,' ')}</SelectItem>
+                    <SelectItem key={s} value={s} disabled={s === 'completada' && checklistBlocked} className="text-xs capitalize">
+                      {s.replace(/_/g,' ')}{s === 'completada' && checklistBlocked ? ' 🔒' : ''}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {checklistBlocked && (
+                <p className="text-[9px] text-orange-500 flex items-center gap-0.5 mt-0.5">
+                  <AlertTriangle className="h-2.5 w-2.5" />{pendingTasks.length} tarea(s) pendiente(s)
+                </p>
+              )}
             </div>
             <div>
               <p className="text-[10px] uppercase text-muted-foreground mb-1">Asignado</p>
@@ -172,6 +191,15 @@ export default function WorkOrderDetailPanel({ order, onClose }) {
 
         {/* Footer */}
         <div className="p-4 border-t border-border flex gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="flex-shrink-0"
+            title="Exportar PDF"
+            onClick={() => exportWorkOrderPDF(data, timeLogs)}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
           <Button className="flex-1 gap-2" onClick={save} disabled={saveMutation.isPending}>
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Guardar Cambios
