@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Plus, Eye, Trash2, Download } from 'lucide-react';
+import { FileText, Plus, Eye, Trash2, Download, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -14,6 +15,33 @@ const estadoStyle = {
 };
 
 export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete }) {
+  const [exporting, setExporting] = useState(null);
+
+  const handleExport = async (cert, format) => {
+    setExporting(`${cert.id}-${format}`);
+    try {
+      const res = await base44.functions.invoke('exportCertificado', {
+        certificadoId: cert.id,
+        format: format
+      });
+      const blob = new Blob([res.data], { 
+        type: format === 'excel' 
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'application/pdf'
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Certificado_N${cert.numero}_${cert.contratista?.replace(/ /g, '_') || 'default'}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting:', err);
+    } finally {
+      setExporting(null);
+    }
+  };
+
   if (isLoading) return <div className="text-center py-20 text-muted-foreground">Cargando...</div>;
 
   if (certificados.length === 0) return (
@@ -46,8 +74,10 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
             <div className="text-xs text-muted-foreground">{c.created_date ? format(new Date(c.created_date), 'dd/MM/yyyy', { locale: es }) : ''}</div>
           </div>
           <div className="flex gap-1">
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onEdit(c)}><Eye className="h-4 w-4" /></Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(c.id)}><Trash2 className="h-4 w-4" /></Button>
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onEdit(c)} title="Editar"><Eye className="h-4 w-4" /></Button>
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleExport(c, 'excel')} disabled={exporting === `${c.id}-excel`} title="Descargar Excel">{exporting === `${c.id}-excel` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}</Button>
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleExport(c, 'pdf')} disabled={exporting === `${c.id}-pdf`} title="Descargar PDF">{exporting === `${c.id}-pdf` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}</Button>
+            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(c.id)} title="Eliminar"><Trash2 className="h-4 w-4" /></Button>
           </div>
         </div>
       ))}

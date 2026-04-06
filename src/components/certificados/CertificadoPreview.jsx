@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Download } from 'lucide-react';
+import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import jsPDF from 'jspdf';
@@ -9,10 +10,32 @@ const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency:
 const fmtDate = (d) => { try { return d ? format(new Date(d), 'dd/MM/yyyy', { locale: es }) : '—'; } catch { return d || '—'; } };
 
 export default function CertificadoPreview({ form, onBack, onSave, saving }) {
+  const [exporting, setExporting] = useState(null);
   const subtotal = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
   const anticipo = subtotal * (form.anticipo_pct / 100);
   const fondoReparo = subtotal * (form.fondo_reparo_pct / 100);
   const totalNeto = subtotal - anticipo - fondoReparo;
+
+  const exportExcel = async () => {
+    setExporting('excel');
+    try {
+      const res = await base44.functions.invoke('exportCertificado', {
+        certificadoId: form.id,
+        format: 'excel'
+      });
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Certificado_N${form.numero}_${form.contratista?.replace(/ /g, '_') || 'default'}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting Excel:', err);
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -121,7 +144,8 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>
         <h2 className="text-lg font-bold flex-1">Vista Previa — Certificado N° {form.numero}</h2>
-        <Button variant="outline" className="gap-2" onClick={exportPDF}><Download className="h-4 w-4" />Exportar PDF</Button>
+        <Button variant="outline" className="gap-2" onClick={exportExcel} disabled={exporting === 'excel'}>{exporting === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}Excel</Button>
+        <Button variant="outline" className="gap-2" onClick={exportPDF} disabled={exporting === 'pdf'}>{exporting === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}PDF</Button>
         <Button className="gap-2" onClick={() => onSave(form)} disabled={saving}>{saving ? 'Guardando...' : 'Guardar certificado'}</Button>
       </div>
 
