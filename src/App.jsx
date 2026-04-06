@@ -25,6 +25,7 @@ import Automatizaciones from '@/pages/Automatizaciones';
 import Certificados from '@/pages/Certificados';
 import Auditoria from '@/pages/Auditoria';
 import Permisos from '@/pages/Permisos';
+import Seguridad from '@/pages/Seguridad';
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -89,6 +90,7 @@ const AuthenticatedApp = () => {
         <Route path="/certificados" element={<Certificados />} />
         <Route path="/auditoria" element={<Auditoria />} />
         <Route path="/permisos" element={<Permisos />} />
+        <Route path="/seguridad" element={<Seguridad />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

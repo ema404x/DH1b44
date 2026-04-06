@@ -1,0 +1,71 @@
+{
+  "name": "EncryptedBackup",
+  "type": "object",
+  "properties": {
+    "backup_name": {
+      "type": "string",
+      "description": "Nombre del backup"
+    },
+    "backup_type": {
+      "type": "string",
+      "enum": [
+        "daily",
+        "weekly",
+        "monthly",
+        "manual"
+      ],
+      "default": "daily"
+    },
+    "backup_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Cu\u00e1ndo se hizo el backup"
+    },
+    "entities_backed_up": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Lista de entidades respaldadas"
+    },
+    "encryption_algorithm": {
+      "type": "string",
+      "default": "AES-256-GCM"
+    },
+    "backup_hash": {
+      "type": "string",
+      "description": "SHA-256 hash del backup para validar integridad"
+    },
+    "size_bytes": {
+      "type": "number",
+      "description": "Tama\u00f1o del backup en bytes"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed",
+        "failed",
+        "verified"
+      ],
+      "default": "pending"
+    },
+    "location": {
+      "type": "string",
+      "description": "D\u00f3nde se almacena el backup (URL privada)"
+    },
+    "retention_days": {
+      "type": "number",
+      "default": 90,
+      "description": "D\u00edas antes de borrar autom\u00e1ticamente"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "backup_name",
+    "backup_type"
+  ]
+}

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  Wrench, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu, Zap, BarChart2, Award
+  Wrench, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu, Zap, BarChart2, Award, Shield
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -49,6 +49,7 @@ const navGroups = [
     items: [
       { label: 'Control de Acceso', icon: Cpu, path: '/permisos' },
       { label: 'Auditoría', icon: FileText, path: '/auditoria' },
+      { label: 'Centro de Seguridad', icon: Shield, path: '/seguridad' },
     ]
   },
 ];
