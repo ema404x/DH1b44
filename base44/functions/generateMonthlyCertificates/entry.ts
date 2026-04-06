@@ -1,8 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import jsPDF from 'npm:jspdf@4.0.0';
 
 // Calcula el último día hábil del mes (lunes-viernes, sin feriados argentinos)
 function getLastBusinessDayOfMonth(year, month) {
-  // Feriados argentinos fijos
   const fixedHolidays = [
     { month: 1, day: 1 },   // Año Nuevo
     { month: 5, day: 1 },   // Día del Trabajo
@@ -19,11 +19,9 @@ function getLastBusinessDayOfMonth(year, month) {
     return dayOfWeek !== 0 && dayOfWeek !== 6 && !isHoliday(date);
   };
 
-  // Obtener último día del mes
   const lastDay = new Date(year, month, 0).getDate();
   let date = new Date(year, month - 1, lastDay);
 
-  // Retroceder hasta encontrar un día hábil
   while (!isBusinessDay(date)) {
     date.setDate(date.getDate() - 1);
   }
@@ -41,10 +39,70 @@ async function getNextCertificateNumber(base44, contratista, mes) {
   return (existingCerts.length || 0) + 1;
 }
 
-// Obtiene contratistas activos
-async function getActiveContractors(base44) {
-  const clients = await base44.asServiceRole.entities.Client.filter({ status: 'activo' });
-  return clients;
+// Genera PDF del certificado
+function generateCertificatePDF(certificado) {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let yPos = 10;
+
+  // Encabezado
+  doc.setFontSize(16);
+  doc.text('CERTIFICADO DE ABONO MENSUAL', pageWidth / 2, yPos, { align: 'center' });
+  yPos += 10;
+
+  // Info principal
+  doc.setFontSize(10);
+  doc.text(`Nº ${certificado.numero}`, 20, yPos);
+  doc.text(`Mes: ${certificado.mes_periodo}`, pageWidth - 40, yPos);
+  yPos += 8;
+
+  doc.text(`Contratista: ${certificado.contratista}`, 20, yPos);
+  yPos += 6;
+
+  doc.text(`Fecha: ${new Date(certificado.fecha_certificado).toLocaleDateString('es-AR')}`, 20, yPos);
+  yPos += 12;
+
+  // Tabla de items
+  if (certificado.items && certificado.items.length > 0) {
+    doc.setFontSize(9);
+    doc.text('ITEMS:', 20, yPos);
+    yPos += 6;
+
+    // Headers tabla
+    doc.setFillColor(200, 200, 200);
+    const colX = [20, 80, 100, 130, 160];
+    doc.text('Descripción', colX[0], yPos);
+    doc.text('Cantidad', colX[1], yPos);
+    doc.text('Unitario', colX[2], yPos);
+    doc.text('Total', colX[3], yPos);
+    yPos += 6;
+
+    // Items
+    certificado.items.forEach((item, idx) => {
+      if (yPos > pageHeight - 20) {
+        doc.addPage();
+        yPos = 10;
+      }
+      doc.text((idx + 1).toString(), colX[0], yPos);
+      doc.text(item.descripcion || '', colX[0] + 5, yPos);
+      doc.text(item.cantidad?.toString() || '', colX[1], yPos);
+      doc.text(`$${item.importe_unitario?.toFixed(2) || '0.00'}`, colX[2], yPos);
+      doc.text(`$${item.importe_total?.toFixed(2) || '0.00'}`, colX[3], yPos);
+      yPos += 6;
+    });
+
+    yPos += 4;
+    doc.setFontSize(11);
+    doc.text(`SUBTOTAL: $${certificado.subtotal?.toFixed(2) || '0.00'}`, pageWidth - 60, yPos);
+  }
+
+  return doc.output('arraybuffer');
+}
+
+// Obtiene clientes activos
+async function getActiveClients(base44) {
+  return await base44.asServiceRole.entities.Client.filter({ status: 'activo' });
 }
 
 Deno.serve(async (req) => {
@@ -52,7 +110,6 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
 
-    // Solo admin puede ejecutar esto
     if (user?.role !== 'admin') {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
@@ -61,10 +118,8 @@ Deno.serve(async (req) => {
     const year = today.getFullYear();
     const month = today.getMonth() + 1;
 
-    // Calcular último día hábil del mes actual
     const lastBusinessDay = getLastBusinessDayOfMonth(year, month);
     
-    // Comparar solo la fecha (sin hora)
     const isLastBusinessDay = 
       today.getDate() === lastBusinessDay.getDate() &&
       today.getMonth() === lastBusinessDay.getMonth() &&
@@ -77,20 +132,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Obtener contratistas activos
-    const contractors = await getActiveContractors(base44);
+    const clients = await getActiveClients(base44);
     const generatedCerts = [];
+    const mesFormato = `${year}-${String(month).padStart(2, '0')}`;
 
-    // Generar certificado para cada contratista
-    for (const contractor of contractors) {
-      const certNumber = await getNextCertificateNumber(base44, contractor.name, `${year}-${String(month).padStart(2, '0')}`);
+    for (const client of clients) {
+      const certNumber = await getNextCertificateNumber(base44, client.name, mesFormato);
       
+      // Generar PDF
       const newCert = {
         numero: certNumber,
         tipo: 'abono_mensual',
         estado: 'emitido',
-        contratista: contractor.name,
-        mes_periodo: `${year}-${String(month).padStart(2, '0')}`,
+        generado_automaticamente: true,
+        contratista: client.name,
+        contratista_id: client.id,
+        mes_periodo: mesFormato,
         fecha_certificado: today.toISOString().split('T')[0],
         items: [],
         subtotal: 0,
@@ -98,12 +155,37 @@ Deno.serve(async (req) => {
         fondo_reparo_pct: 5,
       };
 
+      const pdfBuffer = generateCertificatePDF(newCert);
+      
+      // Construir nombre de archivo con estructura de carpetas
+      const fileName = `${client.name}/${year}/${String(month).padStart(2, '0')}/certificado_${certNumber}.pdf`;
+      
+      // Guardar PDF (simulamos la estructura de carpetas en el nombre)
+      const pdfBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
+      const formData = new FormData();
+      formData.append('file', pdfBlob, fileName);
+
+      // Intentar subir el PDF
+      let pdfUrl = '';
+      try {
+        const uploadRes = await base44.integrations.Core.UploadFile({
+          file: pdfBuffer
+        });
+        pdfUrl = uploadRes.file_url;
+      } catch (uploadErr) {
+        console.log('PDF upload skipped:', uploadErr.message);
+      }
+
+      // Guardar certificado en BD
+      newCert.pdf_url = pdfUrl;
       const created = await base44.asServiceRole.entities.Certificado.create(newCert);
+
       generatedCerts.push({
         id: created.id,
         numero: certNumber,
-        contratista: contractor.name,
-        mes: `${year}-${String(month).padStart(2, '0')}`
+        contratista: client.name,
+        mes: mesFormato,
+        pdf_url: pdfUrl
       });
     }
 

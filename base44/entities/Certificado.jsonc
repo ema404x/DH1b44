@@ -24,6 +24,11 @@
       ],
       "default": "borrador"
     },
+    "generado_automaticamente": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si fue generado por automatizaci\u00f3n"
+    },
     "emprendimiento": {
       "type": "string"
     },
@@ -32,6 +37,10 @@
     },
     "contratista": {
       "type": "string"
+    },
+    "contratista_id": {
+      "type": "string",
+      "description": "ID del cliente/proveedor asociado"
     },
     "ada_numero": {
       "type": "string"
@@ -128,6 +137,10 @@
     "fondo_reparo_pct": {
       "type": "number",
       "default": 5
+    },
+    "pdf_url": {
+      "type": "string",
+      "description": "URL del PDF generado"
     },
     "ada_pdf_url": {
       "type": "string"

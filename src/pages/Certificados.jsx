@@ -2,16 +2,19 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import UploadADA from '@/components/certificados/UploadADA';
 import CertificadoEditor from '@/components/certificados/CertificadoEditor';
 import CertificadoPreview from '@/components/certificados/CertificadoPreview';
 import CertificadosLista from '@/components/certificados/CertificadosLista';
+import CertificadosAutomatizados from '@/components/certificados/CertificadosAutomatizados';
 
 // view: 'list' | 'upload' | 'edit' | 'preview'
 export default function Certificados() {
   const [view, setView] = useState('list');
+  const [tab, setTab] = useState('manuales');
   const [extracted, setExtracted] = useState(null);   // datos extraídos del ADA
   const [editing, setEditing] = useState(null);        // certificado en edición
   const [previewing, setPreviewing] = useState(null);  // form para preview
@@ -99,17 +102,31 @@ export default function Certificados() {
     <div className="space-y-6">
       <PageHeader
         title="Certificados"
-        subtitle="Generación automática de certificados desde ADA / Órdenes de Compra"
+        subtitle="Gestión de certificados manuales y automáticos"
         actionLabel="Nuevo Certificado"
         onAction={() => setView('upload')}
       />
-      <CertificadosLista
-        certificados={certificados}
-        isLoading={isLoading}
-        onNew={() => setView('upload')}
-        onEdit={handleEdit}
-        onDelete={(id) => deleteMutation.mutate(id)}
-      />
+
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="manuales">Certificados Manuales</TabsTrigger>
+          <TabsTrigger value="automaticos">Certificados Automáticos</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="manuales" className="mt-6">
+          <CertificadosLista
+            certificados={certificados.filter(c => !c.generado_automaticamente)}
+            isLoading={isLoading}
+            onNew={() => setView('upload')}
+            onEdit={handleEdit}
+            onDelete={(id) => deleteMutation.mutate(id)}
+          />
+        </TabsContent>
+
+        <TabsContent value="automaticos" className="mt-6">
+          <CertificadosAutomatizados />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
