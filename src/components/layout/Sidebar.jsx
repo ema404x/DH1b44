@@ -44,6 +44,13 @@ const navGroups = [
       { label: 'Inventario', icon: Package, path: '/inventario' },
     ]
   },
+  {
+    label: 'Administración',
+    items: [
+      { label: 'Control de Acceso', icon: Cpu, path: '/permisos' },
+      { label: 'Auditoría', icon: FileText, path: '/auditoria' },
+    ]
+  },
 ];
 
 export default function Sidebar() {

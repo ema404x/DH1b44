@@ -1,0 +1,55 @@
+{
+  "name": "DigitalSignature",
+  "type": "object",
+  "properties": {
+    "entity_type": {
+      "type": "string",
+      "description": "Tipo de entidad firmada (WorkOrder, Certificado, etc.)"
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "ID de la entidad firmada"
+    },
+    "signer_email": {
+      "type": "string",
+      "description": "Email de quien firma"
+    },
+    "signer_role": {
+      "type": "string",
+      "description": "Rol de quien firma"
+    },
+    "signature_hash": {
+      "type": "string",
+      "description": "Hash digital de la firma (SHA-256)"
+    },
+    "certificate": {
+      "type": "string",
+      "description": "Certificado digital X.509 en PEM"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp de la firma"
+    },
+    "signature_algorithm": {
+      "type": "string",
+      "default": "SHA256withRSA",
+      "description": "Algoritmo usado"
+    },
+    "is_valid": {
+      "type": "boolean",
+      "default": true,
+      "description": "Validez de la firma"
+    },
+    "revocation_reason": {
+      "type": "string",
+      "description": "Raz\u00f3n de revocaci\u00f3n si aplica"
+    }
+  },
+  "required": [
+    "entity_type",
+    "entity_id",
+    "signer_email",
+    "signature_hash"
+  ]
+}

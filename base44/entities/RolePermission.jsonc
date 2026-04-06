@@ -1,0 +1,49 @@
+{
+  "name": "RolePermission",
+  "type": "object",
+  "properties": {
+    "role_name": {
+      "type": "string",
+      "description": "Nombre del rol (admin, supervisor, tecnico, viewer)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del rol"
+    },
+    "permissions": {
+      "type": "object",
+      "description": "Permisos por m\u00f3dulo",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "read": {
+            "type": "boolean"
+          },
+          "create": {
+            "type": "boolean"
+          },
+          "update": {
+            "type": "boolean"
+          },
+          "delete": {
+            "type": "boolean"
+          },
+          "export": {
+            "type": "boolean"
+          },
+          "approve": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "role_name",
+    "permissions"
+  ]
+}
