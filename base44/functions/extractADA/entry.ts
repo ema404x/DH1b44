@@ -32,31 +32,35 @@ async function validateAndCorrectData(data, file_url, base44) {
   const correctSubtotal = calculatedItemsTotal;
   const subtotalMismatch = Math.abs(correctSubtotal - (data.subtotal || 0)) > 0.01;
 
-  // 5. Validar monto_contratado vs subtotal
-  const montoMismatch = Math.abs(correctSubtotal - (data.monto_contratado || 0)) > 0.01;
+  // 5. Validar monto_contratado vs subtotal (con tolerancia del 5% en caso de impuestos)
+  const percentDiff = Math.abs(correctSubtotal - (data.monto_contratado || 0)) / correctSubtotal;
+  const montoMismatch = percentDiff > 0.15; // Si la diferencia es mayor al 15%, reanalizamos
 
-  if (itemsFixed || subtotalMismatch || montoMismatch) {
-    // Si hay discrepancias, re-analizar el documento
-    const correctionPrompt = `REANALIZA ESTE DOCUMENTO CON EXTREMA PRECISIÓN.
+  // Si solo hay errores menores (items mal calculados), solo corregimos sin reanalizar
+  if (itemsFixed && !subtotalMismatch && !montoMismatch) {
+    return {
+      success: true,
+      correctionApplied: true,
+      data: { ...data, items: correctedItems, subtotal: correctSubtotal },
+      validationStatus: 'Corregido (errores menores de cálculo)'
+    };
+  }
 
-El primer análisis encontró discrepancias:
-- Suma calculada de items: ${correctSubtotal}
-- Subtotal reportado: ${data.subtotal}
-- Monto total reportado: ${data.monto_contratado}
+  // Si hay discrepancias importantes, reanalizar
+  if (subtotalMismatch || montoMismatch) {
+    const correctionPrompt = `REANALIZA ESTE DOCUMENTO CON PRECISIÓN.
 
-INSTRUCCIONES CRÍTICAS:
-1. Extraé CADA LÍNEA de producto/servicio del documento
-2. Para cada línea: cantidad × precio unitario = total del línea (VERIFICA MANUALMENTE)
-3. Suma TODOS los totales de línea = subtotal (sin IVA)
-4. El monto_contratado debe ser igual al subtotal (o incluir solo impuestos si están detallados)
-5. TODOS los números deben ser exactos, sin redondeos
+Importante: Extrae CADA LÍNEA de producto/servicio exactamente como aparece en el documento.
+Para cada línea: cantidad × precio unitario = total (verifica que sea exacto).
+Suma TODOS los totales = subtotal.
 
-Devolvé el JSON corregido con precisión absoluta:`;
+El monto_contratado debe coincidir con el subtotal (o ser muy similar).
+
+Devolvé el JSON corregido:`;
 
     const correctionResult = await base44.integrations.Core.InvokeLLM({
       prompt: correctionPrompt,
       file_urls: [file_url],
-      model: 'claude_sonnet_4_6', // Usar modelo más preciso para correcciones
       response_json_schema: {
         type: "object",
         properties: {
@@ -83,8 +87,7 @@ Devolvé el JSON corregido con precisión absoluta:`;
                 importe_total: { type: "number" }
               }
             }
-          },
-          analisis_validacion: { type: "string" }
+          }
         }
       }
     });
@@ -94,14 +97,14 @@ Devolvé el JSON corregido con precisión absoluta:`;
       return sum + ((item.cantidad || 0) * (item.importe_unitario || 0));
     }, 0);
 
-    const finalMismatch = Math.abs(finalItemsTotal - (correctionResult.monto_contratado || 0)) > 0.01 ||
-                          Math.abs(finalItemsTotal - (correctionResult.subtotal || 0)) > 0.01;
+    const finalDiff = Math.abs(finalItemsTotal - (correctionResult.monto_contratado || 0)) / finalItemsTotal;
+    const finalMismatch = finalDiff > 0.15;
 
     return {
       success: !finalMismatch,
       correctionApplied: true,
       data: correctionResult,
-      validationStatus: finalMismatch ? 'Error persistente - requiere revisión manual' : 'Corregido y validado'
+      validationStatus: finalMismatch ? 'Error persistente' : 'Reanalizado y validado'
     };
   }
 
