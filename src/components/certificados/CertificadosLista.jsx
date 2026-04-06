@@ -16,6 +16,7 @@ const estadoStyle = {
 
 export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete }) {
   const [exporting, setExporting] = useState(null);
+  const [search, setSearch] = useState('');
 
   const handleExport = async (cert, format) => {
     setExporting(`${cert.id}-${format}`);
@@ -43,6 +44,13 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
     }
   };
 
+  const filtrados = certificados.filter(c =>
+    c.numero?.toString().includes(search) ||
+    c.contratista?.toLowerCase().includes(search.toLowerCase()) ||
+    c.emprendimiento?.toLowerCase().includes(search.toLowerCase()) ||
+    c.ada_numero?.includes(search)
+  );
+
   if (isLoading) return <div className="text-center py-20 text-muted-foreground">Cargando...</div>;
 
   if (certificados.length === 0) return (
@@ -55,33 +63,109 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
   );
 
   return (
-    <div className="space-y-3">
-      {certificados.map((c) => (
-        <div key={c.id} className="bg-card border rounded-xl p-4 flex items-center gap-4 hover:shadow-sm transition-shadow">
-          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <FileText className="h-5 w-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold">Certificado N° {c.numero}</span>
-              <Badge className={`text-xs border ${estadoStyle[c.estado] || estadoStyle.borrador}`}>{c.estado}</Badge>
-              <Badge variant="outline" className="text-xs">{c.tipo === 'abono_mensual' ? 'Abono Mensual' : 'Obra'}</Badge>
+    <div className="space-y-4">
+      <div className="flex gap-2 items-center">
+        <input
+          type="text"
+          placeholder="Buscar por N°, contratista, ADA..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-sm"
+        />
+        <Button onClick={onNew} className="gap-2 shrink-0"><Plus className="h-4 w-4" />Nuevo</Button>
+      </div>
+
+      <div className="space-y-3">
+        {filtrados.map((c) => (
+          <div key={c.id} className="bg-card border rounded-lg p-4 hover:shadow-sm hover:border-primary/20 transition-all group">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 flex-1 min-w-0">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <FileText className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <h3 className="font-semibold">Certificado N° {c.numero}</h3>
+                    <Badge className={`text-xs border ${estadoStyle[c.estado] || estadoStyle.borrador}`}>
+                      {c.estado}
+                    </Badge>
+                    {c.generado_automaticamente && (
+                      <Badge variant="secondary" className="text-xs">Automático</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{c.contratista}</p>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5">
+                    <span>{c.emprendimiento}</span>
+                    <span className="text-border">·</span>
+                    <span>ADA: {c.ada_numero}</span>
+                    {c.mes_periodo && (
+                      <>
+                        <span className="text-border">·</span>
+                        <span>{c.mes_periodo}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-right flex-shrink-0">
+                <div className="font-bold text-primary text-lg">{fmt(c.monto_contratado)}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {c.created_date ? format(new Date(c.created_date), 'dd/MM', { locale: es }) : '—'}
+                </div>
+              </div>
+
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-8 w-8" 
+                  onClick={() => onEdit(c)} 
+                  title="Editar"
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-8 w-8" 
+                  onClick={() => handleExport(c, 'excel')} 
+                  disabled={exporting === `${c.id}-excel`}
+                  title="Descargar Excel"
+                >
+                  {exporting === `${c.id}-excel` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                </Button>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-8 w-8" 
+                  onClick={() => handleExport(c, 'pdf')} 
+                  disabled={exporting === `${c.id}-pdf`}
+                  title="Descargar PDF"
+                >
+                  {exporting === `${c.id}-pdf` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                </Button>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-8 w-8 text-destructive hover:text-destructive" 
+                  onClick={() => onDelete(c.id)}
+                  title="Eliminar"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground truncate mt-0.5">{c.contratista} · {c.emprendimiento}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">ADA: {c.ada_numero} {c.mes_periodo ? `· ${c.mes_periodo}` : ''}</div>
           </div>
-          <div className="text-right flex-shrink-0">
-            <div className="font-bold text-primary">{fmt(c.monto_contratado)}</div>
-            <div className="text-xs text-muted-foreground">{c.created_date ? format(new Date(c.created_date), 'dd/MM/yyyy', { locale: es }) : ''}</div>
-          </div>
-          <div className="flex gap-1">
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onEdit(c)} title="Editar"><Eye className="h-4 w-4" /></Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleExport(c, 'excel')} disabled={exporting === `${c.id}-excel`} title="Descargar Excel">{exporting === `${c.id}-excel` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}</Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleExport(c, 'pdf')} disabled={exporting === `${c.id}-pdf`} title="Descargar PDF">{exporting === `${c.id}-pdf` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}</Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(c.id)} title="Eliminar"><Trash2 className="h-4 w-4" /></Button>
-          </div>
+        ))}
+      </div>
+
+      {filtrados.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          <FileText className="h-8 w-8 mx-auto mb-2 opacity-20" />
+          <p className="text-sm">No hay certificados que coincidan con tu búsqueda</p>
         </div>
-      ))}
+      )}
     </div>
   );
 }

@@ -95,22 +95,24 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pb-4 border-b">
         <Button variant="ghost" size="icon" onClick={onCancel}><ArrowLeft className="h-4 w-4" /></Button>
         <div className="flex-1">
-          <h2 className="text-lg font-bold">Editar Certificado</h2>
-          <p className="text-xs text-muted-foreground">Revisá y ajustá los datos extraídos por la IA</p>
+          <h2 className="text-2xl font-bold">Editar Certificado</h2>
+          <p className="text-xs text-muted-foreground mt-1">Revisá y ajustá los datos extraídos por la IA</p>
         </div>
-        <Badge variant="outline" className={form.tipo === 'abono_mensual' ? 'text-blue-600 border-blue-200 bg-blue-50' : 'text-green-600 border-green-200 bg-green-50'}>
-          {form.tipo === 'abono_mensual' ? 'Abono Mensual' : 'Obra'}
-        </Badge>
-        <Button variant="outline" className="gap-2" onClick={() => onPreview(form)}><Eye className="h-4 w-4" />Vista previa</Button>
-        <Button className="gap-2" onClick={() => onSave(form)} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
+        <div className="flex items-center gap-2">
+          <Badge className={form.tipo === 'abono_mensual' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-green-100 text-green-700 border-green-200'}>
+            {form.tipo === 'abono_mensual' ? 'Abono Mensual' : 'Obra'}
+          </Badge>
+          <Button variant="outline" className="gap-2" onClick={() => onPreview(form)}><Eye className="h-4 w-4" />Vista previa</Button>
+          <Button className="gap-2" onClick={() => onSave(form)} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
+        </div>
       </div>
 
       {/* Encabezado */}
-      <div className="bg-card rounded-xl border p-5">
-        <h3 className="font-semibold text-sm mb-4 text-muted-foreground uppercase tracking-wide">Datos del Encabezado</h3>
+      <div className="bg-card rounded-lg border p-5 space-y-4">
+        <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Datos del Encabezado</h3>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <Field label="Tipo">
             <Select value={form.tipo} onValueChange={v => set('tipo', v)}>
@@ -138,9 +140,9 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       </div>
 
       {/* Ítems */}
-      <div className="bg-card rounded-xl border p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Ítems</h3>
+      <div className="bg-card rounded-lg border p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Ítems</h3>
           <Button size="sm" variant="outline" className="gap-2" onClick={addItem}><Plus className="h-3.5 w-3.5" />Agregar ítem</Button>
         </div>
         <div className="space-y-3">
@@ -179,8 +181,8 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       </div>
 
       {/* Totales */}
-      <div className="bg-card rounded-xl border p-5">
-        <h3 className="font-semibold text-sm mb-4 text-muted-foreground uppercase tracking-wide">Totales y Deducciones</h3>
+      <div className="bg-card rounded-lg border p-5 space-y-4">
+        <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Totales y Deducciones</h3>
         <div className="flex flex-col items-end gap-2 max-w-sm ml-auto">
           <div className="flex justify-between w-full text-sm"><span className="text-muted-foreground">Subtotal:</span><span className="font-semibold">{fmt(subtotal)}</span></div>
           <div className="flex justify-between w-full text-sm items-center gap-2">
