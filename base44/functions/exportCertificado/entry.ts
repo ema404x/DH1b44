@@ -16,8 +16,13 @@ Deno.serve(async (req) => {
       const sheet = workbook.addWorksheet(`CERTIFICADO Nº ${data.numero}`);
 
       // Configurar ancho de columnas
-      for (let i = 1; i <= 14; i++) sheet.getColumn(i).width = 12;
-      sheet.getColumn(2).width = 40;
+      sheet.getColumn(1).width = 8;   // ITEM
+      sheet.getColumn(2).width = 30;  // DESCRIPCION
+      sheet.getColumn(3).width = 8;   // UM
+      sheet.getColumn(4).width = 10;  // CANTIDAD
+      sheet.getColumn(5).width = 12;  // IMPORTE UNITARIO
+      sheet.getColumn(6).width = 12;  // IMPORTE TOTAL
+      for (let i = 7; i <= 14; i++) sheet.getColumn(i).width = 11;
 
       let row = 1;
       const addRow = (text, merged = true) => {
@@ -25,7 +30,8 @@ Deno.serve(async (req) => {
         if (merged) sheet.mergeCells(`A${row}:N${row}`);
         r.font = { bold: true, size: 11 };
         r.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
-        r.alignment = { wrapText: true, vertical: 'center' };
+        r.alignment = { wrapText: true, vertical: 'center', horizontal: 'left' };
+        sheet.getRow(row).height = 25;
         row++;
       };
 
@@ -44,6 +50,8 @@ Deno.serve(async (req) => {
       
       const r = sheet.addRow([`MONTO CONTRATADO: $${(data.monto_contratado || 0).toLocaleString('es-AR')}`, '', '', '', '', '', '', '', '', '', '', '', 'FECHA:', new Date().toLocaleDateString('es-AR')]);
       r.font = { bold: true };
+      r.alignment = { wrapText: true, vertical: 'center' };
+      sheet.getRow(row).height = 20;
       row++;
       
       addRow(`BASE: ${data.base || '—'}`);
@@ -57,11 +65,14 @@ Deno.serve(async (req) => {
       headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
       headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F1C2E' } };
       headerRow.alignment = { horizontal: 'center', vertical: 'center', wrapText: true };
+      sheet.getRow(row).height = 35;
       row++;
 
       const subHeaderRow = sheet.addRow(['', '', '', '', '', '', 'Unidad', 'Importe', 'Unidad', 'Importe', 'Unidad', 'Importe', 'Unidad', 'Importe']);
       subHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
       subHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F1C2E' } };
+      subHeaderRow.alignment = { horizontal: 'center', vertical: 'center' };
+      sheet.getRow(row).height = 20;
       row++;
 
       const subtotal = data.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
@@ -70,40 +81,52 @@ Deno.serve(async (req) => {
 
       // Items
       (data.items || []).forEach((item) => {
-        const itemRow = sheet.addRow([
-          item.numero, item.descripcion, item.um, item.cantidad,
-          item.importe_unitario, item.importe_total,
-          item.med_acum_anterior_unidad || 0, item.med_acum_anterior_importe || 0,
-          item.med_presente_unidad || 0, item.med_presente_importe || 0,
-          item.med_acum_presente_unidad || 0, item.med_acum_presente_importe || 0,
-          item.saldo_pendiente_unidad || 0, item.saldo_pendiente_importe || 0,
-        ]);
-        itemRow.alignment = { horizontal: 'right' };
-        if (row % 2 === 0) itemRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
-        row++;
+       const itemRow = sheet.addRow([
+         item.numero, item.descripcion, item.um, item.cantidad,
+         item.importe_unitario, item.importe_total,
+         item.med_acum_anterior_unidad || 0, item.med_acum_anterior_importe || 0,
+         item.med_presente_unidad || 0, item.med_presente_importe || 0,
+         item.med_acum_presente_unidad || 0, item.med_acum_presente_importe || 0,
+         item.saldo_pendiente_unidad || 0, item.saldo_pendiente_importe || 0,
+       ]);
+       itemRow.alignment = { horizontal: 'right', wrapText: true, vertical: 'center' };
+       itemRow.font = { size: 10 };
+       sheet.getRow(row).height = 25;
+       if (row % 2 === 0) itemRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
+       row++;
       });
 
       // Totales
       const totalRow = sheet.addRow(['', 'TOTAL (en Pesos)', '', '', '', subtotal, '', 0, '', subtotal, '', subtotal, '', totalNeto]);
-      totalRow.font = { bold: true };
+      totalRow.font = { bold: true, size: 11 };
       totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCC99' } };
+      totalRow.alignment = { wrapText: true, vertical: 'center' };
+      sheet.getRow(row).height = 22;
       row += 2;
 
       const facturarRow = sheet.addRow(['', 'TOTAL A FACTURAR', '', '', '', '', '', '', '', subtotal]);
-      facturarRow.font = { bold: true };
+      facturarRow.font = { bold: true, size: 11 };
+      facturarRow.alignment = { wrapText: true, vertical: 'center' };
+      sheet.getRow(row).height = 20;
       row++;
 
       const desaccopioRow = sheet.addRow(['', `DESACOPIO ( NOTA DE CREDITO a emitir) ${data.anticipo_pct}% de anticipo`]);
-      desaccopioRow.font = { bold: true };
+      desaccopioRow.font = { bold: true, size: 11 };
+      desaccopioRow.alignment = { wrapText: true, vertical: 'center' };
+      sheet.getRow(row).height = 25;
       row++;
 
       const subtotalRow = sheet.addRow(['', 'SUBTOTAL', '', '', '', '', '', '', '', subtotal]);
-      subtotalRow.font = { bold: true };
+      subtotalRow.font = { bold: true, size: 11 };
+      subtotalRow.alignment = { wrapText: true, vertical: 'center' };
+      sheet.getRow(row).height = 20;
       row++;
 
       const netoRow = sheet.addRow(['', 'TOTAL NETO', '', '', '', '', '', '', '', totalNeto]);
       netoRow.font = { bold: true, color: { argb: 'FF0000FF' }, size: 12 };
       netoRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+      netoRow.alignment = { wrapText: true, vertical: 'center' };
+      sheet.getRow(row).height = 22;
 
       row += 2;
       const noteRow = sheet.addRow(['', 'Nota: los importes no incluyen impuestos']);
