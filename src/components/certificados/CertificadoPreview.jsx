@@ -20,10 +20,11 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
     setExporting('excel');
     try {
       const res = await base44.functions.invoke('exportCertificado', {
-        certificadoId: form.id,
+        certificadoData: form,
         format: 'excel'
       });
-      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const arrayBuffer = await res.data.arrayBuffer?.() || res.data;
+      const blob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

@@ -21,10 +21,11 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
     setExporting(`${cert.id}-${format}`);
     try {
       const res = await base44.functions.invoke('exportCertificado', {
-        certificadoId: cert.id,
+        certificadoData: cert,
         format: format
       });
-      const blob = new Blob([res.data], { 
+      const arrayBuffer = await res.data.arrayBuffer?.() || res.data;
+      const blob = new Blob([arrayBuffer], { 
         type: format === 'excel' 
           ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
           : 'application/pdf'

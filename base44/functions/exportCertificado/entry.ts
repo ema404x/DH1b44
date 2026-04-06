@@ -8,10 +8,8 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { certificadoId, format } = await req.json();
-    const cert = await base44.entities.Certificado.list();
-    const data = cert.find(c => c.id === certificadoId);
-    if (!data) return Response.json({ error: 'Certificado no encontrado' }, { status: 404 });
+    const { certificadoData, format } = await req.json();
+    const data = certificadoData;
 
     if (format === 'excel') {
       const workbook = new ExcelJS.Workbook();
@@ -68,8 +66,7 @@ Deno.serve(async (req) => {
 
       const subtotal = data.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
       const anticipo = subtotal * (data.anticipo_pct / 100);
-      const fondoReparo = subtotal * (data.fondo_reparo_pct / 100);
-      const totalNeto = subtotal - anticipo - fondoReparo;
+      const totalNeto = subtotal - anticipo;
 
       // Items
       (data.items || []).forEach((item) => {
@@ -102,10 +99,6 @@ Deno.serve(async (req) => {
 
       const subtotalRow = sheet.addRow(['', 'SUBTOTAL', '', '', '', '', '', '', '', subtotal]);
       subtotalRow.font = { bold: true };
-      row++;
-
-      const fondoRow = sheet.addRow(['', `FONDO DE REPARO (cubierto mediante aval)`, '', '', '', '', '', '', '', fondoReparo]);
-      fondoRow.font = { bold: true };
       row++;
 
       const netoRow = sheet.addRow(['', 'TOTAL NETO', '', '', '', '', '', '', '', totalNeto]);
