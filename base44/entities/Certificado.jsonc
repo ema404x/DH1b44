@@ -1,0 +1,144 @@
+{
+  "name": "Certificado",
+  "type": "object",
+  "properties": {
+    "numero": {
+      "type": "number",
+      "description": "N\u00famero de certificado"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "abono_mensual",
+        "obra"
+      ],
+      "default": "abono_mensual",
+      "description": "Tipo de certificado"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "borrador",
+        "emitido",
+        "aprobado"
+      ],
+      "default": "borrador"
+    },
+    "emprendimiento": {
+      "type": "string"
+    },
+    "obra_servicio": {
+      "type": "string"
+    },
+    "contratista": {
+      "type": "string"
+    },
+    "ada_numero": {
+      "type": "string"
+    },
+    "oc_numero": {
+      "type": "string"
+    },
+    "mes_periodo": {
+      "type": "string"
+    },
+    "fecha_inicio": {
+      "type": "string",
+      "format": "date"
+    },
+    "plazo_obra": {
+      "type": "string"
+    },
+    "fecha_finalizacion": {
+      "type": "string",
+      "format": "date"
+    },
+    "monto_contratado": {
+      "type": "number",
+      "default": 0
+    },
+    "base": {
+      "type": "string"
+    },
+    "fecha_certificado": {
+      "type": "string",
+      "format": "date"
+    },
+    "numero_recepcion": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "numero": {
+            "type": "number"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "um": {
+            "type": "string"
+          },
+          "cantidad": {
+            "type": "number"
+          },
+          "importe_unitario": {
+            "type": "number"
+          },
+          "importe_total": {
+            "type": "number"
+          },
+          "med_acum_anterior_unidad": {
+            "type": "number"
+          },
+          "med_acum_anterior_importe": {
+            "type": "number"
+          },
+          "med_presente_unidad": {
+            "type": "number"
+          },
+          "med_presente_importe": {
+            "type": "number"
+          },
+          "med_acum_presente_unidad": {
+            "type": "number"
+          },
+          "med_acum_presente_importe": {
+            "type": "number"
+          },
+          "saldo_pendiente_unidad": {
+            "type": "number"
+          },
+          "saldo_pendiente_importe": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "subtotal": {
+      "type": "number",
+      "default": 0
+    },
+    "anticipo_pct": {
+      "type": "number",
+      "default": 0
+    },
+    "fondo_reparo_pct": {
+      "type": "number",
+      "default": 5
+    },
+    "ada_pdf_url": {
+      "type": "string"
+    },
+    "notas": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "tipo",
+    "contratista",
+    "ada_numero"
+  ]
+}

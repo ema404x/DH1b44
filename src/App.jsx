@@ -22,6 +22,7 @@ import Assets from '@/pages/Assets';
 import Calendario from '@/pages/Calendario';
 import Reportes from '@/pages/Reportes';
 import Automatizaciones from '@/pages/Automatizaciones';
+import Certificados from '@/pages/Certificados';
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -83,6 +84,7 @@ const AuthenticatedApp = () => {
         <Route path="/calendario" element={<Calendario />} />
         <Route path="/reportes" element={<Reportes />} />
         <Route path="/automatizaciones" element={<Automatizaciones />} />
+        <Route path="/certificados" element={<Certificados />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
