@@ -37,10 +37,35 @@ export default function UploadADA({ onExtracted }) {
     // Paso 3: extraer datos
     setStep('reading');
     const res = await base44.functions.invoke('extractADA', { file_url, tipo_override: tipo });
+    let data = res.data.data;
+
+    // Paso 4: si hay discrepancia, llamar función de corrección por separado
+    if (data._validation?.needs_correction) {
+      setStep('correcting');
+      const corrRes = await base44.functions.invoke('correctADAItems', {
+        file_url,
+        calculated: data._validation.subtotal_calculado,
+        docTotal: data._validation.subtotal_documento,
+        direction: data._validation.correction_direction,
+      });
+      if (corrRes.data?.items?.length) {
+        const newCalc = corrRes.data.calculated;
+        const docTotal = data._validation.subtotal_documento;
+        data.items = corrRes.data.items;
+        data.subtotal = newCalc;
+        data._validation = {
+          ...data._validation,
+          subtotal_calculado: newCalc,
+          diferencia: Math.abs(newCalc - docTotal),
+          coincide: Math.abs(newCalc - docTotal) / docTotal <= 0.005,
+          needs_correction: false,
+        };
+      }
+    }
 
     setStep('done');
     setLoading(false);
-    onExtracted({ ...res.data.data, ada_pdf_url: file_url });
+    onExtracted({ ...data, ada_pdf_url: file_url });
   };
 
   const onDrop = (e) => {
@@ -53,6 +78,7 @@ export default function UploadADA({ onExtracted }) {
     uploading: 'Subiendo PDF...',
     detecting: 'Detectando tipo de documento automáticamente...',
     reading: `Extrayendo datos (${TIPO_LABELS[tipoSeleccionado] || 'Auto-detectado'})...`,
+    correcting: 'Corrigiendo discrepancias en los ítems...',
     done: '¡Datos extraídos!',
   };
 
@@ -114,7 +140,7 @@ export default function UploadADA({ onExtracted }) {
       {loading ? (
         <div className="border-2 border-dashed border-primary/30 rounded-2xl p-12 text-center bg-primary/5">
           <Loader2 className="h-10 w-10 text-primary animate-spin mx-auto mb-4" />
-          <p className="font-medium text-primary">{stepLabel[step]}</p>
+          <p className="font-medium text-primary">{stepLabel[step] || stepLabel['reading']}</p>
           {tipoSeleccionado && (
             <span className="inline-block mt-2 text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-medium">
               {TIPO_LABELS[tipoSeleccionado]}

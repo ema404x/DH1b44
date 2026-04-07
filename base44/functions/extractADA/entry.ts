@@ -1,6 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
-// Tolerancia aceptable de redondeo (0.5%)
 const TOLERANCE_PCT = 0.005;
 
 function buildItemsPrompt(tipo) {
@@ -21,13 +20,34 @@ Cada ítem: descripcion, um, cantidad, importe_unitario, importe_total,
   saldo_pendiente_unidad, saldo_pendiente_importe.
 subtotal_documento = TOTAL FINAL del certificado (no subtotales de sección).`;
   }
-  // obra
   return `Este documento tiene rubros/secciones con subtotales intermedios.
 ⚠️ SOLO extraé ítems individuales de trabajo: aquellos con renglón propio + descripción específica + unidad + cantidad + precio unitario.
 IGNORÁ "Subtotal Rubro", "Total Sección", "Total Grupo", "Total Parcial" — estas son agrupaciones, NO ítems.
 Cada ítem: descripcion, um, cantidad, importe_unitario, importe_total.
 subtotal_documento = TOTAL FINAL del presupuesto/contrato (el valor global, no parciales).`;
 }
+
+const ITEMS_SCHEMA = {
+  type: "array",
+  items: {
+    type: "object",
+    properties: {
+      descripcion: { type: "string" },
+      um: { type: "string" },
+      cantidad: { type: "number" },
+      importe_unitario: { type: "number" },
+      importe_total: { type: "number" },
+      med_acum_anterior_unidad: { type: "number" },
+      med_acum_anterior_importe: { type: "number" },
+      med_presente_unidad: { type: "number" },
+      med_presente_importe: { type: "number" },
+      med_acum_presente_unidad: { type: "number" },
+      med_acum_presente_importe: { type: "number" },
+      saldo_pendiente_unidad: { type: "number" },
+      saldo_pendiente_importe: { type: "number" }
+    }
+  }
+};
 
 const EXTRACTION_SCHEMA = {
   type: "object",
@@ -46,27 +66,7 @@ const EXTRACTION_SCHEMA = {
     porcentaje_avance: { type: "number" },
     condiciones_pago: { type: "string" },
     subtotal_documento: { type: "number" },
-    items: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          descripcion: { type: "string" },
-          um: { type: "string" },
-          cantidad: { type: "number" },
-          importe_unitario: { type: "number" },
-          importe_total: { type: "number" },
-          med_acum_anterior_unidad: { type: "number" },
-          med_acum_anterior_importe: { type: "number" },
-          med_presente_unidad: { type: "number" },
-          med_presente_importe: { type: "number" },
-          med_acum_presente_unidad: { type: "number" },
-          med_acum_presente_importe: { type: "number" },
-          saldo_pendiente_unidad: { type: "number" },
-          saldo_pendiente_importe: { type: "number" }
-        }
-      }
-    }
+    items: ITEMS_SCHEMA
   }
 };
 
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
   const { file_url, tipo_override } = await req.json();
 
-  // ── Determinar tipo si no viene del cliente ───────────────────────────────
+  // Detectar tipo si no viene predefinido
   let tipo = tipo_override;
   if (!tipo) {
     const tipoResult = await base44.integrations.Core.InvokeLLM({
@@ -110,88 +110,43 @@ Respondé SOLO con uno de esos tres valores, sin explicación ni puntuación.`,
     tipo = ['abono_mensual', 'obra', 'informe'].includes(raw) ? raw : 'obra';
   }
 
-  // ── Extracción principal ──────────────────────────────────────────────────
+  // Extracción principal — solo encabezado + ítems (sin retry acá)
   const result = await base44.integrations.Core.InvokeLLM({
     prompt: `Sos experto en contratos y presupuestos de construcción argentinos.
 
 CAMPOS DE ENCABEZADO a extraer:
-- emprendimiento: nombre del edificio/proyecto/obra
-- obra_servicio: descripción de la obra o servicio
-- contratista: empresa o persona contratista
-- ada_numero: número de ADA o autorización
-- oc_numero: número de orden de compra (si existe)
-- mes_periodo: período (YYYY-MM)
-- fecha_inicio: fecha de inicio (YYYY-MM-DD)
-- plazo_obra: plazo contractual expresado como texto (ej: "180 días", "6 meses")
-- plazo_entrega: fecha o plazo de entrega final si es diferente al plazo_obra
-- monto_contratado: monto total contratado originalmente (número)
-- monto_obra_contratada: monto total de la obra contratada (puede diferir de monto_contratado si hay redeterminaciones)
-- porcentaje_avance: porcentaje de avance de obra (0-100), si figura en el documento
-- condiciones_pago: descripción de las condiciones de pago (ej: "30 días hábiles", "a 60 días de la factura")
+- emprendimiento, obra_servicio, contratista, ada_numero, oc_numero
+- mes_periodo (YYYY-MM), fecha_inicio (YYYY-MM-DD)
+- plazo_obra, plazo_entrega, condiciones_pago
+- monto_contratado, monto_obra_contratada, porcentaje_avance (0-100)
 
 ÍTEMS:
 ${buildItemsPrompt(tipo)}
 
-VALIDACIÓN CRÍTICA — ANTES de devolver el JSON verificá:
-1. Calculá la suma de (cantidad × importe_unitario) para CADA ítem.
-2. Compará esa suma con subtotal_documento.
-3. Si difieren en más del 0.5%: revisá si hay ítems que son subtotales de grupo disfrazados de ítems (tienen importe = suma de ítems anteriores) y eliminá esos falsos ítems hasta que la suma coincida.
-4. subtotal_documento DEBE ser el valor literal que figura en el documento como total final.
-
+subtotal_documento = el valor total final literal que figura en el documento.
 Devolvé SOLO JSON válido.`,
     file_urls: [file_url],
-    model: 'gemini_3_1_pro',
+    model: 'gemini_3_flash',
     response_json_schema: EXTRACTION_SCHEMA
   });
 
-  // ── Recalcular y validar ──────────────────────────────────────────────────
   result.items = recalcItems(result.items);
-  let calculated = sumItems(result.items);
+  const calculated = sumItems(result.items);
   const docTotal = result.subtotal_documento;
+  const discrepancy = hasDiscrepancy(calculated, docTotal);
 
-  // Si hay discrepancia significativa, pedir corrección al modelo
-  if (hasDiscrepancy(calculated, docTotal)) {
-    const direction = calculated > docTotal
-      ? `La suma calculada (${calculated}) es MAYOR que el total del documento (${docTotal}). Estás incluyendo subtotales de sección/grupo como si fueran ítems. Eliminá las filas cuyo importe sea igual a la suma de ítems anteriores (son subtotales disfrazados).`
-      : `La suma calculada (${calculated}) es MENOR que el total del documento (${docTotal}). Faltan ítems — revisá el documento y agregá los que no extrajiste.`;
-
-    const retry = await base44.integrations.Core.InvokeLLM({
-      prompt: `CORRECCIÓN DE ÍTEMS para este documento.
-
-${direction}
-
-Total final correcto según el documento: ${docTotal}
-La suma de (cantidad × importe_unitario) de todos los ítems corregidos debe ser exactamente ${docTotal} (tolerancia ±0.5%).
-
-Reglas:
-- Ítem REAL: tiene renglón propio, descripción de tarea específica, unidad de medida, cantidad y precio unitario.
-- SUBTOTAL/AGRUPACIÓN: texto como "Subtotal", "Total Grupo", "Total Sección", "Total Rubro" + importe = suma de ítems anteriores. NO LO INCLUYAS.
-
-Devolvé SOLO el array "items" corregido en JSON.`,
-      file_urls: [file_url],
-      model: 'gemini_3_1_pro',
-      response_json_schema: {
-        type: "object",
-        properties: { items: EXTRACTION_SCHEMA.properties.items }
-      }
-    });
-
-    if (retry.items?.length) {
-      result.items = recalcItems(retry.items);
-      calculated = sumItems(result.items);
-    }
-  }
-
-  // ── Armar respuesta final ─────────────────────────────────────────────────
   result.subtotal = calculated;
   result.tipo = tipo;
-
-  // Info de validación para el frontend
   result._validation = {
     subtotal_documento: docTotal || null,
     subtotal_calculado: calculated,
-    coincide: !hasDiscrepancy(calculated, docTotal),
-    diferencia: docTotal ? Math.abs(calculated - docTotal) : null
+    coincide: !discrepancy,
+    diferencia: docTotal ? Math.abs(calculated - docTotal) : null,
+    needs_correction: discrepancy,
+    // Pasamos info para posible corrección posterior
+    correction_direction: discrepancy
+      ? (calculated > docTotal ? 'too_high' : 'too_low')
+      : null
   };
 
   delete result.subtotal_documento;
