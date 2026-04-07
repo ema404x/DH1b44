@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -10,7 +9,6 @@ const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency:
 const fmtDate = (d) => { try { return d ? format(new Date(d), 'dd/MM/yyyy', { locale: es }) : '—'; } catch { return d || '—'; } };
 
 export default function CertificadoPreview({ form, onBack, onSave, saving }) {
-  const [exporting, setExporting] = useState(null);
   const subtotalContrato = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
   // Si hay medición presente aplicada, usar ese importe para los totales del certificado
   const totalPresente = form.items.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0);
@@ -20,28 +18,7 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
   const anticipo = subtotal * (form.anticipo_pct / 100);
   const fondoReparo = subtotal * (form.fondo_reparo_pct / 100);
   const totalNeto = subtotal - anticipo - fondoReparo;
-
-  const exportExcel = async () => {
-    setExporting('excel');
-    try {
-      const res = await base44.functions.invoke('exportCertificado', {
-        certificadoData: form,
-        format: 'excel'
-      });
-      const arrayBuffer = await res.data.arrayBuffer?.() || res.data;
-      const blob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Certificado_N${form.numero}_${form.contratista?.replace(/ /g, '_') || 'default'}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Error exporting Excel:', err);
-    } finally {
-      setExporting(null);
-    }
-  };
+  const pctCertificado = subtotalContrato > 0 ? (totalPresente / subtotalContrato) * 100 : 0;
 
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -141,6 +118,21 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
     doc.setTextColor(255,255,255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
     doc.text('TOTAL NETO:', M + C - 78, y + 5);
     doc.text(fmt(pdfTotalNeto), W - M - 1, y + 5, { align: 'right' });
+    y += 10;
+
+    // Barra de % certificado
+    if (hasMedicion) {
+      const pct = subtotalContrato > 0 ? (totalPresente / subtotalContrato) * 100 : 0;
+      const barW = 120, barH = 5, barX = M;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(15,28,46);
+      doc.text(`Avance certificado: ${pct.toFixed(1)}%`, barX, y); y += 4;
+      // fondo gris
+      doc.setFillColor(220,220,220); doc.rect(barX, y, barW, barH, 'F');
+      // barra azul
+      doc.setFillColor(30, 100, 220); doc.rect(barX, y, barW * Math.min(pct / 100, 1), barH, 'F');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6); doc.setTextColor(80,80,80);
+      doc.text(`${fmt(totalPresente)} certificado de ${fmt(subtotalContrato)} total contrato`, barX, y + barH + 4);
+    }
 
     // Footer
     const pages = doc.getNumberOfPages();
@@ -160,8 +152,7 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>
         <h2 className="text-lg font-bold flex-1">Vista Previa — Certificado N° {form.numero}</h2>
-        <Button variant="outline" className="gap-2" onClick={exportExcel} disabled={exporting === 'excel'}>{exporting === 'excel' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}Excel</Button>
-        <Button variant="outline" className="gap-2" onClick={exportPDF} disabled={exporting === 'pdf'}>{exporting === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}PDF</Button>
+        <Button variant="outline" className="gap-2" onClick={exportPDF}><Download className="h-4 w-4" />PDF</Button>
         <Button className="gap-2" onClick={() => onSave(form)} disabled={saving}>{saving ? 'Guardando...' : 'Guardar certificado'}</Button>
       </div>
 
@@ -243,6 +234,23 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
             </tbody>
           </table>
         </div>
+
+        {/* Barra de avance certificado */}
+        {hasMedicion && (
+          <div className="px-4 py-3 border-t bg-blue-50">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-blue-800">Avance certificado</span>
+              <span className="text-lg font-bold text-blue-700">{pctCertificado.toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-blue-100 rounded-full h-3 overflow-hidden">
+              <div className="h-3 rounded-full bg-blue-600" style={{ width: `${Math.min(100, pctCertificado)}%` }} />
+            </div>
+            <div className="flex justify-between text-xs text-blue-700 mt-1">
+              <span>{fmt(totalPresente)} certificado</span>
+              <span>{fmt(subtotalContrato)} total contrato</span>
+            </div>
+          </div>
+        )}
 
         {/* Totales finales */}
         <div className="flex justify-end p-4 border-t bg-slate-50">
