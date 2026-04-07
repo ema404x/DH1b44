@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Plus, ArrowLeft, Save, Eye } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -48,12 +49,17 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       plazo_obra: initialData?.plazo_obra || '',
       fecha_finalizacion: initialData?.fecha_finalizacion || '',
       monto_contratado: initialData?.monto_contratado || initialData?.subtotal || 0,
+      monto_obra_contratada: initialData?.monto_obra_contratada || 0,
+      porcentaje_avance: initialData?.porcentaje_avance || 0,
+      condiciones_pago: initialData?.condiciones_pago || '',
+      plazo_entrega: initialData?.plazo_entrega || '',
       base: initialData?.base || '',
       fecha_certificado: new Date().toISOString().split('T')[0],
       numero_recepcion: '',
       anticipo_pct: 0,
       fondo_reparo_pct: 5,
       subtotal: initialData?.subtotal || 0,
+      _validation: initialData?._validation || null,
       ada_pdf_url: initialData?.ada_pdf_url || '',
       items,
     };
@@ -93,6 +99,14 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const fondoReparo = subtotal * (form.fondo_reparo_pct / 100);
   const totalNeto = subtotal - anticipo - fondoReparo;
 
+  const validacion = useMemo(() => {
+    const v = form._validation;
+    if (!v?.subtotal_documento) return null;
+    const diff = Math.abs(subtotal - v.subtotal_documento);
+    const pct = diff / v.subtotal_documento;
+    return { docTotal: v.subtotal_documento, diff, coincide: pct <= 0.005 };
+  }, [subtotal, form._validation]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 pb-4 border-b">
@@ -102,13 +116,31 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           <p className="text-xs text-muted-foreground mt-1">Revisá y ajustá los datos extraídos por la IA</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge className={form.tipo === 'abono_mensual' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-green-100 text-green-700 border-green-200'}>
-            {form.tipo === 'abono_mensual' ? 'Abono Mensual' : 'Obra'}
+          <Badge className={
+            form.tipo === 'abono_mensual' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+            form.tipo === 'informe' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+            'bg-green-100 text-green-700 border-green-200'
+          }>
+            {form.tipo === 'abono_mensual' ? 'Abono Mensual' : form.tipo === 'informe' ? 'Informe' : 'Obra'}
           </Badge>
           <Button variant="outline" className="gap-2" onClick={() => onPreview(form)}><Eye className="h-4 w-4" />Vista previa</Button>
           <Button className="gap-2" onClick={() => onSave(form)} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
         </div>
       </div>
+
+      {/* Banner de validación de subtotal */}
+      {validacion && (
+        <div className={`flex items-start gap-3 rounded-lg p-4 border text-sm ${validacion.coincide ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+          {validacion.coincide
+            ? <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+            : <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />}
+          <div>
+            {validacion.coincide
+              ? <span>Subtotal validado: la suma de ítems coincide con el total del documento ({fmt(validacion.docTotal)}).</span>
+              : <span>⚠️ Discrepancia detectada: suma de ítems <strong>{fmt(subtotal)}</strong> vs total del documento <strong>{fmt(validacion.docTotal)}</strong> (diferencia: {fmt(validacion.diff)}). Revisá si hay ítems de más o faltantes.</span>}
+          </div>
+        </div>
+      )}
 
       {/* Encabezado */}
       <div className="bg-card rounded-lg border p-5 space-y-4">
@@ -132,11 +164,17 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           <Field label="Mes / Período"><Input value={form.mes_periodo} onChange={e => set('mes_periodo', e.target.value)} /></Field>
           <Field label="Fecha de Inicio"><Input type="date" value={form.fecha_inicio} onChange={e => set('fecha_inicio', e.target.value)} /></Field>
           <Field label="Plazo de Obra"><Input value={form.plazo_obra} onChange={e => set('plazo_obra', e.target.value)} /></Field>
+          <Field label="Plazo de Entrega"><Input value={form.plazo_entrega} onChange={e => set('plazo_entrega', e.target.value)} /></Field>
           <Field label="Fecha de Finalización"><Input type="date" value={form.fecha_finalizacion} onChange={e => set('fecha_finalizacion', e.target.value)} /></Field>
           <Field label="Monto Contratado $"><Input type="number" value={form.monto_contratado} onChange={e => set('monto_contratado', +e.target.value)} /></Field>
+          <Field label="Monto Obra Contratada $"><Input type="number" value={form.monto_obra_contratada} onChange={e => set('monto_obra_contratada', +e.target.value)} /></Field>
+          <Field label="% Avance de Obra"><Input type="number" min="0" max="100" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', +e.target.value)} /></Field>
           <Field label="Fecha del Certificado"><Input type="date" value={form.fecha_certificado} onChange={e => set('fecha_certificado', e.target.value)} /></Field>
           <Field label="N° de Recepción"><Input value={form.numero_recepcion} onChange={e => set('numero_recepcion', e.target.value)} /></Field>
         </div>
+        <Field label="Condiciones de Pago">
+          <Textarea value={form.condiciones_pago} onChange={e => set('condiciones_pago', e.target.value)} className="h-16 text-sm resize-none" placeholder="Ej: 30 días hábiles desde presentación de factura..." />
+        </Field>
       </div>
 
       {/* Ítems */}
