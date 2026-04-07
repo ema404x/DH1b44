@@ -72,7 +72,7 @@ ${itemsPrompt}
 
 Devolvé SOLO JSON válido.`,
     file_urls: [file_url],
-    model: 'claude_sonnet_4_6',
+    model: 'gemini_3_1_pro',
     response_json_schema: {
       type: "object",
       properties: {

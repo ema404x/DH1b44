@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
 
 Respondé SOLO con uno de esos tres valores, sin explicación ni puntuación.`,
     file_urls: [file_url],
-    model: 'claude_sonnet_4_6'
+    model: 'gemini_3_flash'
   });
 
   const raw = (tipoResult || '').toString().trim().toLowerCase().replace(/[^a-z_]/g, '');
