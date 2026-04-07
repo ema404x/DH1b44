@@ -95,9 +95,14 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const removeItem = (i) => setForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }));
 
   const subtotal = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
-  const anticipo = subtotal * (form.anticipo_pct / 100);
-  const fondoReparo = subtotal * (form.fondo_reparo_pct / 100);
-  const totalNeto = subtotal - anticipo - fondoReparo;
+  const totalPresente = form.items.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0);
+  const totalSaldo = form.items.reduce((acc, it) => acc + (it.saldo_pendiente_importe || 0), 0);
+  const hasMedicion = totalPresente > 0;
+  const baseCalculo = hasMedicion ? totalPresente : subtotal;
+  const anticipo = baseCalculo * (form.anticipo_pct / 100);
+  const fondoReparo = baseCalculo * (form.fondo_reparo_pct / 100);
+  const totalNeto = baseCalculo - anticipo - fondoReparo;
+  const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
   const aplicarAvance = () => {
     const pct = (form.porcentaje_avance || 0) / 100;
@@ -263,6 +268,41 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
         </Field>
       </div>
 
+      {/* Resumen de certificación en tiempo real */}
+      {hasMedicion && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-blue-800">Resumen de certificación</span>
+            <span className="text-2xl font-bold text-blue-700">{pctCertificado.toFixed(1)}%</span>
+          </div>
+          {/* Barra de progreso */}
+          <div className="w-full bg-blue-100 rounded-full h-3 overflow-hidden">
+            <div
+              className="h-3 rounded-full bg-blue-600 transition-all duration-300"
+              style={{ width: `${Math.min(100, pctCertificado)}%` }}
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-xs">
+            <div className="bg-white rounded-md p-2 border border-blue-100 text-center">
+              <div className="text-muted-foreground mb-0.5">Total contrato</div>
+              <div className="font-bold text-foreground">{fmt(subtotal)}</div>
+            </div>
+            <div className="bg-blue-600 rounded-md p-2 text-center">
+              <div className="text-blue-100 mb-0.5">Certificado (presente)</div>
+              <div className="font-bold text-white">{fmt(totalPresente)}</div>
+            </div>
+            <div className="bg-white rounded-md p-2 border border-orange-200 text-center">
+              <div className="text-muted-foreground mb-0.5">Saldo pendiente</div>
+              <div className="font-bold text-orange-600">{fmt(totalSaldo)}</div>
+            </div>
+          </div>
+          <div className="flex justify-between text-xs text-blue-700 font-medium pt-1 border-t border-blue-200">
+            <span>Total Neto a cobrar:</span>
+            <span className="font-bold">{fmt(totalNeto)}</span>
+          </div>
+        </div>
+      )}
+
       {/* Ítems */}
       <div className="bg-card rounded-lg border p-5 space-y-4">
         <div className="flex items-center justify-between">
@@ -308,7 +348,21 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       <div className="bg-card rounded-lg border p-5 space-y-4">
         <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Totales y Deducciones</h3>
         <div className="flex flex-col items-end gap-2 max-w-sm ml-auto">
-          <div className="flex justify-between w-full text-sm"><span className="text-muted-foreground">Subtotal:</span><span className="font-semibold">{fmt(subtotal)}</span></div>
+          {hasMedicion && (
+            <div className="flex justify-between w-full text-xs text-muted-foreground">
+              <span>Total contrato:</span><span>{fmt(subtotal)}</span>
+            </div>
+          )}
+          <div className="flex justify-between w-full text-sm">
+            <span className="text-muted-foreground">{hasMedicion ? 'Importe certificado:' : 'Subtotal:'}</span>
+            <span className="font-semibold text-blue-700">{fmt(baseCalculo)}</span>
+          </div>
+          {hasMedicion && totalSaldo > 0 && (
+            <div className="flex justify-between w-full text-xs">
+              <span className="text-muted-foreground">Saldo pendiente:</span>
+              <span className="text-orange-600 font-semibold">{fmt(totalSaldo)}</span>
+            </div>
+          )}
           <div className="flex justify-between w-full text-sm items-center gap-2">
             <span className="text-muted-foreground">Anticipo/Desacopio %:</span>
             <Input type="number" className="w-20 h-7 text-xs" value={form.anticipo_pct} onChange={e => set('anticipo_pct', +e.target.value)} />
