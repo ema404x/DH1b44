@@ -6,7 +6,7 @@ import { es } from 'date-fns/locale';
 import jsPDF from 'jspdf';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
-const fmtDate = (d) => { try { return d ? format(new Date(d), 'dd/MM/yyyy', { locale: es }) : '—'; } catch { return d || '—'; } };
+const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d || '—'; } };
 
 export default function CertificadoPreview({ form, onBack, onSave, saving }) {
   const subtotalContrato = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
