@@ -1,36 +1,40 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, Loader2, Sparkles } from 'lucide-react';
+import { Upload, FileText, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
 
-const TIPO_LABELS = {
-  abono_mensual: 'Abono Mensual',
-  obra: 'Obra / Presupuesto',
-  informe: 'Informe / Certificado de Medición',
-};
+const TIPOS = [
+  { value: 'abono_mensual', label: 'Abono Mensual', desc: 'Contrato de servicio recurrente mensual', color: 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100' },
+  { value: 'obra',         label: 'Obra / Presupuesto', desc: 'Contrato o presupuesto de obra civil', color: 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100' },
+  { value: 'informe',      label: 'Informe / Certificado', desc: 'Informe de avance o certificado de medición', color: 'border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100' },
+];
+
+const TIPO_LABELS = { abono_mensual: 'Abono Mensual', obra: 'Obra / Presupuesto', informe: 'Informe / Certificado' };
 
 export default function UploadADA({ onExtracted }) {
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState('idle');
-  const [tipoDetectado, setTipoDetectado] = useState(null);
+  const [tipoSeleccionado, setTipoSeleccionado] = useState(null); // null = auto-detectar
 
   const processFile = async (file) => {
     if (!file || file.type !== 'application/pdf') return alert('Solo se aceptan archivos PDF');
     setLoading(true);
-    setTipoDetectado(null);
 
     // Paso 1: subir PDF
     setStep('uploading');
     const { file_url } = await base44.integrations.Core.UploadFile({ file });
 
-    // Paso 2: detectar tipo (llamada rápida separada)
-    setStep('detecting');
-    const tipoRes = await base44.functions.invoke('detectADAType', { file_url });
-    const tipo = tipoRes.data?.tipo || 'obra';
-    setTipoDetectado(tipo);
+    let tipo = tipoSeleccionado;
 
-    // Paso 3: extraer datos (pasando tipo_override para evitar segunda llamada de detección)
+    // Paso 2: detectar tipo solo si no fue predefinido
+    if (!tipo) {
+      setStep('detecting');
+      const tipoRes = await base44.functions.invoke('detectADAType', { file_url });
+      tipo = tipoRes.data?.tipo || 'obra';
+    }
+
+    // Paso 3: extraer datos
     setStep('reading');
     const res = await base44.functions.invoke('extractADA', { file_url, tipo_override: tipo });
 
@@ -47,35 +51,73 @@ export default function UploadADA({ onExtracted }) {
 
   const stepLabel = {
     uploading: 'Subiendo PDF...',
-    detecting: 'Detectando tipo de documento...',
-    reading: tipoDetectado
-      ? `Extrayendo datos (${TIPO_LABELS[tipoDetectado] || tipoDetectado})...`
-      : 'La IA está leyendo el ADA...',
+    detecting: 'Detectando tipo de documento automáticamente...',
+    reading: `Extrayendo datos (${TIPO_LABELS[tipoSeleccionado] || 'Auto-detectado'})...`,
     done: '¡Datos extraídos!',
   };
 
   return (
-    <div className="max-w-xl mx-auto mt-12">
-      <div className="text-center mb-8">
+    <div className="max-w-xl mx-auto mt-12 space-y-6">
+      <div className="text-center">
         <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-primary/10 mb-4">
           <Sparkles className="h-7 w-7 text-primary" />
         </div>
         <h2 className="text-xl font-bold">Subí el ADA / Orden de Compra</h2>
-        <p className="text-muted-foreground text-sm mt-1">La IA detecta el tipo de documento y extrae todos los datos automáticamente</p>
-        <div className="flex justify-center gap-2 mt-3 flex-wrap">
-          {Object.entries(TIPO_LABELS).map(([key, label]) => (
-            <span key={key} className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground border">{label}</span>
+        <p className="text-muted-foreground text-sm mt-1">La IA extrae todos los datos automáticamente</p>
+      </div>
+
+      {/* Selector de tipo */}
+      <div>
+        <p className="text-sm font-semibold text-center mb-3">¿Qué tipo de documento es?</p>
+        <div className="grid grid-cols-1 gap-2">
+          {/* Opción auto-detectar */}
+          <button
+            onClick={() => setTipoSeleccionado(null)}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+              tipoSeleccionado === null
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-border bg-background text-muted-foreground hover:bg-muted/40'
+            }`}
+          >
+            <div className="h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 border-current">
+              {tipoSeleccionado === null && <div className="h-2.5 w-2.5 rounded-full bg-primary" />}
+            </div>
+            <div>
+              <span className="font-medium text-sm">Auto-detectar</span>
+              <p className="text-xs opacity-70">La IA analiza el documento y decide</p>
+            </div>
+          </button>
+
+          {TIPOS.map((t) => (
+            <button
+              key={t.value}
+              onClick={() => setTipoSeleccionado(t.value)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                tipoSeleccionado === t.value
+                  ? `border-current ${t.color}`
+                  : 'border-border bg-background text-muted-foreground hover:bg-muted/40'
+              }`}
+            >
+              <div className="h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 border-current">
+                {tipoSeleccionado === t.value && <div className="h-2.5 w-2.5 rounded-full bg-current" />}
+              </div>
+              <div>
+                <span className="font-medium text-sm">{t.label}</span>
+                <p className="text-xs opacity-70">{t.desc}</p>
+              </div>
+            </button>
           ))}
         </div>
       </div>
 
+      {/* Drop zone */}
       {loading ? (
         <div className="border-2 border-dashed border-primary/30 rounded-2xl p-12 text-center bg-primary/5">
           <Loader2 className="h-10 w-10 text-primary animate-spin mx-auto mb-4" />
           <p className="font-medium text-primary">{stepLabel[step]}</p>
-          {tipoDetectado && step === 'reading' && (
+          {tipoSeleccionado && (
             <span className="inline-block mt-2 text-xs px-3 py-1 rounded-full bg-primary/10 text-primary font-medium">
-              {TIPO_LABELS[tipoDetectado]}
+              {TIPO_LABELS[tipoSeleccionado]}
             </span>
           )}
           <p className="text-xs text-muted-foreground mt-3">Esto puede tomar hasta 30 segundos...</p>
@@ -85,7 +127,7 @@ export default function UploadADA({ onExtracted }) {
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
-          className={`block border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all ${
+          className={`block border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
             dragging ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50 hover:bg-muted/40'
           }`}
         >
