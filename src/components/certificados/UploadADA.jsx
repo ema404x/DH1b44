@@ -25,18 +25,9 @@ export default function UploadADA({ onExtracted }) {
     setStep('uploading');
     const { file_url } = await base44.integrations.Core.UploadFile({ file });
 
-    let tipo = tipoSeleccionado;
-
-    // Paso 2: detectar tipo solo si no fue predefinido
-    if (!tipo) {
-      setStep('detecting');
-      const tipoRes = await base44.functions.invoke('detectADAType', { file_url });
-      tipo = tipoRes.data?.tipo || 'obra';
-    }
-
-    // Paso 3: extraer datos
+    // Paso 2: extraer datos (detección de tipo integrada en extractADA si no hay tipo_override)
     setStep('reading');
-    const res = await base44.functions.invoke('extractADA', { file_url, tipo_override: tipo });
+    const res = await base44.functions.invoke('extractADA', { file_url, tipo_override: tipoSeleccionado || null });
     let data = res.data.data;
 
     // Paso 4: si hay discrepancia, llamar función de corrección por separado
@@ -76,8 +67,7 @@ export default function UploadADA({ onExtracted }) {
 
   const stepLabel = {
     uploading: 'Subiendo PDF...',
-    detecting: 'Detectando tipo de documento automáticamente...',
-    reading: `Extrayendo datos (${TIPO_LABELS[tipoSeleccionado] || 'Auto-detectado'})...`,
+    reading: tipoSeleccionado ? `Extrayendo datos (${TIPO_LABELS[tipoSeleccionado]})...` : 'Analizando y extrayendo datos...',
     correcting: 'Corrigiendo discrepancias en los ítems...',
     done: '¡Datos extraídos!',
   };
