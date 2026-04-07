@@ -152,6 +152,7 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
               <SelectContent>
                 <SelectItem value="abono_mensual">Abono Mensual</SelectItem>
                 <SelectItem value="obra">Obra</SelectItem>
+                <SelectItem value="informe">Informe / Certificado</SelectItem>
               </SelectContent>
             </Select>
           </Field>
