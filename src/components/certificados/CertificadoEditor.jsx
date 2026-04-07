@@ -101,30 +101,53 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
 
   const aplicarAvance = () => {
     const pct = (form.porcentaje_avance || 0) / 100;
-    const montoObra = form.monto_contratado || form.monto_obra_contratada || 0;
-    if (!pct || !montoObra) return;
+    if (!pct) {
+      alert('Ingresá un % de avance mayor a 0 antes de aplicar.');
+      return;
+    }
 
-    const targetTotal = montoObra * pct;
+    // Usar subtotal real de los ítems como base del 100%
+    const totalContrato = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
+    if (!totalContrato) {
+      alert('Los ítems no tienen importes calculados. Revisá cantidad y precio unitario.');
+      return;
+    }
+
+    const targetTotal = totalContrato * pct;
     let acumulado = 0;
 
     const newItems = form.items.map(item => {
       const itemFull = item.importe_total || 0;
-      if (acumulado >= targetTotal) {
-        // Ya llegamos al target, este ítem queda en 0
+
+      if (itemFull === 0) {
         return {
           ...item,
           med_presente_unidad: 0,
           med_presente_importe: 0,
           med_acum_presente_unidad: item.med_acum_anterior_unidad || 0,
           med_acum_presente_importe: item.med_acum_anterior_importe || 0,
-          saldo_pendiente_unidad: item.cantidad,
+          saldo_pendiente_unidad: item.cantidad || 0,
+          saldo_pendiente_importe: 0,
+        };
+      }
+
+      if (acumulado >= targetTotal) {
+        // Ya llegamos al target, este ítem queda pendiente
+        return {
+          ...item,
+          med_presente_unidad: 0,
+          med_presente_importe: 0,
+          med_acum_presente_unidad: item.med_acum_anterior_unidad || 0,
+          med_acum_presente_importe: item.med_acum_anterior_importe || 0,
+          saldo_pendiente_unidad: item.cantidad || 0,
           saldo_pendiente_importe: itemFull,
         };
       }
+
       const resta = targetTotal - acumulado;
       const fraccion = Math.min(1, resta / itemFull);
       const cantPres = Math.round((item.cantidad || 0) * fraccion * 100) / 100;
-      const importePres = Math.round(cantPres * (item.importe_unitario || 0));
+      const importePres = Math.round(itemFull * fraccion);
       acumulado += importePres;
 
       const acumPresUnidad = (item.med_acum_anterior_unidad || 0) + cantPres;

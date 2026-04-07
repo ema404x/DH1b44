@@ -11,7 +11,12 @@ const fmtDate = (d) => { try { return d ? format(new Date(d), 'dd/MM/yyyy', { lo
 
 export default function CertificadoPreview({ form, onBack, onSave, saving }) {
   const [exporting, setExporting] = useState(null);
-  const subtotal = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
+  const subtotalContrato = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
+  // Si hay medición presente aplicada, usar ese importe para los totales del certificado
+  const totalPresente = form.items.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0);
+  const totalSaldo = form.items.reduce((acc, it) => acc + (it.saldo_pendiente_importe || 0), 0);
+  const hasMedicion = totalPresente > 0;
+  const subtotal = hasMedicion ? totalPresente : subtotalContrato;
   const anticipo = subtotal * (form.anticipo_pct / 100);
   const fondoReparo = subtotal * (form.fondo_reparo_pct / 100);
   const totalNeto = subtotal - anticipo - fondoReparo;
@@ -41,6 +46,11 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const W = 297, M = 10, C = W - M * 2;
+    // Usar importe presente si hay medición, sino el contrato completo
+    const pdfSubtotal = hasMedicion ? totalPresente : subtotalContrato;
+    const pdfAnticipo = pdfSubtotal * (form.anticipo_pct / 100);
+    const pdfFondoReparo = pdfSubtotal * (form.fondo_reparo_pct / 100);
+    const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
     // Header
     doc.setFillColor(15, 28, 46); doc.rect(0, 0, W, 22, 'F');
@@ -114,18 +124,23 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
 
     // Totals
     y += 3;
+    if (hasMedicion) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(80,80,80);
+      doc.text(`Total contrato: ${fmt(subtotalContrato)}`, W - M - 1, y, { align: 'right' }); y += 5;
+      doc.text(`Saldo pendiente: ${fmt(totalSaldo)}`, W - M - 1, y, { align: 'right' }); y += 5;
+    }
     doc.setFillColor(230, 240, 255); doc.rect(M + C - 80, y, 80, 5, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(15,28,46);
-    doc.text('SUBTOTAL:', M + C - 78, y + 3.5);
-    doc.text(fmt(subtotal), W - M - 1, y + 3.5, { align: 'right' });
+    doc.text(hasMedicion ? 'IMP. CERTIFICADO:' : 'SUBTOTAL:', M + C - 78, y + 3.5);
+    doc.text(fmt(pdfSubtotal), W - M - 1, y + 3.5, { align: 'right' });
     y += 6;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(80,80,80);
-    doc.text(`Anticipo/Desacopio (${form.anticipo_pct}%): ${fmt(anticipo)}`, W - M - 1, y, { align: 'right' }); y += 5;
-    doc.text(`Fondo de Reparo (${form.fondo_reparo_pct}%): ${fmt(fondoReparo)}`, W - M - 1, y, { align: 'right' }); y += 5;
+    doc.text(`Anticipo/Desacopio (${form.anticipo_pct}%): ${fmt(pdfAnticipo)}`, W - M - 1, y, { align: 'right' }); y += 5;
+    doc.text(`Fondo de Reparo (${form.fondo_reparo_pct}%): ${fmt(pdfFondoReparo)}`, W - M - 1, y, { align: 'right' }); y += 5;
     doc.setFillColor(15,28,46); doc.rect(M + C - 80, y, 80, 7, 'F');
     doc.setTextColor(255,255,255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
     doc.text('TOTAL NETO:', M + C - 78, y + 5);
-    doc.text(fmt(totalNeto), W - M - 1, y + 5, { align: 'right' });
+    doc.text(fmt(pdfTotalNeto), W - M - 1, y + 5, { align: 'right' });
 
     // Footer
     const pages = doc.getNumberOfPages();
@@ -218,14 +233,12 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
                 );
               })}
               <tr className="bg-slate-100 font-bold border-t-2 text-xs">
-                <td colSpan={5} className="px-2 py-2">TOTAL CONTRATO</td>
-                <td className="px-2 py-2 text-right">{fmt(subtotal)}</td>
+                <td colSpan={5} className="px-2 py-2">TOTALES</td>
+                <td className="px-2 py-2 text-right">{fmt(subtotalContrato)}</td>
                 <td colSpan={2}></td>
-                <td className="px-2 py-2 text-right text-blue-700">{fmt(form.items.reduce((a,i)=>a+(i.med_presente_importe||0),0))}</td>
-                <td className="px-2 py-2 text-right text-blue-700"></td>
+                <td colSpan={2} className="px-2 py-2 text-right text-blue-700 font-bold">{fmt(totalPresente)}</td>
                 <td colSpan={2}></td>
-                <td className="px-2 py-2 text-right text-orange-600">{fmt(form.items.reduce((a,i)=>a+(i.saldo_pendiente_importe||0),0))}</td>
-                <td></td>
+                <td colSpan={2} className="px-2 py-2 text-right text-orange-600 font-bold">{fmt(totalSaldo)}</td>
               </tr>
             </tbody>
           </table>
@@ -233,8 +246,22 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
 
         {/* Totales finales */}
         <div className="flex justify-end p-4 border-t bg-slate-50">
-          <div className="w-72 space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-medium">{fmt(subtotal)}</span></div>
+          <div className="w-80 space-y-2 text-sm">
+            {hasMedicion && (
+              <div className="flex justify-between text-muted-foreground text-xs">
+                <span>Total contrato:</span><span>{fmt(subtotalContrato)}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">{hasMedicion ? 'Importe certificado (presente):' : 'Subtotal:'}</span>
+              <span className="font-semibold text-blue-700">{fmt(subtotal)}</span>
+            </div>
+            {hasMedicion && totalSaldo > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Saldo pendiente:</span>
+                <span className="text-orange-600 font-semibold">{fmt(totalSaldo)}</span>
+              </div>
+            )}
             <div className="flex justify-between"><span className="text-muted-foreground">Desacopio ({form.anticipo_pct}%):</span><span>-{fmt(anticipo)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Fondo de Reparo ({form.fondo_reparo_pct}%):</span><span>-{fmt(fondoReparo)}</span></div>
             <div className="flex justify-between font-bold text-base pt-2 border-t">
