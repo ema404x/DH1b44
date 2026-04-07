@@ -7,22 +7,28 @@ Deno.serve(async (req) => {
 
   const { file_url } = await req.json();
 
-  const prompt = `Eres experto leyendo ADAs (Autorizaciones de Adquisición) y órdenes de compra.
+  const prompt = `Eres experto leyendo ADAs (Autorizaciones de Adquisición) y órdenes de compra argentinas.
 
-EXTRAE CUIDADOSAMENTE cada línea de la tabla de items:
+REGLA MÁS IMPORTANTE: El documento puede tener SECCIONES (ej: "Estructura", "Mampostería") y GRUPOS (ej: "Grupo 1", "Grupo 2") con subtotales intermedios. 
+⚠️ NUNCA incluyas subtotales de sección, subtotales de grupo, ni totales parciales como si fueran ítems. Solo incluye las LÍNEAS DE TRABAJO REALES con cantidad, unidad y precio unitario.
+
+Las líneas de subtotal se identifican porque:
+- No tienen unidad de medida propia
+- Su importe = suma de ítems anteriores
+- Dicen "Subtotal", "Total Grupo", "Total Sección" u expresiones similares
+
+EXTRAE CUIDADOSAMENTE solo las líneas de ítem real:
 - descripcion: texto completo del ítem/trabajo
 - cantidad: número exacto
 - importe_unitario: precio por unidad
-- importe_total: cantidad × importe_unitario (CALCULA Y VERIFICA)
-- um: unidad de medida ("m2", "GL", "unidad", etc.)
+- importe_total: cantidad × importe_unitario
+- um: unidad de medida ("m2", "m3", "ml", "GL", "unidad", "hs", etc.)
 
-LUEGO busca en el documento el valor de "SUBTOTAL" o "TOTAL" que aparece explícitamente y devuélvelo como subtotal_documento.
+LUEGO busca el SUBTOTAL TOTAL FINAL del documento (no subtotales de sección) y devuélvelo como subtotal_documento.
 
 Extrae también:
 - emprendimiento, obra_servicio, contratista, ada_numero, oc_numero
 - mes_periodo, fecha_inicio, plazo_obra, monto_contratado, tipo
-
-IMPORTANTE: asegúrate de extraer TODOS los items. Si el documento tiene muchas líneas, asegúrate de captarlas todas.
 
 Devolvé SOLO JSON.`;
 
@@ -75,17 +81,18 @@ Devolvé SOLO JSON.`;
         // Reanalizar con instrucción más específica
         const retryPrompt = `ANALIZA NUEVAMENTE este ADA con MÁXIMA PRECISIÓN.
 
-El subtotal en el documento es: ${docSubtotal}
-Pero la suma de items da: ${calculatedSubtotal}
+El subtotal TOTAL FINAL en el documento es: ${docSubtotal}
+Pero la suma de los ítems extraídos da: ${calculatedSubtotal}
 
-Esto significa que:
-1. Se olvidaron items (busca líneas que no se incluyeron)
-2. O los precios/cantidades están mal
+REGLA CRÍTICA: El documento tiene secciones (Estructura, Mampostería, etc.) y grupos (Grupo 1, Grupo 2, etc.).
+Estas secciones tienen SUBTOTALES INTERMEDIOS que NO son ítems de trabajo.
+- Si calculatedSubtotal > docSubtotal: estás incluyendo subtotales de grupo/sección como si fueran ítems. QUITÁLOS.
+- Si calculatedSubtotal < docSubtotal: faltan ítems reales, incluyelos.
 
-Extrae de nuevo TODOS los items sin excepción. Incluye incluso líneas pequeñas o descripciones largas.
-Para cada item: cantidad × importe_unitario.
+Un ítem REAL tiene: número de renglón, descripción de trabajo, unidad de medida, cantidad y precio unitario.
+Un SUBTOTAL tiene: texto "Subtotal..." y un monto que es suma de ítems anteriores — NO LO INCLUYAS.
 
-La suma de todos debe ser: ${docSubtotal}
+Extrae SOLO los ítems reales. La suma debe ser exactamente: ${docSubtotal}
 
 Devolvé JSON.`;
 
