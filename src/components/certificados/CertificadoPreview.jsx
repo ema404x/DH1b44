@@ -82,7 +82,7 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
     doc.setFillColor(15, 28, 46); doc.rect(M, y, C, 6, 'F');
     doc.setTextColor(255, 255, 255); doc.setFontSize(6); doc.setFont('helvetica', 'bold');
     const cols = [M+1, M+8, M+70, M+80, M+92, M+110, M+128, M+146, M+164, M+182, M+200, M+218, M+240, M+258];
-    ['N°','DESCRIPCIÓN','UM','CANT','IMP.UNIT','IMP.TOTAL','AC.ANT.U','AC.ANT.$','PRES.U','PRES.$','AC.PRES.U','AC.PRES.$','SALDO.U','SALDO.$'].forEach((h,i) => {
+    ['N°','DESCRIPCIÓN','UM','CANT.T','IMP.UNIT','IMP.TOTAL','AC.ANT.U','AC.ANT.$','PRES.U','PRES.$','AC.PR.U','AC.PR.$','SALDO.U','SALDO.$'].forEach((h,i) => {
       doc.text(h, cols[i], y + 4);
     });
     y += 7;
@@ -189,34 +189,43 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-[#0f1c2e] text-white">
-                {['N°','DESCRIPCIÓN','UM','CANT','IMP. UNITARIO','IMP. TOTAL','ACUM. ANT. U','ACUM. ANT. $','PRES. U','PRES. $','ACUM. PRES. U','ACUM. PRES. $','SALDO U','SALDO $'].map(h => (
+                {['N°','DESCRIPCIÓN','UM','CANT TOTAL','IMP. UNITARIO','IMP. TOTAL','ACUM. ANT. U','ACUM. ANT. $','PRES. U','PRES. $','ACUM. PRES. U','ACUM. PRES. $','SALDO PEND. U','SALDO PEND. $'].map(h => (
                   <th key={h} className="px-2 py-2 text-left font-semibold whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {form.items.map((item, i) => (
-                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                  <td className="px-2 py-2">{item.numero || i+1}</td>
-                  <td className="px-2 py-2 max-w-xs">{item.descripcion}</td>
-                  <td className="px-2 py-2">{item.um}</td>
-                  <td className="px-2 py-2 text-right">{item.cantidad}</td>
-                  <td className="px-2 py-2 text-right">{fmt(item.importe_unitario)}</td>
-                  <td className="px-2 py-2 text-right font-bold">{fmt(item.importe_total)}</td>
-                  <td className="px-2 py-2 text-right text-muted-foreground">{item.med_acum_anterior_unidad||0}</td>
-                  <td className="px-2 py-2 text-right text-muted-foreground">{fmt(item.med_acum_anterior_importe)}</td>
-                  <td className="px-2 py-2 text-right">{item.med_presente_unidad||0}</td>
-                  <td className="px-2 py-2 text-right">{fmt(item.med_presente_importe)}</td>
-                  <td className="px-2 py-2 text-right">{item.med_acum_presente_unidad||0}</td>
-                  <td className="px-2 py-2 text-right">{fmt(item.med_acum_presente_importe)}</td>
-                  <td className="px-2 py-2 text-right text-orange-600">{item.saldo_pendiente_unidad||0}</td>
-                  <td className="px-2 py-2 text-right text-orange-600">{fmt(item.saldo_pendiente_importe)}</td>
-                </tr>
-              ))}
-              <tr className="bg-slate-100 font-bold border-t-2">
-                <td colSpan={5} className="px-2 py-2">TOTAL (en Pesos)</td>
+              {form.items.map((item, i) => {
+                const tieneAvance = (item.med_presente_unidad || 0) > 0;
+                const tieneSaldo = (item.saldo_pendiente_importe || 0) > 0;
+                return (
+                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                    <td className="px-2 py-2">{item.numero || i+1}</td>
+                    <td className="px-2 py-2 max-w-xs font-medium">{item.descripcion}</td>
+                    <td className="px-2 py-2">{item.um}</td>
+                    <td className="px-2 py-2 text-right">{item.cantidad}</td>
+                    <td className="px-2 py-2 text-right">{fmt(item.importe_unitario)}</td>
+                    <td className="px-2 py-2 text-right font-bold">{fmt(item.importe_total)}</td>
+                    <td className="px-2 py-2 text-right text-muted-foreground">{item.med_acum_anterior_unidad||0}</td>
+                    <td className="px-2 py-2 text-right text-muted-foreground">{fmt(item.med_acum_anterior_importe)}</td>
+                    <td className={`px-2 py-2 text-right font-semibold ${tieneAvance ? 'text-blue-700' : 'text-muted-foreground'}`}>{item.med_presente_unidad||0}</td>
+                    <td className={`px-2 py-2 text-right font-semibold ${tieneAvance ? 'text-blue-700' : 'text-muted-foreground'}`}>{fmt(item.med_presente_importe)}</td>
+                    <td className="px-2 py-2 text-right">{item.med_acum_presente_unidad||0}</td>
+                    <td className="px-2 py-2 text-right">{fmt(item.med_acum_presente_importe)}</td>
+                    <td className={`px-2 py-2 text-right font-semibold ${tieneSaldo ? 'text-orange-600' : 'text-muted-foreground'}`}>{item.saldo_pendiente_unidad||0}</td>
+                    <td className={`px-2 py-2 text-right font-semibold ${tieneSaldo ? 'text-orange-600' : 'text-muted-foreground'}`}>{fmt(item.saldo_pendiente_importe)}</td>
+                  </tr>
+                );
+              })}
+              <tr className="bg-slate-100 font-bold border-t-2 text-xs">
+                <td colSpan={5} className="px-2 py-2">TOTAL CONTRATO</td>
                 <td className="px-2 py-2 text-right">{fmt(subtotal)}</td>
-                <td colSpan={8}></td>
+                <td colSpan={2}></td>
+                <td className="px-2 py-2 text-right text-blue-700">{fmt(form.items.reduce((a,i)=>a+(i.med_presente_importe||0),0))}</td>
+                <td className="px-2 py-2 text-right text-blue-700"></td>
+                <td colSpan={2}></td>
+                <td className="px-2 py-2 text-right text-orange-600">{fmt(form.items.reduce((a,i)=>a+(i.saldo_pendiente_importe||0),0))}</td>
+                <td></td>
               </tr>
             </tbody>
           </table>
