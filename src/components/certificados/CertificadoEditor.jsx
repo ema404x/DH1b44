@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2, Wand2 } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -99,6 +99,53 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const fondoReparo = subtotal * (form.fondo_reparo_pct / 100);
   const totalNeto = subtotal - anticipo - fondoReparo;
 
+  const aplicarAvance = () => {
+    const pct = (form.porcentaje_avance || 0) / 100;
+    const montoObra = form.monto_contratado || form.monto_obra_contratada || 0;
+    if (!pct || !montoObra) return;
+
+    const targetTotal = montoObra * pct;
+    let acumulado = 0;
+
+    const newItems = form.items.map(item => {
+      const itemFull = item.importe_total || 0;
+      if (acumulado >= targetTotal) {
+        // Ya llegamos al target, este ítem queda en 0
+        return {
+          ...item,
+          med_presente_unidad: 0,
+          med_presente_importe: 0,
+          med_acum_presente_unidad: item.med_acum_anterior_unidad || 0,
+          med_acum_presente_importe: item.med_acum_anterior_importe || 0,
+          saldo_pendiente_unidad: item.cantidad,
+          saldo_pendiente_importe: itemFull,
+        };
+      }
+      const resta = targetTotal - acumulado;
+      const fraccion = Math.min(1, resta / itemFull);
+      const cantPres = Math.round((item.cantidad || 0) * fraccion * 100) / 100;
+      const importePres = Math.round(cantPres * (item.importe_unitario || 0));
+      acumulado += importePres;
+
+      const acumPresUnidad = (item.med_acum_anterior_unidad || 0) + cantPres;
+      const acumPresImporte = (item.med_acum_anterior_importe || 0) + importePres;
+      const saldoUnidad = Math.max(0, (item.cantidad || 0) - acumPresUnidad);
+      const saldoImporte = Math.max(0, itemFull - acumPresImporte);
+
+      return {
+        ...item,
+        med_presente_unidad: cantPres,
+        med_presente_importe: importePres,
+        med_acum_presente_unidad: acumPresUnidad,
+        med_acum_presente_importe: acumPresImporte,
+        saldo_pendiente_unidad: saldoUnidad,
+        saldo_pendiente_importe: saldoImporte,
+      };
+    });
+
+    setForm(f => ({ ...f, items: newItems }));
+  };
+
   const validacion = useMemo(() => {
     const v = form._validation;
     if (!v?.subtotal_documento) return null;
@@ -169,7 +216,22 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           <Field label="Fecha de Finalización"><Input type="date" value={form.fecha_finalizacion} onChange={e => set('fecha_finalizacion', e.target.value)} /></Field>
           <Field label="Monto Contratado $"><Input type="number" value={form.monto_contratado} onChange={e => set('monto_contratado', +e.target.value)} /></Field>
           <Field label="Monto Obra Contratada $"><Input type="number" value={form.monto_obra_contratada} onChange={e => set('monto_obra_contratada', +e.target.value)} /></Field>
-          <Field label="% Avance de Obra"><Input type="number" min="0" max="100" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', +e.target.value)} /></Field>
+          <Field label="% Avance de Obra">
+            <div className="flex gap-2">
+              <Input type="number" min="0" max="100" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', +e.target.value)} />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="shrink-0 gap-1.5 text-xs px-3"
+                onClick={aplicarAvance}
+                title="Distribuir el % de avance sobre los ítems"
+              >
+                <Wand2 className="h-3.5 w-3.5" />
+                Aplicar
+              </Button>
+            </div>
+          </Field>
           <Field label="Fecha del Certificado"><Input type="date" value={form.fecha_certificado} onChange={e => set('fecha_certificado', e.target.value)} /></Field>
           <Field label="N° de Recepción"><Input value={form.numero_recepcion} onChange={e => set('numero_recepcion', e.target.value)} /></Field>
         </div>
