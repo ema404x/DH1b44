@@ -1,108 +1,115 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 import jsPDF from 'npm:jspdf@4.0.0';
 
-// Calcula el último día hábil del mes (lunes-viernes, sin feriados argentinos)
+// Feriados fijos argentinos
+const FERIADOS_FIJOS = [
+  { month: 1, day: 1 },   // Año Nuevo
+  { month: 3, day: 24 },  // Día de la Memoria
+  { month: 4, day: 2 },   // Veteranos de Malvinas
+  { month: 5, day: 1 },   // Día del Trabajo
+  { month: 5, day: 25 },  // Revolución de Mayo
+  { month: 6, day: 20 },  // Paso a la Inmortalidad de Belgrano
+  { month: 7, day: 9 },   // Independencia
+  { month: 8, day: 17 },  // Paso a la Inmortalidad de San Martín
+  { month: 10, day: 12 }, // Día del Respeto a la Diversidad Cultural
+  { month: 11, day: 20 }, // Día de la Soberanía Nacional
+  { month: 12, day: 8 },  // Inmaculada Concepción
+  { month: 12, day: 25 }, // Navidad
+];
+
+function isHoliday(date) {
+  return FERIADOS_FIJOS.some(h => h.month === date.getMonth() + 1 && h.day === date.getDate());
+}
+
+function isBusinessDay(date) {
+  const d = date.getDay();
+  return d !== 0 && d !== 6 && !isHoliday(date);
+}
+
 function getLastBusinessDayOfMonth(year, month) {
-  const fixedHolidays = [
-    { month: 1, day: 1 },   // Año Nuevo
-    { month: 5, day: 1 },   // Día del Trabajo
-    { month: 7, day: 9 },   // Independencia
-    { month: 12, day: 25 }, // Navidad
-  ];
-
-  const isHoliday = (date) => {
-    return fixedHolidays.some(h => h.month === date.getMonth() + 1 && h.day === date.getDate());
-  };
-
-  const isBusinessDay = (date) => {
-    const dayOfWeek = date.getDay();
-    return dayOfWeek !== 0 && dayOfWeek !== 6 && !isHoliday(date);
-  };
-
   const lastDay = new Date(year, month, 0).getDate();
   let date = new Date(year, month - 1, lastDay);
-
   while (!isBusinessDay(date)) {
     date.setDate(date.getDate() - 1);
   }
-
   return date;
 }
 
-// Obtiene el número secuencial del próximo certificado
-async function getNextCertificateNumber(base44, contratista, mes) {
-  const existingCerts = await base44.asServiceRole.entities.Certificado.filter({
-    contratista: contratista,
-    mes_periodo: mes
-  });
-  
-  return (existingCerts.length || 0) + 1;
-}
-
-// Genera PDF del certificado
 function generateCertificatePDF(certificado) {
-  const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  let yPos = 10;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const W = 297, M = 10;
 
-  // Encabezado
-  doc.setFontSize(16);
-  doc.text('CERTIFICADO DE ABONO MENSUAL', pageWidth / 2, yPos, { align: 'center' });
-  yPos += 10;
+  doc.setFillColor(15, 28, 46);
+  doc.rect(0, 0, W, 22, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+  doc.text('MEJORES', M, 10);
+  doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+  doc.text('en mantenimiento, obras y servicios', M, 16);
+  doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+  doc.text(`CERTIFICADO DE ABONO MENSUAL N° ${certificado.numero}`, W - M, 10, { align: 'right' });
+  doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+  doc.text(`Mes: ${certificado.mes_periodo} · Fecha: ${certificado.fecha_certificado}`, W - M, 16, { align: 'right' });
 
-  // Info principal
-  doc.setFontSize(10);
-  doc.text(`Nº ${certificado.numero}`, 20, yPos);
-  doc.text(`Mes: ${certificado.mes_periodo}`, pageWidth - 40, yPos);
-  yPos += 8;
+  let y = 30;
+  doc.setTextColor(60, 60, 60); doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold'); doc.text('CONTRATISTA:', M, y);
+  doc.setFont('helvetica', 'normal'); doc.text(certificado.contratista || '—', M + 30, y);
+  doc.setFont('helvetica', 'bold'); doc.text('EMPRENDIMIENTO:', W / 2, y);
+  doc.setFont('helvetica', 'normal'); doc.text(certificado.emprendimiento || '—', W / 2 + 35, y);
+  y += 8;
+  doc.setFont('helvetica', 'bold'); doc.text('OBRA / SERVICIO:', M, y);
+  doc.setFont('helvetica', 'normal'); doc.text(certificado.obra_servicio || '—', M + 30, y);
+  doc.setFont('helvetica', 'bold'); doc.text('ADA N°:', W / 2, y);
+  doc.setFont('helvetica', 'normal'); doc.text(certificado.ada_numero || '—', W / 2 + 18, y);
+  y += 12;
 
-  doc.text(`Contratista: ${certificado.contratista}`, 20, yPos);
-  yPos += 6;
-
-  doc.text(`Fecha: ${new Date(certificado.fecha_certificado).toLocaleDateString('es-AR')}`, 20, yPos);
-  yPos += 12;
-
-  // Tabla de items
   if (certificado.items && certificado.items.length > 0) {
-    doc.setFontSize(9);
-    doc.text('ITEMS:', 20, yPos);
-    yPos += 6;
+    doc.setFillColor(15, 28, 46); doc.rect(M, y, W - M * 2, 6, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(6); doc.setFont('helvetica', 'bold');
+    doc.text('N°', M + 2, y + 4);
+    doc.text('DESCRIPCIÓN', M + 10, y + 4);
+    doc.text('UM', M + 120, y + 4);
+    doc.text('CANTIDAD', M + 135, y + 4);
+    doc.text('P. UNITARIO', M + 158, y + 4);
+    doc.text('IMPORTE TOTAL', M + 185, y + 4);
+    y += 7;
 
-    // Headers tabla
-    doc.setFillColor(200, 200, 200);
-    const colX = [20, 80, 100, 130, 160];
-    doc.text('Descripción', colX[0], yPos);
-    doc.text('Cantidad', colX[1], yPos);
-    doc.text('Unitario', colX[2], yPos);
-    doc.text('Total', colX[3], yPos);
-    yPos += 6;
-
-    // Items
-    certificado.items.forEach((item, idx) => {
-      if (yPos > pageHeight - 20) {
-        doc.addPage();
-        yPos = 10;
-      }
-      doc.text((idx + 1).toString(), colX[0], yPos);
-      doc.text(item.descripcion || '', colX[0] + 5, yPos);
-      doc.text(item.cantidad?.toString() || '', colX[1], yPos);
-      doc.text(`$${item.importe_unitario?.toFixed(2) || '0.00'}`, colX[2], yPos);
-      doc.text(`$${item.importe_total?.toFixed(2) || '0.00'}`, colX[3], yPos);
-      yPos += 6;
+    doc.setTextColor(50, 50, 50); doc.setFont('helvetica', 'normal');
+    certificado.items.forEach((item, i) => {
+      if (y > 178) { doc.addPage(); y = 15; }
+      if (i % 2 === 0) { doc.setFillColor(247, 247, 247); doc.rect(M, y - 1, W - M * 2, 5.5, 'F'); }
+      doc.setFontSize(5.5);
+      doc.text(String(i + 1), M + 2, y + 3);
+      doc.text(doc.splitTextToSize(item.descripcion || '', 105)[0], M + 10, y + 3);
+      doc.text(item.um || '', M + 120, y + 3);
+      doc.text(String(item.cantidad || ''), M + 135, y + 3);
+      doc.text(`$${(item.importe_unitario || 0).toLocaleString('es-AR')}`, M + 158, y + 3);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`$${(item.importe_total || 0).toLocaleString('es-AR')}`, M + 185, y + 3);
+      doc.setFont('helvetica', 'normal');
+      y += 5.5;
     });
 
-    yPos += 4;
-    doc.setFontSize(11);
-    doc.text(`SUBTOTAL: $${certificado.subtotal?.toFixed(2) || '0.00'}`, pageWidth - 60, yPos);
+    y += 4;
+    const subtotal = certificado.subtotal || 0;
+    doc.setFillColor(230, 240, 255); doc.rect(W - M - 80, y, 80, 5, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(15, 28, 46);
+    doc.text('SUBTOTAL:', W - M - 78, y + 3.5);
+    doc.text(`$${subtotal.toLocaleString('es-AR')}`, W - M - 1, y + 3.5, { align: 'right' });
+  }
+
+  // Footer
+  const pages = doc.getNumberOfPages();
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p);
+    doc.setFillColor(15, 28, 46); doc.rect(0, 197, W, 8, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(6); doc.setFont('helvetica', 'normal');
+    doc.text('Av. Córdoba 1351 1°Piso · (C1055AAD) Ciudad Aut. de Bs. As. · Tel 4816-0111 · www.mejores.ar', M, 202);
+    doc.text(`CERT N° ${certificado.numero} · Pág ${p}/${pages}`, W - M, 202, { align: 'right' });
   }
 
   return doc.output('arraybuffer');
-}
-
-// Obtiene clientes activos
-async function getActiveClients(base44) {
-  return await base44.asServiceRole.entities.Client.filter({ status: 'activo' });
 }
 
 Deno.serve(async (req) => {
@@ -114,32 +121,62 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
+    const body = await req.json().catch(() => ({}));
+    const forceRun = body.forceRun === true;
 
-    const lastBusinessDay = getLastBusinessDayOfMonth(year, month);
-    
-    const isLastBusinessDay = 
-      today.getDate() === lastBusinessDay.getDate() &&
-      today.getMonth() === lastBusinessDay.getMonth() &&
-      today.getFullYear() === lastBusinessDay.getFullYear();
+    // Fecha actual (Argentina UTC-3)
+    const now = new Date();
+    const argOffset = -3 * 60;
+    const argNow = new Date(now.getTime() + (argOffset - now.getTimezoneOffset()) * 60000);
+    const todayYear = argNow.getFullYear();
+    const todayMonth = argNow.getMonth() + 1;
+    const todayDay = argNow.getDate();
 
-    if (!isLastBusinessDay) {
-      return Response.json({ 
-        message: `No es el último día hábil. Próxima ejecución: ${lastBusinessDay.toLocaleDateString('es-AR')}`,
-        shouldRun: false
+    // El último día hábil del mes ACTUAL es cuando se emiten los certificados del MES SIGUIENTE
+    const lastBizDay = getLastBusinessDayOfMonth(todayYear, todayMonth);
+    const isLastBizDay = todayDay === lastBizDay.getDate();
+
+    if (!forceRun && !isLastBizDay) {
+      return Response.json({
+        shouldRun: false,
+        message: `No es el último día hábil del mes. Próxima emisión automática: ${lastBizDay.toLocaleDateString('es-AR')} (para el mes siguiente).`,
+        nextRunDate: lastBizDay.toISOString().split('T')[0],
       });
     }
 
-    const clients = await getActiveClients(base44);
+    // El certificado es para el MES SIGUIENTE
+    let certYear = todayYear;
+    let certMonth = todayMonth + 1;
+    if (certMonth > 12) { certMonth = 1; certYear++; }
+    const mesFormato = `${certYear}-${String(certMonth).padStart(2, '0')}`;
+
+    // Buscar clientes activos con abono_mensual activo
+    const clients = await base44.asServiceRole.entities.Client.filter({ status: 'activo' });
+
     const generatedCerts = [];
-    const mesFormato = `${year}-${String(month).padStart(2, '0')}`;
+    const skipped = [];
 
     for (const client of clients) {
-      const certNumber = await getNextCertificateNumber(base44, client.name, mesFormato);
-      
-      // Generar PDF
+      // Verificar idempotencia: no generar si ya existe para ese mes
+      const existing = await base44.asServiceRole.entities.Certificado.filter({
+        contratista_id: client.id,
+        mes_periodo: mesFormato,
+        tipo: 'abono_mensual',
+        generado_automaticamente: true
+      });
+
+      if (existing.length > 0) {
+        skipped.push({ contratista: client.name, reason: 'Ya existe para este mes' });
+        continue;
+      }
+
+      // Obtener último número de certificado
+      const allCerts = await base44.asServiceRole.entities.Certificado.filter({}, '-numero', 1);
+      const lastNum = allCerts.length > 0 ? (allCerts[0].numero || 0) : 0;
+      const certNumber = lastNum + 1;
+
+      const fechaCert = lastBizDay.toISOString().split('T')[0];
+
       const newCert = {
         numero: certNumber,
         tipo: 'abono_mensual',
@@ -147,36 +184,25 @@ Deno.serve(async (req) => {
         generado_automaticamente: true,
         contratista: client.name,
         contratista_id: client.id,
+        emprendimiento: client.notes || '',
         mes_periodo: mesFormato,
-        fecha_certificado: today.toISOString().split('T')[0],
+        fecha_certificado: fechaCert,
         items: [],
         subtotal: 0,
         anticipo_pct: 0,
         fondo_reparo_pct: 5,
       };
 
-      const pdfBuffer = generateCertificatePDF(newCert);
-      
-      // Construir nombre de archivo con estructura de carpetas
-      const fileName = `${client.name}/${year}/${String(month).padStart(2, '0')}/certificado_${certNumber}.pdf`;
-      
-      // Guardar PDF (simulamos la estructura de carpetas en el nombre)
-      const pdfBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
-      const formData = new FormData();
-      formData.append('file', pdfBlob, fileName);
-
-      // Intentar subir el PDF
+      // Intentar generar y subir PDF
       let pdfUrl = '';
       try {
-        const uploadRes = await base44.integrations.Core.UploadFile({
-          file: pdfBuffer
-        });
+        const pdfBuffer = generateCertificatePDF(newCert);
+        const uploadRes = await base44.integrations.Core.UploadFile({ file: pdfBuffer });
         pdfUrl = uploadRes.file_url;
-      } catch (uploadErr) {
-        console.log('PDF upload skipped:', uploadErr.message);
+      } catch (e) {
+        console.log('PDF upload error:', e.message);
       }
 
-      // Guardar certificado en BD
       newCert.pdf_url = pdfUrl;
       const created = await base44.asServiceRole.entities.Certificado.create(newCert);
 
@@ -189,11 +215,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    return Response.json({ 
+    return Response.json({
       success: true,
-      message: `Se generaron ${generatedCerts.length} certificados mensuales`,
+      message: `Emisión para ${mesFormato}: ${generatedCerts.length} certificados generados, ${skipped.length} omitidos.`,
       generatedCertificates: generatedCerts,
-      executionDate: today.toLocaleDateString('es-AR')
+      skipped,
+      mesPeriodo: mesFormato,
+      executionDate: argNow.toLocaleDateString('es-AR')
     });
 
   } catch (error) {
