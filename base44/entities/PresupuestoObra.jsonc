@@ -1,0 +1,154 @@
+{
+  "name": "PresupuestoObra",
+  "type": "object",
+  "properties": {
+    "codigo": {
+      "type": "string"
+    },
+    "titulo": {
+      "type": "string"
+    },
+    "cliente_nombre": {
+      "type": "string"
+    },
+    "cliente_id": {
+      "type": "string"
+    },
+    "proyecto_nombre": {
+      "type": "string"
+    },
+    "proyecto_id": {
+      "type": "string"
+    },
+    "direccion_obra": {
+      "type": "string"
+    },
+    "responsable": {
+      "type": "string"
+    },
+    "licitacion": {
+      "type": "string",
+      "description": "N\u00famero de licitaci\u00f3n (ej: LICIT. P\u00daBLICA N\u00ba 558-0158-LPU22)"
+    },
+    "comuna": {
+      "type": "string",
+      "enum": [
+        "8A",
+        "8B",
+        "10A",
+        "otro"
+      ],
+      "default": "8A",
+      "description": "Comuna del preciario ministerial asociado"
+    },
+    "coef_pase": {
+      "type": "number",
+      "default": 1.6504,
+      "description": "Coeficiente de pase"
+    },
+    "coef_oferta": {
+      "type": "number",
+      "default": 1.38,
+      "description": "Coeficiente de oferta"
+    },
+    "preciario_fecha": {
+      "type": "string",
+      "description": "Fecha del preciario utilizado"
+    },
+    "plazo": {
+      "type": "string",
+      "description": "Plazo de obra"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "borrador",
+        "enviado",
+        "aprobado",
+        "rechazado",
+        "facturado"
+      ],
+      "default": "borrador"
+    },
+    "fecha_emision": {
+      "type": "string",
+      "format": "date"
+    },
+    "fecha_validez": {
+      "type": "string",
+      "format": "date"
+    },
+    "rubros": {
+      "type": "array",
+      "description": "Grupos de \u00edtems por rubro",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "precario_id": {
+                  "type": "string",
+                  "description": "C\u00f3digo del \u00edtem en el preciario"
+                },
+                "codigo": {
+                  "type": "string"
+                },
+                "descripcion": {
+                  "type": "string"
+                },
+                "unidad": {
+                  "type": "string"
+                },
+                "cantidad": {
+                  "type": "number"
+                },
+                "precio_unitario": {
+                  "type": "number"
+                },
+                "total": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "subtotal": {
+      "type": "number",
+      "default": 0
+    },
+    "gastos_generales_pct": {
+      "type": "number",
+      "default": 15
+    },
+    "beneficio_pct": {
+      "type": "number",
+      "default": 10
+    },
+    "iva_pct": {
+      "type": "number",
+      "default": 21
+    },
+    "total": {
+      "type": "number",
+      "default": 0
+    },
+    "notas": {
+      "type": "string"
+    },
+    "factura_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "titulo",
+    "cliente_nombre"
+  ]
+}
