@@ -1,51 +1,31 @@
 import jsPDF from 'jspdf';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 
-// ── Brand colors Mejores (gris + rojo) ───────────────────────────────────────
-const C = {
-  dark:    [60,  60,  60],      // gris oscuro (texto principal, logo)
-  navyMid: [60,  60,  60],      // alias → dark
-  navy:    [60,  60,  60],      // alias → dark
-  red:     [192, 57,  43],      // rojo Mejores
-  blue:    [192, 57,  43],      // alias → red
-  accent:  [90,  90,  90],      // gris medio
-  blueLt:  [245, 235, 233],     // rojo muy claro
-  gold:    [192, 57,  43],      // alias → red
-  white:   [255, 255, 255],
-  offWht:  [250, 250, 250],
-  gray1:   [50,  50,  50],      // texto oscuro
-  gray2:   [100, 100, 100],     // texto medio
-  gray3:   [160, 160, 160],     // texto muted
-  gray4:   [220, 220, 220],     // líneas/bordes
-  rowAlt:  [247, 247, 247],     // fila alternada
-};
+// ── Colores ───────────────────────────────────────────────────────────────────
+const NAVY   = [10,  24,  52];   // #0A1834
+const NAVY2  = [29,  64,  96];   // #1D4060
+const BLUE   = [205, 225, 245];  // azul claro encabezado
+const RED    = [192, 57,  43];
+const WHITE  = [255, 255, 255];
+const GRAY1  = [30,  30,  30];
+const GRAY2  = [80,  80,  80];
+const GRAY3  = [150, 150, 150];
+const GRAY4  = [210, 210, 210];
+const OFFWHT = [248, 250, 252];
+const YELLOW = [255, 255, 200];
+const GREEN  = [226, 239, 218];
 
-const fmt = (n) =>
-  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+const LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
 
-const fmtDate = (d) => {
-  try { return d ? format(new Date(d), 'dd/MM/yyyy', { locale: es }) : '—'; } catch { return d || '—'; }
-};
+const PAGE_W = 297;  // A4 landscape
+const PAGE_H = 210;
+const M = 10;        // margin
+const C = PAGE_W - M * 2;
 
-const rgb = (doc, arr) => doc.setTextColor(...arr);
-const fill = (doc, arr) => doc.setFillColor(...arr);
-const draw = (doc, arr) => doc.setDrawColor(...arr);
-const bold = (doc) => doc.setFont('helvetica', 'bold');
-const normal = (doc) => doc.setFont('helvetica', 'normal');
-
-// ── Page geometry ─────────────────────────────────────────────────────────────
-const PAGE_W = 210;
-const MARGIN = 14;
-const COL = PAGE_W - MARGIN * 2;
-
-const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
-
-async function loadLogoBase64(url) {
+async function loadLogo() {
   try {
-    const res = await fetch(url);
+    const res = await fetch(LOGO_URL);
     const blob = await res.blob();
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result);
       reader.readAsDataURL(blob);
@@ -53,298 +33,363 @@ async function loadLogoBase64(url) {
   } catch { return null; }
 }
 
-// ── HEADER COVER ──────────────────────────────────────────────────────────────
-function drawHeader(doc, form, logoBase64) {
-  // ── Fondo blanco con línea roja inferior
-  fill(doc, C.white); doc.rect(0, 0, PAGE_W, 52, 'F');
-  fill(doc, C.red); doc.rect(0, 49, PAGE_W, 3, 'F');
-
-  // ── Logo Mejores (imagen real)
-  if (logoBase64) {
-    doc.addImage(logoBase64, 'JPEG', MARGIN, 5, 60, 22);
-  } else {
-    // Fallback vectorial
-    const lx = MARGIN, ly = 8;
-    fill(doc, C.accent); doc.rect(lx, ly, 5, 10, 'F');
-    fill(doc, C.red);    doc.rect(lx + 6, ly, 9, 4.5, 'F');
-    fill(doc, C.accent); doc.rect(lx + 6, ly + 5.5, 9, 4.5, 'F');
-    fill(doc, C.red);    doc.circle(lx + 24, ly + 1, 1, 'F');
-    bold(doc); doc.setFontSize(20); rgb(doc, C.dark);
-    doc.text('Mejores', lx + 17, ly + 9);
-    normal(doc); doc.setFontSize(7); rgb(doc, C.gray3);
-    doc.text('en mantenimiento, obras y servicios', lx + 17, ly + 13.5);
-  }
-  normal(doc); doc.setFontSize(6.5); rgb(doc, C.gray3);
-  doc.text('info@mejores.com.ar  ·  +54 (11) 4000-0000', MARGIN, 30);
-
-  // Divider (vertical)
-  draw(doc, C.gray4); doc.setLineWidth(0.3);
-  doc.line(PAGE_W / 2, 6, PAGE_W / 2, 46);
-
-  // ── Document info right side
-  bold(doc); doc.setFontSize(14); rgb(doc, C.dark);
-  doc.text('PRESUPUESTO DE OBRA', PAGE_W - MARGIN, 16, { align: 'right' });
-
-  const estadoColor = { borrador: C.gray3, enviado: C.accent, aprobado: [60,140,60], rechazado: C.red, facturado: C.dark };
-  const estadoLabels = { borrador:'BORRADOR', enviado:'ENVIADO', aprobado:'APROBADO', rechazado:'RECHAZADO', facturado:'FACTURADO' };
-  const stColor = estadoColor[form.estado] || C.gray3;
-
-  fill(doc, stColor);
-  doc.roundedRect(PAGE_W - MARGIN - 36, 21, 36, 6.5, 1, 1, 'F');
-  bold(doc); doc.setFontSize(7); rgb(doc, C.white);
-  doc.text(estadoLabels[form.estado] || (form.estado || '').toUpperCase(), PAGE_W - MARGIN - 18, 25.5, { align: 'center' });
-
-  normal(doc); doc.setFontSize(7.5); rgb(doc, C.gray2);
-  doc.text(`Código:  ${form.codigo || '—'}`, PAGE_W - MARGIN, 31.5, { align: 'right' });
-  doc.text(`Emisión: ${fmtDate(form.fecha_emision)}`, PAGE_W - MARGIN, 37, { align: 'right' });
-  doc.text(`Validez: ${fmtDate(form.fecha_validez)}`, PAGE_W - MARGIN, 42, { align: 'right' });
-
-  return 58;
+function fmtMoney(n) {
+  return new Intl.NumberFormat('es-AR', { style:'currency', currency:'ARS', maximumFractionDigits:0 }).format(n || 0);
 }
 
-// ── PROJECT INFO BLOCK ────────────────────────────────────────────────────────
-function drawProjectInfo(doc, form, y) {
-  // Section title
-  bold(doc); doc.setFontSize(7.5); rgb(doc, C.blue);
-  doc.text('DATOS DEL PROYECTO', MARGIN, y);
-  draw(doc, C.blue); doc.setLineWidth(0.5);
-  doc.line(MARGIN, y + 1.5, MARGIN + 52, y + 1.5);
-  y += 5;
+function fmtDate(d) {
+  try { if (!d) return '—'; const [y,m,day] = d.split('-'); return `${day}/${m}/${y}`; }
+  catch { return d || '—'; }
+}
 
-  // Two column grid
-  const rows = [
-    ['Cliente',       form.cliente_nombre  || '—', 'Proyecto',    form.proyecto_nombre || '—'],
-    ['Dirección',     form.direccion_obra  || '—', 'Responsable', form.responsable     || '—'],
+function newPage(doc) {
+  doc.addPage();
+  return M;
+}
+
+function drawPageHeader(doc, form, logoBase64, pageNum) {
+  // Barra superior navy
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, PAGE_W, 14, 'F');
+
+  if (logoBase64 && pageNum === 1) {
+    doc.addImage(logoBase64, 'JPEG', M, 1, 38, 12);
+  }
+
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('PLANILLA DE CÓMPUTO Y PRESUPUESTO', PAGE_W / 2, 9, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.text(`${form.codigo || ''} · Pág. ${pageNum}`, PAGE_W - M, 9, { align: 'right' });
+
+  return 18;
+}
+
+function drawMetaBlock(doc, form, y) {
+  const labelStyle = (label) => {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...GRAY2);
+    return label;
+  };
+
+  const col1 = M, col2 = M + 38, col3 = PAGE_W / 2 + 2, col4 = PAGE_W / 2 + 42;
+  const rowH = 6.5;
+
+  const leftMeta = [
+    ['COMITENTE:',    form.cliente_nombre || 'GCBA - MINISTERIO DE EDUCACIÓN GCBA'],
+    ['LICITACIÓN:',   form.licitacion || '—'],
+    ['ESCUELA:',      form.proyecto_nombre || '—'],
+    ['OBRA:',         form.titulo || '—'],
+    ['DIRECCIÓN:',    form.direccion_obra || '—'],
+    ['SUPERVISOR:',   form.responsable || '—'],
   ];
 
-  rows.forEach(([l1, v1, l2, v2]) => {
-    // Left cell
-    fill(doc, C.offWht); doc.roundedRect(MARGIN, y - 1, COL / 2 - 2, 7, 0.8, 0.8, 'F');
-    bold(doc); doc.setFontSize(6.5); rgb(doc, C.gray2); doc.text(l1, MARGIN + 2, y + 2);
-    normal(doc); doc.setFontSize(7.5); rgb(doc, C.gray1);
-    doc.text(doc.splitTextToSize(v1, COL / 2 - 10)[0], MARGIN + 2, y + 5.5);
-    // Right cell
-    const rx = MARGIN + COL / 2 + 1;
-    fill(doc, C.offWht); doc.roundedRect(rx, y - 1, COL / 2 - 2, 7, 0.8, 0.8, 'F');
-    bold(doc); doc.setFontSize(6.5); rgb(doc, C.gray2); doc.text(l2, rx + 2, y + 2);
-    normal(doc); doc.setFontSize(7.5); rgb(doc, C.gray1);
-    doc.text(doc.splitTextToSize(v2, COL / 2 - 10)[0], rx + 2, y + 5.5);
-    y += 9.5;
+  const rightMeta = [
+    ['Nº PRESUPUESTO:',   form.codigo || '—'],
+    ['EMPRESA:',          'MEJORES HOSPITALES S.A.'],
+    ['FECHA:',            fmtDate(form.fecha_emision)],
+    ['PLAZO:',            form.plazo || '—'],
+    ['Coef. Pase:',       String(form.coef_pase ?? 1.6504)],
+    ['Coef. Oferta:',     String(form.coef_oferta ?? 1.38)],
+  ];
+
+  if (form.preciario_fecha) rightMeta.push(['Preciario:',  fmtDate(form.preciario_fecha)]);
+
+  // Fondo del bloque
+  doc.setFillColor(...OFFWHT);
+  doc.rect(M, y - 1, C, Math.max(leftMeta.length, rightMeta.length) * rowH + 4, 'F');
+  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.2);
+  doc.rect(M, y - 1, C, Math.max(leftMeta.length, rightMeta.length) * rowH + 4);
+
+  leftMeta.forEach(([label, val], i) => {
+    const rowY = y + i * rowH + 4;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...GRAY3);
+    doc.text(label, col1 + 1, rowY);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...GRAY1);
+    doc.text(doc.splitTextToSize(val, col3 - col2 - 4)[0], col2, rowY);
   });
 
-  return y + 3;
+  rightMeta.forEach(([label, val], i) => {
+    const rowY = y + i * rowH + 4;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...GRAY3);
+    doc.text(label, col3, rowY);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...GRAY1);
+    doc.text(val, col4, rowY);
+  });
+
+  // Divider vertical
+  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.2);
+  doc.line(PAGE_W / 2, y - 1, PAGE_W / 2, y + Math.max(leftMeta.length, rightMeta.length) * rowH + 3);
+
+  return y + Math.max(leftMeta.length, rightMeta.length) * rowH + 8;
 }
 
-// ── TABLE HEADER ROW ──────────────────────────────────────────────────────────
+// ── Cabecera de tabla de ítems ────────────────────────────────────────────────
+// Columnas: ÍTEM | CÓD.PRECIARIO | DESCRIPCIÓN | UNID | CANT | PU MAT | PU MO | TOTAL PU | COEF PASE | TOTAL PASE | COEF OFERTA | PRECIO RESULT
+const COLS = {
+  item:   { x: M,    w: 10 },
+  cod:    { x: M+10, w: 18 },
+  desc:   { x: M+28, w: 70 },
+  unid:   { x: M+98, w: 10 },
+  cant:   { x: M+108,w: 12 },
+  puMat:  { x: M+120,w: 18 },
+  puMo:   { x: M+138,w: 18 },
+  puTot:  { x: M+156,w: 18 },
+  cPase:  { x: M+174,w: 13 },
+  tPase:  { x: M+187,w: 20 },
+  cOfer:  { x: M+207,w: 13 },
+  result: { x: M+220,w: 67 },
+};
+
 function drawTableHeader(doc, y) {
-  fill(doc, C.navyMid); doc.rect(MARGIN, y, COL, 6.5, 'F');
-  bold(doc); doc.setFontSize(6.5); rgb(doc, C.white);
-  doc.text('CÓD.',     MARGIN + 1,   y + 4.2);
-  doc.text('DESCRIPCIÓN',            MARGIN + 15,  y + 4.2);
-  doc.text('UD.',                    MARGIN + 107, y + 4.2);
-  doc.text('CANT.',                  MARGIN + 118, y + 4.2, { align: 'right' });
-  doc.text('P. UNIT.',               MARGIN + 148, y + 4.2, { align: 'right' });
-  doc.text('TOTAL',   PAGE_W - MARGIN - 1, y + 4.2, { align: 'right' });
-  return y + 7.5;
+  const h1 = 6, h2 = 6;
+
+  // Primera fila headers agrupados
+  doc.setFillColor(...NAVY);
+  doc.rect(M, y, C, h1, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(5.5); doc.setTextColor(...WHITE);
+  doc.text('ÍTEM',           COLS.item.x + 1,  y + 4);
+  doc.text('CÓD.PRECIARIO',  COLS.cod.x  + 1,  y + 4);
+  doc.text('DESCRIPCIÓN',    COLS.desc.x + 1,  y + 4);
+  doc.text('UNID.',          COLS.unid.x + 1,  y + 4);
+  doc.text('CANT.',          COLS.cant.x + 1,  y + 4);
+  // Grupo PRECIOS UNITARIOS
+  const puGroupX = COLS.puMat.x;
+  const puGroupW = COLS.puMat.w + COLS.puMo.w + COLS.puTot.w;
+  doc.text('PRECIOS UNITARIOS', puGroupX + puGroupW / 2, y + 4, { align: 'center' });
+  // COEF PASE
+  doc.text('COEF. PASE', COLS.cPase.x + (COLS.cPase.w + COLS.tPase.w) / 2, y + 4, { align: 'center' });
+  // COEF OFERTA
+  doc.text('COEF. OFERTA', COLS.cOfer.x + (COLS.cOfer.w + COLS.result.w) / 2, y + 4, { align: 'center' });
+  y += h1;
+
+  // Segunda fila sub-headers
+  doc.setFillColor(...NAVY2);
+  doc.rect(M, y, C, h2, 'F');
+  doc.setFontSize(5); doc.setTextColor(...WHITE);
+  [
+    ['', COLS.item],
+    ['', COLS.cod],
+    ['', COLS.desc],
+    ['', COLS.unid],
+    ['', COLS.cant],
+    ['P.U.MAT.',  COLS.puMat],
+    ['P.U.M.O.',  COLS.puMo],
+    ['TOTAL',     COLS.puTot],
+    ['COEF.',     COLS.cPase],
+    ['TOTAL PASE', COLS.tPase],
+    ['COEF.',     COLS.cOfer],
+    ['PRECIO RESULT.', COLS.result],
+  ].forEach(([label, col]) => {
+    if (label) doc.text(label, col.x + col.w / 2, y + 4, { align: 'center' });
+  });
+  y += h2;
+
+  return y;
 }
 
-// ── ITEM ROW ──────────────────────────────────────────────────────────────────
-function drawItemRow(doc, item, y, isAlt) {
-  if (isAlt) { fill(doc, C.rowAlt); doc.rect(MARGIN, y, COL, 6, 'F'); }
-  normal(doc); doc.setFontSize(7); rgb(doc, C.gray1);
-  doc.text(String(item.codigo || ''), MARGIN + 1, y + 4);
-  const desc = doc.splitTextToSize(item.descripcion || '', 88);
-  doc.text(desc[0], MARGIN + 15, y + 4);
-  doc.text(item.unidad || '', MARGIN + 107, y + 4);
-  doc.text(String(item.cantidad ?? ''), MARGIN + 118, y + 4, { align: 'right' });
-  normal(doc); rgb(doc, C.gray2);
-  doc.text(fmt(item.precio_unitario), MARGIN + 148, y + 4, { align: 'right' });
-  bold(doc); rgb(doc, C.gray1);
-  doc.text(fmt(item.total), PAGE_W - MARGIN - 1, y + 4, { align: 'right' });
+function drawRubroHeader(doc, rubro, y) {
+  const subtotal = (rubro.items || []).reduce((a, i) => a + (Number(i.total) || 0), 0);
+  doc.setFillColor(...BLUE);
+  doc.rect(M, y, C, 7, 'F');
+  doc.setFillColor(...NAVY2);
+  doc.rect(M, y, 2.5, 7, 'F');
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...NAVY);
+  doc.text((rubro.nombre || 'RUBRO').toUpperCase(), M + 5, y + 5);
+  doc.setTextColor(...NAVY2);
+  doc.text(fmtMoney(subtotal), PAGE_W - M - 1, y + 5, { align: 'right' });
+  return y + 8;
+}
+
+function drawItemRow(doc, item, y, isAlt, coef_pase, coef_oferta) {
+  if (isAlt) { doc.setFillColor(...OFFWHT); doc.rect(M, y, C, 6, 'F'); }
+
+  const pu_mat    = Number(item.pu_mat) || Number(item.precio_unitario) || 0;
+  const pu_mo     = Number(item.pu_mo) || 0;
+  const total_pu  = pu_mat + pu_mo;
+  const total_pase   = total_pu > 0 ? total_pu * coef_pase : Number(item.precio_unitario) || 0;
+  const precio_result = total_pase > 0 ? total_pase * coef_oferta : Number(item.precio_unitario) || 0;
+
+  // Fondo precio resultante (amarillo)
+  doc.setFillColor(...YELLOW);
+  doc.rect(COLS.result.x, y, COLS.result.w, 6, 'F');
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...GRAY1);
+  doc.text(String(item._num || ''), COLS.item.x + COLS.item.w / 2, y + 4, { align: 'center' });
+  doc.text(item.codigo || '', COLS.cod.x + 1, y + 4);
+  doc.text(doc.splitTextToSize(item.descripcion || '', 68)[0], COLS.desc.x + 1, y + 4);
+  doc.text(item.unidad || '', COLS.unid.x + COLS.unid.w / 2, y + 4, { align: 'center' });
+
+  doc.setTextColor(...GRAY2);
+  const numRight = (val, col) => doc.text(
+    new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(val || 0),
+    col.x + col.w - 1, y + 4, { align: 'right' }
+  );
+
+  numRight(item.cantidad,  COLS.cant);
+  numRight(pu_mat,         COLS.puMat);
+  numRight(pu_mo,          COLS.puMo);
+  numRight(total_pu,       COLS.puTot);
+  numRight(coef_pase,      COLS.cPase);
+  numRight(total_pase,     COLS.tPase);
+  numRight(coef_oferta,    COLS.cOfer);
+
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(...NAVY);
+  numRight(precio_result,  COLS.result);
+
+  // Línea separadora
+  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.1);
+  doc.line(M, y + 6, PAGE_W - M, y + 6);
+
   return y + 6;
 }
 
-// ── RUBRO HEADER ──────────────────────────────────────────────────────────────
-function drawRubroHeader(doc, rubro, y) {
-  const sub = (rubro.items || []).reduce((a, i) => a + (i.total || 0), 0);
-  fill(doc, C.blueLt); doc.rect(MARGIN, y, COL, 7.5, 'F');
-  draw(doc, C.blue); doc.setLineWidth(0.3);
-  doc.line(MARGIN, y, MARGIN, y + 7.5);
-  fill(doc, C.blue); doc.rect(MARGIN, y, 2, 7.5, 'F');
-
-  bold(doc); doc.setFontSize(8); rgb(doc, C.navyMid);
-  doc.text((rubro.nombre || 'RUBRO').toUpperCase(), MARGIN + 4, y + 5);
-  bold(doc); doc.setFontSize(7.5); rgb(doc, C.blue);
-  doc.text(fmt(sub), PAGE_W - MARGIN - 1, y + 5, { align: 'right' });
-  return y + 9;
-}
-
-// ── RUBRO SUBTOTAL ────────────────────────────────────────────────────────────
-function drawRubroFooter(doc, rubro, y) {
-  const sub = (rubro.items || []).reduce((a, i) => a + (i.total || 0), 0);
-  draw(doc, C.gray4); doc.setLineWidth(0.2);
-  doc.line(PAGE_W - MARGIN - 65, y, PAGE_W - MARGIN, y);
-  normal(doc); doc.setFontSize(7); rgb(doc, C.gray2);
-  doc.text(`Subtotal ${rubro.nombre || ''}`, PAGE_W - MARGIN - 65, y + 3.5);
-  bold(doc); rgb(doc, C.navy);
-  doc.text(fmt(sub), PAGE_W - MARGIN - 1, y + 3.5, { align: 'right' });
+function drawRubroSubtotal(doc, rubro, y) {
+  const sub = (rubro.items || []).reduce((a, i) => a + (Number(i.total) || 0), 0);
+  doc.setFillColor(...GREEN);
+  doc.rect(M, y, C, 5.5, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...NAVY2);
+  doc.text(`Subtotal ${rubro.nombre || ''}`, M + 2, y + 4);
+  doc.text(fmtMoney(sub), PAGE_W - M - 1, y + 4, { align: 'right' });
   return y + 7;
 }
 
-// ── FINANCIAL SUMMARY ─────────────────────────────────────────────────────────
 function drawResumen(doc, form, rubros, y) {
-  const subtotal = rubros.reduce((acc, r) => acc + (r.items || []).reduce((a, i) => a + (i.total || 0), 0), 0);
-  const gg = subtotal * ((form.gastos_generales_pct || 15) / 100);
-  const ben = (subtotal + gg) * ((form.beneficio_pct || 10) / 100);
-  const baseImponible = subtotal + gg + ben;
-  const iva = baseImponible * ((form.iva_pct || 21) / 100);
-  const total = baseImponible + iva;
+  const subtotal = rubros.reduce((a, r) => a + (r.items || []).reduce((b, i) => b + (Number(i.total) || 0), 0), 0);
+  const gg  = subtotal * ((form.gastos_generales_pct || 0) / 100);
+  const ben = (subtotal + gg) * ((form.beneficio_pct || 0) / 100);
+  const base = subtotal + gg + ben;
+  const iva  = base * ((form.iva_pct || 0) / 100);
+  const total = base + iva;
 
-  const bx = MARGIN + 80;   // box left
-  const bw = COL - 80;      // box width
+  const bx = M + C - 95, bw = 95;
 
-  // Separator line
-  draw(doc, C.gray4); doc.setLineWidth(0.4);
-  doc.line(MARGIN, y, PAGE_W - MARGIN, y);
-  y += 6;
+  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.3);
+  doc.line(M, y, PAGE_W - M, y); y += 5;
 
-  // Title
-  bold(doc); doc.setFontSize(8); rgb(doc, C.navyMid);
-  doc.text('RESUMEN FINANCIERO', bx, y);
-  y += 5;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...NAVY);
+  doc.text('RESUMEN FINANCIERO', bx, y); y += 4;
 
-  const rows = [
+  const summaryRows = [
     [`Subtotal de obra`, subtotal],
-    [`Gastos generales (${form.gastos_generales_pct || 15}%)`, gg],
-    [`Beneficio / utilidad (${form.beneficio_pct || 10}%)`, ben],
-    [`Base imponible`, baseImponible],
-    [`IVA (${form.iva_pct || 21}%)`, iva],
+    [`Gastos generales (${form.gastos_generales_pct || 0}%)`, gg],
+    [`Beneficio / utilidad (${form.beneficio_pct || 0}%)`, ben],
+    [`Base imponible`, base],
+    [`IVA (${form.iva_pct || 0}%)`, iva],
   ];
 
-  rows.forEach(([label, val], idx) => {
-    if (idx === 3) {
-      draw(doc, C.gray4); doc.setLineWidth(0.2);
-      doc.line(bx, y - 1, PAGE_W - MARGIN, y - 1);
-    }
-    fill(doc, idx % 2 === 0 ? C.offWht : C.white);
-    doc.rect(bx, y - 1, bw, 5.5, 'F');
-
-    normal(doc); doc.setFontSize(7.5); rgb(doc, C.gray2);
-    doc.text(label, bx + 2, y + 3);
-    bold(doc); rgb(doc, C.gray1);
-    doc.text(fmt(val), PAGE_W - MARGIN - 1, y + 3, { align: 'right' });
+  summaryRows.forEach(([label, val], i) => {
+    if (i % 2 === 0) { doc.setFillColor(...OFFWHT); } else { doc.setFillColor(...WHITE); }
+    doc.rect(bx, y, bw, 5.5, 'F');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...GRAY2);
+    doc.text(label, bx + 2, y + 3.8);
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(...GRAY1);
+    doc.text(fmtMoney(val), PAGE_W - M - 1, y + 3.8, { align: 'right' });
     y += 5.5;
   });
 
-  // TOTAL bar
   y += 2;
-  fill(doc, C.dark); doc.rect(bx, y, bw, 11, 'F');
-  fill(doc, C.red); doc.rect(bx, y, 3, 11, 'F');
-  bold(doc); doc.setFontSize(8.5); rgb(doc, C.white);
-  doc.text('TOTAL', bx + 6, y + 7);
-  doc.setFontSize(11); rgb(doc, C.white);
-  doc.text(fmt(total), PAGE_W - MARGIN - 1, y + 7, { align: 'right' });
+  doc.setFillColor(...NAVY);
+  doc.rect(bx, y, bw, 11, 'F');
+  doc.setFillColor(...RED);
+  doc.rect(bx, y, 3, 11, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...WHITE);
+  doc.text('TOTAL PRESUPUESTO', bx + 5, y + 7.5);
+  doc.setFontSize(9);
+  doc.text(fmtMoney(total), PAGE_W - M - 1, y + 7.5, { align: 'right' });
 
-  return y + 16;
+  return y + 15;
 }
 
-// ── NOTES ────────────────────────────────────────────────────────────────────
-function drawNotas(doc, form, y) {
-  if (!form.notas) return y;
-  bold(doc); doc.setFontSize(7.5); rgb(doc, C.blue);
-  doc.text('NOTAS Y CONDICIONES', MARGIN, y);
-  draw(doc, C.blue); doc.setLineWidth(0.3);
-  doc.line(MARGIN, y + 1.5, MARGIN + 56, y + 1.5);
-  y += 5;
-
-  fill(doc, C.offWht); doc.rect(MARGIN, y - 1, COL, 4, 'F'); // will resize below
-  normal(doc); doc.setFontSize(7.5); rgb(doc, C.gray2);
-  const lines = doc.splitTextToSize(form.notas, COL - 4);
-  const boxH = lines.length * 4 + 3;
-  fill(doc, C.offWht); doc.rect(MARGIN, y - 1, COL, boxH, 'F');
-  draw(doc, C.gray4); doc.setLineWidth(0.2);
-  doc.rect(MARGIN, y - 1, COL, boxH);
-  doc.text(lines, MARGIN + 2, y + 3);
-  return y + boxH + 4;
+function drawFooter(doc, form, pageNum, totalPages) {
+  doc.setFillColor(...NAVY);
+  doc.rect(0, PAGE_H - 8, PAGE_W, 8, 'F');
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6); doc.setTextColor(...WHITE);
+  doc.text('MEJORES HOSPITALES S.A.  ·  en mantenimiento, obras y servicios', M, PAGE_H - 3);
+  doc.text(`${form.codigo || 'PRESUPUESTO'}  ·  Pág. ${pageNum} / ${totalPages}`, PAGE_W - M, PAGE_H - 3, { align: 'right' });
 }
 
-// ── SIGNATURE BLOCK ──────────────────────────────────────────────────────────
-function drawSignatures(doc, form, y) {
-  if (y > 255) { doc.addPage(); y = 20; }
-  y += 8;
-  const half = COL / 2 - 5;
-
-  // Left: company sig
-  draw(doc, C.gray4); doc.setLineWidth(0.3);
-  doc.line(MARGIN, y + 15, MARGIN + half, y + 15);
-  bold(doc); doc.setFontSize(7); rgb(doc, C.gray2);
-  doc.text('MEJORES — Empresa', MARGIN + half / 2, y + 19, { align: 'center' });
-  normal(doc); doc.setFontSize(6.5); rgb(doc, C.gray3);
-  doc.text('Firma y sello', MARGIN + half / 2, y + 23, { align: 'center' });
-
-  // Right: client sig
-  const rx = MARGIN + half + 10;
-  doc.line(rx, y + 15, rx + half, y + 15);
-  bold(doc); doc.setFontSize(7); rgb(doc, C.gray2);
-  doc.text(form.cliente_nombre || 'Cliente', rx + half / 2, y + 19, { align: 'center' });
-  normal(doc); doc.setFontSize(6.5); rgb(doc, C.gray3);
-  doc.text('Conformidad y firma', rx + half / 2, y + 23, { align: 'center' });
-}
-
-// ── GLOBAL FOOTER ────────────────────────────────────────────────────────────
-function drawFooters(doc, form) {
-  const pages = doc.getNumberOfPages();
-  for (let i = 1; i <= pages; i++) {
-    doc.setPage(i);
-    fill(doc, C.red); doc.rect(0, 287, PAGE_W, 10, 'F');
-    normal(doc); doc.setFontSize(6.5); rgb(doc, C.white);
-    doc.text('MEJORES — en mantenimiento, obras y servicios  ·  info@mejores.com.ar', MARGIN, 293);
-    doc.text(`${form.codigo || 'PRESUPUESTO'}  ·  Pág. ${i} / ${pages}`, PAGE_W - MARGIN, 293, { align: 'right' });
-    if (i > 1) {
-      fill(doc, C.red); doc.rect(0, 0, PAGE_W, 3, 'F');
-    }
-  }
-}
-
-// ── MAIN EXPORT ──────────────────────────────────────────────────────────────
+// ── MAIN ──────────────────────────────────────────────────────────────────────
 export async function generatePresupuestoPDF(form) {
-  const logoBase64 = await loadLogoBase64(MEJORES_LOGO_URL);
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const logoBase64 = await loadLogo();
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const rubros = form.rubros || [];
+  const coef_pase   = form.coef_pase ?? 1.6504;
+  const coef_oferta = form.coef_oferta ?? 1.38;
 
-  let y = drawHeader(doc, form, logoBase64);
-  y = drawProjectInfo(doc, form, y);
+  let pageNum = 1;
 
-  // ── Items per rubro
-  rubros.forEach((rubro) => {
-    // Check space for rubro header + table header + at least 1 row
-    if (y + 25 > 278) { doc.addPage(); y = 14; }
+  let y = drawPageHeader(doc, form, logoBase64, pageNum);
+  y = drawMetaBlock(doc, form, y);
+
+  const SAFE_BOTTOM = PAGE_H - 15;
+
+  // Tabla
+  y = drawTableHeader(doc, y);
+
+  let globalItemNum = 1;
+
+  for (const rubro of rubros) {
+    // Si no hay espacio para el header del rubro + al menos 1 fila
+    if (y + 20 > SAFE_BOTTOM) {
+      drawFooter(doc, form, pageNum, '?');
+      doc.addPage(); pageNum++;
+      y = drawPageHeader(doc, form, logoBase64, pageNum);
+      y = drawTableHeader(doc, y);
+    }
 
     y = drawRubroHeader(doc, rubro, y);
-    y = drawTableHeader(doc, y);
 
-    (rubro.items || []).forEach((item, idx) => {
-      if (y + 7 > 278) {
-        doc.addPage(); y = 14;
-        y = drawRubroHeader(doc, rubro, y);
+    for (const item of (rubro.items || [])) {
+      if (y + 6 > SAFE_BOTTOM) {
+        drawFooter(doc, form, pageNum, '?');
+        doc.addPage(); pageNum++;
+        y = drawPageHeader(doc, form, logoBase64, pageNum);
         y = drawTableHeader(doc, y);
+        y = drawRubroHeader(doc, rubro, y);
       }
-      y = drawItemRow(doc, item, y, idx % 2 === 1);
-    });
+      item._num = globalItemNum++;
+      y = drawItemRow(doc, item, y, globalItemNum % 2 === 0, coef_pase, coef_oferta);
+    }
 
-    y = drawRubroFooter(doc, rubro, y);
-    y += 2;
-  });
+    y = drawRubroSubtotal(doc, rubro, y);
+    y += 3;
+  }
 
-  // Financial summary
-  if (y + 60 > 278) { doc.addPage(); y = 14; }
+  // Resumen
+  if (y + 60 > SAFE_BOTTOM) {
+    drawFooter(doc, form, pageNum, '?');
+    doc.addPage(); pageNum++;
+    y = drawPageHeader(doc, form, logoBase64, pageNum);
+    y += 5;
+  }
+
   y = drawResumen(doc, form, rubros, y);
 
-  // Notes & signatures
-  y = drawNotas(doc, form, y);
-  drawSignatures(doc, form, y);
+  // Notas
+  if (form.notas) {
+    if (y + 20 > SAFE_BOTTOM) {
+      drawFooter(doc, form, pageNum, '?');
+      doc.addPage(); pageNum++;
+      y = drawPageHeader(doc, form, logoBase64, pageNum);
+      y += 5;
+    }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...NAVY);
+    doc.text('NOTAS Y CONDICIONES:', M, y); y += 4;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...GRAY2);
+    const lines = doc.splitTextToSize(form.notas, C - 4);
+    doc.text(lines, M + 2, y);
+  }
 
-  drawFooters(doc, form);
+  // Corregir el número de páginas en todos los footers
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    drawFooter(doc, form, p, totalPages);
+  }
 
-  doc.save(`${form.codigo || 'presupuesto'}_MEJORES.pdf`);
+  doc.save(`PCP_${form.codigo || 'presupuesto'}_MEJORES.pdf`);
 }
