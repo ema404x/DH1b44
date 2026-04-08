@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -24,6 +24,13 @@ export default function Mapa() {
   const [expandedLog, setExpandedLog] = useState(null);
   const [tracking, setTracking] = useState(true);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const unsubscribe = base44.entities.LocationQR.subscribe((event) => {
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+    });
+    return unsubscribe;
+  }, [queryClient]);
 
   // Fetch locations
   const { data: locations = [], isLoading: locLoading } = useQuery({
@@ -214,14 +221,14 @@ export default function Mapa() {
 
           <div className="rounded-xl overflow-hidden border border-border shadow-lg bg-white flex-1 relative">
             <MapaInteractivo
-              locations={filteredLocations}
+              locations={locations}
               selectedLocation={selectedLocation}
               onSelectLocation={setSelectedLocation}
               onLocationUpdate={(id, data) => updateLocationMutation.mutate({ id, data })}
               isDraggable={true}
             />
             <MapControls onToggleTracking={() => setTracking(!tracking)} tracking={tracking} />
-            {filteredLocations.length === 0 && (
+            {locations.length === 0 && (
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center bg-black/5 rounded-xl">
                 <div className="text-center bg-white/90 px-6 py-4 rounded-lg backdrop-blur-sm">
                   <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />

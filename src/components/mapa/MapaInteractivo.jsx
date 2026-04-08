@@ -75,6 +75,14 @@ export default function MapaInteractivo({
   }, [validLocations]);
 
   useEffect(() => {
+    if (mapRef.current && validLocations.length > 0) {
+      const avgLat = validLocations.reduce((sum, l) => sum + l.latitude, 0) / validLocations.length;
+      const avgLng = validLocations.reduce((sum, l) => sum + l.longitude, 0) / validLocations.length;
+      mapRef.current.setView([avgLat, avgLng], 13, { animate: true });
+    }
+  }, [validLocations]);
+
+  useEffect(() => {
     if (selectedLocation?.latitude && selectedLocation?.longitude && mapRef.current) {
       mapRef.current.setView([selectedLocation.latitude, selectedLocation.longitude], 16, { animate: true });
     }
