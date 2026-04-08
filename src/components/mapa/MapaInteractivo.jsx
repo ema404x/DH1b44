@@ -94,14 +94,18 @@ export default function MapaInteractivo({ locations, selectedLocation, onSelectL
   // Actualizar zoom en ubicación seleccionada
   useEffect(() => {
     if (selectedLocation && mapInstanceRef.current) {
-      const marker = markersRef.current[selectedLocation.id];
-      if (marker) {
-        mapInstanceRef.current.setView(
-          [selectedLocation.latitude, selectedLocation.longitude],
-          15,
-          { animate: true }
-        );
-        marker.openPopup();
+      const { latitude, longitude } = selectedLocation;
+      if (typeof latitude === 'number' && typeof longitude === 'number' && 
+          !isNaN(latitude) && !isNaN(longitude)) {
+        const marker = markersRef.current[selectedLocation.id];
+        if (marker) {
+          mapInstanceRef.current.setView(
+            [latitude, longitude],
+            15,
+            { animate: true }
+          );
+          marker.openPopup();
+        }
       }
     }
   }, [selectedLocation]);
