@@ -15,6 +15,14 @@ Deno.serve(async (req) => {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet(`CERTIFICADO Nº ${data.numero}`);
 
+      // Cargar logo de Mejores
+      let logoId = null;
+      try {
+        const logoRes = await fetch('https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg');
+        const logoBuffer = await logoRes.arrayBuffer();
+        logoId = workbook.addImage({ buffer: logoBuffer, extension: 'jpeg' });
+      } catch {}
+
       // Configurar ancho de columnas
       sheet.getColumn(1).width = 8;   // ITEM
       sheet.getColumn(2).width = 30;  // DESCRIPCION
@@ -24,7 +32,19 @@ Deno.serve(async (req) => {
       sheet.getColumn(6).width = 12;  // IMPORTE TOTAL
       for (let i = 7; i <= 14; i++) sheet.getColumn(i).width = 11;
 
+      // Fila 1 para el logo (altura 60px)
       let row = 1;
+      sheet.getRow(row).height = 60;
+      sheet.mergeCells(`A${row}:N${row}`);
+      if (logoId !== null) {
+        sheet.addImage(logoId, {
+          tl: { col: 0, row: 0 },
+          ext: { width: 220, height: 55 },
+          editAs: 'oneCell',
+        });
+      }
+      row++;
+
       const addRow = (text, merged = true) => {
         const r = sheet.addRow([text]);
         if (merged) sheet.mergeCells(`A${row}:N${row}`);

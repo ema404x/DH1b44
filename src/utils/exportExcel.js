@@ -336,10 +336,230 @@ function fmtARS(val) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val || 0);
 }
 
+// ── Image embedding helpers ───────────────────────────────────────────────────
+async function fetchImageBase64(url) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]); // raw base64
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
+function base64ToBytes(b64) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function buildXlsxWithImage(sheets, imageBase64) {
+  const globalSS = [];
+  const globalSSMap = {};
+  function globalIdx(val) {
+    const str = String(val);
+    if (globalSSMap[str] === undefined) { globalSSMap[str] = globalSS.length; globalSS.push(str); }
+    return globalSSMap[str];
+  }
+
+  const processedSheets = sheets.map(({ name, rows, colWidths, merges }) => {
+    const rowsXml = rows.map((row, ri) => {
+      const hAttr = row._h ? ` ht="${row._h}" customHeight="1"` : '';
+      const cellsXml = (Array.isArray(row) ? row : []).map((cell, ci) => {
+        if (cell === null || cell === undefined) return '';
+        const ref = `${colName(ci)}${ri + 1}`;
+        const st = cell.s !== undefined ? ` s="${cell.s}"` : '';
+        if (cell.t === 'n' || typeof cell.v === 'number') {
+          return `<c r="${ref}" t="n"${st}><v>${n(cell.v)}</v></c>`;
+        } else {
+          const idx = globalIdx(cell.v ?? '');
+          return `<c r="${ref}" t="s"${st}><v>${idx}</v></c>`;
+        }
+      }).join('');
+      return `<row r="${ri + 1}"${hAttr}>${cellsXml}</row>`;
+    }).join('');
+
+    const colsXml = colWidths
+      ? `<cols>${colWidths.map((w, i) => `<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols>`
+      : '';
+    const mergesXml = (merges && merges.length)
+      ? `<mergeCells count="${merges.length}">${merges.map(m => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>`
+      : '';
+
+    return { name, xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${colsXml}<sheetData>${rowsXml}</sheetData>${mergesXml}</worksheet>` };
+  });
+
+  const ssXml = buildSST(globalSS);
+
+  const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets>${processedSheets.map((s, i) => `<sheet name="${escXml(s.name)}" sheetId="${i+1}" r:id="rId${i+2}"/>`).join('')}</sheets>
+</workbook>`;
+
+  const hasImage = !!imageBase64;
+
+  // Sheet 1 gets the image drawing; other sheets don't
+  const sheetRels = processedSheets.map((_, i) => {
+    if (i === 0 && hasImage) {
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>
+</Relationships>`;
+    }
+    return null;
+  });
+
+  // Patch sheet1 xml to reference drawing
+  if (hasImage) {
+    processedSheets[0].xml = processedSheets[0].xml.replace('</worksheet>', '<drawing r:id="rId1"/></worksheet>');
+    // Add xmlns:r to worksheet
+    processedSheets[0].xml = processedSheets[0].xml.replace(
+      'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',
+      'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
+    );
+  }
+
+  const drawingXml = hasImage ? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+           xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <xdr:oneCellAnchor>
+    <xdr:from><xdr:col>0</xdr:col><xdr:colOff>50000</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>50000</xdr:rowOff></xdr:from>
+    <xdr:ext cx="1800000" cy="630000"/>
+    <xdr:pic>
+      <xdr:nvPicPr>
+        <xdr:cNvPr id="2" name="Logo"/>
+        <xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr>
+      </xdr:nvPicPr>
+      <xdr:blipFill>
+        <a:blip r:embed="rId1"/>
+        <a:stretch><a:fillRect/></a:stretch>
+      </xdr:blipFill>
+      <xdr:spPr>
+        <a:xfrm><a:off x="0" y="0"/><a:ext cx="1800000" cy="630000"/></a:xfrm>
+        <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+      </xdr:spPr>
+    </xdr:pic>
+    <xdr:clientData/>
+  </xdr:oneCellAnchor>
+</xdr:wsDr>` : null;
+
+  const drawingRels = hasImage ? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/logo.jpg"/>
+</Relationships>` : null;
+
+  const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>
+<Relationship Id="rId1a" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+${processedSheets.map((_, i) => `<Relationship Id="rId${i+2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('\n')}
+</Relationships>`;
+
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+${hasImage ? '<Default Extension="jpg" ContentType="image/jpeg"/>' : ''}
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+${processedSheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('\n')}
+${hasImage ? '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>' : ''}
+</Types>`;
+
+  const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+  // Build file map
+  const fileMap = {};
+  const addText = (path, content) => { fileMap[path] = { type: 'text', content }; };
+  const addBin  = (path, bytes)   => { fileMap[path] = { type: 'bin',  content: bytes }; };
+
+  addText('[Content_Types].xml', contentTypes);
+  addText('_rels/.rels', rootRels);
+  addText('xl/workbook.xml', workbookXml);
+  addText('xl/_rels/workbook.xml.rels', workbookRels);
+  addText('xl/sharedStrings.xml', ssXml);
+  addText('xl/styles.xml', STYLES_XML);
+  processedSheets.forEach((sh, i) => {
+    addText(`xl/worksheets/sheet${i+1}.xml`, sh.xml);
+    if (sheetRels[i]) addText(`xl/worksheets/_rels/sheet${i+1}.xml.rels`, sheetRels[i]);
+  });
+  if (hasImage && drawingXml && drawingRels) {
+    addText('xl/drawings/drawing1.xml', drawingXml);
+    addText('xl/drawings/_rels/drawing1.xml.rels', drawingRels);
+    addBin('xl/media/logo.jpg', base64ToBytes(imageBase64));
+  }
+
+  return buildZipMixed(fileMap);
+}
+
+function buildZipMixed(files) {
+  let offset = 0;
+  const localParts = [];
+  const centralHeaders = [];
+
+  for (const [name, entry] of Object.entries(files)) {
+    const nameBytes = str2bytes(name);
+    const dataBytes = entry.type === 'bin' ? entry.content : str2bytes(entry.content);
+    const crc = crc32(dataBytes);
+    const size = dataBytes.length;
+
+    const lh = new Uint8Array(30 + nameBytes.length);
+    const lv = new DataView(lh.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true); lv.setUint16(6, 0, true); lv.setUint16(8, 0, true);
+    lv.setUint16(10, 0, true); lv.setUint16(12, 0, true);
+    lv.setUint32(14, crc, true); lv.setUint32(18, size, true); lv.setUint32(22, size, true);
+    lv.setUint16(26, nameBytes.length, true); lv.setUint16(28, 0, true);
+    lh.set(nameBytes, 30);
+
+    const ch = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0, true); cv.setUint16(10, 0, true); cv.setUint16(12, 0, true); cv.setUint16(14, 0, true);
+    cv.setUint32(16, crc, true); cv.setUint32(20, size, true); cv.setUint32(24, size, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint16(30, 0, true); cv.setUint16(32, 0, true); cv.setUint16(34, 0, true); cv.setUint16(36, 0, true);
+    cv.setUint32(38, 0, true); cv.setUint32(42, offset, true);
+    ch.set(nameBytes, 46);
+
+    localParts.push(lh, dataBytes);
+    centralHeaders.push(ch);
+    offset += lh.length + dataBytes.length;
+  }
+
+  const cdSize = centralHeaders.reduce((s, c) => s + c.length, 0);
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(4, 0, true); ev.setUint16(6, 0, true);
+  ev.setUint16(8, centralHeaders.length, true); ev.setUint16(10, centralHeaders.length, true);
+  ev.setUint32(12, cdSize, true); ev.setUint32(16, offset, true); ev.setUint16(20, 0, true);
+
+  const parts = [...localParts, ...centralHeaders, eocd];
+  const total = parts.reduce((sum, p) => sum + p.length, 0);
+  const result = new Uint8Array(total);
+  let pos = 0;
+  for (const part of parts) { result.set(part, pos); pos += part.length; }
+  return result;
+}
+
+const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC API
 // ─────────────────────────────────────────────────────────────────────────────
-export function exportPresupuestoExcel(form) {
+export async function exportPresupuestoExcel(form) {
+  const imageBase64 = await fetchImageBase64(MEJORES_LOGO_URL);
+
   // ── Sheet 1: Portada ──────────────────────────────────────────────────────
   const portadaColWidths = [28, 45, 20, 20];
 
@@ -352,8 +572,8 @@ export function exportPresupuestoExcel(form) {
   const total = baseImponible + iva;
 
   const portadaRows = [
-    // Row 1 — Company header (height 30)
-    Object.assign([s('MEJORES — Mantenimiento y Construcción Escolar', XF.hdrNavy), empty(XF.hdrNavy), empty(XF.hdrNavy), empty(XF.hdrNavy)], { _h: 30 }),
+    // Row 1 — Logo placeholder row (height 50 para la imagen)
+    Object.assign([s('', XF.hdrNavy), empty(XF.hdrNavy), empty(XF.hdrNavy), empty(XF.hdrNavy)], { _h: 50 }),
     Object.assign([s('info@mejores.com.ar  ·  Sistema de Gestión ERP', XF.italic), empty(), empty(), empty()], { _h: 14 }),
     // Row 3 — blank
     [empty(), empty(), empty(), empty()],
@@ -513,10 +733,10 @@ export function exportPresupuestoExcel(form) {
   }
 
   // ── Build xlsx ─────────────────────────────────────────────────────────────
-  const zipBytes = buildXlsx([
+  const zipBytes = buildXlsxWithImage([
     { name: 'Portada',           rows: portadaRows, colWidths: portadaColWidths, merges: portadaMerges },
     { name: 'Planilla Ministerio', rows: planRows,    colWidths: planColWidths,   merges: planMerges },
-  ]);
+  ], imageBase64);
 
   const blob = new Blob([zipBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
