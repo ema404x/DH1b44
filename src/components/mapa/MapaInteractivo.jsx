@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -111,46 +111,46 @@ export default function MapaInteractivo({
         maxZoom={19}
       />
       {validLocations.map(loc => (
-          <Marker
-            key={loc.id}
-            position={[loc.latitude, loc.longitude]}
-            icon={createCustomIcon(loc.color || 'blue')}
-            draggable={isDraggable}
-            eventHandlers={{
-              click: () => onSelectLocation(loc),
-              dragend: (e) => {
-                if (isDraggable) {
-                  handleMarkerDragEnd(e.target, loc.id);
-                }
-              },
-            }}
-            ref={(marker) => {
-              if (marker) markersRef.current[loc.id] = marker;
-            }}
-          >
-            <Popup className="custom-popup">
-              <div className="min-w-64">
-                <h3 className="font-semibold text-sm mb-2">{loc.name}</h3>
-                {loc.address && (
-                  <p className="text-xs text-muted-foreground mb-2">{loc.address}</p>
-                )}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <p className="text-muted-foreground">Escaneos</p>
-                    <p className="font-semibold">{loc.total_scans || 0}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Estado</p>
-                    <p className="font-semibold">{loc.is_active ? '✓ Activo' : '✗ Inactivo'}</p>
-                  </div>
+        <Marker
+          key={loc.id}
+          position={[loc.latitude, loc.longitude]}
+          icon={createCustomIcon(loc.color || 'blue')}
+          draggable={isDraggable}
+          eventHandlers={{
+            click: () => onSelectLocation(loc),
+            dragend: (e) => {
+              if (isDraggable) {
+                handleMarkerDragEnd(e.target, loc.id);
+              }
+            },
+          }}
+          ref={(marker) => {
+            if (marker) markersRef.current[loc.id] = marker;
+          }}
+        >
+          <Popup className="custom-popup">
+            <div className="min-w-64">
+              <h3 className="font-semibold text-sm mb-2">{loc.name}</h3>
+              {loc.address && (
+                <p className="text-xs text-muted-foreground mb-2">{loc.address}</p>
+              )}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p className="text-muted-foreground">Escaneos</p>
+                  <p className="font-semibold">{loc.total_scans || 0}</p>
                 </div>
-                <div className="text-xs text-muted-foreground mt-2 pt-2 border-t">
-                  {loc.latitude?.toFixed(5)}, {loc.longitude?.toFixed(5)}
+                <div>
+                  <p className="text-muted-foreground">Estado</p>
+                  <p className="font-semibold">{loc.is_active ? '✓ Activo' : '✗ Inactivo'}</p>
                 </div>
               </div>
-            </Popup>
-          </Marker>
-          ))}
-          </MapContainer>
+              <div className="text-xs text-muted-foreground mt-2 pt-2 border-t">
+                {loc.latitude?.toFixed(5)}, {loc.longitude?.toFixed(5)}
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </MapContainer>
   );
 }
