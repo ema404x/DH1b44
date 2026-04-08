@@ -1,5 +1,29 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+
+async function sendEmailViaResend(to, subject, body) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'DH1 Software Alertas <onboarding@resend.dev>',
+      to: [to],
+      subject,
+      text: body,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Resend error: ${err}`);
+  }
+  return await res.json();
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
@@ -17,7 +41,6 @@ Deno.serve(async (req) => {
   for (const contact of contacts) {
     if (!contact.active) continue;
 
-    // Filtrar alertas relevantes para este contacto
     const relevantAlerts = alerts.filter(a =>
       !contact.alert_types?.length || contact.alert_types.includes(a.ruleId)
     );
@@ -30,20 +53,13 @@ Deno.serve(async (req) => {
 
     if (contact.type === 'email') {
       try {
-        await base44.asServiceRole.integrations.Core.SendEmail({
-          to: contact.value,
-          subject,
-          body,
-          from_name: 'DH1 Software Alertas',
-        });
+        await sendEmailViaResend(contact.value, subject, body);
         sent++;
       } catch (e) {
         errors.push(`Email a ${contact.value}: ${e.message}`);
       }
     } else if (contact.type === 'whatsapp') {
-      // WhatsApp: registramos que debería enviarse (requiere integración externa tipo Twilio/Meta)
-      // Por ahora lo dejamos como pendiente y registramos el intento
-      errors.push(`WhatsApp a ${contact.value}: requiere integración externa (Twilio/Meta). Pendiente de configurar.`);
+      errors.push(`WhatsApp a ${contact.value}: requiere integración externa (Twilio/Meta).`);
     }
   }
 
