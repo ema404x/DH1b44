@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  MapPin, LogIn, LogOut, Activity, AlertCircle, Loader2, Search,
-  X, Eye, ChevronDown, ChevronUp, Calendar
+  MapPin, LogIn, LogOut, Activity, AlertCircle, Loader2, Plus,
+  Eye, ChevronDown, ChevronUp, Calendar, MoreVertical
 } from 'lucide-react';
 import { format, startOfDay, isToday, isYesterday } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -13,18 +13,22 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import MapaInteractivo from '@/components/mapa/MapaInteractivo';
+import LocationDetailPanel from '@/components/mapa/LocationDetailPanel';
+import MapSearchBar from '@/components/mapa/MapSearchBar';
+import { toast } from 'sonner';
 
 export default function Mapa() {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('all');
+  const [filters, setFilters] = useState({});
   const [expandedLog, setExpandedLog] = useState(null);
-  const [mapMounted, setMapMounted] = useState(false);
+  const queryClient = useQueryClient();
 
   // Fetch locations
   const { data: locations = [], isLoading: locLoading } = useQuery({
     queryKey: ['locations'],
     queryFn: () => base44.entities.LocationQR.list(),
+    staleTime: 30000,
   });
 
   // Fetch attendance logs
@@ -38,33 +42,74 @@ export default function Mapa() {
     refetchInterval: 15000,
   });
 
-  useEffect(() => {
-    const interval = setInterval(() => refetch(), 15000);
-    return () => clearInterval(interval);
-  }, [refetch]);
+  // Update location mutation
+  const updateLocationMutation = useMutation({
+    mutationFn: (payload) =>
+      base44.entities.LocationQR.update(payload.id, payload.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+      toast.success('Ubicación actualizada');
+    },
+    onError: () => {
+      toast.error('Error al actualizar ubicación');
+    },
+  });
 
-  useEffect(() => {
-    setMapMounted(true);
-  }, []);
+  // Delete location mutation
+  const deleteLocationMutation = useMutation({
+    mutationFn: (id) => base44.entities.LocationQR.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+      setSelectedLocation(null);
+      toast.success('Ubicación eliminada');
+    },
+    onError: () => {
+      toast.error('Error al eliminar ubicación');
+    },
+  });
 
-  const activeLocations = locations.filter(l => l.is_active);
-  
-  const logsByDay = useMemo(() => {
-    let result = logs;
-    
-    if (filterType !== 'all') {
-      result = result.filter(log => log.type === filterType);
-    }
-    
+  const availableFilters = [
+    {
+      key: 'is_active',
+      label: 'Estado',
+      type: 'checkbox',
+    },
+    {
+      key: 'event_type',
+      label: 'Tipo de Evento',
+      type: 'select',
+      options: [
+        { value: 'entrada', label: 'Entrada' },
+        { value: 'salida', label: 'Salida' },
+        { value: 'ambos', label: 'Ambos' },
+      ],
+    },
+  ];
+
+  const filteredLocations = useMemo(() => {
+    let result = locations;
+
     if (searchTerm) {
-      result = result.filter(log =>
-        log.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.location_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      result = result.filter(loc =>
+        loc.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        loc.address?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
+    if (filters.is_active !== undefined && filters.is_active !== null) {
+      result = result.filter(loc => loc.is_active === true);
+    }
+
+    if (filters.event_type) {
+      result = result.filter(loc => loc.event_type === filters.event_type);
+    }
+
+    return result;
+  }, [locations, searchTerm, filters]);
+
+  const logsByDay = useMemo(() => {
     const grouped = {};
-    result.forEach(log => {
+    logs.forEach(log => {
       const date = new Date(log.timestamp);
       const key = startOfDay(date).toISOString();
       if (!grouped[key]) grouped[key] = [];
@@ -74,7 +119,7 @@ export default function Mapa() {
     return Object.entries(grouped)
       .sort(([a], [b]) => new Date(b) - new Date(a))
       .map(([date, items]) => ({ date: new Date(date), logs: items }));
-  }, [logs, filterType, searchTerm]);
+  }, [logs]);
 
   const stats = useMemo(() => {
     const today = startOfDay(new Date());
@@ -87,11 +132,11 @@ export default function Mapa() {
       totalScans: logs.length,
       todayScans: todayLogs.length,
       uniqueEmployees: new Set(logs.map(l => l.employee_name)).size,
-      totalLocations: activeLocations.length,
+      totalLocations: locations.filter(l => l.is_active).length,
       entrances: logs.filter(l => l.type === 'entrada').length,
       exits: logs.filter(l => l.type === 'salida').length,
     };
-  }, [logs, activeLocations]);
+  }, [logs, locations]);
 
   if (locLoading) {
     return (
@@ -112,17 +157,17 @@ export default function Mapa() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
-                <MapPin className="h-6 w-6 text-primary" /> Mapa en Vivo
+                <MapPin className="h-6 w-6 text-primary" /> Mapa Interactivo
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Sistema de seguimiento de asistencia geolocalizado
+                Gestión visual de ubicaciones con edición drag & drop
               </p>
             </div>
             <Button
-              variant="ghost"
+              variant="default"
               size="sm"
-              onClick={() => refetch()}
               className="gap-1.5"
+              onClick={() => refetch()}
             >
               <Activity className="h-4 w-4" /> Actualizar
             </Button>
@@ -131,8 +176,8 @@ export default function Mapa() {
           {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             {[
-              { label: 'Escaneos Hoy', value: stats.todayScans, icon: '📍' },
-              { label: 'Escaneos Total', value: stats.totalScans, icon: '📊' },
+              { label: 'Hoy', value: stats.todayScans, icon: '📍' },
+              { label: 'Total', value: stats.totalScans, icon: '📊' },
               { label: 'Empleados', value: stats.uniqueEmployees, icon: '👥' },
               { label: 'Ubicaciones', value: stats.totalLocations, icon: '📌' },
               { label: 'Entradas', value: stats.entrances, icon: '➡️' },
@@ -157,18 +202,29 @@ export default function Mapa() {
       <div className="flex-1 flex gap-4 p-4 overflow-hidden">
         {/* Mapa */}
         <div className="flex-1 flex flex-col min-h-0 gap-3">
-          <div className="rounded-2xl overflow-hidden border border-border shadow-lg bg-white flex-1 relative">
-            {activeLocations.length > 0 ? (
-              <MapaInteractivo 
-                locations={activeLocations} 
+          <MapSearchBar
+            locations={locations}
+            onSearch={setSearchTerm}
+            onLocationSelect={setSelectedLocation}
+            filters={filters}
+            onFiltersChange={setFilters}
+            availableFilters={availableFilters}
+          />
+
+          <div className="rounded-xl overflow-hidden border border-border shadow-lg bg-white flex-1 relative">
+            {filteredLocations.length > 0 ? (
+              <MapaInteractivo
+                locations={filteredLocations}
                 selectedLocation={selectedLocation}
                 onSelectLocation={setSelectedLocation}
+                onLocationUpdate={(id, data) => updateLocationMutation.mutate({ id, data })}
+                isDraggable={true}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-slate-50">
                 <div className="text-center">
                   <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-2 opacity-50" />
-                  <p className="text-muted-foreground">No hay ubicaciones activas para mostrar</p>
+                  <p className="text-muted-foreground">No hay ubicaciones que coincidan con los filtros</p>
                 </div>
               </div>
             )}
@@ -183,36 +239,22 @@ export default function Mapa() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Eye className="h-4 w-4 text-primary" />
-                  {selectedLocation.name}
+                  Ubicación Seleccionada
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm">
+              <CardContent className="text-sm">
+                <p className="font-semibold mb-2">{selectedLocation.name}</p>
                 {selectedLocation.address && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase font-semibold">Dirección</p>
-                    <p className="text-sm mt-1">{selectedLocation.address}</p>
-                  </div>
+                  <p className="text-muted-foreground text-xs mb-3">{selectedLocation.address}</p>
                 )}
-                {selectedLocation.description && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase font-semibold">Descripción</p>
-                    <p className="text-sm mt-1 italic text-foreground/80">{selectedLocation.description}</p>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-primary/10">
-                  <div className="bg-white rounded-lg p-2.5">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white rounded-lg p-2">
                     <p className="text-xs text-muted-foreground uppercase font-semibold">Escaneos</p>
-                    <p className="text-2xl font-bold text-primary mt-1">{selectedLocation.total_scans || 0}</p>
+                    <p className="text-lg font-bold text-primary">{selectedLocation.total_scans || 0}</p>
                   </div>
-                  <div className="bg-white rounded-lg p-2.5">
+                  <div className="bg-white rounded-lg p-2">
                     <p className="text-xs text-muted-foreground uppercase font-semibold">Estado</p>
-                    <Badge
-                      className={`mt-1 ${
-                        selectedLocation.is_active
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
+                    <Badge className={selectedLocation.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}>
                       {selectedLocation.is_active ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </div>
@@ -221,53 +263,13 @@ export default function Mapa() {
             </Card>
           )}
 
-          {/* Filtros y búsqueda */}
-          <Card>
-            <CardHeader className="pb-3">
+          {/* Historial por Días */}
+          <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <CardHeader className="pb-3 sticky top-0 bg-card/50 backdrop-blur-sm z-10">
               <CardTitle className="text-base flex items-center gap-2">
                 <Activity className="h-4 w-4" /> Últimos Fichajes
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por empleado o ubicación..."
-                  className="pl-9 h-9 text-sm"
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                />
-              </div>
-
-              <div className="flex gap-2">
-                {['all', 'entrada', 'salida'].map(type => (
-                  <button
-                    key={type}
-                    onClick={() => setFilterType(type)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5',
-                      filterType === type
-                        ? type === 'all'
-                          ? 'bg-primary text-white'
-                          : type === 'entrada'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-blue-100 text-blue-700'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    )}
-                  >
-                    {type === 'all' && 'Todos'}
-                    {type === 'entrada' && <LogIn className="h-3 w-3" />}
-                    {type === 'salida' && <LogOut className="h-3 w-3" />}
-                    {type === 'entrada' && 'Entradas'}
-                    {type === 'salida' && 'Salidas'}
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Historial por Días */}
-          <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <CardContent className="flex-1 overflow-y-auto p-3 space-y-3">
               {logsLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -292,9 +294,6 @@ export default function Mapa() {
                             <p className="text-xs text-muted-foreground">{dayLogs.length} registros</p>
                           </div>
                         </div>
-                        <div className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-full">
-                          {dayLogs.filter(l => l.type === 'entrada').length}↓ {dayLogs.filter(l => l.type === 'salida').length}↑
-                        </div>
                         {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </button>
 
@@ -302,35 +301,23 @@ export default function Mapa() {
                         <div className="p-2 space-y-1.5 bg-background border-t border-border max-h-60 overflow-y-auto">
                           {dayLogs.map(log => {
                             const isEntry = log.type === 'entrada';
-
                             return (
                               <div
                                 key={log.id}
-                                className="p-2.5 rounded-lg bg-card border border-border/50 hover:border-primary/30 hover:shadow-sm transition-all group cursor-pointer"
+                                className="p-2.5 rounded-lg bg-card border border-border/50 hover:border-primary/30 hover:shadow-sm transition-all"
                               >
                                 <div className="flex items-start gap-2.5">
-                                  <div
-                                    className={cn(
-                                      'h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs',
-                                      isEntry
-                                        ? 'bg-emerald-100 text-emerald-600'
-                                        : 'bg-blue-100 text-blue-600'
-                                    )}
-                                  >
+                                  <div className={cn(
+                                    'h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0',
+                                    isEntry ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'
+                                  )}>
                                     {isEntry ? <LogIn className="h-3.5 w-3.5" /> : <LogOut className="h-3.5 w-3.5" />}
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <p className="font-semibold text-xs text-foreground">{log.employee_name}</p>
                                     <p className="text-xs text-muted-foreground truncate">{log.location_name || 'Sin ubicación'}</p>
-                                    {log.latitude && log.longitude && (
-                                      <p className="text-xs text-muted-foreground/60 mt-0.5">
-                                        📍 {log.latitude.toFixed(4)}, {log.longitude.toFixed(4)}
-                                      </p>
-                                    )}
                                   </div>
-                                  <div className="text-right flex-shrink-0">
-                                    <p className="font-semibold text-xs text-foreground">{format(new Date(log.timestamp), 'HH:mm:ss')}</p>
-                                  </div>
+                                  <p className="font-semibold text-xs text-foreground flex-shrink-0">{format(new Date(log.timestamp), 'HH:mm')}</p>
                                 </div>
                               </div>
                             );
@@ -350,6 +337,17 @@ export default function Mapa() {
           </Card>
         </div>
       </div>
+
+      {/* Location Detail Panel */}
+      {selectedLocation && (
+        <LocationDetailPanel
+          location={selectedLocation}
+          onClose={() => setSelectedLocation(null)}
+          onUpdate={(id, data) => updateLocationMutation.mutateAsync({ id, data })}
+          onDelete={(id) => deleteLocationMutation.mutateAsync(id)}
+          isLoading={updateLocationMutation.isPending || deleteLocationMutation.isPending}
+        />
+      )}
     </div>
   );
 }
