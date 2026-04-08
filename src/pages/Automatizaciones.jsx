@@ -5,12 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Bell, Wrench, Package, ClipboardList, CheckCircle2, Play, RefreshCw, Clock, AlertTriangle, Send } from 'lucide-react';
+import { Zap, Bell, Wrench, Package, ClipboardList, CheckCircle2, Play, RefreshCw, Clock, AlertTriangle } from 'lucide-react';
 import { differenceInDays, isPast, parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import PageHeader from '@/components/shared/PageHeader';
-import AlertContactsManager from '@/components/automatizaciones/AlertContactsManager';
 
 const RULES = [
   {
@@ -86,8 +85,6 @@ export default function Automatizaciones() {
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list() });
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list() });
   const { data: notifications = [] } = useQuery({ queryKey: ['notifications'], queryFn: () => base44.entities.Notification.list('-created_date', 50) });
-  const { data: alertContacts = [] } = useQuery({ queryKey: ['alert_contacts'], queryFn: () => base44.entities.AlertContact.list() });
-  const [sendingAlerts, setSendingAlerts] = useState(false);
 
   const createNotif = useMutation({
     mutationFn: (n) => base44.entities.Notification.create(n),
@@ -184,48 +181,6 @@ export default function Automatizaciones() {
     setLastRun(new Date());
     setRunning(false);
     toast.success(created > 0 ? `${created} notificación${created > 1 ? 'es' : ''} generada${created > 1 ? 's' : ''}` : 'Todo al día — sin alertas nuevas');
-
-    // Enviar alertas a contactos si hay novedades
-    if (created > 0) {
-      const activeContacts = alertContacts.filter(c => c.active);
-      if (activeContacts.length > 0) {
-        sendAlertsToContacts(activeContacts);
-      }
-    }
-  };
-
-  const sendAlertsToContacts = async (contacts) => {
-    setSendingAlerts(true);
-    const alerts = [];
-
-    if (enabled.ot_vencida) {
-      const vencidas = orders.filter(o => o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada','cancelada'].includes(o.status));
-      if (vencidas.length > 0) alerts.push({ ruleId: 'ot_vencida', title: `OTs vencidas (${vencidas.length})`, message: vencidas.map(o => o.title).slice(0,3).join(', ') });
-    }
-    if (enabled.stock_bajo) {
-      const low = materials.filter(m => m.min_stock > 0 && m.stock <= m.min_stock);
-      if (low.length > 0) alerts.push({ ruleId: 'stock_bajo', title: `Stock bajo (${low.length} materiales)`, message: low.map(m => m.name).slice(0,3).join(', ') });
-    }
-    if (enabled.mantenimiento_vencido) {
-      const venc = assets.filter(a => a.next_maintenance && isPast(new Date(a.next_maintenance)));
-      if (venc.length > 0) alerts.push({ ruleId: 'mantenimiento_vencido', title: `Mantenimientos vencidos (${venc.length})`, message: venc.map(a => a.name).slice(0,3).join(', ') });
-    }
-    if (enabled.ot_urgente) {
-      const urg = orders.filter(o => o.priority === 'urgente' && !['completada','cancelada'].includes(o.status));
-      if (urg.length > 0) alerts.push({ ruleId: 'ot_urgente', title: `OTs urgentes activas (${urg.length})`, message: urg.map(o => o.title).slice(0,3).join(', ') });
-    }
-
-    if (alerts.length > 0) {
-      const res = await base44.functions.invoke('sendAlertNotifications', { contacts, alerts });
-      if (res.data?.sent > 0) toast.success(`📧 ${res.data.sent} alerta${res.data.sent > 1 ? 's' : ''} enviada${res.data.sent > 1 ? 's' : ''} por email`);
-    }
-    setSendingAlerts(false);
-  };
-
-  const handleManualSendAlerts = async () => {
-    const activeContacts = alertContacts.filter(c => c.active);
-    if (!activeContacts.length) { toast.error('No hay contactos activos configurados'); return; }
-    await sendAlertsToContacts(activeContacts);
   };
 
   // Ejecutar automáticamente al cargar si hay datos
@@ -253,9 +208,6 @@ export default function Automatizaciones() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Rules panel */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Contacts Manager */}
-          <AlertContactsManager />
-
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -263,28 +215,15 @@ export default function Automatizaciones() {
                   <Zap className="h-4 w-4 text-primary" />
                   Reglas de Automatización
                 </CardTitle>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5 h-8 text-xs"
-                    onClick={handleManualSendAlerts}
-                    disabled={sendingAlerts || !alertContacts.filter(c => c.active).length}
-                    title={!alertContacts.filter(c => c.active).length ? 'Agregá contactos primero' : 'Enviar alertas ahora'}
-                  >
-                    {sendingAlerts ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                    {sendingAlerts ? 'Enviando...' : 'Enviar Alertas'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="gap-1.5 h-8 text-xs"
-                    onClick={runAutomations}
-                    disabled={running}
-                  >
-                    {running ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-                    {running ? 'Ejecutando...' : 'Ejecutar Ahora'}
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  className="gap-1.5 h-8"
+                  onClick={runAutomations}
+                  disabled={running}
+                >
+                  {running ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                  {running ? 'Ejecutando...' : 'Ejecutar Ahora'}
+                </Button>
               </div>
               {lastRun && (
                 <p className="text-xs text-muted-foreground">
