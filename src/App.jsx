@@ -96,8 +96,6 @@ const AuthenticatedApp = () => {
         <Route path="/seguridad" element={<Seguridad />} />
         <Route path="/asistencia" element={<Asistencia />} />
       </Route>
-      <Route path="/fichar" element={<Fichar />} />
-      <Route path="/fichar-ubicacion" element={<FicharUbicacion />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
@@ -108,10 +106,18 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
-          <AuthProvider>
-            <AuthenticatedApp />
-            <Toaster />
-          </AuthProvider>
+          <Routes>
+            {/* Rutas públicas — sin autenticación */}
+            <Route path="/fichar" element={<Fichar />} />
+            <Route path="/fichar-ubicacion" element={<FicharUbicacion />} />
+            {/* Rutas autenticadas */}
+            <Route path="/*" element={
+              <AuthProvider>
+                <AuthenticatedApp />
+                <Toaster />
+              </AuthProvider>
+            } />
+          </Routes>
         </Router>
       </QueryClientProvider>
     </ErrorBoundary>
