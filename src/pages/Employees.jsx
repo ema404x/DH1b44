@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Search, UserCog, Pencil, Trash2, Phone, Mail } from 'lucide-react';
+import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode } from 'lucide-react';
+import QRCodeModal from '@/components/shared/QRCodeModal';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
@@ -45,6 +46,7 @@ export default function Employees() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [qrEmployee, setQrEmployee] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: employees = [], isLoading } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list('-created_date') });
@@ -105,6 +107,9 @@ export default function Employees() {
                         <p className="text-xs text-muted-foreground">{roleLabels[emp.role] || emp.role} · {specialtyLabels[emp.specialty] || emp.specialty}</p>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => setQrEmployee(emp)} title="QR Fichaje">
+                          <QrCode className="h-3.5 w-3.5" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(emp); setDialogOpen(true); }}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -131,6 +136,14 @@ export default function Employees() {
           ))}
         </div>
       )}
+
+      <QRCodeModal
+        open={!!qrEmployee}
+        onClose={() => setQrEmployee(null)}
+        title={qrEmployee?.full_name || ''}
+        subtitle={`Fichaje de asistencia · ${qrEmployee?.role || ''}`}
+        value={qrEmployee ? `${window.location.origin}/fichar?id=${qrEmployee.id}` : ''}
+      />
 
       <EntityFormDialog
         open={dialogOpen}

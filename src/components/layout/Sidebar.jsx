@@ -41,6 +41,7 @@ const navGroups = [
     label: 'Recursos',
     items: [
       { label: 'Empleados', icon: UserCog, path: '/empleados' },
+      { label: 'Asistencia', icon: ClipboardList, path: '/asistencia' },
       { label: 'Inventario', icon: Package, path: '/inventario' },
     ]
   },

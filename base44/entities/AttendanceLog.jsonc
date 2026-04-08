@@ -1,0 +1,52 @@
+{
+  "name": "AttendanceLog",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "ID del empleado"
+    },
+    "employee_name": {
+      "type": "string",
+      "description": "Nombre del empleado"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "entrada",
+        "salida"
+      ],
+      "description": "Tipo de fichaje"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora del fichaje"
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Latitud GPS"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitud GPS"
+    },
+    "location_name": {
+      "type": "string",
+      "description": "Descripci\u00f3n de la ubicaci\u00f3n"
+    },
+    "device_info": {
+      "type": "string",
+      "description": "Info del dispositivo"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "employee_id",
+    "employee_name",
+    "type",
+    "timestamp"
+  ]
+}

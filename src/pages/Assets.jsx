@@ -11,10 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Search, Plus, Wrench, Clock, Pencil, Trash2, Cpu, Zap, Wind, Droplets, Car, Hammer, Building, History } from 'lucide-react';
+import { Search, Plus, Wrench, Clock, Pencil, Trash2, Cpu, Zap, Wind, Droplets, Car, Hammer, Building, History, QrCode } from 'lucide-react';
 import { differenceInDays, isPast } from 'date-fns';
 import PageHeader from '@/components/shared/PageHeader';
 import AssetHistory from '@/components/assets/AssetHistory';
+import QRCodeModal from '@/components/shared/QRCodeModal';
 
 const typeLabels = { equipo_electrico:'Eléctrico', equipo_mecanico:'Mecánico', instalacion_hvac:'HVAC', instalacion_sanitaria:'Sanitario', estructura:'Estructura', vehiculo:'Vehículo', herramienta:'Herramienta', otro:'Otro' };
 const typeIcons = { equipo_electrico: Zap, equipo_mecanico: Wrench, instalacion_hvac: Wind, instalacion_sanitaria: Droplets, estructura: Building, vehiculo: Car, herramienta: Hammer, otro: Cpu };
@@ -29,6 +30,7 @@ export default function Assets() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyAsset);
+  const [qrAsset, setQrAsset] = useState(null);
   const qc = useQueryClient();
 
   const { data: assets = [], isLoading } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list() });
@@ -145,6 +147,7 @@ export default function Assets() {
                     Criticidad {asset.criticality}
                   </Badge>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => setQrAsset(asset)} title="Ver QR"><QrCode className="h-3.5 w-3.5" /></Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(asset)}><Pencil className="h-3.5 w-3.5" /></Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
@@ -168,6 +171,15 @@ export default function Assets() {
           </div>
         )}
       </div>
+
+      {/* QR Modal */}
+      <QRCodeModal
+        open={!!qrAsset}
+        onClose={() => setQrAsset(null)}
+        title={qrAsset?.name || ''}
+        subtitle={`${qrAsset?.code ? `Cód: ${qrAsset.code} · ` : ''}${qrAsset?.location || ''}`}
+        value={qrAsset ? `${window.location.origin}/activos?id=${qrAsset.id}&code=${qrAsset.code || ''}` : ''}
+      />
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
