@@ -12,7 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import MapaInteractivo, { MapControls } from '@/components/mapa/MapaInteractivo';
+import MapboxGLComponent from '@/components/mapa/MapboxGLComponent';
+import LocationCreationForm from '@/components/mapa/LocationCreationForm';
 import LocationDetailPanel from '@/components/mapa/LocationDetailPanel';
 import MapSearchBar from '@/components/mapa/MapSearchBar';
 import { toast } from 'sonner';
@@ -22,7 +23,7 @@ export default function Mapa() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({});
   const [expandedLog, setExpandedLog] = useState(null);
-  const [tracking, setTracking] = useState(true);
+  const [creatingLocation, setCreatingLocation] = useState(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -73,6 +74,19 @@ export default function Mapa() {
     },
     onError: () => {
       toast.error('Error al eliminar ubicación');
+    },
+  });
+
+  // Create location mutation
+  const createLocationMutation = useMutation({
+    mutationFn: (data) => base44.entities.LocationQR.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+      setCreatingLocation(null);
+      toast.success('Ubicación creada exitosamente');
+    },
+    onError: () => {
+      toast.error('Error al crear ubicación');
     },
   });
 
@@ -220,22 +234,17 @@ export default function Mapa() {
           />
 
           <div className="rounded-xl overflow-hidden border border-border shadow-lg bg-white flex-1 relative">
-            <MapaInteractivo
+            <MapboxGLComponent
               locations={locations}
               selectedLocation={selectedLocation}
               onSelectLocation={setSelectedLocation}
               onLocationUpdate={(id, data) => updateLocationMutation.mutate({ id, data })}
+              onClickToAdd={(coords) => setCreatingLocation(coords)}
               isDraggable={true}
             />
-            <MapControls onToggleTracking={() => setTracking(!tracking)} tracking={tracking} />
-            {locations.length === 0 && (
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center bg-black/5 rounded-xl">
-                <div className="text-center bg-white/90 px-6 py-4 rounded-lg backdrop-blur-sm">
-                  <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">Sin ubicaciones - visualiza el mapa en vivo</p>
-                </div>
-              </div>
-            )}
+            <div className="absolute bottom-4 left-4 z-10 bg-white rounded-lg shadow-lg px-4 py-2 text-xs text-muted-foreground">
+              💡 Clic derecho en el mapa para crear ubicación
+            </div>
           </div>
         </div>
 
@@ -354,6 +363,16 @@ export default function Mapa() {
           onUpdate={(id, data) => updateLocationMutation.mutateAsync({ id, data })}
           onDelete={(id) => deleteLocationMutation.mutateAsync(id)}
           isLoading={updateLocationMutation.isPending || deleteLocationMutation.isPending}
+        />
+      )}
+
+      {/* Location Creation Form */}
+      {creatingLocation && (
+        <LocationCreationForm
+          initialCoords={creatingLocation}
+          onSave={(data) => createLocationMutation.mutateAsync(data)}
+          onCancel={() => setCreatingLocation(null)}
+          isLoading={createLocationMutation.isPending}
         />
       )}
     </div>
