@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -37,84 +38,72 @@ const createCustomIcon = (color) => {
 };
 
 export default function MapaInteractivo({ locations, selectedLocation, onSelectLocation }) {
-  const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const markersRef = useRef({});
+  const [mapCenter, setMapCenter] = useState([-34.6037, -58.3816]); // Buenos Aires
+  const validLocations = locations.filter(l => 
+    l.latitude && l.longitude && 
+    typeof l.latitude === 'number' && 
+    typeof l.longitude === 'number' &&
+    !isNaN(l.latitude) && !isNaN(l.longitude)
+  );
 
   useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
+    if (validLocations.length > 0) {
+      const avgLat = validLocations.reduce((sum, l) => sum + l.latitude, 0) / validLocations.length;
+      const avgLng = validLocations.reduce((sum, l) => sum + l.longitude, 0) / validLocations.length;
+      setMapCenter([avgLat, avgLng]);
+    }
+  }, [validLocations]);
 
-    // Calcular centro del mapa
-    const center = locations.length > 0
-      ? [
-          locations.reduce((sum, l) => sum + l.latitude, 0) / locations.length,
-          locations.reduce((sum, l) => sum + l.longitude, 0) / locations.length,
-        ]
-      : [-34.6037, -58.3816]; // Buenos Aires default
-
-    // Crear mapa
-    const map = L.map(mapRef.current).setView(center, 13);
-
-    // Tile layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-      maxZoom: 19,
-    }).addTo(map);
-
-    mapInstanceRef.current = map;
-
-    // Agregar marcadores
-    locations.forEach(loc => {
-      if (loc.latitude && loc.longitude) {
-        const marker = L.marker([loc.latitude, loc.longitude], {
-          icon: createCustomIcon(loc.color || 'blue'),
-        }).addTo(map);
-
-        marker.bindPopup(`
-          <div style="font-size: 12px; min-width: 180px;">
-            <strong>${loc.name}</strong>
-            ${loc.address ? `<br/><small>${loc.address}</small>` : ''}
-            <br/><small style="color: #666;">Escaneos: ${loc.total_scans || 0}</small>
-            <br/><small style="color: #666;">GPS: ${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}</small>
-          </div>
-        `);
-
-        marker.on('click', () => onSelectLocation(loc));
-
-        markersRef.current[loc.id] = marker;
-      }
-    });
-
-    return () => {
-      map.remove();
-      mapInstanceRef.current = null;
-    };
-  }, [locations]);
-
-  // Actualizar zoom en ubicación seleccionada
   useEffect(() => {
-    if (selectedLocation && mapInstanceRef.current) {
-      const { latitude, longitude } = selectedLocation;
-      if (typeof latitude === 'number' && typeof longitude === 'number' && 
-          !isNaN(latitude) && !isNaN(longitude)) {
-        const marker = markersRef.current[selectedLocation.id];
-        if (marker) {
-          mapInstanceRef.current.setView(
-            [latitude, longitude],
-            15,
-            { animate: true }
-          );
-          marker.openPopup();
-        }
-      }
+    if (selectedLocation && selectedLocation.latitude && selectedLocation.longitude) {
+      setMapCenter([selectedLocation.latitude, selectedLocation.longitude]);
     }
   }, [selectedLocation]);
 
+  if (validLocations.length === 0) return null;
+
   return (
-    <div
-      ref={mapRef}
-      className="w-full h-full"
-      style={{ zIndex: 1 }}
-    />
+    <MapContainer
+      center={mapCenter}
+      zoom={13}
+      style={{ height: '100%', width: '100%' }}
+      key={`map-${mapCenter.join('-')}`}
+    >
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='© OpenStreetMap contributors'
+        maxZoom={19}
+      />
+      {validLocations.map(loc => (
+        <Marker
+          key={loc.id}
+          position={[loc.latitude, loc.longitude]}
+          icon={createCustomIcon(loc.color || 'blue')}
+          eventHandlers={{
+            click: () => onSelectLocation(loc),
+          }}
+        >
+          <Popup>
+            <div className="text-sm">
+              <strong>{loc.name}</strong>
+              {loc.address && (
+                <>
+                  <br />
+                  <small>{loc.address}</small>
+                </>
+              )}
+              <br />
+              <small className="text-muted-foreground">
+                Escaneos: {loc.total_scans || 0}
+              </small>
+              <br />
+              <small className="text-muted-foreground">
+                GPS: {loc.latitude.toFixed(5)}, {loc.longitude.toFixed(5)}
+              </small>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </MapContainer>
   );
 }
