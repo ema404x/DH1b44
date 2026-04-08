@@ -76,14 +76,14 @@ export default function Sidebar() {
             <img
               src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/09691a31d_Gemini_Generated_Image_509uto509uto509u.png"
               alt="DH1 Software"
-              className="h-9 w-9 object-contain rounded"
+              className="h-9 w-9 object-contain rounded mix-blend-screen brightness-200"
             />
           </div>
         ) : (
           <img
             src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/09691a31d_Gemini_Generated_Image_509uto509uto509u.png"
             alt="DH1 Software"
-            className="h-10 object-contain"
+            className="h-10 object-contain mix-blend-screen brightness-200"
           />
         )}
       </div>

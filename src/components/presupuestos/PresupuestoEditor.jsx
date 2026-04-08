@@ -10,9 +10,10 @@ import { Separator } from '@/components/ui/separator';
 import {
   ArrowLeft, Plus, Download, FileCheck, Loader2, Save,
   FileSpreadsheet, FileText, Building2, MapPin, User, Hash,
-  Gavel, Calendar, ChevronDown
+  Gavel, Calendar, Eye
 } from 'lucide-react';
 import RubroSection from '@/components/presupuestos/RubroSection';
+import PresupuestoPreview from '@/components/presupuestos/PresupuestoPreview';
 import { generatePresupuestoPDF } from '@/components/presupuestos/presupuestoPDF';
 import { exportPresupuestoExcel } from '@/utils/exportExcel';
 import { base44 } from '@/api/base44Client';
@@ -138,6 +139,7 @@ function StickyResumen({ form, onPctChange }) {
 }
 
 export default function PresupuestoEditor({ presupuesto, onSave, onCancel, saving }) {
+  const [showPreview, setShowPreview] = useState(false);
   const [form, setForm] = useState(() => presupuesto ? { ...presupuesto } : {
     codigo: generateCode(),
     titulo: '',
@@ -227,6 +229,15 @@ export default function PresupuestoEditor({ presupuesto, onSave, onCancel, savin
   const estado = estadoConfig[form.estado] || estadoConfig.borrador;
 
   return (
+    <>
+    {showPreview && (
+      <PresupuestoPreview
+        form={form}
+        onClose={() => setShowPreview(false)}
+        onExportPDF={() => { generatePresupuestoPDF(form); setShowPreview(false); }}
+        onExportExcel={() => { exportPresupuestoExcel(form); setShowPreview(false); }}
+      />
+    )}
     <div className="flex flex-col min-h-full">
       {/* Top bar */}
       <div className="flex items-center gap-3 pb-4 border-b mb-6">
@@ -258,6 +269,9 @@ export default function PresupuestoEditor({ presupuesto, onSave, onCancel, savin
               ))}
             </SelectContent>
           </Select>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setShowPreview(true)}>
+            <Eye className="h-3.5 w-3.5" /> Vista Previa
+          </Button>
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => generatePresupuestoPDF(form)}>
             <FileText className="h-3.5 w-3.5" /> PDF
           </Button>
@@ -421,5 +435,6 @@ export default function PresupuestoEditor({ presupuesto, onSave, onCancel, savin
         <StickyResumen form={form} onPctChange={handlePctChange} />
       </div>
     </div>
+    </>
   );
 }
