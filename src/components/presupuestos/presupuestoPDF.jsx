@@ -39,25 +39,43 @@ const PAGE_W = 210;
 const MARGIN = 14;
 const COL = PAGE_W - MARGIN * 2;
 
+const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
+
+async function loadLogoBase64(url) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
 // ── HEADER COVER ──────────────────────────────────────────────────────────────
-function drawHeader(doc, form) {
+function drawHeader(doc, form, logoBase64) {
   // ── Fondo blanco con línea roja inferior
   fill(doc, C.white); doc.rect(0, 0, PAGE_W, 52, 'F');
   fill(doc, C.red); doc.rect(0, 49, PAGE_W, 3, 'F');
 
-  // ── Logo vectorial Mejores (rectangulos gris+rojo)
-  const lx = MARGIN, ly = 8;
-  fill(doc, C.accent); doc.rect(lx, ly, 5, 10, 'F');          // bloque izquierdo gris
-  fill(doc, C.red);    doc.rect(lx + 6, ly, 9, 4.5, 'F');     // bloque derecho arriba rojo
-  fill(doc, C.accent); doc.rect(lx + 6, ly + 5.5, 9, 4.5, 'F'); // bloque derecho abajo gris
-  fill(doc, C.red);    doc.circle(lx + 24, ly + 1, 1, 'F');   // punto rojo acento
-
-  bold(doc); doc.setFontSize(20); rgb(doc, C.dark);
-  doc.text('Mejores', lx + 17, ly + 9);
-  normal(doc); doc.setFontSize(7); rgb(doc, C.gray3);
-  doc.text('en mantenimiento, obras y servicios', lx + 17, ly + 13.5);
-  doc.setFontSize(6.5);
-  doc.text('info@mejores.com.ar  ·  +54 (11) 4000-0000', lx + 17, ly + 17.5);
+  // ── Logo Mejores (imagen real)
+  if (logoBase64) {
+    doc.addImage(logoBase64, 'JPEG', MARGIN, 5, 60, 22);
+  } else {
+    // Fallback vectorial
+    const lx = MARGIN, ly = 8;
+    fill(doc, C.accent); doc.rect(lx, ly, 5, 10, 'F');
+    fill(doc, C.red);    doc.rect(lx + 6, ly, 9, 4.5, 'F');
+    fill(doc, C.accent); doc.rect(lx + 6, ly + 5.5, 9, 4.5, 'F');
+    fill(doc, C.red);    doc.circle(lx + 24, ly + 1, 1, 'F');
+    bold(doc); doc.setFontSize(20); rgb(doc, C.dark);
+    doc.text('Mejores', lx + 17, ly + 9);
+    normal(doc); doc.setFontSize(7); rgb(doc, C.gray3);
+    doc.text('en mantenimiento, obras y servicios', lx + 17, ly + 13.5);
+  }
+  normal(doc); doc.setFontSize(6.5); rgb(doc, C.gray3);
+  doc.text('info@mejores.com.ar  ·  +54 (11) 4000-0000', MARGIN, 30);
 
   // Divider (vertical)
   draw(doc, C.gray4); doc.setLineWidth(0.3);
@@ -289,11 +307,12 @@ function drawFooters(doc, form) {
 }
 
 // ── MAIN EXPORT ──────────────────────────────────────────────────────────────
-export function generatePresupuestoPDF(form) {
+export async function generatePresupuestoPDF(form) {
+  const logoBase64 = await loadLogoBase64(MEJORES_LOGO_URL);
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const rubros = form.rubros || [];
 
-  let y = drawHeader(doc, form);
+  let y = drawHeader(doc, form, logoBase64);
   y = drawProjectInfo(doc, form, y);
 
   // ── Items per rubro

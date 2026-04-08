@@ -20,7 +20,20 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
   const totalNeto = subtotal - anticipo - fondoReparo;
   const pctCertificado = subtotalContrato > 0 ? (totalPresente / subtotalContrato) * 100 : 0;
 
-  const exportPDF = () => {
+  const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
+
+  const exportPDF = async () => {
+    let logoBase64 = null;
+    try {
+      const res = await fetch(MEJORES_LOGO_URL);
+      const blob = await res.blob();
+      logoBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch {}
+
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const W = 297, M = 10, C = W - M * 2;
     // Usar importe presente si hay medición, sino el contrato completo
@@ -31,10 +44,14 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
 
     // Header
     doc.setFillColor(15, 28, 46); doc.rect(0, 0, W, 22, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-    doc.text('MEJORES', M, 10);
-    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-    doc.text('en mantenimiento, obras y servicios', M, 15);
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'JPEG', M, 1, 50, 19);
+    } else {
+      doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+      doc.text('MEJORES', M, 10);
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+      doc.text('en mantenimiento, obras y servicios', M, 15);
+    }
     doc.setFontSize(11); doc.setFont('helvetica', 'bold');
     doc.text(`CERTIFICADO N° ${form.numero}`, W - M, 10, { align: 'right' });
     doc.setFontSize(7); doc.setFont('helvetica', 'normal');

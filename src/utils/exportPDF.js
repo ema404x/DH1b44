@@ -9,22 +9,39 @@ const fmtDate = (d) => {
   try { return d ? format(new Date(d), 'dd/MM/yyyy', { locale: es }) : '-'; } catch { return d || '-'; }
 };
 
+const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
+
+async function loadLogoBase64(url) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────
-function addHeader(doc, title, subtitle) {
+function addHeader(doc, title, subtitle, logoBase64) {
   const pageW = 210;
   const margin = 14;
   doc.setFillColor(15, 30, 55);
   doc.rect(0, 0, pageW, 36, 'F');
 
-  doc.setTextColor(80, 160, 255);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text('MEJORES', margin, 15);
-
-  doc.setTextColor(200, 210, 230);
-  doc.setFontSize(7.5);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Mantenimiento y Construcción Escolar', margin, 21);
+  if (logoBase64) {
+    doc.addImage(logoBase64, 'JPEG', margin, 3, 55, 20);
+  } else {
+    doc.setTextColor(80, 160, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('MEJORES', margin, 15);
+    doc.setTextColor(200, 210, 230);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Mantenimiento y Construcción Escolar', margin, 21);
+  }
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(13);
@@ -41,6 +58,12 @@ function addHeader(doc, title, subtitle) {
   doc.text(`Generado: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: es })}`, pageW - margin, 28, { align: 'right' });
 
   return 44;
+}
+
+let _cachedLogo = null;
+async function getCachedLogo() {
+  if (!_cachedLogo) _cachedLogo = await loadLogoBase64(MEJORES_LOGO_URL);
+  return _cachedLogo;
 }
 
 function addFooter(doc) {
@@ -87,11 +110,12 @@ function kpiRow(doc, items, y, margin = 14) {
 }
 
 // ── REPORTE DE PROYECTOS ─────────────────────────────────────────────────
-export function exportProyectosPDF(projects) {
+export async function exportProyectosPDF(projects) {
+  const logoBase64 = await getCachedLogo();
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const margin = 14;
   const pageW = 210;
-  let y = addHeader(doc, 'REPORTE DE PROYECTOS', `Total: ${projects.length} proyectos`);
+  let y = addHeader(doc, 'REPORTE DE PROYECTOS', `Total: ${projects.length} proyectos`, logoBase64);
 
   const total = projects.length;
   const enProgreso = projects.filter(p => p.status === 'en_progreso').length;
@@ -132,7 +156,7 @@ export function exportProyectosPDF(projects) {
   drawTableHeader();
 
   projects.forEach((p, idx) => {
-    if (y > 270) { doc.addPage(); y = addHeader(doc, 'REPORTE DE PROYECTOS', '(continuación)'); drawTableHeader(); }
+    if (y > 270) { doc.addPage(); y = addHeader(doc, 'REPORTE DE PROYECTOS', '(continuación)', logoBase64); drawTableHeader(); }
     if (idx % 2 === 0) { doc.setFillColor(248, 250, 255); doc.rect(margin, y - 1, 182, 6.5, 'F'); }
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
@@ -155,11 +179,12 @@ export function exportProyectosPDF(projects) {
 }
 
 // ── REPORTE DE ÓRDENES DE TRABAJO ────────────────────────────────────────
-export function exportOTsPDF(orders, dateFrom, dateTo) {
+export async function exportOTsPDF(orders, dateFrom, dateTo) {
+  const logoBase64 = await getCachedLogo();
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const margin = 14;
   const pageW = 297;
-  let y = addHeader(doc, 'REPORTE DE ÓRDENES DE TRABAJO', `Período: ${fmtDate(dateFrom)} — ${fmtDate(dateTo)}`);
+  let y = addHeader(doc, 'REPORTE DE ÓRDENES DE TRABAJO', `Período: ${fmtDate(dateFrom)} — ${fmtDate(dateTo)}`, logoBase64);
 
   const completadas = orders.filter(o => o.status === 'completada').length;
   const urgentes = orders.filter(o => o.priority === 'urgente' && !['completada','cancelada'].includes(o.status)).length;
@@ -208,7 +233,7 @@ export function exportOTsPDF(orders, dateFrom, dateTo) {
   drawHeader();
 
   orders.forEach((o, idx) => {
-    if (y > 185) { doc.addPage(); y = addHeader(doc, 'REPORTE OTs', '(continuación)'); drawHeader(); }
+    if (y > 185) { doc.addPage(); y = addHeader(doc, 'REPORTE OTs', '(continuación)', logoBase64); drawHeader(); }
     if (idx % 2 === 0) { doc.setFillColor(248, 250, 255); doc.rect(margin, y - 1, 269, 6, 'F'); }
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
@@ -234,10 +259,11 @@ export function exportOTsPDF(orders, dateFrom, dateTo) {
 }
 
 // ── REPORTE KPIs ─────────────────────────────────────────────────────────
-export function exportKPIsPDF({ orders, timeLogs, materials, assets, dateFrom, dateTo }) {
+export async function exportKPIsPDF({ orders, timeLogs, materials, assets, dateFrom, dateTo }) {
+  const logoBase64 = await getCachedLogo();
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const margin = 14;
-  let y = addHeader(doc, 'REPORTE DE KPIs OPERACIONALES', `Período: ${fmtDate(dateFrom)} — ${fmtDate(dateTo)}`);
+  let y = addHeader(doc, 'REPORTE DE KPIs OPERACIONALES', `Período: ${fmtDate(dateFrom)} — ${fmtDate(dateTo)}`, logoBase64);
 
   const completadas = orders.filter(o => o.status === 'completada').length;
   const eficiencia = orders.length > 0 ? Math.round((completadas / orders.length) * 100) : 0;

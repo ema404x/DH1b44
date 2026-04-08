@@ -55,7 +55,22 @@ const TYPE_LABELS = {
   instalacion: 'Instalación', inspeccion: 'Inspección', reparacion: 'Reparación', emergencia: 'Emergencia',
 };
 
-export function exportWorkOrderPDF(order, timeLogs = []) {
+const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
+
+async function loadLogoBase64(url) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
+export async function exportWorkOrderPDF(order, timeLogs = []) {
+  const logoBase64 = await loadLogoBase64(MEJORES_LOGO_URL);
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const W = 210, M = 14, COL = W - M * 2;
   let y = 0;
@@ -65,24 +80,22 @@ export function exportWorkOrderPDF(order, timeLogs = []) {
   doc.setFillColor(...C.red); doc.rect(0, 49, W, 3, 'F');
   doc.setFillColor(...C.gray4); doc.rect(0, 48.5, W, 0.5, 'F');
 
-  // ── Logo vectorial Mejores (rectángulos gris+rojo)
-  const lx = M, ly = 8;
-  // Bloque izquierdo gris grande
-  doc.setFillColor(...C.mid); doc.rect(lx, ly, 5, 10, 'F');
-  // Bloque derecho arriba rojo
-  doc.setFillColor(...C.red); doc.rect(lx + 6, ly, 9, 4.5, 'F');
-  // Bloque derecho abajo gris
-  doc.setFillColor(...C.mid); doc.rect(lx + 6, ly + 5.5, 9, 4.5, 'F');
-  // Punto rojo pequeño encima del texto (acento)
-  doc.setFillColor(...C.red); doc.circle(lx + 24, ly + 1, 1, 'F');
-
-  // Nombre empresa
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(...C.mid);
-  doc.text('Mejores', lx + 17, ly + 9);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...C.gray3);
-  doc.text('en mantenimiento, obras y servicios', lx + 17, ly + 13.5);
-  doc.setFontSize(6.5); doc.setTextColor(...C.gray3);
-  doc.text('info@mejores.com.ar  ·  +54 (11) 4000-0000', lx + 17, ly + 17.5);
+  // ── Logo Mejores (imagen real)
+  if (logoBase64) {
+    doc.addImage(logoBase64, 'JPEG', M, 5, 60, 22);
+  } else {
+    const lx = M, ly = 8;
+    doc.setFillColor(...C.mid); doc.rect(lx, ly, 5, 10, 'F');
+    doc.setFillColor(...C.red); doc.rect(lx + 6, ly, 9, 4.5, 'F');
+    doc.setFillColor(...C.mid); doc.rect(lx + 6, ly + 5.5, 9, 4.5, 'F');
+    doc.setFillColor(...C.red); doc.circle(lx + 24, ly + 1, 1, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(...C.mid);
+    doc.text('Mejores', lx + 17, ly + 9);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...C.gray3);
+    doc.text('en mantenimiento, obras y servicios', lx + 17, ly + 13.5);
+  }
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...C.gray3);
+  doc.text('info@mejores.com.ar  ·  +54 (11) 4000-0000', M, 30);
 
   // Línea divisoria vertical
   doc.setDrawColor(...C.gray4); doc.setLineWidth(0.3);
