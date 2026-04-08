@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import MapboxGLComponent from '@/components/mapa/MapboxGLComponent';
+import MapaInteractivo from '@/components/mapa/MapaInteractivo';
 import LocationCreationForm from '@/components/mapa/LocationCreationForm';
 import LocationDetailPanel from '@/components/mapa/LocationDetailPanel';
 import MapSearchBar from '@/components/mapa/MapSearchBar';
@@ -234,16 +234,15 @@ export default function Mapa() {
           />
 
           <div className="rounded-xl overflow-hidden border border-border shadow-lg bg-white flex-1 relative">
-            <MapboxGLComponent
-              locations={locations}
+            <MapaInteractivo
+              locations={filteredLocations}
               selectedLocation={selectedLocation}
               onSelectLocation={setSelectedLocation}
               onLocationUpdate={(id, data) => updateLocationMutation.mutate({ id, data })}
-              onClickToAdd={(coords) => setCreatingLocation(coords)}
               isDraggable={true}
             />
             <div className="absolute bottom-4 left-4 z-10 bg-white rounded-lg shadow-lg px-4 py-2 text-xs text-muted-foreground">
-              💡 Clic derecho en el mapa para crear ubicación
+              💡 Arrastra marcadores para actualizar ubicación
             </div>
           </div>
         </div>
@@ -366,7 +365,15 @@ export default function Mapa() {
         />
       )}
 
-      {/* Location Creation Form */}
+      {/* Location Creation Form - Botón flotante alternativo */}
+      <button
+        onClick={() => setCreatingLocation({ latitude: -34.6037, longitude: -58.3816 })}
+        className="fixed bottom-6 right-6 h-14 w-14 bg-primary text-white rounded-full shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center z-40 hover:scale-110 transform"
+        title="Crear nueva ubicación"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+
       {creatingLocation && (
         <LocationCreationForm
           initialCoords={creatingLocation}
