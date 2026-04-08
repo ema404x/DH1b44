@@ -213,28 +213,21 @@ export default function Mapa() {
           />
 
           <div className="rounded-xl overflow-hidden border border-border shadow-lg bg-white flex-1 relative">
-            {filteredLocations.length > 0 ? (
-              <>
-                <MapaInteractivo
-                  locations={filteredLocations}
-                  selectedLocation={selectedLocation}
-                  onSelectLocation={setSelectedLocation}
-                  onLocationUpdate={(id, data) => updateLocationMutation.mutate({ id, data })}
-                  isDraggable={true}
-                />
-                <MapControls onToggleTracking={() => setTracking(!tracking)} tracking={tracking} />
-              </>
-            ) : (
-              <iframe
-                src="https://www.google.com/maps/embed?pb=!1m10!1m8!1m3!1d105597.27296266998!2d-58.445!3d-34.603!3m2!1i1024!2i768!4f13.1!5e0!3m2!1ses!2sar!4v1712602800000"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                allowFullScreen=""
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                className="rounded-xl"
-              />
+            <MapaInteractivo
+              locations={filteredLocations}
+              selectedLocation={selectedLocation}
+              onSelectLocation={setSelectedLocation}
+              onLocationUpdate={(id, data) => updateLocationMutation.mutate({ id, data })}
+              isDraggable={true}
+            />
+            <MapControls onToggleTracking={() => setTracking(!tracking)} tracking={tracking} />
+            {filteredLocations.length === 0 && (
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center bg-black/5 rounded-xl">
+                <div className="text-center bg-white/90 px-6 py-4 rounded-lg backdrop-blur-sm">
+                  <AlertCircle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Sin ubicaciones - visualiza el mapa en vivo</p>
+                </div>
+              </div>
             )}
           </div>
         </div>
