@@ -11,8 +11,9 @@ Deno.serve(async (req) => {
       if (!locationId) {
         return Response.json({ error: 'locationId requerido' }, { status: 400 });
       }
-      const location = await base44.asServiceRole.entities.LocationQR.get(locationId);
-      return Response.json({ location: location || null });
+      const results = await base44.asServiceRole.entities.LocationQR.list('name', 200);
+      const location = results.find(l => l.id === locationId) || null;
+      return Response.json({ location });
     }
 
     // CREATE attendance log (public, no auth needed)
@@ -24,6 +25,18 @@ Deno.serve(async (req) => {
       const { location_qr_id, ...logData } = attendanceData;
 
       const log = await base44.asServiceRole.entities.AttendanceLog.create(logData);
+
+      // Update scan count
+      if (location_qr_id) {
+        const allLocs = await base44.asServiceRole.entities.LocationQR.list('name', 200);
+        const loc = allLocs.find(l => l.id === location_qr_id);
+        if (loc) {
+          await base44.asServiceRole.entities.LocationQR.update(loc.id, {
+            total_scans: (loc.total_scans || 0) + 1,
+          });
+        }
+      }
+
       return Response.json({ success: true, log });
     }
 

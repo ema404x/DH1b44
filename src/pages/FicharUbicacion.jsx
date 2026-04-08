@@ -50,20 +50,23 @@ export default function FicharUbicacion() {
 
     const init = async () => {
       try {
-        // Direct entity read works in public context for LocationQR
-        const locs = await base44.entities.LocationQR.filter({ id: locationId });
-        if (!locs || locs.length === 0) {
+        const res = await base44.functions.invoke('publicFichar', {
+          action: 'getLocationData',
+          locationId,
+        });
+        const loc = res.data?.location;
+        if (!loc) {
           setError('Punto de fichaje no encontrado.');
           setLoading(false);
           return;
         }
-        if (!locs[0].is_active) {
+        if (!loc.is_active) {
           setError('Este punto de fichaje está desactivado.');
           setLoading(false);
           return;
         }
-        setLocation(locs[0]);
-        if (locs[0].event_type !== 'ambos') setEventType(locs[0].event_type);
+        setLocation(loc);
+        if (loc.event_type !== 'ambos') setEventType(loc.event_type);
       } catch (e) {
         setError('Error al cargar datos. Intentá de nuevo.');
       }
@@ -124,13 +127,6 @@ export default function FicharUbicacion() {
         notes: `QR Ubicación: ${location.name}`,
       },
     });
-
-    // Update scan count directly (same session as entity read)
-    try {
-      await base44.entities.LocationQR.update(location.id, {
-        total_scans: (location.total_scans || 0) + 1,
-      });
-    } catch { /* non-critical */ }
 
     setDone({ type: eventType, timestamp, locationName });
     setSubmitting(false);
