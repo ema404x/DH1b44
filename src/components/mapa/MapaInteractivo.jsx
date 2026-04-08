@@ -60,14 +60,21 @@ export default function MapaInteractivo({ locations, selectedLocation, onSelectL
     }
   }, [selectedLocation]);
 
-  if (validLocations.length === 0) return null;
+  if (validLocations.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-slate-50">
+        <div className="text-center text-muted-foreground">
+          <p>No hay ubicaciones con coordenadas para mostrar</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <MapContainer
-      center={mapCenter}
+      center={mapCenter && mapCenter[0] && mapCenter[1] ? mapCenter : [-34.6037, -58.3816]}
       zoom={13}
       style={{ height: '100%', width: '100%' }}
-      key={`map-${mapCenter.join('-')}`}
     >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
