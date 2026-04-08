@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import MapaInteractivo from '@/components/mapa/MapaInteractivo';
 
 export default function Mapa() {
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -154,58 +155,20 @@ export default function Mapa() {
 
       {/* Main Content */}
       <div className="flex-1 flex gap-4 p-4 overflow-hidden">
-        {/* Mapa + Ubicaciones */}
+        {/* Mapa */}
         <div className="flex-1 flex flex-col min-h-0 gap-3">
-          <div className="rounded-2xl overflow-hidden border border-border shadow-lg bg-gradient-to-br from-blue-50 to-blue-100 flex-1 relative">
+          <div className="rounded-2xl overflow-hidden border border-border shadow-lg bg-white flex-1 relative">
             {activeLocations.length > 0 ? (
-              <div className="w-full h-full p-6 space-y-4 overflow-y-auto">
-                <div className="text-center pb-4 border-b border-blue-200">
-                  <h2 className="font-semibold text-blue-900">📍 Ubicaciones Registradas</h2>
-                  <p className="text-sm text-blue-700 mt-1">{activeLocations.length} puntos activos de fichaje</p>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-3">
-                  {activeLocations.map(loc => (
-                    <button
-                      key={loc.id}
-                      onClick={() => setSelectedLocation(selectedLocation?.id === loc.id ? null : loc)}
-                      className={cn(
-                        'p-4 rounded-xl border-2 text-left transition-all',
-                        selectedLocation?.id === loc.id
-                          ? 'border-primary bg-white shadow-lg'
-                          : 'border-blue-200 bg-white hover:border-primary hover:shadow-md'
-                      )}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-foreground">{loc.name}</h3>
-                          {loc.address && <p className="text-xs text-muted-foreground mt-1">{loc.address}</p>}
-                        </div>
-                        <Badge className="flex-shrink-0 bg-primary/10 text-primary">{loc.total_scans || 0}</Badge>
-                      </div>
-                      <div className="flex gap-2 items-center">
-                        <Badge
-                          className={`text-xs ${
-                            loc.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {loc.is_active ? 'Activo' : 'Inactivo'}
-                        </Badge>
-                        {loc.latitude && loc.longitude && (
-                          <span className="text-xs text-muted-foreground">
-                            📍 {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <MapaInteractivo 
+                locations={activeLocations} 
+                selectedLocation={selectedLocation}
+                onSelectLocation={setSelectedLocation}
+              />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
+              <div className="w-full h-full flex items-center justify-center bg-slate-50">
                 <div className="text-center">
-                  <AlertCircle className="h-12 w-12 text-blue-400 mx-auto mb-2 opacity-50" />
-                  <p className="text-blue-700">No hay ubicaciones activas para mostrar</p>
+                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-2 opacity-50" />
+                  <p className="text-muted-foreground">No hay ubicaciones activas para mostrar</p>
                 </div>
               </div>
             )}
