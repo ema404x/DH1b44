@@ -32,7 +32,7 @@ const createMarkerIcon = (color = 'blue') => {
 
 function MapController({ center }) {
   const map = useMap();
-  React.useEffect(() => {
+  useEffect(() => {
     if (center) {
       map.setView(center, 13, { animate: true, duration: 0.5 });
     }
@@ -190,63 +190,64 @@ export default function Mapa() {
           <div className="rounded-2xl overflow-hidden border border-border shadow-lg bg-white flex-1 relative">
             {activeLocations.length > 0 ? (
               <>
-                <MapContainer
-                  center={mapCenterCoords}
-                  zoom={13}
-                  style={{ height: '100%', width: '100%' }}
-                  className="z-0"
-                >
-                  <TileLayer
-                    url="https://{s}.basemaps.cartocdn.com/positron/{z}/{x}/{y}{r}.png"
-                    attribution='&copy; OpenStreetMap contributors, &copy; CartoDB'
-                    maxZoom={19}
-                    loading="eager"
-                  />
-                  <MapController center={mapCenter} />
-                  {activeLocations.map(loc => (
-                    loc.latitude && loc.longitude && (
-                      <div key={loc.id}>
-                        <Marker
-                          position={[loc.latitude, loc.longitude]}
-                          icon={createMarkerIcon(loc.color || 'blue')}
-                          eventHandlers={{
-                            click: () => {
-                              setSelectedLocation(loc);
-                              setMapCenter([loc.latitude, loc.longitude]);
-                            },
-                          }}
-                        >
-                          <Popup className="custom-popup">
-                            <div className="font-semibold text-sm mb-1">{loc.name}</div>
-                            {loc.address && (
-                              <div className="text-xs text-muted-foreground mb-2">{loc.address}</div>
-                            )}
-                            <div className="flex gap-2 items-center justify-between">
-                              <Badge variant="outline" className="text-xs">
-                                {loc.total_scans || 0} escaneos
-                              </Badge>
-                              <Badge
-                                className={`text-xs ${loc.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}
-                              >
-                                {loc.is_active ? 'Activo' : 'Inactivo'}
-                              </Badge>
-                            </div>
-                          </Popup>
-                        </Marker>
-                        <Circle
-                          center={[loc.latitude, loc.longitude]}
-                          radius={600}
-                          pathOptions={{
-                            color: `rgba(59, 130, 246, 0.1)`,
-                            weight: 1.5,
-                            fillOpacity: 0.08,
-                            dashArray: '5, 5',
-                          }}
-                        />
-                      </div>
-                    )
-                  ))}
-                </MapContainer>
+                {typeof window !== 'undefined' && (
+                  <MapContainer
+                    center={mapCenterCoords}
+                    zoom={13}
+                    style={{ height: '100%', width: '100%' }}
+                    className="z-0"
+                  >
+                    <TileLayer
+                      url="https://{s}.basemaps.cartocdn.com/positron/{z}/{x}/{y}{r}.png"
+                      attribution='&copy; OpenStreetMap contributors, &copy; CartoDB'
+                      maxZoom={19}
+                    />
+                    <MapController center={mapCenter} />
+                    {activeLocations.map(loc => (
+                      loc.latitude && loc.longitude && (
+                        <div key={loc.id}>
+                          <Marker
+                            position={[loc.latitude, loc.longitude]}
+                            icon={createMarkerIcon(loc.color || 'blue')}
+                            eventHandlers={{
+                              click: () => {
+                                setSelectedLocation(loc);
+                                setMapCenter([loc.latitude, loc.longitude]);
+                              },
+                            }}
+                          >
+                            <Popup className="custom-popup">
+                              <div className="font-semibold text-sm mb-1">{loc.name}</div>
+                              {loc.address && (
+                                <div className="text-xs text-muted-foreground mb-2">{loc.address}</div>
+                              )}
+                              <div className="flex gap-2 items-center justify-between">
+                                <Badge variant="outline" className="text-xs">
+                                  {loc.total_scans || 0} escaneos
+                                </Badge>
+                                <Badge
+                                  className={`text-xs ${loc.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}
+                                >
+                                  {loc.is_active ? 'Activo' : 'Inactivo'}
+                                </Badge>
+                              </div>
+                            </Popup>
+                          </Marker>
+                          <Circle
+                            center={[loc.latitude, loc.longitude]}
+                            radius={600}
+                            pathOptions={{
+                              color: `rgba(59, 130, 246, 0.1)`,
+                              weight: 1.5,
+                              fillOpacity: 0.08,
+                              dashArray: '5, 5',
+                            }}
+                          />
+                        </div>
+                      )
+                    ))}
+                  </MapContainer>
+                )}
 
                 {/* Location selector badge */}
                 {selectedLocation && (
