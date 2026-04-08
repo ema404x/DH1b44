@@ -74,16 +74,16 @@ export default function Sidebar() {
         {collapsed ? (
           <div className="flex-shrink-0 flex items-center justify-center h-9 w-9">
             <img
-              src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/09691a31d_Gemini_Generated_Image_509uto509uto509u.png"
+              src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png"
               alt="DH1 Software"
-              className="h-9 w-9 object-contain rounded mix-blend-screen brightness-200"
+              className="h-9 w-9 object-contain mix-blend-screen"
             />
           </div>
         ) : (
           <img
-            src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/09691a31d_Gemini_Generated_Image_509uto509uto509u.png"
+            src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png"
             alt="DH1 Software"
-            className="h-10 object-contain mix-blend-screen brightness-200"
+            className="h-11 object-contain mix-blend-screen"
           />
         )}
       </div>
