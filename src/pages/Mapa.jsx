@@ -46,6 +46,7 @@ export default function Mapa() {
   const [filterType, setFilterType] = useState('all');
   const [mapCenter, setMapCenter] = useState(null);
   const [expandedLog, setExpandedLog] = useState(null);
+  const [logPage, setLogPage] = useState(0);
 
   // Fetch locations
   const { data: locations = [], isLoading: locLoading } = useQuery({
@@ -57,9 +58,10 @@ export default function Mapa() {
   const { data: logs = [], isLoading: logsLoading, refetch } = useQuery({
     queryKey: ['attendanceLogs'],
     queryFn: async () => {
-      const allLogs = await base44.entities.AttendanceLog.list('-timestamp', 1000);
+      const allLogs = await base44.entities.AttendanceLog.list('-timestamp', 200);
       return allLogs;
     },
+    staleTime: 30000, // Cache por 30 segundos
   });
 
   const activeLocations = locations.filter(l => l.is_active);
@@ -77,8 +79,10 @@ export default function Mapa() {
       );
     }
     
-    return result.slice(0, 30);
-  }, [logs, filterType, searchTerm]);
+    const pageSize = 15;
+    const start = logPage * pageSize;
+    return result.slice(start, start + pageSize);
+  }, [logs, filterType, searchTerm, logPage]);
 
   const stats = useMemo(() => {
     const today = startOfDay(new Date());
@@ -356,7 +360,7 @@ export default function Mapa() {
 
           {/* Historial */}
           <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <CardContent className="flex-1 overflow-y-auto p-4 space-y-2">
+            <CardContent className="flex-1 overflow-y-auto p-4 space-y-2 relative">
               {logsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -449,6 +453,33 @@ export default function Mapa() {
                 </div>
               )}
             </CardContent>
+            {filteredLogs.length > 0 && (
+              <div className="border-t border-border p-3 flex items-center justify-between bg-muted/30">
+                <p className="text-xs text-muted-foreground">
+                  Página {logPage + 1}
+                </p>
+                <div className="flex gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    onClick={() => setLogPage(Math.max(0, logPage - 1))}
+                    disabled={logPage === 0}
+                  >
+                    ←
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    onClick={() => setLogPage(logPage + 1)}
+                    disabled={filteredLogs.length < 15}
+                  >
+                    →
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       </div>
