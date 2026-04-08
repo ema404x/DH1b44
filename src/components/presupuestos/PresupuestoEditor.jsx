@@ -10,6 +10,7 @@ import RubroSection from '@/components/presupuestos/RubroSection';
 import PresupuestoResumen from '@/components/presupuestos/PresupuestoResumen';
 import { generatePresupuestoPDF } from '@/components/presupuestos/presupuestoPDF';
 import { exportPresupuestoExcel } from '@/utils/exportExcel';
+import { exportPresupuestoPCP } from '@/utils/exportPCP';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -38,6 +39,19 @@ export default function PresupuestoEditor({ presupuesto, precario, onSave, onCan
     iva_pct: 21,
     total: 0,
     notas: '',
+    // Campos PCP Ministerio
+    comitente: 'GCBA - MINISTERIO DE EDUCACIÓN DE LA CIUDAD DE BUENOS AIRES - DGMESC',
+    licitacion: '',
+    zona: '',
+    empresa: 'MEJORES HOSPITALES S.A.',
+    escuela: '',
+    obra: '',
+    supervisor: 'Arq. Claudio Muñoz',
+    inspector: '',
+    plazo: '',
+    coef_pase: 1.6504,
+    coef_oferta: 1.38,
+    numero_presupuesto: '',
   });
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -129,7 +143,10 @@ export default function PresupuestoEditor({ presupuesto, precario, onSave, onCan
             <Download className="h-3.5 w-3.5 mr-1" /> PDF
           </Button>
           <Button variant="outline" size="sm" onClick={() => exportPresupuestoExcel(form)} className="border-emerald-400 text-emerald-700 hover:bg-emerald-50">
-            <Download className="h-3.5 w-3.5 mr-1" /> Excel Ministerio
+            <Download className="h-3.5 w-3.5 mr-1" /> Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportPresupuestoPCP(form)} className="border-blue-500 text-blue-700 hover:bg-blue-50">
+            <Download className="h-3.5 w-3.5 mr-1" /> Formato PCP
           </Button>
           {form.estado === 'aprobado' && !form.factura_id && (
             <Button variant="outline" size="sm" className="border-emerald-500 text-emerald-700 hover:bg-emerald-50" onClick={handleGenerateInvoice}>
@@ -149,7 +166,7 @@ export default function PresupuestoEditor({ presupuesto, precario, onSave, onCan
       {/* Datos generales */}
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Datos Generales</CardTitle></CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-1.5"><Label className="text-xs">Código</Label><Input value={form.codigo || ''} onChange={e => set('codigo', e.target.value)} className="font-mono" /></div>
             <div className="col-span-2 space-y-1.5"><Label className="text-xs">Título *</Label><Input value={form.titulo || ''} onChange={e => set('titulo', e.target.value)} placeholder="Ej: Remodelación oficinas planta alta" /></div>
@@ -159,6 +176,29 @@ export default function PresupuestoEditor({ presupuesto, precario, onSave, onCan
             <div className="col-span-2 space-y-1.5"><Label className="text-xs">Dirección de Obra</Label><Input value={form.direccion_obra || ''} onChange={e => set('direccion_obra', e.target.value)} /></div>
             <div className="space-y-1.5"><Label className="text-xs">Fecha Emisión</Label><Input type="date" value={form.fecha_emision || ''} onChange={e => set('fecha_emision', e.target.value)} /></div>
             <div className="space-y-1.5"><Label className="text-xs">Válido Hasta</Label><Input type="date" value={form.fecha_validez || ''} onChange={e => set('fecha_validez', e.target.value)} /></div>
+          </div>
+          {/* Campos específicos PCP Ministerio */}
+          <div className="border-t pt-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Datos PCP Ministerio (para exportación)</p>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="col-span-2 lg:col-span-3 space-y-1.5"><Label className="text-xs">Comitente</Label><Input value={form.comitente || ''} onChange={e => set('comitente', e.target.value)} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Licitación</Label><Input value={form.licitacion || ''} onChange={e => set('licitacion', e.target.value)} placeholder="LICIT. PÚBLICA Nº 558-..." /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Zona / Comuna</Label><Input value={form.zona || ''} onChange={e => set('zona', e.target.value)} placeholder="8 A" /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Nº Presupuesto</Label><Input value={form.numero_presupuesto || ''} onChange={e => set('numero_presupuesto', e.target.value)} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Escuela</Label><Input value={form.escuela || ''} onChange={e => set('escuela', e.target.value)} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Obra</Label><Input value={form.obra || ''} onChange={e => set('obra', e.target.value)} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Plazo</Label><Input value={form.plazo || ''} onChange={e => set('plazo', e.target.value)} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Supervisor</Label><Input value={form.supervisor || ''} onChange={e => set('supervisor', e.target.value)} /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Inspector</Label><Input value={form.inspector || ''} onChange={e => set('inspector', e.target.value)} /></div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Coef. Pase</Label>
+                <Input type="number" step="0.0001" value={form.coef_pase || 1.6504} onChange={e => set('coef_pase', parseFloat(e.target.value) || 1.6504)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Coef. Oferta</Label>
+                <Input type="number" step="0.01" value={form.coef_oferta || 1.38} onChange={e => set('coef_oferta', parseFloat(e.target.value) || 1.38)} />
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

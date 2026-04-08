@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Pencil, Trash2, FileSpreadsheet } from 'lucide-react';
+import { Search, Pencil, Trash2, FileSpreadsheet, Download, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -22,6 +24,28 @@ const estadoColors = {
 
 export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onDelete }) {
   const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState(null);
+
+  const handleExportPCP = async (e, presupuesto) => {
+    e.stopPropagation();
+    setExporting(presupuesto.id);
+    try {
+      const res = await base44.functions.invoke('exportPresupuestoPCP', { presupuestoId: presupuesto.id });
+      if (res.data?.file_url) {
+        const a = document.createElement('a');
+        a.href = res.data.file_url;
+        a.download = `PCP_${presupuesto.codigo || presupuesto.titulo}_MEJORES.xlsx`;
+        a.click();
+        toast.success('Excel PCP generado');
+      } else {
+        toast.error(res.data?.error || 'Error al generar Excel PCP');
+      }
+    } catch (err) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const filtered = presupuestos.filter(p =>
     !search ||
@@ -78,11 +102,19 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
                   </TableCell>
                   <TableCell className="text-right font-semibold">{fmt(p.total)}</TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(p)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <AlertDialog>
+                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(p)}>
+                       <Pencil className="h-3.5 w-3.5" />
+                     </Button>
+                     <Button
+                       variant="ghost" size="icon" className="h-7 w-7 text-green-700"
+                       onClick={(e) => handleExportPCP(e, p)}
+                       disabled={exporting === p.id}
+                       title="Exportar Excel formato PCP Ministerio"
+                     >
+                       {exporting === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+                     </Button>
+                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
                         </AlertDialogTrigger>

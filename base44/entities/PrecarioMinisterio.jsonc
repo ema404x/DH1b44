@@ -1,0 +1,85 @@
+{
+  "name": "PrecarioMinisterio",
+  "type": "object",
+  "properties": {
+    "codigo": {
+      "type": "string",
+      "description": "C\u00f3digo del \u00edtem seg\u00fan preciario (ej: GNPR001, DMDE001)"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripci\u00f3n del trabajo/material"
+    },
+    "unidad": {
+      "type": "string",
+      "description": "Unidad de medida (M2, M3, ML, UN, HH, GL, etc.)"
+    },
+    "categoria": {
+      "type": "string",
+      "description": "Categor\u00eda/secci\u00f3n del preciario (ej: GENERALES, DEMOLICIONES, ESTRUCTURA)"
+    },
+    "subcategoria": {
+      "type": "string",
+      "description": "Sub-categor\u00eda (ej: PRELIMINARES, MANO DE OBRA GENERAL, CIMIENTOS)"
+    },
+    "comuna": {
+      "type": "string",
+      "enum": [
+        "8A",
+        "8B",
+        "10A"
+      ],
+      "description": "Comuna a la que pertenece este preciario"
+    },
+    "pu_mat": {
+      "type": "number",
+      "default": 0,
+      "description": "Precio Unitario de Materiales (base sin coeficientes)"
+    },
+    "pu_mo": {
+      "type": "number",
+      "default": 0,
+      "description": "Precio Unitario de Mano de Obra (base)"
+    },
+    "pu_mat_coef_pase": {
+      "type": "number",
+      "default": 0,
+      "description": "P.U. MAT con coeficiente de pase aplicado"
+    },
+    "pu_mo_coef_pase": {
+      "type": "number",
+      "default": 0,
+      "description": "P.U. MO con coeficiente de pase aplicado"
+    },
+    "coef_pase": {
+      "type": "number",
+      "default": 1.6504,
+      "description": "Coeficiente de pase"
+    },
+    "coef_oferta": {
+      "type": "number",
+      "default": 1.38,
+      "description": "Coeficiente de oferta"
+    },
+    "total_coef_pase": {
+      "type": "number",
+      "default": 0,
+      "description": "Total con coef de pase"
+    },
+    "total_coef_oferta": {
+      "type": "number",
+      "default": 0,
+      "description": "Total con coef de oferta (TOTAL oferta MEJORES)"
+    },
+    "activo": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "codigo",
+    "descripcion",
+    "unidad",
+    "comuna"
+  ]
+}
