@@ -1,13 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import {
   MapPin, Clock, LogIn, LogOut, Activity, AlertCircle, Loader2, Search,
-  TrendingUp, Users, Filter, X, Eye, ChevronDown
+  TrendingUp, Users, Filter, X, Eye, ChevronDown, ChevronUp, Calendar
 } from 'lucide-react';
-import { format, differenceInDays, startOfDay } from 'date-fns';
+import { format, differenceInDays, startOfDay, isToday, isYesterday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -58,14 +58,21 @@ export default function Mapa() {
   const { data: logs = [], isLoading: logsLoading, refetch } = useQuery({
     queryKey: ['attendanceLogs'],
     queryFn: async () => {
-      const allLogs = await base44.entities.AttendanceLog.list('-timestamp', 200);
+      const allLogs = await base44.entities.AttendanceLog.list('-timestamp', 300);
       return allLogs;
     },
-    staleTime: 30000, // Cache por 30 segundos
+    staleTime: 15000,
+    refetchInterval: 15000, // Actualizar cada 15 segundos
   });
 
+  // Auto-refresh
+  useEffect(() => {
+    const interval = setInterval(() => refetch(), 15000);
+    return () => clearInterval(interval);
+  }, [refetch]);
+
   const activeLocations = locations.filter(l => l.is_active);
-  const filteredLogs = useMemo(() => {
+  const logsByDay = useMemo(() => {
     let result = logs;
     
     if (filterType !== 'all') {
@@ -78,11 +85,19 @@ export default function Mapa() {
         log.location_name?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
-    const pageSize = 15;
-    const start = logPage * pageSize;
-    return result.slice(start, start + pageSize);
-  }, [logs, filterType, searchTerm, logPage]);
+
+    const grouped = {};
+    result.forEach(log => {
+      const date = new Date(log.timestamp);
+      const key = startOfDay(date).toISOString();
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(log);
+    });
+
+    return Object.entries(grouped)
+      .sort(([a], [b]) => new Date(b) - new Date(a))
+      .map(([date, items]) => ({ date: new Date(date), logs: items }));
+  }, [logs, filterType, searchTerm]);
 
   const stats = useMemo(() => {
     const today = startOfDay(new Date());
@@ -182,8 +197,10 @@ export default function Mapa() {
                   className="z-0"
                 >
                   <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution='&copy; OpenStreetMap contributors'
+                    url="https://{s}.basemaps.cartocdn.com/positron/{z}/{x}/{y}{r}.png"
+                    attribution='&copy; OpenStreetMap contributors, &copy; CartoDB'
+                    maxZoom={19}
+                    loading="eager"
                   />
                   <MapController center={mapCenter} />
                   {activeLocations.map(loc => (
@@ -358,89 +375,76 @@ export default function Mapa() {
             </CardContent>
           </Card>
 
-          {/* Historial */}
+          {/* Historial por Días */}
           <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <CardContent className="flex-1 overflow-y-auto p-4 space-y-2 relative">
+            <CardContent className="flex-1 overflow-y-auto p-3 space-y-3">
               {logsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
-              ) : filteredLogs.length > 0 ? (
-                filteredLogs.map(log => {
-                  const isEntry = log.type === 'entrada';
-                  const locInfo = locations.find(l => l.id === log.location_qr_id);
-                  const isExpanded = expandedLog === log.id;
+              ) : logsByDay.length > 0 ? (
+                logsByDay.map(({ date, logs: dayLogs }) => {
+                  const dayKey = date.toISOString();
+                  const isExpanded = expandedLog === dayKey;
+                  const todayLabel = isToday(date) ? 'Hoy' : isYesterday(date) ? 'Ayer' : format(date, 'd MMM', { locale: es });
 
                   return (
-                    <div
-                      key={log.id}
-                      className="group border border-border rounded-xl overflow-hidden hover:border-primary/50 hover:shadow-md transition-all"
-                    >
+                    <div key={dayKey} className="border border-border rounded-lg overflow-hidden">
                       <button
-                        onClick={() => setExpandedLog(isExpanded ? null : log.id)}
-                        className="w-full p-3 flex items-start gap-3 hover:bg-accent/50 transition-colors text-left"
+                        onClick={() => setExpandedLog(isExpanded ? null : dayKey)}
+                        className="w-full px-3 py-2 flex items-center justify-between hover:bg-accent/50 transition-colors bg-muted/30"
                       >
-                        <div
-                          className={cn(
-                            'h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 font-semibold text-sm',
-                            isEntry
-                              ? 'bg-emerald-100 text-emerald-600'
-                              : 'bg-blue-100 text-blue-600'
-                          )}
-                        >
-                          {isEntry ? <LogIn className="h-4 w-4" /> : <LogOut className="h-4 w-4" />}
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-primary" />
+                          <div className="text-left">
+                            <p className="text-xs font-bold text-foreground">{todayLabel}</p>
+                            <p className="text-xs text-muted-foreground">{dayLogs.length} registros</p>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-foreground truncate">
-                            {log.employee_name}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {log.location_name || 'Sin ubicación'}
-                          </p>
+                        <div className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-full">
+                          {dayLogs.filter(l => l.type === 'entrada').length}↓ {dayLogs.filter(l => l.type === 'salida').length}↑
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-xs font-semibold text-foreground">
-                            {format(new Date(log.timestamp), 'HH:mm')}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(log.timestamp), 'd MMM', { locale: es })}
-                          </p>
-                        </div>
+                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </button>
 
                       {isExpanded && (
-                        <div className="px-3 pb-3 bg-muted/30 border-t border-border space-y-2 text-xs">
-                          {locInfo && (
-                            <>
-                              <button
-                                onClick={() => {
-                                  setSelectedLocation(locInfo);
-                                  setMapCenter([locInfo.latitude, locInfo.longitude]);
-                                }}
-                                className="w-full text-left p-2 rounded-lg bg-white hover:bg-primary/10 border border-border hover:border-primary transition-all"
+                        <div className="p-2 space-y-1.5 bg-background border-t border-border max-h-60 overflow-y-auto">
+                          {dayLogs.map(log => {
+                            const isEntry = log.type === 'entrada';
+                            const locInfo = locations.find(l => l.id === log.location_qr_id);
+
+                            return (
+                              <div
+                                key={log.id}
+                                className="p-2.5 rounded-lg bg-card border border-border/50 hover:border-primary/30 hover:shadow-sm transition-all group cursor-pointer"
                               >
-                                <p className="font-semibold text-foreground">📍 {locInfo.name}</p>
-                                {locInfo.address && (
-                                  <p className="text-muted-foreground mt-0.5">{locInfo.address}</p>
-                                )}
-                              </button>
-                            </>
-                          )}
-                          {log.latitude && log.longitude && (
-                            <p className="text-muted-foreground text-xs">
-                              GPS: {log.latitude.toFixed(4)}, {log.longitude.toFixed(4)}
-                            </p>
-                          )}
-                          {log.signature_url && (
-                            <a
-                              href={log.signature_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block text-primary hover:underline text-xs font-medium"
-                            >
-                              Ver firma
-                            </a>
-                          )}
+                                <div className="flex items-start gap-2.5">
+                                  <div
+                                    className={cn(
+                                      'h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs',
+                                      isEntry
+                                        ? 'bg-emerald-100 text-emerald-600'
+                                        : 'bg-blue-100 text-blue-600'
+                                    )}
+                                  >
+                                    {isEntry ? <LogIn className="h-3.5 w-3.5" /> : <LogOut className="h-3.5 w-3.5" />}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-xs text-foreground">{log.employee_name}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{log.location_name || 'Sin ubicación'}</p>
+                                    {log.latitude && log.longitude && (
+                                      <p className="text-xs text-muted-foreground/60 mt-0.5">
+                                        📍 {log.latitude.toFixed(4)}, {log.longitude.toFixed(4)}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="text-right flex-shrink-0">
+                                    <p className="font-semibold text-xs text-foreground">{format(new Date(log.timestamp), 'HH:mm:ss')}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -453,33 +457,6 @@ export default function Mapa() {
                 </div>
               )}
             </CardContent>
-            {filteredLogs.length > 0 && (
-              <div className="border-t border-border p-3 flex items-center justify-between bg-muted/30">
-                <p className="text-xs text-muted-foreground">
-                  Página {logPage + 1}
-                </p>
-                <div className="flex gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    onClick={() => setLogPage(Math.max(0, logPage - 1))}
-                    disabled={logPage === 0}
-                  >
-                    ←
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    onClick={() => setLogPage(logPage + 1)}
-                    disabled={filteredLogs.length < 15}
-                  >
-                    →
-                  </Button>
-                </div>
-              </div>
-            )}
           </Card>
         </div>
       </div>
