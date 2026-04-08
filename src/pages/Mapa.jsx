@@ -225,12 +225,16 @@ export default function Mapa() {
                 <MapControls onToggleTracking={() => setTracking(!tracking)} tracking={tracking} />
               </>
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-slate-50">
-                <div className="text-center">
-                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-2 opacity-50" />
-                  <p className="text-muted-foreground">No hay ubicaciones que coincidan con los filtros</p>
-                </div>
-              </div>
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m10!1m8!1m3!1d105597.27296266998!2d-58.445!3d-34.603!3m2!1i1024!2i768!4f13.1!5e0!3m2!1ses!2sar!4v1712602800000"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen=""
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                className="rounded-xl"
+              />
             )}
           </div>
         </div>
