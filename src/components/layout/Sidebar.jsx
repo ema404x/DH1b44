@@ -71,24 +71,20 @@ export default function Sidebar() {
         "flex items-center gap-3 px-4 py-5 border-b border-white/10",
         collapsed && "justify-center px-2"
       )}>
-        {/* DH1 Logo: azul + amarillo minimalista */}
-        <div className="flex-shrink-0 flex items-center justify-center h-9 w-9">
-          <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-9 w-9">
-            {/* Fondo redondeado azul */}
-            <rect width="36" height="36" rx="8" fill="#1A56DB"/>
-            {/* Letra D - azul más claro */}
-            <path d="M7 10h5c3.866 0 7 2.91 7 6.5S15.866 23 12 23H7V10z" fill="#60A5FA"/>
-            {/* Letra H */}
-            <path d="M20 10h2.5v5h4V10H29v13h-2.5v-5.5h-4V23H20V10z" fill="white"/>
-            {/* Acento amarillo "1" */}
-            <rect x="30" y="10" width="3" height="13" rx="1.5" fill="#FBBF24"/>
-          </svg>
-        </div>
-        {!collapsed && (
-          <div className="flex flex-col">
-            <span className="text-base font-bold text-white tracking-tight leading-tight">DH1</span>
-            <span className="text-[10px] text-white/50 uppercase tracking-widest">CMMS & Obras</span>
+        {collapsed ? (
+          <div className="flex-shrink-0 flex items-center justify-center h-9 w-9">
+            <img
+              src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/09691a31d_Gemini_Generated_Image_509uto509uto509u.png"
+              alt="DH1 Software"
+              className="h-9 w-9 object-contain rounded"
+            />
           </div>
+        ) : (
+          <img
+            src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/09691a31d_Gemini_Generated_Image_509uto509uto509u.png"
+            alt="DH1 Software"
+            className="h-10 object-contain"
+          />
         )}
       </div>
 
