@@ -4,7 +4,7 @@
   "properties": {
     "employee_id": {
       "type": "string",
-      "description": "ID del empleado"
+      "description": "ID del empleado (si aplica)"
     },
     "employee_name": {
       "type": "string",
@@ -39,12 +39,15 @@
       "type": "string",
       "description": "Info del dispositivo"
     },
+    "signature_url": {
+      "type": "string",
+      "description": "URL de la firma digital del empleado"
+    },
     "notes": {
       "type": "string"
     }
   },
   "required": [
-    "employee_id",
     "employee_name",
     "type",
     "timestamp"

@@ -1,20 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   CheckCircle2, Clock, MapPin, Loader2, AlertTriangle,
-  LogIn, LogOut, Building2, User, ChevronDown, Search
+  LogIn, LogOut, Building2, User, PenLine
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import SignaturePad from '@/components/fichar/SignaturePad';
 
 const COLOR_MAP = {
-  blue:   { bg: 'from-blue-600 to-blue-800',     icon: 'bg-blue-500/20 text-blue-200',  btn: 'bg-blue-500 hover:bg-blue-400' },
-  green:  { bg: 'from-emerald-600 to-emerald-800', icon: 'bg-emerald-500/20 text-emerald-200', btn: 'bg-emerald-500 hover:bg-emerald-400' },
-  purple: { bg: 'from-purple-600 to-purple-800', icon: 'bg-purple-500/20 text-purple-200', btn: 'bg-purple-500 hover:bg-purple-400' },
-  orange: { bg: 'from-orange-600 to-orange-800', icon: 'bg-orange-500/20 text-orange-200', btn: 'bg-orange-500 hover:bg-orange-400' },
-  red:    { bg: 'from-red-600 to-red-800',       icon: 'bg-red-500/20 text-red-200',    btn: 'bg-red-500 hover:bg-red-400' },
+  blue:   { bg: 'from-blue-600 to-blue-800',     icon: 'bg-blue-500/20 text-blue-200',  },
+  green:  { bg: 'from-emerald-600 to-emerald-800', icon: 'bg-emerald-500/20 text-emerald-200' },
+  purple: { bg: 'from-purple-600 to-purple-800', icon: 'bg-purple-500/20 text-purple-200' },
+  orange: { bg: 'from-orange-600 to-orange-800', icon: 'bg-orange-500/20 text-orange-200' },
+  red:    { bg: 'from-red-600 to-red-800',       icon: 'bg-red-500/20 text-red-200' },
 };
 
 export default function FicharUbicacion() {
@@ -22,17 +23,15 @@ export default function FicharUbicacion() {
   const locationId = params.get('loc');
 
   const [location, setLocation] = useState(null);
-  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [gps, setGps] = useState(null);
   const [gpsLoading, setGpsLoading] = useState(true);
 
-  // UI state
-  const [step, setStep] = useState('select'); // 'select' | 'confirm' | 'done'
-  const [search, setSearch] = useState('');
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  // Form state
+  const [fullName, setFullName] = useState('');
   const [eventType, setEventType] = useState('entrada');
+  const [signatureData, setSignatureData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(null);
   const [now, setNow] = useState(new Date());
@@ -43,20 +42,29 @@ export default function FicharUbicacion() {
   }, []);
 
   useEffect(() => {
-    if (!locationId) { setError('QR inválido. No se encontró la ubicación.'); setLoading(false); return; }
+    if (!locationId) {
+      setError('QR inválido. No se encontró la ubicación.');
+      setLoading(false);
+      return;
+    }
 
     const init = async () => {
       try {
-        const [locs, emps] = await Promise.all([
-          base44.entities.LocationQR.filter({ id: locationId }),
-          base44.entities.Employee.filter({ status: 'activo' }, 'full_name', 200),
-        ]);
-        if (!locs || locs.length === 0) { setError('Punto de fichaje no encontrado o inactivo.'); setLoading(false); return; }
-        if (!locs[0].is_active) { setError('Este punto de fichaje está desactivado.'); setLoading(false); return; }
+        // Direct entity read works in public context for LocationQR
+        const locs = await base44.entities.LocationQR.filter({ id: locationId });
+        if (!locs || locs.length === 0) {
+          setError('Punto de fichaje no encontrado.');
+          setLoading(false);
+          return;
+        }
+        if (!locs[0].is_active) {
+          setError('Este punto de fichaje está desactivado.');
+          setLoading(false);
+          return;
+        }
         setLocation(locs[0]);
-        setEmployees(emps || []);
         if (locs[0].event_type !== 'ambos') setEventType(locs[0].event_type);
-      } catch {
+      } catch (e) {
         setError('Error al cargar datos. Intentá de nuevo.');
       }
       setLoading(false);
@@ -74,15 +82,22 @@ export default function FicharUbicacion() {
     }
   }, [locationId]);
 
-  const filteredEmployees = employees.filter(e =>
-    e.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    e.dni?.includes(search)
-  );
+  const handleSubmit = async () => {
+    if (!fullName.trim()) return;
+    if (!signatureData) return;
 
-  const handleConfirm = async () => {
     setSubmitting(true);
     const timestamp = new Date().toISOString();
     const deviceInfo = navigator.userAgent.slice(0, 120);
+
+    // Upload signature
+    let signatureUrl = null;
+    try {
+      const blob = await (await fetch(signatureData)).blob();
+      const file = new File([blob], 'firma.png', { type: 'image/png' });
+      const uploaded = await base44.integrations.Core.UploadFile({ file });
+      signatureUrl = uploaded.file_url;
+    } catch { /* continúa sin firma subida */ }
 
     let locationName = location.name;
     if (gps) {
@@ -93,31 +108,38 @@ export default function FicharUbicacion() {
       } catch { locationName = `${location.name} · ${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}`; }
     }
 
-    await base44.entities.AttendanceLog.create({
-      employee_id: selectedEmployee.id,
-      employee_name: selectedEmployee.full_name,
-      type: eventType,
-      timestamp,
-      latitude: gps?.lat || null,
-      longitude: gps?.lng || null,
-      location_name: locationName,
-      device_info: deviceInfo,
-      notes: `QR Ubicación: ${location.name}`,
+    // Create attendance log + update scan count via backend (service role)
+    await base44.functions.invoke('publicFichar', {
+      action: 'createAttendance',
+      attendanceData: {
+        location_qr_id: location.id,
+        employee_name: fullName.trim(),
+        type: eventType,
+        timestamp,
+        latitude: gps?.lat || null,
+        longitude: gps?.lng || null,
+        location_name: locationName,
+        device_info: deviceInfo,
+        signature_url: signatureUrl,
+        notes: `QR Ubicación: ${location.name}`,
+      },
     });
 
-    // Update scan count
-    await base44.entities.LocationQR.update(location.id, {
-      total_scans: (location.total_scans || 0) + 1,
-    });
+    // Update scan count directly (same session as entity read)
+    try {
+      await base44.entities.LocationQR.update(location.id, {
+        total_scans: (location.total_scans || 0) + 1,
+      });
+    } catch { /* non-critical */ }
 
     setDone({ type: eventType, timestamp, locationName });
-    setStep('done');
     setSubmitting(false);
   };
 
   const colors = COLOR_MAP[location?.color || 'blue'] || COLOR_MAP.blue;
+  const canSubmit = fullName.trim().length > 2 && signatureData && !submitting;
 
-  // ── Loading ────────────────────────────────────────────────────────────────
+  // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
       <div className="text-center">
@@ -127,7 +149,7 @@ export default function FicharUbicacion() {
     </div>
   );
 
-  // ── Error ──────────────────────────────────────────────────────────────────
+  // ── Error ────────────────────────────────────────────────────────────────────
   if (error) return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
       <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
@@ -140,8 +162,8 @@ export default function FicharUbicacion() {
     </div>
   );
 
-  // ── Done ──────────────────────────────────────────────────────────────────
-  if (step === 'done') return (
+  // ── Done ─────────────────────────────────────────────────────────────────────
+  if (done) return (
     <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${colors.bg} p-4`}>
       <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
         <div className="relative mb-6">
@@ -155,12 +177,11 @@ export default function FicharUbicacion() {
             <CheckCircle2 className="h-4 w-4 text-white" />
           </div>
         </div>
-        <h2 className="font-bold text-2xl mb-1">¡Listo!</h2>
+        <h2 className="font-bold text-2xl mb-1">¡Registro exitoso!</h2>
         <p className="text-muted-foreground text-sm mb-5">
           {done.type === 'entrada' ? 'Entrada' : 'Salida'} registrada para{' '}
-          <strong className="text-foreground">{selectedEmployee.full_name}</strong>
+          <strong className="text-foreground">{fullName}</strong>
         </p>
-
         <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-left space-y-2.5 text-sm mb-5">
           <div className="flex items-center gap-2 text-slate-600">
             <Clock className="h-4 w-4 text-slate-400 flex-shrink-0" />
@@ -170,109 +191,30 @@ export default function FicharUbicacion() {
             <MapPin className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
             <span className="text-xs leading-relaxed">{done.locationName}</span>
           </div>
+          {gps && (
+            <div className="flex items-center gap-2 text-emerald-600 text-xs">
+              <MapPin className="h-3.5 w-3.5" />
+              <span>GPS: {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}</span>
+            </div>
+          )}
         </div>
-
         <Button
           variant="outline"
           className="w-full"
-          onClick={() => { setStep('select'); setSelectedEmployee(null); setSearch(''); setDone(null); }}
+          onClick={() => {
+            setFullName('');
+            setSignatureData(null);
+            setDone(null);
+          }}
         >
-          Fichar otro empleado
+          Nuevo registro
         </Button>
         <p className="text-xs text-muted-foreground mt-3">Podés cerrar esta ventana.</p>
       </div>
     </div>
   );
 
-  // ── Confirm ────────────────────────────────────────────────────────────────
-  if (step === 'confirm') return (
-    <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${colors.bg} p-4`}>
-      <div className="bg-white rounded-2xl overflow-hidden max-w-sm w-full shadow-2xl">
-        {/* Header */}
-        <div className={`bg-gradient-to-br ${colors.bg} p-6 text-white text-center`}>
-          <div className={`h-14 w-14 rounded-full ${colors.icon} flex items-center justify-center mx-auto mb-3 backdrop-blur-sm`}>
-            <Building2 className="h-7 w-7" />
-          </div>
-          <p className="text-white/60 text-xs font-medium uppercase tracking-wider mb-0.5">Punto de fichaje</p>
-          <h2 className="font-bold text-xl">{location.name}</h2>
-          {location.address && <p className="text-white/60 text-xs mt-1">{location.address}</p>}
-        </div>
-
-        <div className="p-6 space-y-4">
-          {/* Employee info */}
-          <div className="bg-slate-50 rounded-xl p-4 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0">
-              <User className="h-5 w-5 text-slate-500" />
-            </div>
-            <div>
-              <p className="font-semibold text-sm">{selectedEmployee.full_name}</p>
-              <p className="text-xs text-muted-foreground capitalize">{selectedEmployee.role}</p>
-            </div>
-            <Button variant="ghost" size="sm" className="ml-auto text-xs" onClick={() => setStep('select')}>
-              Cambiar
-            </Button>
-          </div>
-
-          {/* Event type */}
-          {location.event_type === 'ambos' && (
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setEventType('entrada')}
-                className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${eventType === 'entrada' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
-              >
-                <LogIn className="h-4 w-4" /> Entrada
-              </button>
-              <button
-                onClick={() => setEventType('salida')}
-                className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${eventType === 'salida' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
-              >
-                <LogOut className="h-4 w-4" /> Salida
-              </button>
-            </div>
-          )}
-
-          {location.event_type !== 'ambos' && (
-            <div className={`py-3 rounded-xl text-sm font-semibold text-center ${eventType === 'entrada' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
-              {eventType === 'entrada' ? <span className="flex items-center justify-center gap-2"><LogIn className="h-4 w-4" />Solo Entrada</span> : <span className="flex items-center justify-center gap-2"><LogOut className="h-4 w-4" />Solo Salida</span>}
-            </div>
-          )}
-
-          {/* Time & GPS */}
-          <div className="bg-slate-50 rounded-xl p-3 space-y-2 text-xs text-slate-500">
-            <div className="flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5" />
-              <span className="font-mono font-semibold text-slate-700">{format(now, "HH:mm:ss")}</span>
-              <span>· {format(now, "d 'de' MMMM yyyy", { locale: es })}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <MapPin className="h-3.5 w-3.5" />
-              {gpsLoading
-                ? <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Obteniendo GPS...</span>
-                : gps
-                  ? <span className="text-emerald-600">GPS capturado ✓</span>
-                  : <span className="text-amber-600">Sin GPS</span>
-              }
-            </div>
-          </div>
-
-          <Button
-            className={`w-full h-12 text-base font-bold gap-2 ${eventType === 'entrada' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-            onClick={handleConfirm}
-            disabled={submitting}
-          >
-            {submitting
-              ? <Loader2 className="h-5 w-5 animate-spin" />
-              : eventType === 'entrada'
-                ? <><LogIn className="h-5 w-5" />Confirmar Entrada</>
-                : <><LogOut className="h-5 w-5" />Confirmar Salida</>
-            }
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── Select employee ────────────────────────────────────────────────────────
+  // ── Main Form ────────────────────────────────────────────────────────────────
   return (
     <div className={`min-h-screen bg-gradient-to-br ${colors.bg} p-4 flex flex-col`}>
       {/* Header */}
@@ -283,55 +225,89 @@ export default function FicharUbicacion() {
         <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-1">Punto de fichaje</p>
         <h1 className="font-bold text-2xl">{location.name}</h1>
         {location.address && <p className="text-white/50 text-sm mt-1">{location.address}</p>}
-        {location.project_name && (
-          <span className="inline-block mt-2 px-3 py-0.5 bg-white/10 backdrop-blur-sm rounded-full text-white/70 text-xs">
-            {location.project_name}
-          </span>
-        )}
-        <p className="text-white/40 text-xs mt-4 font-mono">{format(now, "HH:mm:ss · d MMM yyyy")}</p>
+        <p className="text-white/40 text-xs mt-3 font-mono">{format(now, "HH:mm:ss · d MMM yyyy")}</p>
       </div>
 
-      {/* Card */}
-      <div className="flex-1 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-w-sm w-full mx-auto">
-        <div className="p-4 border-b">
-          <p className="text-sm font-semibold text-center text-muted-foreground mb-3">Seleccioná tu nombre</p>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      {/* Form Card */}
+      <div className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-sm w-full mx-auto">
+        <div className="p-6 space-y-5">
+          {/* Nombre */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5" /> Nombre y Apellido
+            </label>
             <Input
-              placeholder="Buscar por nombre o DNI..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-10"
+              placeholder="Ej: Juan García"
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              className="h-12 text-base"
               autoFocus
             />
           </div>
-        </div>
 
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-          {filteredEmployees.length === 0 && (
-            <div className="text-center py-10 text-muted-foreground">
-              <User className="h-10 w-10 mx-auto mb-2 opacity-20" />
-              <p className="text-sm">No se encontraron empleados</p>
+          {/* Tipo de evento */}
+          {location.event_type === 'ambos' ? (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Tipo</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setEventType('entrada')}
+                  className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${eventType === 'entrada' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                >
+                  <LogIn className="h-4 w-4" /> Entrada
+                </button>
+                <button
+                  onClick={() => setEventType('salida')}
+                  className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${eventType === 'salida' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                >
+                  <LogOut className="h-4 w-4" /> Salida
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={`py-3 rounded-xl text-sm font-semibold text-center ${eventType === 'entrada' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
+              {eventType === 'entrada'
+                ? <span className="flex items-center justify-center gap-2"><LogIn className="h-4 w-4" />Solo Entrada</span>
+                : <span className="flex items-center justify-center gap-2"><LogOut className="h-4 w-4" />Solo Salida</span>
+              }
             </div>
           )}
-          {filteredEmployees.map(emp => (
-            <button
-              key={emp.id}
-              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left"
-              onClick={() => { setSelectedEmployee(emp); setStep('confirm'); }}
-            >
-              <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-sm font-bold text-slate-500">
-                {emp.full_name?.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm text-slate-800">{emp.full_name}</p>
-                <p className="text-xs text-muted-foreground capitalize">{emp.role}{emp.specialty !== 'general' ? ` · ${emp.specialty}` : ''}</p>
-              </div>
-              <ChevronDown className="h-4 w-4 text-slate-300 -rotate-90 flex-shrink-0" />
-            </button>
-          ))}
+
+          {/* GPS status */}
+          <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2.5">
+            <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+            {gpsLoading
+              ? <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Obteniendo GPS...</span>
+              : gps
+                ? <span className="text-emerald-600 font-semibold">GPS capturado ✓ ({gps.lat.toFixed(4)}, {gps.lng.toFixed(4)})</span>
+                : <span className="text-amber-600">Sin GPS disponible</span>
+            }
+          </div>
+
+          {/* Firma */}
+          <SignaturePad onSign={setSignatureData} signed={!!signatureData} />
+
+          {/* Submit */}
+          <Button
+            className={`w-full h-12 text-base font-bold gap-2 ${eventType === 'entrada' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'} disabled:opacity-40`}
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+          >
+            {submitting
+              ? <Loader2 className="h-5 w-5 animate-spin" />
+              : eventType === 'entrada'
+                ? <><LogIn className="h-5 w-5" />Registrar Entrada</>
+                : <><LogOut className="h-5 w-5" />Registrar Salida</>
+            }
+          </Button>
+
+          {(!fullName.trim() || fullName.trim().length <= 2) && (
+            <p className="text-center text-xs text-slate-400">Completá tu nombre y firma para continuar</p>
+          )}
         </div>
       </div>
+
+      <p className="text-white/30 text-xs text-center mt-4 pb-4">DH1 Software · Sistema de Gestión</p>
     </div>
   );
 }
