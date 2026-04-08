@@ -16,7 +16,7 @@ import Inventory from '@/pages/Inventory';
 import Quotes from '@/pages/Quotes';
 import Invoices from '@/pages/Invoices';
 import Finanzas from '@/pages/Finanzas';
-import Presupuestos from '@/pages/Presupuestos';
+import Presupuestos from '@/pages/Presupuestos.jsx';
 import Informes from '@/pages/Informes';
 import Assets from '@/pages/Assets';
 import Calendario from '@/pages/Calendario';
