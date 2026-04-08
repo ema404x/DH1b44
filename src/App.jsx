@@ -27,6 +27,7 @@ import Auditoria from '@/pages/Auditoria';
 import Permisos from '@/pages/Permisos';
 import Seguridad from '@/pages/Seguridad';
 import Fichar from '@/pages/Fichar';
+import FicharUbicacion from '@/pages/FicharUbicacion';
 import Asistencia from '@/pages/Asistencia';
 
 class ErrorBoundary extends React.Component {
@@ -96,6 +97,7 @@ const AuthenticatedApp = () => {
         <Route path="/asistencia" element={<Asistencia />} />
       </Route>
       <Route path="/fichar" element={<Fichar />} />
+      <Route path="/fichar-ubicacion" element={<FicharUbicacion />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

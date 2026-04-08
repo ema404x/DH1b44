@@ -1,0 +1,52 @@
+{
+  "name": "LocationQR",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre de la ubicaci\u00f3n (ej: Obra Norte, Dep\u00f3sito Central)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n adicional"
+    },
+    "address": {
+      "type": "string",
+      "description": "Direcci\u00f3n f\u00edsica"
+    },
+    "project_id": {
+      "type": "string",
+      "description": "Proyecto asociado"
+    },
+    "project_name": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "entrada",
+        "salida",
+        "ambos"
+      ],
+      "default": "ambos",
+      "description": "Tipo de fichaje que permite"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "color": {
+      "type": "string",
+      "default": "blue",
+      "description": "Color identificador"
+    },
+    "total_scans": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de escaneos registrados"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

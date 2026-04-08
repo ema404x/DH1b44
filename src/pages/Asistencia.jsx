@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, LogIn, LogOut, MapPin, Clock, Users, Calendar } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search, LogIn, LogOut, MapPin, Clock, Users, Calendar, QrCode } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
+import LocationQRManager from '@/components/asistencia/LocationQRManager';
 import { format, startOfDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -40,98 +42,117 @@ export default function Asistencia() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Registro de Asistencia"
-        subtitle="Historial de fichajes por QR con ubicación GPS"
+        title="Asistencia"
+        subtitle="Historial de fichajes y gestión de puntos QR"
       />
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Entradas Hoy', value: todayEntradas, icon: LogIn, color: 'border-l-emerald-500' },
-          { label: 'Empleados Hoy', value: uniqueToday, icon: Users, color: 'border-l-blue-500' },
-          { label: 'Total Registros', value: logs.length, icon: Clock, color: 'border-l-slate-400' },
-          { label: 'Con Ubicación', value: logs.filter(l => l.latitude).length, icon: MapPin, color: 'border-l-purple-500' },
-        ].map(s => (
-          <Card key={s.label} className={`border-l-4 ${s.color}`}>
-            <CardContent className="pt-4 pb-3 flex items-center gap-3">
-              <s.icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-              <div>
-                <div className="text-2xl font-bold">{s.value}</div>
-                <div className="text-xs text-muted-foreground">{s.label}</div>
-              </div>
+      <Tabs defaultValue="registros">
+        <TabsList>
+          <TabsTrigger value="registros" className="gap-1.5">
+            <Calendar className="h-3.5 w-3.5" /> Registros
+          </TabsTrigger>
+          <TabsTrigger value="ubicaciones" className="gap-1.5">
+            <QrCode className="h-3.5 w-3.5" /> QRs por Ubicación
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ── REGISTROS ── */}
+        <TabsContent value="registros" className="space-y-5 mt-5">
+          {/* Stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: 'Entradas Hoy', value: todayEntradas, icon: LogIn, color: 'border-l-emerald-500' },
+              { label: 'Empleados Hoy', value: uniqueToday, icon: Users, color: 'border-l-blue-500' },
+              { label: 'Total Registros', value: logs.length, icon: Clock, color: 'border-l-slate-400' },
+              { label: 'Con Ubicación', value: logs.filter(l => l.latitude).length, icon: MapPin, color: 'border-l-purple-500' },
+            ].map(s => (
+              <Card key={s.label} className={`border-l-4 ${s.color}`}>
+                <CardContent className="pt-4 pb-3 flex items-center gap-3">
+                  <s.icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <div>
+                    <div className="text-2xl font-bold">{s.value}</div>
+                    <div className="text-xs text-muted-foreground">{s.label}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar empleado..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+            </div>
+            <Select value={dayFilter} onValueChange={setDayFilter}>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Hoy</SelectItem>
+                <SelectItem value="7days">Últimos 7 días</SelectItem>
+                <SelectItem value="30days">Últimos 30 días</SelectItem>
+                <SelectItem value="all">Todo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Log list */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Calendar className="h-4 w-4" /> Registros ({filtered.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {filtered.length === 0 && !isLoading ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Clock className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                  <p className="text-sm">Sin registros para el período seleccionado</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border/50">
+                  {filtered.map(log => (
+                    <div key={log.id} className="flex items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${log.type === 'entrada' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
+                        {log.type === 'entrada'
+                          ? <LogIn className="h-4 w-4 text-emerald-600" />
+                          : <LogOut className="h-4 w-4 text-blue-600" />
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm">{log.employee_name}</span>
+                          <Badge variant="outline" className={`text-[10px] ${log.type === 'entrada' ? 'border-emerald-300 text-emerald-700 bg-emerald-50' : 'border-blue-300 text-blue-700 bg-blue-50'}`}>
+                            {log.type}
+                          </Badge>
+                        </div>
+                        {log.location_name && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{log.location_name}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-sm font-semibold">
+                          {format(new Date(log.timestamp), 'HH:mm')}hs
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(log.timestamp), "d MMM yy", { locale: es })}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
-        ))}
-      </div>
+        </TabsContent>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar empleado..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
-        </div>
-        <Select value={dayFilter} onValueChange={setDayFilter}>
-          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="today">Hoy</SelectItem>
-            <SelectItem value="7days">Últimos 7 días</SelectItem>
-            <SelectItem value="30days">Últimos 30 días</SelectItem>
-            <SelectItem value="all">Todo</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Log list */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Calendar className="h-4 w-4" /> Registros ({filtered.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {filtered.length === 0 && !isLoading ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Clock className="h-10 w-10 mx-auto mb-3 opacity-20" />
-              <p className="text-sm">Sin registros para el período seleccionado</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/50">
-              {filtered.map(log => (
-                <div key={log.id} className="flex items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
-                  <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${log.type === 'entrada' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
-                    {log.type === 'entrada'
-                      ? <LogIn className="h-4 w-4 text-emerald-600" />
-                      : <LogOut className="h-4 w-4 text-blue-600" />
-                    }
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-sm">{log.employee_name}</span>
-                      <Badge variant="outline" className={`text-[10px] ${log.type === 'entrada' ? 'border-emerald-300 text-emerald-700 bg-emerald-50' : 'border-blue-300 text-blue-700 bg-blue-50'}`}>
-                        {log.type}
-                      </Badge>
-                    </div>
-                    {log.location_name && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                        <MapPin className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate">{log.location_name}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-semibold">
-                      {format(new Date(log.timestamp), 'HH:mm')}hs
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {format(new Date(log.timestamp), "d MMM yy", { locale: es })}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {/* ── QRs UBICACIÓN ── */}
+        <TabsContent value="ubicaciones" className="mt-5">
+          <LocationQRManager />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
