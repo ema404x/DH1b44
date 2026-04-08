@@ -1,0 +1,40 @@
+{
+  "name": "AlertContact",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del contacto"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "email",
+        "whatsapp"
+      ],
+      "default": "email",
+      "description": "Tipo de contacto"
+    },
+    "value": {
+      "type": "string",
+      "description": "Email o n\u00famero de WhatsApp (ej: +5491112345678)"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el contacto recibe alertas"
+    },
+    "alert_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tipos de alerta a recibir: ot_vencida, stock_bajo, mantenimiento_vencido, mantenimiento_proximo, ot_urgente"
+    }
+  },
+  "required": [
+    "name",
+    "type",
+    "value"
+  ]
+}
