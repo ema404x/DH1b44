@@ -215,6 +215,11 @@ export default function FicharUbicacion() {
     <div className={`min-h-screen bg-gradient-to-br ${colors.bg} p-4 flex flex-col`}>
       {/* Header */}
       <div className="text-center pt-8 pb-6 text-white">
+        <img
+          src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png"
+          alt="DH1 Software"
+          className="h-10 object-contain mix-blend-screen mx-auto mb-4"
+        />
         <div className={`h-16 w-16 rounded-2xl ${colors.icon} flex items-center justify-center mx-auto mb-4 backdrop-blur-sm`}>
           <Building2 className="h-8 w-8" />
         </div>
@@ -303,7 +308,14 @@ export default function FicharUbicacion() {
         </div>
       </div>
 
-      <p className="text-white/30 text-xs text-center mt-4 pb-4">DH1 Software · Sistema de Gestión</p>
+      <div className="flex flex-col items-center gap-2 mt-4 pb-4">
+        <img
+          src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png"
+          alt="DH1 Software"
+          className="h-6 object-contain mix-blend-screen opacity-70"
+        />
+        <p className="text-white/30 text-xs text-center">Sistema de Gestión</p>
+      </div>
     </div>
   );
 }
