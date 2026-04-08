@@ -49,6 +49,7 @@ export default function MapaInteractivo({
   selectedLocation, 
   onSelectLocation, 
   onLocationUpdate,
+  onClickToAdd,
   isDraggable = true 
 }) {
   const [mapCenter, setMapCenter] = useState([-34.6037, -58.3816]);
@@ -124,17 +125,6 @@ export default function MapaInteractivo({
     }
   };
 
-  if (validLocations.length === 0) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 border border-border rounded-lg">
-        <div className="text-center space-y-2">
-          <p className="text-lg font-semibold text-foreground">No hay ubicaciones</p>
-          <p className="text-sm text-muted-foreground">Crea ubicaciones con coordenadas GPS válidas</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <MapContainer
       ref={mapRef}
@@ -142,6 +132,12 @@ export default function MapaInteractivo({
       zoom={13}
       style={{ height: '100%', width: '100%' }}
       className="rounded-xl overflow-hidden"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (onClickToAdd) {
+          onClickToAdd({ latitude: e.latlng.lat, longitude: e.latlng.lng });
+        }
+      }}
     >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -192,7 +188,7 @@ export default function MapaInteractivo({
         </>
       )}
 
-      {validLocations.map(loc => (
+      {validLocations.length > 0 ? validLocations.map(loc => (
         <Marker
           key={loc.id}
           position={[loc.latitude, loc.longitude]}
@@ -231,11 +227,11 @@ export default function MapaInteractivo({
               </div>
             </div>
           </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
-  );
-}
+          </Marker>
+          )) : null}
+          </MapContainer>
+          );
+          }
 
 export function MapControls({ onToggleTracking, tracking }) {
   return (

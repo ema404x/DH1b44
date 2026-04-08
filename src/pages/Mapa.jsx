@@ -235,14 +235,15 @@ export default function Mapa() {
 
           <div className="rounded-xl overflow-hidden border border-border shadow-lg bg-white flex-1 relative">
             <MapaInteractivo
-              locations={filteredLocations}
+              locations={locations}
               selectedLocation={selectedLocation}
               onSelectLocation={setSelectedLocation}
               onLocationUpdate={(id, data) => updateLocationMutation.mutate({ id, data })}
+              onClickToAdd={(coords) => setCreatingLocation(coords)}
               isDraggable={true}
             />
             <div className="absolute bottom-4 left-4 z-10 bg-white rounded-lg shadow-lg px-4 py-2 text-xs text-muted-foreground">
-              💡 Arrastra marcadores para actualizar ubicación
+              💡 Clic derecho en el mapa para crear ubicación
             </div>
           </div>
         </div>
@@ -364,15 +365,6 @@ export default function Mapa() {
           isLoading={updateLocationMutation.isPending || deleteLocationMutation.isPending}
         />
       )}
-
-      {/* Location Creation Form - Botón flotante alternativo */}
-      <button
-        onClick={() => setCreatingLocation({ latitude: -34.6037, longitude: -58.3816 })}
-        className="fixed bottom-6 right-6 h-14 w-14 bg-primary text-white rounded-full shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center z-40 hover:scale-110 transform"
-        title="Crear nueva ubicación"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
 
       {creatingLocation && (
         <LocationCreationForm
