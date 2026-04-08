@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import MapaInteractivo from '@/components/mapa/MapaInteractivo';
+import MapaInteractivo, { MapControls } from '@/components/mapa/MapaInteractivo';
 import LocationDetailPanel from '@/components/mapa/LocationDetailPanel';
 import MapSearchBar from '@/components/mapa/MapSearchBar';
 import { toast } from 'sonner';
@@ -22,6 +22,7 @@ export default function Mapa() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({});
   const [expandedLog, setExpandedLog] = useState(null);
+  const [tracking, setTracking] = useState(true);
   const queryClient = useQueryClient();
 
   // Fetch locations
@@ -213,13 +214,16 @@ export default function Mapa() {
 
           <div className="rounded-xl overflow-hidden border border-border shadow-lg bg-white flex-1 relative">
             {filteredLocations.length > 0 ? (
-              <MapaInteractivo
-                locations={filteredLocations}
-                selectedLocation={selectedLocation}
-                onSelectLocation={setSelectedLocation}
-                onLocationUpdate={(id, data) => updateLocationMutation.mutate({ id, data })}
-                isDraggable={true}
-              />
+              <>
+                <MapaInteractivo
+                  locations={filteredLocations}
+                  selectedLocation={selectedLocation}
+                  onSelectLocation={setSelectedLocation}
+                  onLocationUpdate={(id, data) => updateLocationMutation.mutate({ id, data })}
+                  isDraggable={true}
+                />
+                <MapControls onToggleTracking={() => setTracking(!tracking)} tracking={tracking} />
+              </>
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-slate-50">
                 <div className="text-center">

@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { MapPin } from 'lucide-react';
 
 const COLOR_MAP = {
   blue: '#3b82f6',
@@ -51,9 +52,12 @@ export default function MapaInteractivo({
   isDraggable = true 
 }) {
   const [mapCenter, setMapCenter] = useState([-34.6037, -58.3816]);
+  const [userLocation, setUserLocation] = useState(null);
+  const [tracking, setTracking] = useState(true);
   const mapRef = useRef(null);
   const markersRef = useRef({});
   const draggedMarkerRef = useRef(null);
+  const watchIdRef = useRef(null);
 
   const validLocations = locations.filter(l => 
     l.latitude && l.longitude && 
@@ -75,6 +79,32 @@ export default function MapaInteractivo({
       mapRef.current.setView([selectedLocation.latitude, selectedLocation.longitude], 16, { animate: true });
     }
   }, [selectedLocation]);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    const startTracking = () => {
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ latitude, longitude });
+          if (tracking && mapRef.current) {
+            mapRef.current.setView([latitude, longitude], 16, { animate: true });
+          }
+        },
+        (error) => console.error('Error GPS:', error),
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+      );
+    };
+
+    startTracking();
+
+    return () => {
+      if (watchIdRef.current) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, [tracking]);
 
   const handleMarkerDragEnd = (marker, locationId) => {
     const latLng = marker.getLatLng();
@@ -110,6 +140,50 @@ export default function MapaInteractivo({
         attribution='© OpenStreetMap contributors'
         maxZoom={19}
       />
+      
+      {userLocation && (
+        <>
+          <Marker
+            position={[userLocation.latitude, userLocation.longitude]}
+            icon={L.divIcon({
+              html: `
+                <div style="
+                  background: linear-gradient(135deg, #3b82f6, #2563eb);
+                  width: 50px;
+                  height: 50px;
+                  border-radius: 50%;
+                  border: 4px solid white;
+                  box-shadow: 0 0 0 3px #3b82f6, 0 4px 12px rgba(59, 130, 246, 0.4);
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  cursor: pointer;
+                  font-size: 24px;
+                ">
+                  🎯
+                </div>
+              `,
+              iconSize: [50, 50],
+              iconAnchor: [25, 25],
+              popupAnchor: [0, -25],
+              className: 'user-location-marker',
+            })}
+          >
+            <Popup>
+              <div className="text-xs">
+                <p className="font-semibold">Tu ubicación</p>
+                <p>{userLocation.latitude.toFixed(5)}, {userLocation.longitude.toFixed(5)}</p>
+              </div>
+            </Popup>
+          </Marker>
+          <Circle
+            center={[userLocation.latitude, userLocation.longitude]}
+            radius={20}
+            pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1 }}
+          />
+        </>
+      )}
+
       {validLocations.map(loc => (
         <Marker
           key={loc.id}
@@ -152,5 +226,23 @@ export default function MapaInteractivo({
         </Marker>
       ))}
     </MapContainer>
+  );
+}
+
+export function MapControls({ onToggleTracking, tracking }) {
+  return (
+    <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-2">
+      <button
+        onClick={onToggleTracking}
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-lg ${
+          tracking
+            ? 'bg-blue-500 text-white hover:bg-blue-600'
+            : 'bg-white text-blue-500 border border-blue-500 hover:bg-blue-50'
+        }`}
+      >
+        <MapPin className="h-4 w-4" />
+        {tracking ? 'Siguiendo' : 'Seguir ubicación'}
+      </button>
+    </div>
   );
 }
