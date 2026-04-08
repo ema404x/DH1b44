@@ -7,16 +7,23 @@ import { Download, Printer, Copy, Check } from 'lucide-react';
 export default function QRCodeModal({ open, onClose, title, subtitle, value, logoText }) {
   const canvasRef = useRef(null);
   const [copied, setCopied] = useState(false);
+  const [qrReady, setQrReady] = useState(false);
 
   useEffect(() => {
-    if (open && value && canvasRef.current) {
-      QRCode.toCanvas(canvasRef.current, value, {
-        width: 280,
-        margin: 2,
-        color: { dark: '#0a1628', light: '#ffffff' },
-        errorCorrectionLevel: 'H',
-      });
-    }
+    if (!open || !value) return;
+    setQrReady(false);
+    // Small delay to ensure the Dialog has fully mounted the canvas
+    const timer = setTimeout(() => {
+      if (canvasRef.current) {
+        QRCode.toCanvas(canvasRef.current, value, {
+          width: 280,
+          margin: 2,
+          color: { dark: '#0a1628', light: '#ffffff' },
+          errorCorrectionLevel: 'H',
+        }).then(() => setQrReady(true));
+      }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [open, value]);
 
   const handleDownload = () => {
@@ -111,7 +118,14 @@ export default function QRCodeModal({ open, onClose, title, subtitle, value, log
           <div className="bg-white border-2 border-border rounded-2xl p-5 shadow-sm flex flex-col items-center gap-2 w-full">
             <p className="font-bold text-sm text-center text-foreground leading-tight">{title}</p>
             {subtitle && <p className="text-xs text-muted-foreground text-center">{subtitle}</p>}
-            <canvas ref={canvasRef} className="rounded-lg" />
+            <div className="relative">
+              <canvas ref={canvasRef} className="rounded-lg" />
+              {!qrReady && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white rounded-lg">
+                  <div className="w-6 h-6 border-2 border-slate-200 border-t-slate-600 rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
             <p className="text-[10px] text-muted-foreground/60 font-mono break-all text-center">{value}</p>
           </div>
 
