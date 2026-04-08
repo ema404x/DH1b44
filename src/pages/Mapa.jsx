@@ -1,13 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
-import L from 'leaflet';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import {
-  MapPin, Clock, LogIn, LogOut, Activity, AlertCircle, Loader2, Search,
-  TrendingUp, Users, Filter, X, Eye, ChevronDown, ChevronUp, Calendar
+  MapPin, LogIn, LogOut, Activity, AlertCircle, Loader2, Search,
+  X, Eye, ChevronDown, ChevronUp, Calendar
 } from 'lucide-react';
-import { format, differenceInDays, startOfDay, isToday, isYesterday } from 'date-fns';
+import { format, startOfDay, isToday, isYesterday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,38 +13,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-const createMarkerIcon = (color = 'blue') => {
-  const colorMap = {
-    blue: '#3b82f6',
-    green: '#10b981',
-    purple: '#a855f7',
-    orange: '#f97316',
-    red: '#ef4444',
-  };
-  return L.divIcon({
-    html: `<div style="background: linear-gradient(135deg, ${colorMap[color]} 0%, rgba(0,0,0,.1) 100%); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.25), 0 0 0 2px ${colorMap[color]}; animation: pulse 2s infinite;">📍</div>`,
-    iconSize: [44, 44],
-    className: 'custom-marker',
-  });
-};
-
-function MapController({ center }) {
-  const map = useMap();
-  useEffect(() => {
-    if (center) {
-      map.setView(center, 13, { animate: true, duration: 0.5 });
-    }
-  }, [center, map]);
-  return null;
-}
-
 export default function Mapa() {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
-  const [mapCenter, setMapCenter] = useState(null);
   const [expandedLog, setExpandedLog] = useState(null);
-  const [logPage, setLogPage] = useState(0);
+  const [mapMounted, setMapMounted] = useState(false);
 
   // Fetch locations
   const { data: locations = [], isLoading: locLoading } = useQuery({
@@ -62,16 +34,20 @@ export default function Mapa() {
       return allLogs;
     },
     staleTime: 15000,
-    refetchInterval: 15000, // Actualizar cada 15 segundos
+    refetchInterval: 15000,
   });
 
-  // Auto-refresh
   useEffect(() => {
     const interval = setInterval(() => refetch(), 15000);
     return () => clearInterval(interval);
   }, [refetch]);
 
+  useEffect(() => {
+    setMapMounted(true);
+  }, []);
+
   const activeLocations = locations.filter(l => l.is_active);
+  
   const logsByDay = useMemo(() => {
     let result = logs;
     
@@ -115,13 +91,6 @@ export default function Mapa() {
       exits: logs.filter(l => l.type === 'salida').length,
     };
   }, [logs, activeLocations]);
-
-  const defaultCenter = [-34.6037, -58.3816];
-  const mapCenterCoords = selectedLocation?.latitude && selectedLocation?.longitude
-    ? [selectedLocation.latitude, selectedLocation.longitude]
-    : activeLocations[0]?.latitude && activeLocations[0]?.longitude
-      ? [activeLocations[0].latitude, activeLocations[0].longitude]
-      : defaultCenter;
 
   if (locLoading) {
     return (
@@ -185,100 +154,58 @@ export default function Mapa() {
 
       {/* Main Content */}
       <div className="flex-1 flex gap-4 p-4 overflow-hidden">
-        {/* Mapa */}
+        {/* Mapa + Ubicaciones */}
         <div className="flex-1 flex flex-col min-h-0 gap-3">
-          <div className="rounded-2xl overflow-hidden border border-border shadow-lg bg-white flex-1 relative">
+          <div className="rounded-2xl overflow-hidden border border-border shadow-lg bg-gradient-to-br from-blue-50 to-blue-100 flex-1 relative">
             {activeLocations.length > 0 ? (
-              <>
-                {typeof window !== 'undefined' && (
-                  <MapContainer
-                    center={mapCenterCoords}
-                    zoom={13}
-                    style={{ height: '100%', width: '100%' }}
-                    className="z-0"
-                  >
-                    <TileLayer
-                      url="https://{s}.basemaps.cartocdn.com/positron/{z}/{x}/{y}{r}.png"
-                      attribution='&copy; OpenStreetMap contributors, &copy; CartoDB'
-                      maxZoom={19}
-                    />
-                    <MapController center={mapCenter} />
-                    {activeLocations.map(loc => (
-                      loc.latitude && loc.longitude && (
-                        <div key={loc.id}>
-                          <Marker
-                            position={[loc.latitude, loc.longitude]}
-                            icon={createMarkerIcon(loc.color || 'blue')}
-                            eventHandlers={{
-                              click: () => {
-                                setSelectedLocation(loc);
-                                setMapCenter([loc.latitude, loc.longitude]);
-                              },
-                            }}
-                          >
-                            <Popup className="custom-popup">
-                              <div className="font-semibold text-sm mb-1">{loc.name}</div>
-                              {loc.address && (
-                                <div className="text-xs text-muted-foreground mb-2">{loc.address}</div>
-                              )}
-                              <div className="flex gap-2 items-center justify-between">
-                                <Badge variant="outline" className="text-xs">
-                                  {loc.total_scans || 0} escaneos
-                                </Badge>
-                                <Badge
-                                  className={`text-xs ${loc.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}
-                                >
-                                  {loc.is_active ? 'Activo' : 'Inactivo'}
-                                </Badge>
-                              </div>
-                            </Popup>
-                          </Marker>
-                          <Circle
-                            center={[loc.latitude, loc.longitude]}
-                            radius={600}
-                            pathOptions={{
-                              color: `rgba(59, 130, 246, 0.1)`,
-                              weight: 1.5,
-                              fillOpacity: 0.08,
-                              dashArray: '5, 5',
-                            }}
-                          />
+              <div className="w-full h-full p-6 space-y-4 overflow-y-auto">
+                <div className="text-center pb-4 border-b border-blue-200">
+                  <h2 className="font-semibold text-blue-900">📍 Ubicaciones Registradas</h2>
+                  <p className="text-sm text-blue-700 mt-1">{activeLocations.length} puntos activos de fichaje</p>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  {activeLocations.map(loc => (
+                    <button
+                      key={loc.id}
+                      onClick={() => setSelectedLocation(selectedLocation?.id === loc.id ? null : loc)}
+                      className={cn(
+                        'p-4 rounded-xl border-2 text-left transition-all',
+                        selectedLocation?.id === loc.id
+                          ? 'border-primary bg-white shadow-lg'
+                          : 'border-blue-200 bg-white hover:border-primary hover:shadow-md'
+                      )}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-foreground">{loc.name}</h3>
+                          {loc.address && <p className="text-xs text-muted-foreground mt-1">{loc.address}</p>}
                         </div>
-                      )
-                    ))}
-                  </MapContainer>
-                )}
-
-                {/* Location selector badge */}
-                {selectedLocation && (
-                  <div className="absolute top-4 left-4 z-10 bg-white border border-border rounded-xl shadow-lg p-3 max-w-xs">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm text-foreground">{selectedLocation.name}</p>
-                        {selectedLocation.address && (
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                            {selectedLocation.address}
-                          </p>
+                        <Badge className="flex-shrink-0 bg-primary/10 text-primary">{loc.total_scans || 0}</Badge>
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <Badge
+                          className={`text-xs ${
+                            loc.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {loc.is_active ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                        {loc.latitude && loc.longitude && (
+                          <span className="text-xs text-muted-foreground">
+                            📍 {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
+                          </span>
                         )}
                       </div>
-                      <button
-                        onClick={() => {
-                          setSelectedLocation(null);
-                          setMapCenter(null);
-                        }}
-                        className="text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-slate-50">
+              <div className="w-full h-full flex items-center justify-center">
                 <div className="text-center">
-                  <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-2 opacity-50" />
-                  <p className="text-muted-foreground">No hay ubicaciones activas para mostrar</p>
+                  <AlertCircle className="h-12 w-12 text-blue-400 mx-auto mb-2 opacity-50" />
+                  <p className="text-blue-700">No hay ubicaciones activas para mostrar</p>
                 </div>
               </div>
             )}
@@ -287,7 +214,7 @@ export default function Mapa() {
 
         {/* Panel Lateral */}
         <div className="w-full lg:w-[420px] flex flex-col gap-4 min-h-0">
-          {/* Detalles */}
+          {/* Detalles de ubicación */}
           {selectedLocation && (
             <Card className="border-primary/40 bg-gradient-to-br from-primary/5 to-primary/10 shadow-md">
               <CardHeader className="pb-3">
@@ -412,7 +339,6 @@ export default function Mapa() {
                         <div className="p-2 space-y-1.5 bg-background border-t border-border max-h-60 overflow-y-auto">
                           {dayLogs.map(log => {
                             const isEntry = log.type === 'entrada';
-                            const locInfo = locations.find(l => l.id === log.location_qr_id);
 
                             return (
                               <div
