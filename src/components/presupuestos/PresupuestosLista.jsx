@@ -117,7 +117,7 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
       {/* ── Lista ────────────────────────────────────────────────────────── */}
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin" style={{ color: BLUE_H }} />
+          <Loader2 className="h-8 w-8 animate-spin" style={{ color: RED_DARK }} />
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-xl border-2 border-dashed flex flex-col items-center justify-center py-20 gap-3" style={{ borderColor: RED_LIGHT }}>
