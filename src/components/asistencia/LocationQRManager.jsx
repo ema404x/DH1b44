@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, QrCode, MapPin, Pencil, Trash2, LogIn, LogOut, ArrowLeftRight, Building2, Scan } from 'lucide-react';
+import { Plus, QrCode, MapPin, Pencil, Trash2, Building2, ClipboardList } from 'lucide-react';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 
 const COLOR_OPTIONS = [
@@ -21,13 +21,7 @@ const COLOR_OPTIONS = [
   { value: 'red',    label: 'Rojo',     dot: 'bg-red-500' },
 ];
 
-const EVENT_LABELS = {
-  entrada: { label: 'Solo Entrada', icon: LogIn, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
-  salida:  { label: 'Solo Salida',  icon: LogOut, color: 'text-blue-600 bg-blue-50 border-blue-200' },
-  ambos:   { label: 'Entrada & Salida', icon: ArrowLeftRight, color: 'text-slate-600 bg-slate-50 border-slate-200' },
-};
-
-const emptyForm = { name: '', description: '', address: '', project_name: '', event_type: 'ambos', color: 'blue', is_active: true };
+const emptyForm = { name: '', description: '', address: '', project_name: '', color: 'blue', is_active: true };
 
 export default function LocationQRManager() {
   const qc = useQueryClient();
@@ -62,7 +56,7 @@ export default function LocationQRManager() {
   const openEdit = (loc) => { setEditing(loc); setForm({ ...loc }); setDialogOpen(true); };
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  const getQRUrl = (loc) => `${window.location.origin}/fichar-ubicacion?loc=${loc.id}`;
+  const getQRUrl = (loc) => `${window.location.origin}/ordenes?ubicacion=${loc.id}&sitio=${encodeURIComponent(loc.name)}`;
 
   const dotColor = COLOR_OPTIONS.find(c => c.value === form.color)?.dot || 'bg-blue-500';
 
@@ -71,8 +65,8 @@ export default function LocationQRManager() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-sm">QRs por Ubicación</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Generá QRs para obras, depósitos o cualquier punto de trabajo</p>
+          <h3 className="font-semibold text-sm">QRs de Ubicación — Pilares de Sitio</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Generá QRs identificadores para obras, sitios y puntos de control de órdenes de trabajo</p>
         </div>
         <Button size="sm" onClick={openNew} className="gap-1.5">
           <Plus className="h-4 w-4" /> Nueva Ubicación
@@ -84,7 +78,7 @@ export default function LocationQRManager() {
         <div className="border-2 border-dashed border-border rounded-xl py-12 text-center">
           <MapPin className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
           <p className="font-medium text-sm text-muted-foreground">Sin ubicaciones configuradas</p>
-          <p className="text-xs text-muted-foreground/70 mt-1 mb-4">Creá un punto de fichaje y generá su QR</p>
+          <p className="text-xs text-muted-foreground/70 mt-1 mb-4">Creá un pilar de sitio y generá su QR identificador</p>
           <Button size="sm" variant="outline" onClick={openNew} className="gap-1.5">
             <Plus className="h-4 w-4" /> Crear primera ubicación
           </Button>
@@ -125,15 +119,10 @@ export default function LocationQRManager() {
 
                   <div className="flex items-center justify-between mt-3">
                     <div className="flex items-center gap-1.5">
-                      <Badge variant="outline" className={`text-[10px] gap-1 ${eventCfg.color}`}>
-                        <eventCfg.icon className="h-3 w-3" />
-                        {eventCfg.label}
+                      <Badge variant="outline" className="text-[10px] gap-1 text-slate-600 bg-slate-50 border-slate-200">
+                        <ClipboardList className="h-3 w-3" />
+                        Control OT
                       </Badge>
-                      {loc.total_scans > 0 && (
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                          <Scan className="h-3 w-3" />{loc.total_scans}
-                        </span>
-                      )}
                     </div>
                     <div className="flex items-center gap-0.5">
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => setQrLoc(loc)} title="Ver QR">
@@ -151,7 +140,7 @@ export default function LocationQRManager() {
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>¿Eliminar ubicación?</AlertDialogTitle>
-                            <AlertDialogDescription>Se eliminará el punto de fichaje y su QR dejará de funcionar.</AlertDialogDescription>
+                            <AlertDialogDescription>Se eliminará el pilar de ubicación y su QR dejará de ser válido para control de OTs.</AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -173,7 +162,7 @@ export default function LocationQRManager() {
         open={!!qrLoc}
         onClose={() => setQrLoc(null)}
         title={qrLoc?.name || ''}
-        subtitle={qrLoc?.address || qrLoc?.project_name || 'Punto de fichaje'}
+        subtitle={qrLoc?.address || qrLoc?.project_name || 'Pilar de ubicación — Control de OT'}
         value={qrLoc ? getQRUrl(qrLoc) : ''}
       />
 
@@ -181,12 +170,16 @@ export default function LocationQRManager() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar Ubicación' : 'Nueva Ubicación'}</DialogTitle>
+            <DialogTitle>{editing ? 'Editar Ubicación' : 'Nueva Ubicación / Pilar'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">Nombre *</Label>
-              <Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Ej: Obra Norte, Depósito Central" />
+              <Label className="text-xs">Nombre del sitio *</Label>
+              <Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Ej: Planta Norte, Subestación 5, Obra Av. San Martín" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Descripción</Label>
+              <Input value={form.description || ''} onChange={e => set('description', e.target.value)} placeholder="Descripción del sitio o punto de control" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Dirección</Label>
@@ -196,44 +189,31 @@ export default function LocationQRManager() {
               <Label className="text-xs">Proyecto asociado</Label>
               <Input value={form.project_name} onChange={e => set('project_name', e.target.value)} placeholder="Nombre del proyecto (opcional)" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Tipo de fichaje</Label>
-                <Select value={form.event_type} onValueChange={v => set('event_type', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ambos">Entrada & Salida</SelectItem>
-                    <SelectItem value="entrada">Solo Entrada</SelectItem>
-                    <SelectItem value="salida">Solo Salida</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Color</Label>
-                <Select value={form.color} onValueChange={v => set('color', v)}>
-                  <SelectTrigger>
-                    <div className="flex items-center gap-2">
-                      <div className={`h-3 w-3 rounded-full ${dotColor}`} />
-                      <SelectValue />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COLOR_OPTIONS.map(c => (
-                      <SelectItem key={c.value} value={c.value}>
-                        <div className="flex items-center gap-2">
-                          <div className={`h-3 w-3 rounded-full ${c.dot}`} />
-                          {c.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Color identificador</Label>
+              <Select value={form.color} onValueChange={v => set('color', v)}>
+                <SelectTrigger>
+                  <div className="flex items-center gap-2">
+                    <div className={`h-3 w-3 rounded-full ${dotColor}`} />
+                    <SelectValue />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {COLOR_OPTIONS.map(c => (
+                    <SelectItem key={c.value} value={c.value}>
+                      <div className="flex items-center gap-2">
+                        <div className={`h-3 w-3 rounded-full ${c.dot}`} />
+                        {c.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center justify-between pt-1">
               <div>
                 <Label className="text-sm font-medium">Activo</Label>
-                <p className="text-xs text-muted-foreground">El QR estará operativo para fichajes</p>
+                <p className="text-xs text-muted-foreground">El pilar estará operativo para control de OTs</p>
               </div>
               <Switch checked={!!form.is_active} onCheckedChange={v => set('is_active', v)} />
             </div>
