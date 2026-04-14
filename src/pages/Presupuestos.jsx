@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Database, Loader2 } from 'lucide-react';
 import PresupuestosLista from '@/components/presupuestos/PresupuestosLista';
-import PresupuestoEditor from '@/components/presupuestos/PresupuestoEditor';
+import PresupuestoEditor from '@/components/presupuestos/PresupuestoEditor.jsx';
 import PrecarioManager from '@/components/presupuestos/PrecarioManager';
 import { toast } from 'sonner';
 
