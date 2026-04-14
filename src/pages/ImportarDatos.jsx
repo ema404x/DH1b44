@@ -48,7 +48,7 @@ export default function ImportarDatos() {
     try {
       const response = await base44.functions.invoke('smartImportExecute', {
         mapping: finalMapping,
-        file_url: uploadedFile.fileUrl,
+        raw_data: uploadedFile.rawData,
       });
       setImportResult(response.data);
       setStep(3);

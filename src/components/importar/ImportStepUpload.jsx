@@ -29,7 +29,7 @@ export default function ImportStepUpload({ onFileUploaded }) {
             const ws = workbook.Sheets[name];
             const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
             if (json.length > 0) {
-              sheets[name] = json.slice(0, 20); // primeras 20 filas para preview
+              sheets[name] = json; // todas las filas
             }
           });
           resolve(sheets);

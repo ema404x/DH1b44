@@ -15,10 +15,9 @@ const ENTITY_DEFAULTS = {
 function parseValue(value, field) {
   if (value === null || value === undefined || value === '') return undefined;
 
-  // Numeric fields
   const numericFields = ['stock', 'min_stock', 'unit_cost', 'hourly_rate', 'estimated_budget', 'actual_cost',
     'progress', 'purchase_cost', 'pu_mat', 'pu_mo', 'coef_pase', 'coef_oferta', 'subtotal', 'total', 'tax_rate',
-    'estimated_hours', 'row_count'];
+    'estimated_hours'];
   if (numericFields.includes(field)) {
     const num = parseFloat(String(value).replace(',', '.'));
     return isNaN(num) ? 0 : num;
@@ -32,23 +31,16 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { mapping } = await req.json();
+  const { mapping, raw_data } = await req.json();
   const sheets = (mapping.sheets || []).filter(s => s.target_entity && s.target_entity !== 'skip');
 
   if (sheets.length === 0) {
     return Response.json({ error: 'No hay hojas para importar' }, { status: 400 });
   }
 
-  // Extract full data from file using base44 integration
-  const fileData = await base44.integrations.Core.ExtractDataFromUploadedFile({
-    file_url: mapping.file_url || '',
-    json_schema: {
-      type: 'object',
-      properties: {
-        sheets: { type: 'array', items: { type: 'object', additionalProperties: true } }
-      }
-    }
-  });
+  if (!raw_data || Object.keys(raw_data).length === 0) {
+    return Response.json({ error: 'No se encontraron datos para importar' }, { status: 400 });
+  }
 
   const results = [];
 
@@ -56,33 +48,44 @@ Deno.serve(async (req) => {
     const entityKey = sheet.target_entity;
     const fieldMapping = sheet.field_mapping || {};
     const defaults = ENTITY_DEFAULTS[entityKey] || {};
-
-    // Get data from the raw_data passed or re-read
-    // We'll build records from sample or use the full data from the extraction
     const errorDetails = [];
     let imported = 0;
 
-    // Use full extraction for each sheet
-    let sheetRows = [];
-    if (fileData && fileData.output) {
-      const raw = Array.isArray(fileData.output) ? fileData.output : [fileData.output];
-      sheetRows = raw;
+    // Get rows for this sheet from raw_data. raw_data format: { sheetName: [[header, ...], [val, ...], ...] }
+    const sheetRows = raw_data[sheet.sheet_name];
+    if (!sheetRows || sheetRows.length < 2) {
+      results.push({
+        entity: entityKey,
+        entity_key: entityKey,
+        imported: 0,
+        errors: 0,
+        error_details: ['No se encontraron filas para esta hoja'],
+      });
+      continue;
     }
 
-    // If extraction didn't work well, build from the sheet data in mapping
-    if (sheetRows.length === 0 && sheet.sample_data) {
-      sheetRows = [sheet.sample_data];
-    }
+    // First row is headers
+    const headers = sheetRows[0].map(h => String(h || '').trim());
+    const dataRows = sheetRows.slice(1);
 
-    // Determine columns from field_mapping
-    const columns = Object.entries(fieldMapping).filter(([, v]) => v && v.trim());
+    // Build column index: header name -> column index
+    const colIndex = {};
+    headers.forEach((h, i) => { colIndex[h] = i; });
 
-    for (const row of sheetRows) {
+    // Active mappings: only columns that map to a field
+    const activeMappings = Object.entries(fieldMapping).filter(([, v]) => v && v.trim());
+
+    for (const row of dataRows) {
+      // Skip completely empty rows
+      if (row.every(cell => cell === null || cell === undefined || cell === '')) continue;
+
       const record = { ...defaults };
       let hasData = false;
 
-      for (const [colName, fieldName] of columns) {
-        const rawVal = row[colName];
+      for (const [colName, fieldName] of activeMappings) {
+        const colIdx = colIndex[colName];
+        if (colIdx === undefined) continue;
+        const rawVal = row[colIdx];
         if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
           const parsed = parseValue(rawVal, fieldName);
           if (parsed !== undefined) {
@@ -98,7 +101,7 @@ Deno.serve(async (req) => {
         await base44.entities[entityKey].create(record);
         imported++;
       } catch (err) {
-        errorDetails.push(`Fila: ${JSON.stringify(record).slice(0, 80)} — ${err.message}`);
+        errorDetails.push(`Fila: ${JSON.stringify(record).slice(0, 100)} — ${err.message}`);
       }
     }
 

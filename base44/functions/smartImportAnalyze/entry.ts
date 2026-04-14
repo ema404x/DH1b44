@@ -25,11 +25,11 @@ Deno.serve(async (req) => {
 
   // Build prompt with sheet headers and sample data
   const sheetsInfo = Object.entries(raw_data).map(([sheetName, rows]) => {
-    const headers = rows[0] || [];
+    const headers = (rows[0] || []).map(h => String(h || '').trim()).filter(Boolean);
     const sampleRows = rows.slice(1, 4);
     const sample = {};
     headers.forEach((h, i) => {
-      sample[h] = sampleRows.map(r => r[i]).filter(Boolean).join(', ');
+      sample[h] = sampleRows.map(r => r[i]).filter(v => v !== '' && v !== null && v !== undefined).join(', ');
     });
     return { sheetName, headers, sample, rowCount: Math.max(0, rows.length - 1) };
   });
