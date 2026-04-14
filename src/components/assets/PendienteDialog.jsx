@@ -7,14 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, User, MapPin, Calendar, Wrench } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, User, MapPin, Calendar, Wrench, FileText } from 'lucide-react';
 
 const empty = {
-  numero_sap: '', descripcion: '', tipo: 'mantenimiento', estado: 'pendiente',
-  prioridad: 'media', sitio: '', direccion: '', comuna: '', inspector: '', inspector_email: '',
-  jefe_sitio: '', jefe_sitio_email: '',
-  fecha_emision_sap: '', fecha_limite: '', proyecto_nombre: '', activo_nombre: '',
-  presupuesto_estimado: 0, materiales_necesarios: '', observaciones: '', notas_resolucion: '',
+  numero_sap: '', numero_sap_desaprobado: '', descripcion: '', tipo: 'mantenimiento',
+  estado: 'pendiente', prioridad: 'media', sitio: '', establecimiento: '', direccion: '',
+  inspector: '', clase_orden: '', status_sap: '', comuna: '',
+  jefe_sitio: '', jefe_sitio_email: '', fecha_emision_sap: '', fecha_limite: '',
+  proyecto_nombre: '', activo_nombre: '', presupuesto_estimado: 0,
+  materiales_necesarios: '', observaciones: '', notas_resolucion: '',
 };
 
 export default function PendienteDialog({ open, onOpenChange, pendiente, onSave, isSaving }) {
@@ -44,16 +46,48 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{pendiente ? `Editar: ${pendiente.numero_sap || pendiente.descripcion?.slice(0, 40)}` : 'Nuevo Pendiente SAP'}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {pendiente ? `Editar: ${pendiente.numero_sap || pendiente.descripcion?.slice(0, 40)}` : 'Nuevo Pendiente SAP'}
+            {form.comuna && <Badge variant="outline" className="text-xs">Comuna {form.comuna}</Badge>}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
-          {/* SAP + Tipo */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">N° SAP</Label>
-              <Input value={form.numero_sap} onChange={e => set('numero_sap', e.target.value)} placeholder="Ej: 100045678" />
+          {/* SAP info row */}
+          <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
+            <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5" /> Datos SAP
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">N° Orden SAP</Label>
+                <Input value={form.numero_sap} onChange={e => set('numero_sap', e.target.value)} placeholder="Ej: 421499633" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">N° Orden 1° Desaprobado</Label>
+                <Input value={form.numero_sap_desaprobado || ''} onChange={e => set('numero_sap_desaprobado', e.target.value)} placeholder="Si aplica" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Inspector (creó la orden)</Label>
+                <Input value={form.inspector || ''} onChange={e => set('inspector', e.target.value)} placeholder="Nombre del inspector" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Comuna</Label>
+                <Input value={form.comuna || ''} onChange={e => set('comuna', e.target.value)} placeholder="Ej: 8A" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Clase de Orden</Label>
+                <Input value={form.clase_orden || ''} onChange={e => set('clase_orden', e.target.value)} placeholder="Ej: MEES" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Status SAP</Label>
+                <Input value={form.status_sap || ''} onChange={e => set('status_sap', e.target.value)} placeholder="Ej: AEJE" />
+              </div>
             </div>
+          </div>
+
+          {/* Tipo + Prioridad */}
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Tipo *</Label>
               <Select value={form.tipo} onValueChange={v => set('tipo', v)}>
@@ -82,17 +116,23 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
 
           {/* Descripcion */}
           <div className="space-y-1.5">
-            <Label className="text-xs">Descripción *</Label>
-            <Textarea rows={3} value={form.descripcion} onChange={e => set('descripcion', e.target.value)} placeholder="Descripción del trabajo a realizar..." />
+            <Label className="text-xs">Tareas a Realizar *</Label>
+            <Textarea rows={3} value={form.descripcion} onChange={e => set('descripcion', e.target.value)} placeholder="Descripción de las tareas..." />
           </div>
 
           {/* Sitio */}
           <div className="border rounded-lg p-3 space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> Ubicación del sitio</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5" /> Ubicación
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Nombre del sitio</Label>
-                <Input value={form.sitio} onChange={e => set('sitio', e.target.value)} placeholder="Ej: Planta Norte" />
+                <Label className="text-xs">Ubicación / Dirección</Label>
+                <Input value={form.sitio} onChange={e => set('sitio', e.target.value)} placeholder="Ej: MARTINEZ CASTRO 3061" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Establecimiento</Label>
+                <Input value={form.establecimiento || ''} onChange={e => set('establecimiento', e.target.value)} placeholder="Nombre del establecimiento" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Proyecto</Label>
@@ -103,24 +143,14 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
                   </SelectContent>
                 </Select>
               </div>
-              <div className="col-span-2 space-y-1.5">
-                <Label className="text-xs">Dirección</Label>
-                <Input value={form.direccion} onChange={e => set('direccion', e.target.value)} placeholder="Dirección física" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Comuna / Zona</Label>
-                <Input value={form.comuna || ''} onChange={e => set('comuna', e.target.value)} placeholder="Ej: 8A, 8B, 10A, Centro" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Inspector (creó el aviso)</Label>
-                <Input value={form.inspector || ''} onChange={e => set('inspector', e.target.value)} placeholder="Nombre del inspector" />
-              </div>
             </div>
           </div>
 
           {/* Asignacion */}
           <div className="border rounded-lg p-3 space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5"><User className="h-3.5 w-3.5" /> Asignación</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5" /> Asignación
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Jefe de Sitio</Label>
@@ -132,8 +162,9 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
                 }}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar jefe..." /></SelectTrigger>
                   <SelectContent>
-                    {jefes.map(e => <SelectItem key={e.id} value={e.full_name}>{e.full_name} — {e.role}</SelectItem>)}
-                    {jefes.length === 0 && employees.map(e => <SelectItem key={e.id} value={e.full_name}>{e.full_name}</SelectItem>)}
+                    {(jefes.length > 0 ? jefes : employees).map(e => (
+                      <SelectItem key={e.id} value={e.full_name}>{e.full_name} — {e.role}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -155,19 +186,21 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
 
           {/* Fechas */}
           <div className="border rounded-lg p-3 space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> Fechas</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" /> Fechas
+            </p>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Emisión SAP</Label>
+                <Label className="text-xs">Fecha Inicio SAP</Label>
                 <Input type="date" value={form.fecha_emision_sap || ''} onChange={e => set('fecha_emision_sap', e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Fecha límite</Label>
+                <Label className="text-xs">Fecha Límite SAP</Label>
                 <Input type="date" value={form.fecha_limite || ''} onChange={e => set('fecha_limite', e.target.value)} />
               </div>
               {form.estado === 'resuelto' && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Fecha resolución</Label>
+                  <Label className="text-xs">Fecha Resolución</Label>
                   <Input type="date" value={form.fecha_resolucion || ''} onChange={e => set('fecha_resolucion', e.target.value)} />
                 </div>
               )}
@@ -176,11 +209,13 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
 
           {/* Trabajo */}
           <div className="border rounded-lg p-3 space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5"><Wrench className="h-3.5 w-3.5" /> Detalles del trabajo</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
+              <Wrench className="h-3.5 w-3.5" /> Detalles del trabajo
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Activo / Equipo relacionado</Label>
-                <Input value={form.activo_nombre} onChange={e => set('activo_nombre', e.target.value)} placeholder="Nombre del activo" />
+                <Input value={form.activo_nombre || ''} onChange={e => set('activo_nombre', e.target.value)} placeholder="Nombre del activo" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Presupuesto estimado ($)</Label>
@@ -188,17 +223,13 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Materiales necesarios</Label>
-              <Textarea rows={2} value={form.materiales_necesarios} onChange={e => set('materiales_necesarios', e.target.value)} placeholder="Lista de materiales requeridos..." />
-            </div>
-            <div className="space-y-1.5">
               <Label className="text-xs">Observaciones</Label>
-              <Textarea rows={2} value={form.observaciones} onChange={e => set('observaciones', e.target.value)} placeholder="Observaciones adicionales..." />
+              <Textarea rows={2} value={form.observaciones || ''} onChange={e => set('observaciones', e.target.value)} placeholder="Observaciones adicionales..." />
             </div>
             {form.estado === 'resuelto' && (
               <div className="space-y-1.5">
-                <Label className="text-xs">Notas de resolución (jefe de sitio)</Label>
-                <Textarea rows={2} value={form.notas_resolucion} onChange={e => set('notas_resolucion', e.target.value)} placeholder="Descripción de cómo se resolvió..." />
+                <Label className="text-xs">Notas de resolución</Label>
+                <Textarea rows={2} value={form.notas_resolucion || ''} onChange={e => set('notas_resolucion', e.target.value)} placeholder="Cómo se resolvió..." />
               </div>
             )}
           </div>
