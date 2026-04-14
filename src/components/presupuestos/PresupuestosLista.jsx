@@ -42,13 +42,13 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
     e.stopPropagation();
     setExporting(`pcp-${p.id}`);
     try {
-      const res = await base44.functions.invoke('exportPresupuestoPCP', { presupuestoId: p.id });
+      const res = await base44.functions.invoke('exportPresupuestoExcelTemplate', { presupuestoId: p.id });
       if (res.data?.file_url) {
         const a = document.createElement('a');
         a.href = res.data.file_url;
         a.download = `PCP_${p.codigo || p.titulo}_MEJORES.xlsx`;
         a.click();
-        toast.success('Excel PCP generado');
+        toast.success('Excel generado');
       } else toast.error(res.data?.error || 'Error');
     } catch (err) { toast.error(err.message); }
     finally { setExporting(null); }
