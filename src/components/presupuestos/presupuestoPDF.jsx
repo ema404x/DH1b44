@@ -1,25 +1,77 @@
 import jsPDF from 'jspdf';
 
-// ── Colores ───────────────────────────────────────────────────────────────────
-const NAVY   = [10,  24,  52];   // #0A1834
-const NAVY2  = [29,  64,  96];   // #1D4060
-const BLUE   = [205, 225, 245];  // azul claro encabezado
-const RED    = [192, 57,  43];
-const WHITE  = [255, 255, 255];
+// ── Paleta oficial ─────────────────────────────────────────────────────────────
+const NAVY   = [10,  24,  52];
+const NAVY2  = [29,  64,  96];
 const GRAY1  = [30,  30,  30];
 const GRAY2  = [80,  80,  80];
-const GRAY3  = [150, 150, 150];
+const GRAY3  = [140, 140, 140];
 const GRAY4  = [210, 210, 210];
+const WHITE  = [255, 255, 255];
 const OFFWHT = [248, 250, 252];
 const YELLOW = [255, 255, 200];
 const GREEN  = [226, 239, 218];
+const BLUE_H = [197, 217, 241];   // encabezado grupo columna
+const BLUE_L = [221, 235, 247];   // sub-encabezado
 
 const LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
 
-const PAGE_W = 297;  // A4 landscape
+// A4 apaisado
+const PAGE_W = 297;
 const PAGE_H = 210;
-const M = 10;        // margin
-const C = PAGE_W - M * 2;
+const ML = 7;   // margen izquierdo
+const MR = 7;   // margen derecho
+const C  = PAGE_W - ML - MR;  // 283 mm
+
+// ────────────────────────────────────────────────────────────────────────────────
+// COLUMNAS — réplica exacta del Excel 8A
+// ÍTEM PRESUP | ÍTEM PRECIARIO | DESCRIPCIÓN | UNID | CANT
+// PU MAT | PU MO | TOTAL (precios unit.)
+// PRECIO ACTUAL SIN IVA | COEF DEFLACTOR | PRECIO DEFLACIONADO  (deflación)
+// COEF PASE | TOTAL PASE
+// COEF OFERTA | PRECIO RESULTANTE
+// SUBTOTAL
+// ────────────────────────────────────────────────────────────────────────────────
+const C_ITEM   = { x: ML,       w: 9  };
+const C_COD    = { x: ML+9,     w: 16 };
+const C_DESC   = { x: ML+25,    w: 58 };
+const C_UNID   = { x: ML+83,    w: 9  };
+const C_CANT   = { x: ML+92,    w: 11 };
+// precios unitarios
+const C_PUMAT  = { x: ML+103,   w: 16 };
+const C_PUMO   = { x: ML+119,   w: 16 };
+const C_PUTOT  = { x: ML+135,   w: 16 };
+// deflación
+const C_DACT   = { x: ML+151,   w: 18 };
+const C_DCOEF  = { x: ML+169,   w: 12 };
+const C_DDEF   = { x: ML+181,   w: 16 };
+// coef pase
+const C_CPASE  = { x: ML+197,   w: 11 };
+const C_TPASE  = { x: ML+208,   w: 17 };
+// coef oferta
+const C_COFER  = { x: ML+225,   w: 11 };
+const C_RESULT = { x: ML+236,   w: 17 };
+// subtotal (= precio resultante * cantidad)
+const C_SUBT   = { x: ML+253,   w: 23 };
+
+const ALL_COLS = [C_ITEM, C_COD, C_DESC, C_UNID, C_CANT,
+                  C_PUMAT, C_PUMO, C_PUTOT,
+                  C_DACT, C_DCOEF, C_DDEF,
+                  C_CPASE, C_TPASE,
+                  C_COFER, C_RESULT, C_SUBT];
+
+// ── helpers ────────────────────────────────────────────────────────────────────
+function fmtN(n, dec = 2) {
+  if (!n && n !== 0) return '';
+  return new Intl.NumberFormat('es-AR', { maximumFractionDigits: dec, minimumFractionDigits: dec }).format(n);
+}
+function fmtMoney(n) {
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+}
+function fmtDate(d) {
+  try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; }
+  catch { return d || '—'; }
+}
 
 async function loadLogo() {
   try {
@@ -33,358 +85,412 @@ async function loadLogo() {
   } catch { return null; }
 }
 
-function fmtMoney(n) {
-  return new Intl.NumberFormat('es-AR', { style:'currency', currency:'ARS', maximumFractionDigits:0 }).format(n || 0);
-}
-
-function fmtDate(d) {
-  try { if (!d) return '—'; const [y,m,day] = d.split('-'); return `${day}/${m}/${y}`; }
-  catch { return d || '—'; }
-}
-
-function newPage(doc) {
-  doc.addPage();
-  return M;
-}
-
-function drawPageHeader(doc, form, logoBase64, pageNum) {
-  // Barra superior navy
+// ── Cabecera de página ─────────────────────────────────────────────────────────
+function drawPageHeader(doc, form, logo, pageNum) {
+  // Barra navy
   doc.setFillColor(...NAVY);
-  doc.rect(0, 0, PAGE_W, 14, 'F');
+  doc.rect(0, 0, PAGE_W, 13, 'F');
 
-  if (logoBase64 && pageNum === 1) {
-    doc.addImage(logoBase64, 'JPEG', M, 1, 38, 12);
+  if (logo && pageNum === 1) {
+    doc.addImage(logo, 'JPEG', ML, 0.5, 32, 12);
   }
 
   doc.setTextColor(...WHITE);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('PLANILLA DE CÓMPUTO Y PRESUPUESTO', PAGE_W / 2, 9, { align: 'center' });
+  doc.setFontSize(9);
+  doc.text('PLANILLA DE CÓMPUTO Y PRESUPUESTO', PAGE_W / 2, 8.5, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.text(`${form.codigo || ''} · Pág. ${pageNum}`, PAGE_W - M, 9, { align: 'right' });
+  doc.setFontSize(6);
+  doc.text(`${form.codigo || ''} · Pág. ${pageNum}`, PAGE_W - MR, 8.5, { align: 'right' });
 
-  return 18;
+  return 15;
 }
 
+// ── Bloque de metadatos (replica el encabezado del Excel) ──────────────────────
 function drawMetaBlock(doc, form, y) {
-  const labelStyle = (label) => {
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...GRAY2);
-    return label;
-  };
+  const ROW = 5.5;
+  const rows = 6;
+  const blockH = rows * ROW + 4;
 
-  const col1 = M, col2 = M + 38, col3 = PAGE_W / 2 + 2, col4 = PAGE_W / 2 + 42;
-  const rowH = 6.5;
-
-  const leftMeta = [
-    ['COMITENTE:',    form.cliente_nombre || 'GCBA - MINISTERIO DE EDUCACIÓN GCBA'],
-    ['LICITACIÓN:',   form.licitacion || '—'],
-    ['ESCUELA:',      form.proyecto_nombre || '—'],
-    ['OBRA:',         form.titulo || '—'],
-    ['DIRECCIÓN:',    form.direccion_obra || '—'],
-    ['SUPERVISOR:',   form.responsable || '—'],
-  ];
-
-  const rightMeta = [
-    ['Nº PRESUPUESTO:',   form.codigo || '—'],
-    ['EMPRESA:',          'MEJORES HOSPITALES S.A.'],
-    ['FECHA:',            fmtDate(form.fecha_emision)],
-    ['PLAZO:',            form.plazo || '—'],
-    ['Coef. Pase:',       String(form.coef_pase ?? 1.6504)],
-    ['Coef. Oferta:',     String(form.coef_oferta ?? 1.38)],
-  ];
-
-  if (form.preciario_fecha) rightMeta.push(['Preciario:',  fmtDate(form.preciario_fecha)]);
-
-  // Fondo del bloque
+  // Fondo
   doc.setFillColor(...OFFWHT);
-  doc.rect(M, y - 1, C, Math.max(leftMeta.length, rightMeta.length) * rowH + 4, 'F');
-  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.2);
-  doc.rect(M, y - 1, C, Math.max(leftMeta.length, rightMeta.length) * rowH + 4);
+  doc.rect(ML, y, C, blockH, 'F');
+  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.15);
+  doc.rect(ML, y, C, blockH);
 
-  leftMeta.forEach(([label, val], i) => {
-    const rowY = y + i * rowH + 4;
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...GRAY3);
-    doc.text(label, col1 + 1, rowY);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...GRAY1);
-    doc.text(doc.splitTextToSize(val, col3 - col2 - 4)[0], col2, rowY);
+  // Divisor vertical central
+  const mid = ML + C / 2;
+  doc.line(mid, y, mid, y + blockH);
+
+  const left = [
+    ['COMITENTE:',   form.cliente_nombre || 'GCBA - MINISTERIO DE EDUCACIÓN DE LA CIUDAD DE BUENOS AIRES - DGMESC'],
+    ['LICITACIÓN:',  form.licitacion || '—'],
+    ['ESCUELA:',     form.proyecto_nombre || '—'],
+    ['OBRA:',        form.titulo || '—'],
+    ['DIRECCIÓN:',   form.direccion_obra || '—'],
+    ['SUPERVISOR:',  form.responsable || '—'],
+  ];
+  const right = [
+    ['Nº PRESUPUESTO:',  form.codigo || '—'],
+    ['EMPRESA:',         'MEJORES HOSPITALES S.A.'],
+    ['FECHA ingreso SAP:', fmtDate(form.fecha_emision)],
+    ['PLAZO:',           form.plazo || '—'],
+    ['Preciario Utilizado:', fmtDate(form.preciario_fecha)],
+    ['Coef. Pase:',      fmtN(form.coef_pase ?? 1.6504, 4)],
+    ['Coef. Oferta:',    fmtN(form.coef_oferta ?? 1.38, 2)],
+  ];
+
+  const lx1 = ML + 2, lx2 = ML + 30;
+  const rx1 = mid + 2, rx2 = mid + 38;
+
+  left.forEach(([lbl, val], i) => {
+    const ry = y + 4 + i * ROW;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(5.8); doc.setTextColor(...GRAY3);
+    doc.text(lbl, lx1, ry);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.2); doc.setTextColor(...GRAY1);
+    doc.text(doc.splitTextToSize(val, mid - lx2 - 2)[0], lx2, ry);
+  });
+  right.forEach(([lbl, val], i) => {
+    const ry = y + 4 + i * ROW;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(5.8); doc.setTextColor(...GRAY3);
+    doc.text(lbl, rx1, ry);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.2); doc.setTextColor(...GRAY1);
+    doc.text(String(val), rx2, ry);
   });
 
-  rightMeta.forEach(([label, val], i) => {
-    const rowY = y + i * rowH + 4;
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...GRAY3);
-    doc.text(label, col3, rowY);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...GRAY1);
-    doc.text(val, col4, rowY);
-  });
+  // MTOM N° + Inspector en fila inferior
+  const mtomY = y + blockH - ROW;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(5.8); doc.setTextColor(...GRAY3);
+  doc.text('MTOM Nº:', lx1, mtomY);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(5.8); doc.setTextColor(...GRAY3);
+  doc.text('INSPECTOR:', rx1, mtomY);
 
-  // Divider vertical
-  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.2);
-  doc.line(PAGE_W / 2, y - 1, PAGE_W / 2, y + Math.max(leftMeta.length, rightMeta.length) * rowH + 3);
-
-  return y + Math.max(leftMeta.length, rightMeta.length) * rowH + 8;
+  return y + blockH + 3;
 }
 
-// ── Cabecera de tabla de ítems ────────────────────────────────────────────────
-// Columnas: ÍTEM | CÓD.PRECIARIO | DESCRIPCIÓN | UNID | CANT | PU MAT | PU MO | TOTAL PU | COEF PASE | TOTAL PASE | COEF OFERTA | PRECIO RESULT
-const COLS = {
-  item:   { x: M,    w: 10 },
-  cod:    { x: M+10, w: 18 },
-  desc:   { x: M+28, w: 70 },
-  unid:   { x: M+98, w: 10 },
-  cant:   { x: M+108,w: 12 },
-  puMat:  { x: M+120,w: 18 },
-  puMo:   { x: M+138,w: 18 },
-  puTot:  { x: M+156,w: 18 },
-  cPase:  { x: M+174,w: 13 },
-  tPase:  { x: M+187,w: 20 },
-  cOfer:  { x: M+207,w: 13 },
-  result: { x: M+220,w: 67 },
-};
-
+// ── Cabecera de tabla (3 filas: grupos + subgrupos + sub-col) ──────────────────
 function drawTableHeader(doc, y) {
-  const h1 = 6, h2 = 6;
+  const H1 = 5.5, H2 = 5, H3 = 5;
 
-  // Primera fila headers agrupados
+  // ── Fila 1: grupos de columnas ──────────────────────────────────────────────
   doc.setFillColor(...NAVY);
-  doc.rect(M, y, C, h1, 'F');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(5.5); doc.setTextColor(...WHITE);
-  doc.text('ÍTEM',           COLS.item.x + 1,  y + 4);
-  doc.text('CÓD.PRECIARIO',  COLS.cod.x  + 1,  y + 4);
-  doc.text('DESCRIPCIÓN',    COLS.desc.x + 1,  y + 4);
-  doc.text('UNID.',          COLS.unid.x + 1,  y + 4);
-  doc.text('CANT.',          COLS.cant.x + 1,  y + 4);
-  // Grupo PRECIOS UNITARIOS
-  const puGroupX = COLS.puMat.x;
-  const puGroupW = COLS.puMat.w + COLS.puMo.w + COLS.puTot.w;
-  doc.text('PRECIOS UNITARIOS', puGroupX + puGroupW / 2, y + 4, { align: 'center' });
-  // COEF PASE
-  doc.text('COEF. PASE', COLS.cPase.x + (COLS.cPase.w + COLS.tPase.w) / 2, y + 4, { align: 'center' });
-  // COEF OFERTA
-  doc.text('COEF. OFERTA', COLS.cOfer.x + (COLS.cOfer.w + COLS.result.w) / 2, y + 4, { align: 'center' });
-  y += h1;
+  doc.rect(ML, y, C, H1, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(5); doc.setTextColor(...WHITE);
 
-  // Segunda fila sub-headers
-  doc.setFillColor(...NAVY2);
-  doc.rect(M, y, C, h2, 'F');
-  doc.setFontSize(5); doc.setTextColor(...WHITE);
-  [
-    ['', COLS.item],
-    ['', COLS.cod],
-    ['', COLS.desc],
-    ['', COLS.unid],
-    ['', COLS.cant],
-    ['P.U.MAT.',  COLS.puMat],
-    ['P.U.M.O.',  COLS.puMo],
-    ['TOTAL',     COLS.puTot],
-    ['COEF.',     COLS.cPase],
-    ['TOTAL PASE', COLS.tPase],
-    ['COEF.',     COLS.cOfer],
-    ['PRECIO RESULT.', COLS.result],
-  ].forEach(([label, col]) => {
-    if (label) doc.text(label, col.x + col.w / 2, y + 4, { align: 'center' });
+  const centerOf = (cols) => cols[0].x + cols.reduce((a, c) => a + c.w, 0) / 2;
+  const rightEdge = (col) => col.x + col.w;
+
+  doc.text('ÍTEM', C_ITEM.x + C_ITEM.w / 2, y + 3.8, { align: 'center' });
+  doc.text('ÍTEM', C_COD.x + C_COD.w / 2, y + 3.8, { align: 'center' });
+  doc.text('DESCRIPCIÓN', C_DESC.x + C_DESC.w / 2, y + 3.8, { align: 'center' });
+  doc.text('UNID.', C_UNID.x + C_UNID.w / 2, y + 3.8, { align: 'center' });
+  doc.text('CANT.', C_CANT.x + C_CANT.w / 2, y + 3.8, { align: 'center' });
+  doc.text('PRECIOS UNITARIOS', centerOf([C_PUMAT, C_PUMO, C_PUTOT]), y + 3.8, { align: 'center' });
+  doc.text('DEFLACIÓN DE MATERIALES FUERA DE PRECIARIO', centerOf([C_DACT, C_DCOEF, C_DDEF]), y + 3.8, { align: 'center' });
+  doc.text('COEF. DE PASE', centerOf([C_CPASE, C_TPASE]), y + 3.8, { align: 'center' });
+  doc.text('COEF. OFERTA', centerOf([C_COFER, C_RESULT]), y + 3.8, { align: 'center' });
+  doc.text('SUBTOTAL', C_SUBT.x + C_SUBT.w / 2, y + 3.8, { align: 'center' });
+  y += H1;
+
+  // ── Fila 2: sub-encabezados ────────────────────────────────────────────────
+  doc.setFillColor(...BLUE_H);
+  doc.rect(ML, y, C, H2, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(4.5); doc.setTextColor(...NAVY);
+
+  const subH = [
+    ['PRESUP.', C_ITEM],
+    ['PRECIARIO', C_COD],
+    ['', C_DESC],
+    ['', C_UNID],
+    ['', C_CANT],
+    ['P.U. MAT.', C_PUMAT],
+    ['P.U. M.O.', C_PUMO],
+    ['TOTAL', C_PUTOT],
+    ['PRECIO ACTUAL\nSIN IVA', C_DACT],
+    ['COEF.\nDEFLACTOR', C_DCOEF],
+    ['PRECIO\nDEFLACIONADO', C_DDEF],
+    ['COEF.', C_CPASE],
+    ['TOTAL', C_TPASE],
+    ['COEF.', C_COFER],
+    ['PRECIO\nRESULTANTE', C_RESULT],
+    ['AVANCE', C_SUBT],
+  ];
+
+  subH.forEach(([lbl, col]) => {
+    if (!lbl) return;
+    const lines = lbl.split('\n');
+    if (lines.length > 1) {
+      doc.text(lines[0], col.x + col.w / 2, y + 2, { align: 'center' });
+      doc.text(lines[1], col.x + col.w / 2, y + 4, { align: 'center' });
+    } else {
+      doc.text(lbl, col.x + col.w / 2, y + 3.2, { align: 'center' });
+    }
   });
-  y += h2;
+  y += H2;
+
+  // ── Fila 3: segunda sub-fila para las columnas de DEFLACIÓN ────────────────
+  doc.setFillColor(...BLUE_L);
+  doc.rect(ML, y, C, H3, 'F');
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(4); doc.setTextColor(...NAVY2);
+  // Separadores verticales
+  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.1);
+  ALL_COLS.forEach((col, i) => {
+    if (i > 0) doc.line(col.x, y - H1 - H2, col.x, y + H3);
+  });
+  doc.line(PAGE_W - MR, y - H1 - H2, PAGE_W - MR, y + H3);
+  y += H3;
 
   return y;
 }
 
-function drawRubroHeader(doc, rubro, y) {
-  const subtotal = (rubro.items || []).reduce((a, i) => a + (Number(i.total) || 0), 0);
-  doc.setFillColor(...BLUE);
-  doc.rect(M, y, C, 7, 'F');
-  doc.setFillColor(...NAVY2);
-  doc.rect(M, y, 2.5, 7, 'F');
-
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...NAVY);
-  doc.text((rubro.nombre || 'RUBRO').toUpperCase(), M + 5, y + 5);
-  doc.setTextColor(...NAVY2);
-  doc.text(fmtMoney(subtotal), PAGE_W - M - 1, y + 5, { align: 'right' });
-  return y + 8;
-}
-
-function drawItemRow(doc, item, y, isAlt, coef_pase, coef_oferta) {
-  if (isAlt) { doc.setFillColor(...OFFWHT); doc.rect(M, y, C, 6, 'F'); }
-
-  const pu_mat    = Number(item.pu_mat) || Number(item.precio_unitario) || 0;
-  const pu_mo     = Number(item.pu_mo) || 0;
-  const total_pu  = pu_mat + pu_mo;
-  const total_pase   = total_pu > 0 ? total_pu * coef_pase : Number(item.precio_unitario) || 0;
-  const precio_result = total_pase > 0 ? total_pase * coef_oferta : Number(item.precio_unitario) || 0;
-
-  // Fondo precio resultante (amarillo)
-  doc.setFillColor(...YELLOW);
-  doc.rect(COLS.result.x, y, COLS.result.w, 6, 'F');
-
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...GRAY1);
-  doc.text(String(item._num || ''), COLS.item.x + COLS.item.w / 2, y + 4, { align: 'center' });
-  doc.text(item.codigo || '', COLS.cod.x + 1, y + 4);
-  doc.text(doc.splitTextToSize(item.descripcion || '', 68)[0], COLS.desc.x + 1, y + 4);
-  doc.text(item.unidad || '', COLS.unid.x + COLS.unid.w / 2, y + 4, { align: 'center' });
-
-  doc.setTextColor(...GRAY2);
-  const numRight = (val, col) => doc.text(
-    new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(val || 0),
-    col.x + col.w - 1, y + 4, { align: 'right' }
-  );
-
-  numRight(item.cantidad,  COLS.cant);
-  numRight(pu_mat,         COLS.puMat);
-  numRight(pu_mo,          COLS.puMo);
-  numRight(total_pu,       COLS.puTot);
-  numRight(coef_pase,      COLS.cPase);
-  numRight(total_pase,     COLS.tPase);
-  numRight(coef_oferta,    COLS.cOfer);
-
-  doc.setFont('helvetica', 'bold'); doc.setTextColor(...NAVY);
-  numRight(precio_result,  COLS.result);
-
-  // Línea separadora
-  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.1);
-  doc.line(M, y + 6, PAGE_W - M, y + 6);
-
-  return y + 6;
-}
-
-function drawRubroSubtotal(doc, rubro, y) {
-  const sub = (rubro.items || []).reduce((a, i) => a + (Number(i.total) || 0), 0);
-  doc.setFillColor(...GREEN);
-  doc.rect(M, y, C, 5.5, 'F');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...NAVY2);
-  doc.text(`Subtotal ${rubro.nombre || ''}`, M + 2, y + 4);
-  doc.text(fmtMoney(sub), PAGE_W - M - 1, y + 4, { align: 'right' });
+// ── Encabezado de ubicación / zona ─────────────────────────────────────────────
+function drawUbicacion(doc, nombre, total, y) {
+  doc.setFillColor(...NAVY);
+  doc.rect(ML, y, C, 6.5, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...WHITE);
+  doc.text((nombre || 'UBICACIÓN - ZONA DE TRABAJO').toUpperCase(), ML + 3, y + 4.5);
+  doc.text(`TOTAL  ${fmtMoney(total)}`, PAGE_W - MR - 2, y + 4.5, { align: 'right' });
   return y + 7;
 }
 
-function drawResumen(doc, form, rubros, y) {
-  const subtotal = rubros.reduce((a, r) => a + (r.items || []).reduce((b, i) => b + (Number(i.total) || 0), 0), 0);
-  const gg  = subtotal * ((form.gastos_generales_pct || 0) / 100);
-  const ben = (subtotal + gg) * ((form.beneficio_pct || 0) / 100);
-  const base = subtotal + gg + ben;
-  const iva  = base * ((form.iva_pct || 0) / 100);
-  const total = base + iva;
+// ── Encabezado de rubro ────────────────────────────────────────────────────────
+function drawRubroHeader(doc, nombre, y) {
+  doc.setFillColor(...BLUE_H);
+  doc.rect(ML, y, C, 5.5, 'F');
+  doc.setFillColor(...NAVY2);
+  doc.rect(ML, y, 2, 5.5, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(...NAVY);
+  doc.text((nombre || 'RUBRO').toUpperCase(), ML + 4, y + 4);
+  return y + 6;
+}
 
-  const bx = M + C - 95, bw = 95;
+// ── Fila de ítem ───────────────────────────────────────────────────────────────
+function drawItemRow(doc, item, y, isAlt, cp, co, coefDeflactor) {
+  const ROW_H = 5.5;
 
-  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.3);
-  doc.line(M, y, PAGE_W - M, y); y += 5;
+  if (isAlt) { doc.setFillColor(245, 247, 250); doc.rect(ML, y, C, ROW_H, 'F'); }
+
+  const pu_mat   = Number(item.pu_mat) || Number(item.precio_unitario) || 0;
+  const pu_mo    = Number(item.pu_mo)  || 0;
+  const pu_total = pu_mat + pu_mo;
+
+  // Deflación: sólo aplica si el ítem tiene precio fuera del preciario
+  const d_actual     = 0;          // precio actual sin IVA (fuera preciario) — vacío si no aplica
+  const d_coef       = coefDeflactor || 6.37;
+  const d_deflac     = d_actual > 0 ? d_actual / d_coef : 0;
+
+  // Si hay deflación, base para coef pase es d_deflac; sino es pu_total
+  const base_pase    = d_deflac > 0 ? d_deflac : pu_total;
+  const total_pase   = base_pase * cp;
+  const precio_resul = total_pase * co;
+  const subtotal     = precio_resul * (Number(item.cantidad) || 0);
+
+  // Fondo amarillo en precio resultante y subtotal
+  doc.setFillColor(...YELLOW);
+  doc.rect(C_RESULT.x, y, C_RESULT.w, ROW_H, 'F');
+  doc.rect(C_SUBT.x, y, C_SUBT.w, ROW_H, 'F');
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(5.8); doc.setTextColor(...GRAY1);
+
+  const ctr = (txt, col) => doc.text(String(txt), col.x + col.w / 2, y + 3.8, { align: 'center' });
+  const rgt = (val, col, dec = 2) => {
+    if (val === 0 || !val) return;
+    doc.text(fmtN(val, dec), col.x + col.w - 1, y + 3.8, { align: 'right' });
+  };
+
+  ctr(item._num || '', C_ITEM);
+  doc.text(item.codigo || '', C_COD.x + 1, y + 3.8);
+
+  // Descripción: recortar al ancho
+  const desc = doc.splitTextToSize(item.descripcion || '', C_DESC.w - 2)[0];
+  doc.text(desc, C_DESC.x + 1, y + 3.8);
+
+  ctr(item.unidad || '', C_UNID);
+  rgt(item.cantidad,  C_CANT);
+  rgt(pu_mat,         C_PUMAT);
+  rgt(pu_mo,          C_PUMO);
+  rgt(pu_total,       C_PUTOT);
+
+  // deflación (en blanco si no aplica)
+  if (d_actual > 0) {
+    rgt(d_actual,  C_DACT);
+    rgt(d_coef,    C_DCOEF, 2);
+    rgt(d_deflac,  C_DDEF);
+  }
+
+  doc.setTextColor(...GRAY2);
+  rgt(cp,           C_CPASE, 4);
+  rgt(total_pase,   C_TPASE);
+  rgt(co,           C_COFER, 2);
+
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(...NAVY);
+  rgt(precio_resul, C_RESULT);
+  rgt(subtotal,     C_SUBT);
+
+  // Línea separadora
+  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.08);
+  doc.line(ML, y + ROW_H, PAGE_W - MR, y + ROW_H);
+
+  return y + ROW_H;
+}
+
+// ── Subtotal de rubro ──────────────────────────────────────────────────────────
+function drawRubroSubtotal(doc, rubro, y, cp, co) {
+  const sub = (rubro.items || []).reduce((a, i) => {
+    const pu_mat  = Number(i.pu_mat) || Number(i.precio_unitario) || 0;
+    const pu_mo   = Number(i.pu_mo) || 0;
+    const result  = (pu_mat + pu_mo) * cp * co;
+    return a + result * (Number(i.cantidad) || 0);
+  }, 0);
+  doc.setFillColor(...GREEN);
+  doc.rect(ML, y, C, 5, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(...NAVY2);
+  doc.text(`Subtotal ${(rubro.nombre || '').toUpperCase()}`, ML + 2, y + 3.5);
+  doc.text(fmtMoney(sub), PAGE_W - MR - 1, y + 3.5, { align: 'right' });
+  return y + 5.5;
+}
+
+// ── Total presupuesto ──────────────────────────────────────────────────────────
+function drawTotalRow(doc, total, y) {
+  doc.setFillColor(...NAVY);
+  doc.rect(ML, y, C, 7, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...WHITE);
+  doc.text('TOTAL PRESUPUESTO', ML + 3, y + 5);
+  doc.text(fmtMoney(total), PAGE_W - MR - 2, y + 5, { align: 'right' });
+  return y + 8;
+}
+
+// ── Sección de redeterminación ─────────────────────────────────────────────────
+function drawRedeterminacion(doc, form, total, y) {
+  y += 6;
+  doc.setDrawColor(...GRAY4); doc.setLineWidth(0.2);
+  doc.line(ML, y, PAGE_W - MR, y);
+  y += 4;
 
   doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...NAVY);
-  doc.text('RESUMEN FINANCIERO', bx, y); y += 4;
+  doc.text('REDETERMINACIÓN', ML, y);
+  y += 5;
 
-  const summaryRows = [
-    [`Subtotal de obra`, subtotal],
-    [`Gastos generales (${form.gastos_generales_pct || 0}%)`, gg],
-    [`Beneficio / utilidad (${form.beneficio_pct || 0}%)`, ben],
-    [`Base imponible`, base],
-    [`IVA (${form.iva_pct || 0}%)`, iva],
+  const cp    = form.coef_pase   ?? 1.6504;
+  const co    = form.coef_oferta ?? 1.38;
+  const redPct = form.redeterminacion_pct ?? 0;
+  const redCoef = redPct ? 1 + redPct / 100 : 1;
+
+  const rows = [
+    ['Costo de obra a valor actual:', fmtMoney(total)],
+    ['Coef. Redeterminación:', fmtN(redCoef, 4)],
+    ['Precio venta a valores base contractual:', fmtMoney(total)],
+    ['Coef. Pase:', fmtN(cp, 4)],
+    ['Coef. Oferta:', fmtN(co, 2)],
   ];
 
-  summaryRows.forEach(([label, val], i) => {
-    if (i % 2 === 0) { doc.setFillColor(...OFFWHT); } else { doc.setFillColor(...WHITE); }
-    doc.rect(bx, y, bw, 5.5, 'F');
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...GRAY2);
-    doc.text(label, bx + 2, y + 3.8);
+  const bx = ML + C - 110;
+  rows.forEach(([lbl, val], i) => {
+    const ry = y + i * 5.5;
+    if (i % 2 === 0) { doc.setFillColor(...OFFWHT); doc.rect(bx, ry - 1, 110, 5.5, 'F'); }
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.2); doc.setTextColor(...GRAY2);
+    doc.text(lbl, bx + 2, ry + 2.8);
     doc.setFont('helvetica', 'bold'); doc.setTextColor(...GRAY1);
-    doc.text(fmtMoney(val), PAGE_W - M - 1, y + 3.8, { align: 'right' });
-    y += 5.5;
+    doc.text(val, PAGE_W - MR - 2, ry + 2.8, { align: 'right' });
   });
 
-  y += 2;
-  doc.setFillColor(...NAVY);
-  doc.rect(bx, y, bw, 11, 'F');
-  doc.setFillColor(...RED);
-  doc.rect(bx, y, 3, 11, 'F');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...WHITE);
-  doc.text('TOTAL PRESUPUESTO', bx + 5, y + 7.5);
-  doc.setFontSize(9);
-  doc.text(fmtMoney(total), PAGE_W - M - 1, y + 7.5, { align: 'right' });
-
-  return y + 15;
+  return y + rows.length * 5.5 + 5;
 }
 
+// ── Notas ──────────────────────────────────────────────────────────────────────
+function drawNotas(doc, notas, y) {
+  if (!notas) return y;
+  y += 4;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...NAVY);
+  doc.text('NOTAS Y CONDICIONES:', ML, y); y += 4;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6); doc.setTextColor(...GRAY2);
+  const lines = doc.splitTextToSize(notas, C - 4);
+  doc.text(lines, ML + 2, y);
+  return y + lines.length * 4;
+}
+
+// ── Pie de página ─────────────────────────────────────────────────────────────
 function drawFooter(doc, form, pageNum, totalPages) {
   doc.setFillColor(...NAVY);
-  doc.rect(0, PAGE_H - 8, PAGE_W, 8, 'F');
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(6); doc.setTextColor(...WHITE);
-  doc.text('MEJORES HOSPITALES S.A.  ·  en mantenimiento, obras y servicios', M, PAGE_H - 3);
-  doc.text(`${form.codigo || 'PRESUPUESTO'}  ·  Pág. ${pageNum} / ${totalPages}`, PAGE_W - M, PAGE_H - 3, { align: 'right' });
+  doc.rect(0, PAGE_H - 7, PAGE_W, 7, 'F');
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5); doc.setTextColor(...WHITE);
+  doc.text('MEJORES HOSPITALES S.A.  ·  mantenimiento, obras y servicios', ML, PAGE_H - 2.5);
+  doc.text(
+    `${form.codigo || 'PRESUPUESTO'}  ·  ${form.licitacion || ''}  ·  Pág. ${pageNum} / ${totalPages}`,
+    PAGE_W - MR, PAGE_H - 2.5, { align: 'right' }
+  );
 }
 
-// ── MAIN ──────────────────────────────────────────────────────────────────────
+// ── FUNCIÓN PRINCIPAL ─────────────────────────────────────────────────────────
 export async function generatePresupuestoPDF(form) {
-  const logoBase64 = await loadLogo();
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const rubros = form.rubros || [];
-  const coef_pase   = form.coef_pase ?? 1.6504;
-  const coef_oferta = form.coef_oferta ?? 1.38;
+  const logo     = await loadLogo();
+  const doc      = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const rubros   = form.rubros || [];
+  const cp       = form.coef_pase   ?? 1.6504;
+  const co       = form.coef_oferta ?? 1.38;
+  const coefDef  = 6.37;
+  const SAFE_BOTTOM = PAGE_H - 10;
 
   let pageNum = 1;
 
-  let y = drawPageHeader(doc, form, logoBase64, pageNum);
-  y = drawMetaBlock(doc, form, y);
-
-  const SAFE_BOTTOM = PAGE_H - 15;
-
-  // Tabla
-  y = drawTableHeader(doc, y);
-
-  let globalItemNum = 1;
-
-  for (const rubro of rubros) {
-    // Si no hay espacio para el header del rubro + al menos 1 fila
-    if (y + 20 > SAFE_BOTTOM) {
-      drawFooter(doc, form, pageNum, '?');
+  const ensureSpace = (needed) => {
+    if (y + needed > SAFE_BOTTOM) {
+      drawFooter(doc, form, pageNum, '??');
       doc.addPage(); pageNum++;
-      y = drawPageHeader(doc, form, logoBase64, pageNum);
+      y = drawPageHeader(doc, form, logo, pageNum);
       y = drawTableHeader(doc, y);
     }
+  };
 
-    y = drawRubroHeader(doc, rubro, y);
+  let y = drawPageHeader(doc, form, logo, pageNum);
+  y = drawMetaBlock(doc, form, y);
+  y = drawTableHeader(doc, y);
+
+  let globalIdx = 1;
+
+  for (const rubro of rubros) {
+    ensureSpace(15);
+    y = drawRubroHeader(doc, rubro.nombre, y);
 
     for (const item of (rubro.items || [])) {
-      if (y + 6 > SAFE_BOTTOM) {
-        drawFooter(doc, form, pageNum, '?');
-        doc.addPage(); pageNum++;
-        y = drawPageHeader(doc, form, logoBase64, pageNum);
-        y = drawTableHeader(doc, y);
-        y = drawRubroHeader(doc, rubro, y);
-      }
-      item._num = globalItemNum++;
-      y = drawItemRow(doc, item, y, globalItemNum % 2 === 0, coef_pase, coef_oferta);
+      ensureSpace(6);
+      item._num = globalIdx++;
+      y = drawItemRow(doc, item, y, globalIdx % 2 === 0, cp, co, coefDef);
     }
 
-    y = drawRubroSubtotal(doc, rubro, y);
-    y += 3;
+    ensureSpace(6);
+    y = drawRubroSubtotal(doc, rubro, y, cp, co);
+    y += 2;
   }
 
-  // Resumen
-  if (y + 60 > SAFE_BOTTOM) {
-    drawFooter(doc, form, pageNum, '?');
-    doc.addPage(); pageNum++;
-    y = drawPageHeader(doc, form, logoBase64, pageNum);
-    y += 5;
+  // Total general
+  const totalGeneral = rubros.reduce((acc, r) =>
+    acc + (r.items || []).reduce((a, i) => {
+      const pu = (Number(i.pu_mat) || Number(i.precio_unitario) || 0) + (Number(i.pu_mo) || 0);
+      return a + pu * cp * co * (Number(i.cantidad) || 0);
+    }, 0), 0);
+
+  ensureSpace(10);
+  y = drawTotalRow(doc, totalGeneral, y);
+
+  // Generales / Volquetes / Limpieza (si hay notas en ese campo)
+  if (form.notas_generales) {
+    ensureSpace(30);
+    y = drawNotas(doc, form.notas_generales, y);
   }
 
-  y = drawResumen(doc, form, rubros, y);
+  // Redeterminación
+  ensureSpace(50);
+  y = drawRedeterminacion(doc, form, totalGeneral, y);
 
-  // Notas
+  // Notas finales
   if (form.notas) {
-    if (y + 20 > SAFE_BOTTOM) {
-      drawFooter(doc, form, pageNum, '?');
-      doc.addPage(); pageNum++;
-      y = drawPageHeader(doc, form, logoBase64, pageNum);
-      y += 5;
-    }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...NAVY);
-    doc.text('NOTAS Y CONDICIONES:', M, y); y += 4;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...GRAY2);
-    const lines = doc.splitTextToSize(form.notas, C - 4);
-    doc.text(lines, M + 2, y);
+    ensureSpace(20);
+    y = drawNotas(doc, form.notas, y);
   }
 
-  // Corregir el número de páginas en todos los footers
+  // Pies definitivos
   const totalPages = doc.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
