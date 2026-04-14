@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Brain, ChevronDown, ChevronUp, AlertCircle, CheckCircle2, Edit2 } from 'lucide-react';
+import { Brain, ChevronDown, ChevronUp, CheckCircle2, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,8 +17,24 @@ const ENTITY_OPTIONS = [
   { value: 'skip', label: '— Ignorar esta hoja —' },
 ];
 
+// Key fields per entity — used to highlight important mappings
+const KEY_FIELDS = {
+  Client: ['cuit', 'name'],
+  Employee: ['dni', 'full_name'],
+  Material: ['code', 'name'],
+  Project: ['code', 'name'],
+  WorkOrder: ['code', 'title'],
+  Asset: ['serial_number', 'code'],
+  PrecarioMinisterio: ['codigo'],
+  Quote: ['title', 'client_name'],
+  Invoice: ['client_name', 'issue_date'],
+};
+
 export default function ImportStepMapping({ mappingResult, onConfirm, onBack }) {
-  const [sheets, setSheets] = useState(mappingResult.sheets || []);
+  // Already sorted by confidence from backend; preserve order
+  const [sheets, setSheets] = useState(
+    [...(mappingResult.sheets || [])].sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
+  );
   const [expandedSheet, setExpandedSheet] = useState(0);
 
   const updateSheetEntity = (sheetIdx, newEntity) => {
@@ -101,23 +117,31 @@ export default function ImportStepMapping({ mappingResult, onConfirm, onBack }) 
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(sheet.field_mapping || {}).map(([col, field], i) => (
-                      <tr key={i} className="border-t border-border/50 hover:bg-muted/20">
-                        <td className="px-3 py-2 font-mono text-foreground">{col}</td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={field || ''}
-                            onChange={(e) => updateFieldMapping(sheetIdx, col, e.target.value)}
-                            placeholder="ignorar"
-                            className="px-2 py-1 border border-border rounded text-xs bg-background w-full"
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground truncate max-w-32">
-                          {(sheet.sample_data?.[col] || '—')}
-                        </td>
-                      </tr>
-                    ))}
+                    {Object.entries(sheet.field_mapping || {}).map(([col, field], i) => {
+                      const isKeyField = field && (KEY_FIELDS[sheet.target_entity] || []).includes(field);
+                      return (
+                        <tr key={i} className={`border-t border-border/50 hover:bg-muted/20 ${isKeyField ? 'bg-amber-50/60' : ''}`}>
+                          <td className="px-3 py-2 font-mono text-foreground">
+                            <span className="flex items-center gap-1">
+                              {isKeyField && <Star className="h-3 w-3 text-amber-500 flex-shrink-0" />}
+                              {col}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="text"
+                              value={field || ''}
+                              onChange={(e) => updateFieldMapping(sheetIdx, col, e.target.value)}
+                              placeholder="ignorar"
+                              className={`px-2 py-1 border rounded text-xs bg-background w-full ${isKeyField ? 'border-amber-400 font-medium' : 'border-border'}`}
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground truncate max-w-32">
+                            {(sheet.sample_data?.[col] || '—')}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
