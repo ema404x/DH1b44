@@ -1,0 +1,126 @@
+{
+  "name": "Pendiente",
+  "type": "object",
+  "properties": {
+    "numero_sap": {
+      "type": "string",
+      "description": "N\u00famero de orden SAP"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripci\u00f3n del trabajo pendiente"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "mantenimiento",
+        "obra",
+        "inspeccion",
+        "emergencia"
+      ],
+      "default": "mantenimiento",
+      "description": "Tipo de trabajo"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "pendiente",
+        "asignado",
+        "en_progreso",
+        "resuelto",
+        "cancelado"
+      ],
+      "default": "pendiente"
+    },
+    "prioridad": {
+      "type": "string",
+      "enum": [
+        "baja",
+        "media",
+        "alta",
+        "urgente"
+      ],
+      "default": "media"
+    },
+    "sitio": {
+      "type": "string",
+      "description": "Nombre del sitio / ubicaci\u00f3n"
+    },
+    "direccion": {
+      "type": "string",
+      "description": "Direcci\u00f3n del sitio"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Nombre del jefe de sitio asignado"
+    },
+    "jefe_sitio_email": {
+      "type": "string",
+      "description": "Email del jefe de sitio"
+    },
+    "cuadrilla": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Miembros de la cuadrilla asignada"
+    },
+    "fecha_emision_sap": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha en que SAP emiti\u00f3 el pendiente"
+    },
+    "fecha_limite": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha l\u00edmite para resolver"
+    },
+    "fecha_asignacion": {
+      "type": "string",
+      "format": "date",
+      "description": "Cuando se asign\u00f3 al jefe de sitio"
+    },
+    "fecha_resolucion": {
+      "type": "string",
+      "format": "date",
+      "description": "Cuando fue resuelto"
+    },
+    "proyecto_nombre": {
+      "type": "string"
+    },
+    "proyecto_id": {
+      "type": "string"
+    },
+    "activo_nombre": {
+      "type": "string",
+      "description": "Activo o equipo relacionado"
+    },
+    "presupuesto_estimado": {
+      "type": "number",
+      "default": 0
+    },
+    "materiales_necesarios": {
+      "type": "string",
+      "description": "Materiales requeridos para el trabajo"
+    },
+    "observaciones": {
+      "type": "string"
+    },
+    "notas_resolucion": {
+      "type": "string",
+      "description": "Notas del jefe al resolver"
+    },
+    "fotos_resolucion": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "URLs de fotos al resolver"
+    }
+  },
+  "required": [
+    "descripcion",
+    "tipo",
+    "estado"
+  ]
+}

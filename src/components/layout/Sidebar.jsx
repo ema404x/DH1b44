@@ -20,7 +20,7 @@ const navGroups = [
     items: [
       { label: 'Proyectos', icon: FolderKanban, path: '/proyectos' },
       { label: 'Órdenes de Trabajo', icon: ClipboardList, path: '/ordenes' },
-      { label: 'Activos & Equipos', icon: Cpu, path: '/activos' },
+      { label: 'Pendientes', icon: ClipboardList, path: '/activos' },
       { label: 'Informes', icon: ClipboardCheck, path: '/informes' },
       { label: 'Reportes & KPIs', icon: BarChart2, path: '/reportes' },
       { label: 'Automatizaciones', icon: Zap, path: '/automatizaciones' },
