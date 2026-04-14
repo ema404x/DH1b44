@@ -1,0 +1,113 @@
+{
+  "name": "PresupuestoObraEnhanced",
+  "type": "object",
+  "properties": {
+    "codigo": {
+      "type": "string",
+      "description": "N\u00famero de presupuesto"
+    },
+    "titulo": {
+      "type": "string",
+      "description": "T\u00edtulo de la obra"
+    },
+    "cliente_nombre": {
+      "type": "string",
+      "description": "Comitente"
+    },
+    "cliente_id": {
+      "type": "string"
+    },
+    "licitacion": {
+      "type": "string",
+      "description": "N\u00famero de licitaci\u00f3n"
+    },
+    "empresa": {
+      "type": "string",
+      "default": "MEJORES HOSPITALES S.A."
+    },
+    "direccion_obra": {
+      "type": "string"
+    },
+    "escuela": {
+      "type": "string"
+    },
+    "mtom": {
+      "type": "string",
+      "description": "N\u00famero MTOM"
+    },
+    "supervisor": {
+      "type": "string"
+    },
+    "inspector": {
+      "type": "string"
+    },
+    "fecha_ingreso_sap": {
+      "type": "string",
+      "format": "date"
+    },
+    "plazo_dias": {
+      "type": "number",
+      "description": "Plazo en d\u00edas"
+    },
+    "preciario_utilizado": {
+      "type": "string",
+      "format": "date"
+    },
+    "coef_pase": {
+      "type": "number",
+      "default": 1.6504,
+      "description": "Coeficiente de pase"
+    },
+    "coef_oferta": {
+      "type": "number",
+      "default": 1.38,
+      "description": "Coeficiente de oferta"
+    },
+    "grilla_data": {
+      "type": "object",
+      "description": "Estado completo de la grilla PCP en JSON"
+    },
+    "rubros": {
+      "type": "array",
+      "description": "Rubros agrupados",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    "plan_trabajos": {
+      "type": "object",
+      "description": "Estado generado del Plan de Trabajos"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "borrador",
+        "enviado",
+        "aprobado",
+        "rechazado",
+        "facturado"
+      ],
+      "default": "borrador"
+    },
+    "total_presupuesto": {
+      "type": "number",
+      "default": 0
+    },
+    "notas": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "codigo",
+    "titulo",
+    "cliente_nombre"
+  ]
+}
