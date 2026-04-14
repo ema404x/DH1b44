@@ -86,7 +86,6 @@ export default function LocationQRManager() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {locations.map(loc => {
-            const eventCfg = EVENT_LABELS[loc.event_type] || EVENT_LABELS.ambos;
             const colorDot = COLOR_OPTIONS.find(c => c.value === loc.color)?.dot || 'bg-blue-500';
             return (
               <Card key={loc.id} className={`overflow-hidden transition-all ${!loc.is_active ? 'opacity-60' : ''}`}>
