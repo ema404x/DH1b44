@@ -4,11 +4,39 @@
   "properties": {
     "numero_sap": {
       "type": "string",
-      "description": "N\u00famero de orden SAP"
+      "description": "N\u00b0 de orden SAP"
+    },
+    "numero_sap_desaprobado": {
+      "type": "string",
+      "description": "N\u00b0 de orden 1\u00b0 desaprobado"
     },
     "descripcion": {
       "type": "string",
-      "description": "Descripci\u00f3n del trabajo pendiente"
+      "description": "Tareas a realizar"
+    },
+    "establecimiento": {
+      "type": "string",
+      "description": "Nombre del establecimiento"
+    },
+    "sitio": {
+      "type": "string",
+      "description": "Ubicaci\u00f3n / direcci\u00f3n del sitio"
+    },
+    "inspector": {
+      "type": "string",
+      "description": "Inspector que cre\u00f3 la orden en SAP"
+    },
+    "clase_orden": {
+      "type": "string",
+      "description": "Clase de orden SAP (ej: MEES)"
+    },
+    "status_sap": {
+      "type": "string",
+      "description": "Status SAP original (ej: AEJE)"
+    },
+    "comuna": {
+      "type": "string",
+      "description": "Comuna a la que pertenece el pendiente"
     },
     "tipo": {
       "type": "string",
@@ -18,8 +46,7 @@
         "inspeccion",
         "emergencia"
       ],
-      "default": "mantenimiento",
-      "description": "Tipo de trabajo"
+      "default": "mantenimiento"
     },
     "estado": {
       "type": "string",
@@ -42,48 +69,36 @@
       ],
       "default": "media"
     },
-    "sitio": {
-      "type": "string",
-      "description": "Nombre del sitio / ubicaci\u00f3n"
-    },
-    "direccion": {
-      "type": "string",
-      "description": "Direcci\u00f3n del sitio"
-    },
     "jefe_sitio": {
       "type": "string",
-      "description": "Nombre del jefe de sitio asignado"
+      "description": "Jefe de sitio asignado"
     },
     "jefe_sitio_email": {
-      "type": "string",
-      "description": "Email del jefe de sitio"
+      "type": "string"
     },
     "cuadrilla": {
       "type": "array",
       "items": {
         "type": "string"
-      },
-      "description": "Miembros de la cuadrilla asignada"
+      }
     },
     "fecha_emision_sap": {
       "type": "string",
       "format": "date",
-      "description": "Fecha en que SAP emiti\u00f3 el pendiente"
+      "description": "Fecha inicio SAP"
     },
     "fecha_limite": {
       "type": "string",
       "format": "date",
-      "description": "Fecha l\u00edmite para resolver"
+      "description": "Fecha l\u00edmite SAP"
     },
     "fecha_asignacion": {
       "type": "string",
-      "format": "date",
-      "description": "Cuando se asign\u00f3 al jefe de sitio"
+      "format": "date"
     },
     "fecha_resolucion": {
       "type": "string",
-      "format": "date",
-      "description": "Cuando fue resuelto"
+      "format": "date"
     },
     "proyecto_nombre": {
       "type": "string"
@@ -92,30 +107,26 @@
       "type": "string"
     },
     "activo_nombre": {
-      "type": "string",
-      "description": "Activo o equipo relacionado"
+      "type": "string"
     },
     "presupuesto_estimado": {
       "type": "number",
       "default": 0
     },
     "materiales_necesarios": {
-      "type": "string",
-      "description": "Materiales requeridos para el trabajo"
+      "type": "string"
     },
     "observaciones": {
       "type": "string"
     },
     "notas_resolucion": {
-      "type": "string",
-      "description": "Notas del jefe al resolver"
+      "type": "string"
     },
     "fotos_resolucion": {
       "type": "array",
       "items": {
         "type": "string"
-      },
-      "description": "URLs de fotos al resolver"
+      }
     }
   },
   "required": [

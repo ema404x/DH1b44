@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, ClipboardList, AlertCircle, Clock, CheckCircle2, User, MapPin, Calendar, Upload } from 'lucide-react';
-import { differenceInDays, isPast } from 'date-fns';
+import { Search, Plus, ClipboardList, Upload } from 'lucide-react';
+import { isPast } from 'date-fns';
 import { toast } from 'sonner';
 import PendienteDialog from '@/components/assets/PendienteDialog';
 import PendienteCard from '@/components/assets/PendienteCard';
-import { Link } from 'react-router-dom';
+import PendientesImportModal from '@/components/assets/PendientesImportModal';
 
 const estadoColors = {
   pendiente: 'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -33,6 +33,7 @@ export default function PendientesTab() {
   const [filterEstado, setFilterEstado] = useState('all');
   const [filterTipo, setFilterTipo] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const qc = useQueryClient();
 
@@ -136,11 +137,9 @@ export default function PendientesTab() {
           </SelectContent>
         </Select>
         <div className="flex gap-2">
-          <Link to="/importar">
-            <Button variant="outline" className="gap-1.5 whitespace-nowrap">
-              <Upload className="h-4 w-4" /> Importar SAP
-            </Button>
-          </Link>
+          <Button variant="outline" className="gap-1.5 whitespace-nowrap" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4" /> Importar SAP
+          </Button>
           <Button onClick={openNew} className="gap-1.5 whitespace-nowrap">
             <Plus className="h-4 w-4" /> Nuevo
           </Button>
@@ -174,6 +173,15 @@ export default function PendientesTab() {
         pendiente={selected}
         onSave={(data) => saveMutation.mutate(data)}
         isSaving={saveMutation.isPending}
+      />
+
+      <PendientesImportModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => {
+          qc.invalidateQueries({ queryKey: ['pendientes'] });
+          toast.success('Pendientes importados correctamente');
+        }}
       />
     </div>
   );

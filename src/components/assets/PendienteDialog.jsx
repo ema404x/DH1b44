@@ -11,7 +11,8 @@ import { Loader2, User, MapPin, Calendar, Wrench } from 'lucide-react';
 
 const empty = {
   numero_sap: '', descripcion: '', tipo: 'mantenimiento', estado: 'pendiente',
-  prioridad: 'media', sitio: '', direccion: '', jefe_sitio: '', jefe_sitio_email: '',
+  prioridad: 'media', sitio: '', direccion: '', comuna: '', inspector: '', inspector_email: '',
+  jefe_sitio: '', jefe_sitio_email: '',
   fecha_emision_sap: '', fecha_limite: '', proyecto_nombre: '', activo_nombre: '',
   presupuesto_estimado: 0, materiales_necesarios: '', observaciones: '', notas_resolucion: '',
 };
@@ -105,6 +106,14 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
               <div className="col-span-2 space-y-1.5">
                 <Label className="text-xs">Dirección</Label>
                 <Input value={form.direccion} onChange={e => set('direccion', e.target.value)} placeholder="Dirección física" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Comuna / Zona</Label>
+                <Input value={form.comuna || ''} onChange={e => set('comuna', e.target.value)} placeholder="Ej: 8A, 8B, 10A, Centro" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Inspector (creó el aviso)</Label>
+                <Input value={form.inspector || ''} onChange={e => set('inspector', e.target.value)} placeholder="Nombre del inspector" />
               </div>
             </div>
           </div>

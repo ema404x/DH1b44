@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Pencil, Trash2, User, MapPin, Calendar, AlertCircle } from 'lucide-react';
+import { Pencil, Trash2, User, MapPin, Calendar, AlertCircle, Eye } from 'lucide-react';
 import { differenceInDays, isPast, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -50,7 +50,13 @@ export default function PendienteCard({ pendiente: p, estadoColors, prioridadCol
           {p.sitio && (
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <MapPin className="h-3 w-3 flex-shrink-0" />
-              <span className="truncate">{p.sitio}</span>
+              <span className="truncate">{p.sitio}{p.comuna ? ` · ${p.comuna}` : ''}</span>
+            </div>
+          )}
+          {p.inspector && (
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Eye className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">Inspector: <span className="font-medium text-foreground">{p.inspector}</span></span>
             </div>
           )}
           {p.jefe_sitio && (
