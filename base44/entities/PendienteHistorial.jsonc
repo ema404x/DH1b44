@@ -1,0 +1,65 @@
+{
+  "name": "PendienteHistorial",
+  "type": "object",
+  "properties": {
+    "pendiente_id": {
+      "type": "string",
+      "description": "ID del pendiente relacionado"
+    },
+    "pendiente_numero_sap": {
+      "type": "string",
+      "description": "N\u00b0 SAP del pendiente (desnormalizado para b\u00fasqueda)"
+    },
+    "usuario_email": {
+      "type": "string",
+      "description": "Email del usuario que realiz\u00f3 el cambio"
+    },
+    "usuario_nombre": {
+      "type": "string",
+      "description": "Nombre del usuario"
+    },
+    "estado_anterior": {
+      "type": "string",
+      "enum": [
+        "pendiente",
+        "asignado",
+        "en_progreso",
+        "resuelto",
+        "cancelado"
+      ],
+      "description": "Estado anterior al cambio"
+    },
+    "estado_nuevo": {
+      "type": "string",
+      "enum": [
+        "pendiente",
+        "asignado",
+        "en_progreso",
+        "resuelto",
+        "cancelado"
+      ],
+      "description": "Nuevo estado"
+    },
+    "comentario": {
+      "type": "string",
+      "description": "Comentario o nota del usuario sobre el cambio"
+    },
+    "campos_modificados": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Lista de campos que cambiaron adem\u00e1s del estado"
+    },
+    "jefe_sitio_anterior": {
+      "type": "string"
+    },
+    "jefe_sitio_nuevo": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "pendiente_id",
+    "usuario_email"
+  ]
+}
