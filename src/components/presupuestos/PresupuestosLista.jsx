@@ -17,12 +17,11 @@ import { exportPresupuestoExcel } from '@/utils/exportExcel';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
-// Paleta ministerial — idéntica al Excel/PDF
-const NAVY    = '#0F1C2E';
-const NAVY2   = '#1A3A5C';
-const BLUE_H  = '#1F4E79';
-const BLUE_S  = '#BDD7EE';
-const RUBRO_F = '#17375E';
+// Paleta Mejores — rojo corporativo del Excel
+const RED_MAIN = '#C53030';  // Rojo principal
+const RED_DARK = '#9B1C1C';  // Rojo más oscuro para headers
+const RED_LIGHT = '#FED7D7'; // Rojo muy claro para fondos
+const GRAY_ACCENT = '#4A5568'; // Gris para secundarios
 
 const ESTADO = {
   borrador:  { label: 'Borrador',  bar: '#94a3b8', pill: 'bg-slate-100 text-slate-700 border-slate-200' },
@@ -70,21 +69,21 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
   return (
     <div className="space-y-5">
 
-      {/* ── KPI bar (réplica header del Excel) ─────────────────────────── */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-0 rounded-xl overflow-hidden border border-[#1F4E79] shadow-sm">
+      {/* ── KPI bar (réplica header del Excel rojo) ────────────────────── */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-0 rounded-xl overflow-hidden border shadow-sm" style={{ borderColor: RED_DARK }}>
         {[
           { label: 'TOTAL',     value: presupuestos.length, sub: fmt(presupuestos.reduce((a,p)=>a+(p.total||0),0)), icon: FileText },
           { label: 'APROBADOS', value: aprobados.length,   sub: fmt(totalAprobado),   icon: CheckCircle2 },
           { label: 'BORRADOR',  value: borradores,         sub: 'pendientes de envío', icon: FilePlus2 },
           { label: 'ENVIADOS',  value: enviados,           sub: 'esperando respuesta', icon: Clock },
         ].map(({ label, value, sub, icon: Icon }, i) => (
-          <div key={label} className={`flex items-center gap-3 px-4 py-3 ${i < 3 ? 'border-r border-[#1F4E79]/30' : ''}`}
-            style={{ background: i === 0 ? NAVY : i === 1 ? BLUE_H : '#FFFFFF' }}>
-            <Icon className="h-5 w-5 shrink-0" style={{ color: i < 2 ? '#BDD7EE' : BLUE_H }} />
+          <div key={label} className={`flex items-center gap-3 px-4 py-3 ${i < 3 ? 'border-r' : ''}`}
+            style={{ background: i === 0 ? RED_DARK : i === 1 ? RED_MAIN : '#FFFFFF', borderColor: RED_DARK }}>
+            <Icon className="h-5 w-5 shrink-0" style={{ color: i < 2 ? 'white' : RED_MAIN }} />
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: i < 2 ? '#BDD7EE' : '#6B7280' }}>{label}</p>
-              <p className="text-xl font-bold tabular-nums leading-none mt-0.5" style={{ color: i < 2 ? '#FFFFFF' : NAVY }}>{value}</p>
-              <p className="text-[10px] mt-0.5 truncate" style={{ color: i < 2 ? '#BDD7EE' : '#9CA3AF' }}>{sub}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: i < 2 ? '#FFE4E4' : '#6B7280' }}>{label}</p>
+              <p className="text-xl font-bold tabular-nums leading-none mt-0.5" style={{ color: i < 2 ? '#FFFFFF' : RED_DARK }}>{value}</p>
+              <p className="text-[10px] mt-0.5 truncate" style={{ color: i < 2 ? '#FFE4E4' : '#9CA3AF' }}>{sub}</p>
             </div>
           </div>
         ))}
@@ -102,7 +101,7 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
             <button key={f} onClick={() => setEstadoFilter(f)}
               className="px-3 py-1.5 rounded text-xs font-semibold transition-all border"
               style={estadoFilter === f
-                ? { background: NAVY, color: '#fff', borderColor: NAVY }
+                ? { background: RED_DARK, color: '#fff', borderColor: RED_DARK }
                 : { background: '#F8FAFC', color: '#475569', borderColor: '#CBD5E1' }}>
               {f === 'todos' ? 'Todos' : ESTADO[f]?.label}
               {f !== 'todos' && <span className="ml-1.5 opacity-60">{presupuestos.filter(p => p.estado === f).length}</span>}
@@ -110,7 +109,7 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
           ))}
         </div>
         <Button onClick={onNew} className="gap-2 ml-auto shrink-0 text-white"
-          style={{ background: NAVY, borderColor: NAVY }}>
+          style={{ background: RED_DARK, borderColor: RED_DARK }}>
           <Plus className="h-4 w-4" /> Nuevo Presupuesto
         </Button>
       </div>
@@ -121,23 +120,23 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
           <Loader2 className="h-8 w-8 animate-spin" style={{ color: BLUE_H }} />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border-2 border-dashed border-[#BDD7EE] flex flex-col items-center justify-center py-20 gap-3">
-          <div className="h-14 w-14 rounded-xl flex items-center justify-center" style={{ background: BLUE_S }}>
-            <FileText className="h-7 w-7" style={{ color: BLUE_H }} />
+        <div className="rounded-xl border-2 border-dashed flex flex-col items-center justify-center py-20 gap-3" style={{ borderColor: RED_LIGHT }}>
+          <div className="h-14 w-14 rounded-xl flex items-center justify-center" style={{ background: RED_LIGHT }}>
+            <FileText className="h-7 w-7" style={{ color: RED_MAIN }} />
           </div>
-          <p className="font-bold text-base" style={{ color: NAVY }}>{presupuestos.length === 0 ? 'Sin presupuestos aún' : 'Sin resultados'}</p>
+          <p className="font-bold text-base" style={{ color: RED_DARK }}>{presupuestos.length === 0 ? 'Sin presupuestos aún' : 'Sin resultados'}</p>
           <p className="text-sm text-gray-400">{presupuestos.length === 0 ? 'Creá tu primer presupuesto basado en el preciario ministerial.' : 'Probá con otros filtros.'}</p>
           {presupuestos.length === 0 && (
-            <Button onClick={onNew} className="gap-2 mt-1 text-white" style={{ background: NAVY }}>
+            <Button onClick={onNew} className="gap-2 mt-1 text-white" style={{ background: RED_DARK }}>
               <Plus className="h-4 w-4" /> Nuevo Presupuesto
             </Button>
           )}
         </div>
       ) : (
-        <div className="rounded-xl overflow-hidden border shadow-sm" style={{ borderColor: '#CBD5E1' }}>
+        <div className="rounded-xl overflow-hidden border shadow-sm" style={{ borderColor: RED_DARK }}>
           {/* Table header — replica Excel encabezado */}
           <div className="grid grid-cols-12 px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest"
-            style={{ background: NAVY, color: '#BDD7EE' }}>
+            style={{ background: RED_DARK, color: '#FFE4E4' }}>
             <div className="col-span-4">Obra / Presupuesto</div>
             <div className="col-span-2">Cliente / Licitación</div>
             <div className="col-span-1 text-center">Plazo</div>
@@ -155,18 +154,18 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
             return (
               <div key={p.id}
                 onClick={() => onEdit(p)}
-                className="grid grid-cols-12 px-4 py-3 border-b cursor-pointer transition-colors hover:bg-[#EBF4FB] group"
-                style={{ background: isAlt ? '#EBF4FB' : '#FFFFFF', borderColor: '#E2E8F0' }}>
+                className="grid grid-cols-12 px-4 py-3 border-b cursor-pointer transition-colors group"
+                style={{ background: isAlt ? RED_LIGHT : '#FFFFFF', borderColor: '#E2E8F0' }}>
 
                 {/* Acento de estado */}
                 <div className="absolute left-0 top-0 h-full w-1 rounded-r" style={{ background: est.bar }} />
 
                 {/* Obra / código */}
                 <div className="col-span-4 min-w-0">
-                  <p className="font-semibold text-sm truncate leading-snug group-hover:text-[#1F4E79] transition-colors"
-                    style={{ color: NAVY }}>{p.titulo || '(Sin título)'}</p>
+                  <p className="font-semibold text-sm truncate leading-snug group-hover:text-red-600 transition-colors"
+                    style={{ color: RED_DARK }}>{p.titulo || '(Sin título)'}</p>
                   {p.codigo && <p className="text-[10px] font-mono mt-0.5" style={{ color: '#94A3B8' }}>{p.codigo}</p>}
-                  {totalItems > 0 && <p className="text-[10px] mt-0.5" style={{ color: BLUE_H }}>{totalItems} ítems · {(p.rubros||[]).length} rubros</p>}
+                  {totalItems > 0 && <p className="text-[10px] mt-0.5" style={{ color: RED_MAIN }}>{totalItems} ítems · {(p.rubros||[]).length} rubros</p>}
                 </div>
 
                 {/* Cliente */}
@@ -183,12 +182,12 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
 
                 {/* Plazo */}
                 <div className="col-span-1 self-center text-center">
-                  <span className="text-xs font-mono" style={{ color: RUBRO_F }}>{p.plazo ? `${p.plazo}d` : '—'}</span>
+                  <span className="text-xs font-mono" style={{ color: GRAY_ACCENT }}>{p.plazo ? `${p.plazo}d` : '—'}</span>
                 </div>
 
                 {/* Coef */}
                 <div className="col-span-1 self-center text-center">
-                  <span className="text-[10px] font-mono" style={{ color: BLUE_H }}>{p.coef_pase || '—'}</span>
+                  <span className="text-[10px] font-mono" style={{ color: RED_MAIN }}>{p.coef_pase || '—'}</span>
                 </div>
 
                 {/* Estado */}
@@ -201,9 +200,9 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
 
                 {/* Total */}
                 <div className="col-span-2 self-center text-right">
-                  <span className="text-sm font-bold tabular-nums" style={{ color: NAVY }}>{fmt(p.total)}</span>
+                  <span className="text-sm font-bold tabular-nums" style={{ color: RED_DARK }}>{fmt(p.total)}</span>
                   {p.comuna && p.comuna !== 'otro' && (
-                    <p className="text-[10px] font-semibold mt-0.5" style={{ color: BLUE_H }}>Comuna {p.comuna}</p>
+                    <p className="text-[10px] font-semibold mt-0.5" style={{ color: RED_MAIN }}>Comuna {p.comuna}</p>
                   )}
                 </div>
 
@@ -212,7 +211,7 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Download className="h-3.5 w-3.5" style={{ color: BLUE_H }} />
+                        <Download className="h-3.5 w-3.5" style={{ color: RED_MAIN }} />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
