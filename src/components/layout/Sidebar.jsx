@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  Wrench, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen
+  Wrench, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -58,6 +58,7 @@ const navGroups = [
     label: 'Ayuda y Aprendizaje',
     items: [
       { label: 'Centro de Aprendizaje', icon: BookOpen, path: '/tutorial' },
+      { label: 'Importar Datos', icon: Upload, path: '/importar' },
     ]
   },
 ];
