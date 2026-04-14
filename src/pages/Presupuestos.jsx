@@ -1,169 +1,101 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Save, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FileText, Database } from 'lucide-react';
 import { toast } from 'sonner';
-import PresupuestosLista from '@/components/presupuestos/PresupuestosLista';
-import PresupuestoGridPCP from '@/components/presupuestos/PresupuestoGridPCP';
-import PlanTrabajosGenerator from '@/components/presupuestos/PlanTrabajosGenerator';
+import ExcelRenderer from '@/components/presupuestos/ExcelRenderer';
 
 const COLORS = {
   redDark: '#9B1C1C',
   redMain: '#C53030',
-  grayDark: '#2D3748',
 };
 
 export default function Presupuestos() {
-  const [view, setView] = useState('lista'); // 'lista', 'editor', 'plan'
-  const [editingId, setEditingId] = useState(null);
-  const [editorData, setEditorData] = useState(null);
-  const queryClient = useQueryClient();
+  const [tab, setTab] = useState('excel');
+  const [loadedExcelData, setLoadedExcelData] = useState(null);
 
-  const { data: presupuestos = [], isLoading } = useQuery({
-    queryKey: ['presupuestosObra'],
-    queryFn: () => base44.entities.PresupuestoObraEnhanced.list('-updated_date', 100),
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.PresupuestoObraEnhanced.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['presupuestosObra'] });
-      toast.success('Presupuesto creado');
-      setView('lista');
-      setEditorData(null);
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.PresupuestoObraEnhanced.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['presupuestosObra'] });
-      toast.success('Presupuesto guardado');
-      setView('lista');
-      setEditorData(null);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.PresupuestoObraEnhanced.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['presupuestosObra'] });
-      toast.success('Presupuesto eliminado');
-    },
-  });
-
-  const handleSave = (cabecera, items) => {
-    const dataToSave = {
-      ...cabecera,
-      grilla_data: items,
-      total_presupuesto: items.reduce((sum, row) => sum + (parseFloat(row.subtotal) || 0), 0),
-    };
-
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, data: dataToSave });
-    } else {
-      createMutation.mutate(dataToSave);
-    }
+  const handleExcelLoaded = (data) => {
+    setLoadedExcelData(data);
+    toast.success('Excel listo para trabajar');
   };
 
-  const handleGenerarPlanTrabajos = (data) => {
-    setEditorData({ ...editorData, ...data });
-    setView('plan');
-  };
-
-  const handleNewPresupuesto = () => {
-    setEditingId(null);
-    setEditorData({
-      codigo: `PPTO-${Date.now()}`,
-      cliente_nombre: 'GCBA - MINISTERIO DE EDUCACIÓN',
-      empresa: 'MEJORES HOSPITALES S.A.',
-      coef_pase: 1.6504,
-      coef_oferta: 1.38,
-      items: [],
-    });
-    setView('editor');
-  };
-
-  const handleEdit = (presupuesto) => {
-    setEditingId(presupuesto.id);
-    setEditorData({
-      ...presupuesto,
-      items: presupuesto.grilla_data || [],
-    });
-    setView('editor');
-  };
-
-  if (view === 'lista') {
-    return (
-      <div className="min-h-screen p-6" style={{ background: '#F7FAFC' }}>
-        <PresupuestosLista
-          presupuestos={presupuestos}
-          isLoading={isLoading}
-          onEdit={handleEdit}
-          onDelete={(id) => deleteMutation.mutate(id)}
-          onNew={handleNewPresupuesto}
-        />
+  return (
+    <div className="space-y-5 p-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold" style={{ color: COLORS.redDark }}>
+          Presupuestos - Sistema DH1
+        </h1>
+        <p className="text-sm text-gray-600 mt-1">
+          Cargá tu Excel "Nuevo formato presupuestos 8AA" y trabajá directamente dentro del software.
+        </p>
       </div>
-    );
-  }
 
-  if (view === 'plan' && editorData) {
-    return (
-      <div className="min-h-screen p-6" style={{ background: '#F7FAFC' }}>
-        <PlanTrabajosGenerator
-          cabecera={editorData}
-          items={editorData.items || []}
-          onBack={() => setView('editor')}
-        />
-      </div>
-    );
-  }
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="bg-gray-100 h-10">
+          <TabsTrigger value="excel" className="gap-2">
+            <FileText className="h-4 w-4" />
+            Plantilla Excel
+          </TabsTrigger>
+          <TabsTrigger value="ordenes" className="gap-2">
+            <Database className="h-4 w-4" />
+            Orden de Tareas
+          </TabsTrigger>
+        </TabsList>
 
-  if (view === 'editor' && editorData) {
-    return (
-      <div className="min-h-screen p-6 space-y-4" style={{ background: '#F7FAFC' }}>
-        {/* TOP BAR */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => {
-              setView('lista');
-              setEditorData(null);
-              setEditingId(null);
-            }}
-            className="text-sm font-semibold hover:opacity-80"
-            style={{ color: COLORS.redDark }}
-          >
-            ← Volver
-          </button>
-          <h1 className="text-2xl font-bold" style={{ color: COLORS.redDark }}>
-            {editingId ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}
-          </h1>
-          <Button
-            onClick={() => handleSave(editorData, editorData.items || [])}
-            disabled={createMutation.isPending || updateMutation.isPending}
-            style={{ background: COLORS.redDark, color: 'white' }}
-          >
-            {createMutation.isPending || updateMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        <TabsContent value="excel" className="mt-6">
+          <ExcelRenderer onDataLoaded={handleExcelLoaded} />
+        </TabsContent>
+
+        <TabsContent value="ordenes" className="mt-6">
+          <div className="p-6 rounded-lg border-2" style={{ borderColor: COLORS.redDark }}>
+            <h2 className="text-lg font-bold mb-4" style={{ color: COLORS.redDark }}>
+              Catálogo de Órdenes de Tareas
+            </h2>
+            {loadedExcelData?.sheets?.['ORDEN TAREAS'] ? (
+              <OrdenesTareasRenderer sheetData={loadedExcelData.sheets['ORDEN TAREAS']} />
             ) : (
-              <Save className="h-4 w-4 mr-2" />
+              <p className="text-sm text-gray-500">Cargá un Excel para ver las órdenes de tareas.</p>
             )}
-            Guardar
-          </Button>
-        </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
 
-        {/* GRID */}
-        <PresupuestoGridPCP
-          cabecera={editorData}
-          onCabeceraChange={(newCabecera) => setEditorData(newCabecera)}
-          items={editorData.items || []}
-          onItemsChange={(newItems) => setEditorData({ ...editorData, items: newItems })}
-          onGenerarPlanTrabajos={handleGenerarPlanTrabajos}
-        />
-      </div>
-    );
-  }
+function OrdenesTareasRenderer({ sheetData }) {
+  const { rows } = sheetData;
 
-  return null;
+  return (
+    <table className="w-full border-collapse">
+      <thead>
+        <tr style={{ background: COLORS.redDark }}>
+          <th style={{ padding: '10px', color: 'white', textAlign: 'left', fontWeight: 'bold' }}>
+            #
+          </th>
+          <th style={{ padding: '10px', color: 'white', textAlign: 'left', fontWeight: 'bold' }}>
+            Orden de Tarea
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.slice(0, 21).map((row, idx) => {
+          const num = row[0]?.value;
+          const tarea = row[1]?.value;
+          return (
+            <tr key={idx} style={{ background: idx % 2 === 0 ? '#F7FAFC' : '#FFFFFF' }}>
+              <td style={{ padding: '8px', borderBottom: '1px solid #E2E8F0', color: COLORS.redDark, fontWeight: 'bold' }}>
+                {num}
+              </td>
+              <td style={{ padding: '8px', borderBottom: '1px solid #E2E8F0' }}>
+                {tarea}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
 }
