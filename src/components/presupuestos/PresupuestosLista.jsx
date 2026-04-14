@@ -165,7 +165,7 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
                   <p className="font-semibold text-sm truncate leading-snug group-hover:text-red-600 transition-colors"
                     style={{ color: RED_DARK }}>{p.titulo || '(Sin título)'}</p>
                   {p.codigo && <p className="text-[10px] font-mono mt-0.5" style={{ color: '#94A3B8' }}>{p.codigo}</p>}
-                  {totalItems > 0 && <p className="text-[10px] mt-0.5" style={{ color: RED_MAIN }}>{totalItems} ítems · {(p.rubros||[]).length} rubros</p>}
+                  {totalItems > 0 && <p className="text-[10px] mt-0.5" style={{ color: RED_DARK }}>{totalItems} ítems · {(p.rubros||[]).length} rubros</p>}
                 </div>
 
                 {/* Cliente */}

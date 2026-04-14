@@ -403,7 +403,7 @@ export default function PresupuestoEditor({ presupuesto, onSave, onCancel, savin
 
               {/* Preciario status */}
               {precario.length > 0 ? (
-                <div className="flex items-center gap-2 text-xs rounded px-3 py-2" style={{ background: '#E2EFDA', border: `1px solid #A9D18E`, color: RUBRO_F }}>
+                <div className="flex items-center gap-2 text-xs rounded px-3 py-2" style={{ background: '#E2EFDA', border: `1px solid #A9D18E`, color: RED_DARK }}>
                   <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: '#375623' }} />
                   <span><strong>{precario.length} ítems</strong> disponibles del Preciario Ministerial — Comuna {form.comuna}</span>
                 </div>
@@ -451,7 +451,7 @@ export default function PresupuestoEditor({ presupuesto, onSave, onCancel, savin
             <div className="p-4" style={{ background: '#FEF2F2' }}>
               <Textarea rows={3} value={form.notas || ''} onChange={e => set('notas', e.target.value)}
                 placeholder="Condiciones de pago, alcance del trabajo, exclusiones..."
-                className="text-sm resize-none" style={{ borderColor: BLUE_S }} />
+                className="text-sm resize-none" style={{ borderColor: '#E5E7EB' }} />
             </div>
           </div>
 
