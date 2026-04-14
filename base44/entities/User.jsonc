@@ -1,0 +1,19 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ],
+      "default": "user"
+    },
+    "can_delete_pendientes": {
+      "type": "boolean",
+      "default": false,
+      "description": "Habilita al usuario a eliminar pendientes SAP"
+    }
+  }
+}

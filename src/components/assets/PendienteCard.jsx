@@ -22,7 +22,7 @@ const estadoLabels = {
   cancelado: 'Cancelado',
 };
 
-export default function PendienteCard({ pendiente: p, estadoColors, prioridadColors, onEdit, onDelete }) {
+export default function PendienteCard({ pendiente: p, estadoColors, prioridadColors, onEdit, onDelete, canDelete = false }) {
   const isVencido = p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado';
   const diasRestantes = p.fecha_limite ? differenceInDays(new Date(p.fecha_limite), new Date()) : null;
 
@@ -96,23 +96,25 @@ export default function PendienteCard({ pendiente: p, estadoColors, prioridadCol
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(p)}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Eliminar pendiente?</AlertDialogTitle>
-                  <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onDelete(p.id)}>Eliminar</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {canDelete && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Eliminar pendiente?</AlertDialogTitle>
+                    <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onDelete(p.id)}>Eliminar</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
       </CardContent>

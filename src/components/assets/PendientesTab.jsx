@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Search, Plus, ClipboardList, AlertCircle, Upload,
-  LayoutGrid, Table2, X, ChevronUp, ChevronDown
+  LayoutGrid, Table2, X, ChevronUp, ChevronDown, Trash2
 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { isPast, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -49,7 +50,14 @@ export default function PendientesTab() {
   const [selected, setSelected] = useState(null);
   const [sortCol, setSortCol] = useState('fecha_limite');
   const [sortDir, setSortDir] = useState('asc');
+  const [canDelete, setCanDelete] = useState(false);
   const qc = useQueryClient();
+
+  useEffect(() => {
+    base44.auth.me().then(u => {
+      setCanDelete(u?.role === 'admin' || u?.can_delete_pendientes === true);
+    }).catch(() => {});
+  }, []);
 
   const { data: pendientes = [], isLoading } = useQuery({
     queryKey: ['pendientes'],
@@ -252,6 +260,7 @@ export default function PendientesTab() {
                     { key: 'estado', label: 'ESTADO' },
                     { key: 'jefe_sitio', label: 'JEFE SITIO' },
                     { key: 'comuna', label: 'COMUNA' },
+                    ...(canDelete ? [{ key: '_delete', label: '' }] : []),
                   ].map(col => (
                     <th
                       key={col.key}
@@ -313,6 +322,27 @@ export default function PendientesTab() {
                           : <span className="text-xs text-muted-foreground">—</span>
                         }
                       </td>
+                      {canDelete && (
+                        <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>¿Eliminar pendiente?</AlertDialogTitle>
+                                <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteMutation.mutate(p.id)}>Eliminar</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -333,6 +363,7 @@ export default function PendientesTab() {
               prioridadColors={prioridadColors}
               onEdit={openEdit}
               onDelete={(id) => deleteMutation.mutate(id)}
+              canDelete={canDelete}
             />
           ))}
           {filtered.length === 0 && !isLoading && (
