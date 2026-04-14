@@ -371,7 +371,7 @@ export default function PresupuestoEditor({ presupuesto, onSave, onCancel, savin
               </div>
 
               {/* Separador */}
-              <div className="border-t" style={{ borderColor: BLUE_S }} />
+              <div className="border-t" style={{ borderColor: '#E5E7EB' }} />
 
               {/* Fila 7: Fechas + Coefs */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
