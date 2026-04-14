@@ -1,39 +1,94 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import ExcelJS from 'npm:exceljs@4.4.0';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Genera el Excel en formato PCP (Planilla de Cómputo y Presupuesto)
-// del Ministerio de Educación GCBA - DGMESC
+// PLANILLA DE CÓMPUTO Y PRESUPUESTO — Formato exacto Ministerio de Educación
+// GCBA - DGMESC  /  MEJORES HOSPITALES S.A.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
-const COLOR_HEADER = '0F1C2E';
-const COLOR_UBICACION = '1A3A5C';
-const COLOR_RUBRO_BG = 'DBEAFE';
-const COLOR_WHITE = 'FFFFFF';
-const COLOR_ALT = 'F7F9FC';
+const LOGO_URL  = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
 
-async function loadLogoBuffer(url) {
+// Paleta oficial
+const NAVY      = '0A1834';   // azul muy oscuro (header/total)
+const NAVY2     = '1D4060';   // azul medio (ubicación, labels)
+const BLUE_H    = 'C5D9F1';   // azul claro header columnas
+const BLUE_L    = 'DCE6F1';   // azul muy claro sub-header
+const BLUE_UB   = 'BDD7EE';   // ubicacion
+const WHITE     = 'FFFFFF';
+const OFF_WHITE = 'EFF3F7';   // fondo filas pares
+const YELLOW    = 'FFFF99';   // precio resultante
+const GREEN     = 'E2EFDA';   // subtotal rubro
+const ORANGE    = 'FCE4D6';   // deflación
+const TOTAL_BG  = '0A1834';
+
+async function loadLogo() {
   try {
-    const res = await fetch(url);
+    const res = await fetch(LOGO_URL);
+    if (!res.ok) return null;
     return await res.arrayBuffer();
   } catch { return null; }
 }
 
-function hFill(argb) {
+function fill(argb) {
   return { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${argb}` } };
 }
 
-function hFont(bold = true, color = COLOR_WHITE, size = 9) {
-  return { bold, color: { argb: `FF${color}` }, size, name: 'Calibri' };
+function font(bold, color, size = 9, italic = false) {
+  return { bold, italic, color: { argb: `FF${color}` }, size, name: 'Arial' };
 }
 
-function thinBorder() {
-  const s = { style: 'thin', color: { argb: 'FFB0BEC5' } };
+function border(color = 'B0BEC5', style = 'thin') {
+  const s = { style, color: { argb: `FF${color}` } };
   return { top: s, bottom: s, left: s, right: s };
 }
 
-function numFmt(cell, fmt) { cell.numFmt = fmt; }
+function borderMedium() {
+  const s = { style: 'medium', color: { argb: `FF${NAVY}` } };
+  return { top: s, bottom: s, left: s, right: s };
+}
+
+function applyHeader(cell, text, bgArgb, fontColor = WHITE, sz = 9, wrap = true) {
+  cell.value    = text;
+  cell.fill     = fill(bgArgb);
+  cell.font     = font(true, fontColor, sz);
+  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: wrap };
+  cell.border   = border(NAVY, 'thin');
+}
+
+function numCell(cell, val, bgArgb, fmtStr = '#,##0.00', fColor = '1D1D1D', bold = false) {
+  cell.value     = val === 0 ? 0 : (val || null);
+  cell.fill      = fill(bgArgb);
+  cell.numFmt    = fmtStr;
+  cell.font      = font(bold, fColor, 8);
+  cell.alignment = { horizontal: 'right', vertical: 'middle' };
+  cell.border    = border();
+}
+
+function txtCell(cell, val, bgArgb, align = 'left', bold = false, fColor = '1D1D1D', sz = 8) {
+  cell.value     = val ?? '';
+  cell.fill      = fill(bgArgb);
+  cell.font      = font(bold, fColor, sz);
+  cell.alignment = { horizontal: align, vertical: 'middle', wrapText: true };
+  cell.border    = border();
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  try { const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d; }
+}
+
+// 21 columnas: A..U
+// A=ITEM, B=PRECIARIO, C=DESC, D=UNID, E=CANT,
+// F=PUMAT, G=PUMO, H=TOT PU,
+// I=DEFL PRECIO, J=DEFL COEF, K=DEFL DEFLAC,
+// L=COEF PASE, M=TOT PASE,
+// N=COEF OFERTA, O=PRECIO RESULT,
+// P=SUBTOTAL,
+// Q=% AVANCE, R=ANT, S=ACT, T=ACUM, U=vacío
+
+const COL_WIDTHS = [9, 13, 52, 7, 9, 14, 14, 14, 14, 9, 14, 9, 14, 9, 16, 14, 9, 11, 11, 11, 5];
+const NCOLS = 21;
+function colLetter(i) { return String.fromCharCode(65 + i); } // 0=A, 1=B, ...
 
 Deno.serve(async (req) => {
   try {
@@ -44,351 +99,348 @@ Deno.serve(async (req) => {
     const { presupuestoId } = await req.json();
     if (!presupuestoId) return Response.json({ error: 'presupuestoId requerido' }, { status: 400 });
 
-    // Cargar el presupuesto
-    const presupuestos = await base44.entities.PresupuestoObra.filter({ id: presupuestoId });
-    if (!presupuestos.length) return Response.json({ error: 'Presupuesto no encontrado' }, { status: 404 });
-    const form = presupuestos[0];
+    const [form] = await base44.entities.PresupuestoObra.filter({ id: presupuestoId });
+    if (!form) return Response.json({ error: 'Presupuesto no encontrado' }, { status: 404 });
 
-    // Cargar preciario de la comuna correspondiente
-    const comunaKey = form.comuna || '8A';
-    const precarioItems = await base44.asServiceRole.entities.PrecarioMinisterio.filter({ comuna: comunaKey }, 'codigo', 500);
-
-    const coefPase = form.coef_pase || 1.6504;
-    const coefOferta = form.coef_oferta || 1.38;
+    const cp = Number(form.coef_pase)   || 1.6504;
+    const co = Number(form.coef_oferta) || 1.38;
+    const DEFL_COEF = 6.37;
 
     const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('PCP');
-
-    // Columnas
-    ws.columns = [
-      { width: 10 }, { width: 13 }, { width: 50 }, { width: 8 }, { width: 10 },
-      { width: 14 }, { width: 14 }, { width: 14 },
-      { width: 14 }, { width: 10 }, { width: 14 },
-      { width: 10 }, { width: 14 }, { width: 10 }, { width: 16 },
-      { width: 14 }, { width: 8 }, { width: 8 }, { width: 8 },
-    ];
-
-    let r = 0;
-
-    // ── Fila 1 — Logo ────────────────────────────────────────────────────────
-    r++;
-    ws.mergeCells(`A${r}:S${r}`);
-    ws.getRow(r).height = 42;
-    ws.getCell(`A${r}`).fill = hFill(COLOR_HEADER);
-
-    const logoBuffer = await loadLogoBuffer(MEJORES_LOGO_URL);
-    if (logoBuffer) {
-      const imgId = wb.addImage({ buffer: logoBuffer, extension: 'jpeg' });
-      ws.addImage(imgId, { tl: { col: 0, row: 0 }, ext: { width: 200, height: 40 }, editAs: 'oneCell' });
-    }
-
-    // ── Fila 2 — Título PCP ──────────────────────────────────────────────────
-    r++;
-    ws.mergeCells(`A${r}:S${r}`);
-    const t = ws.getCell(`A${r}`);
-    t.value = 'PLANILLA DE CÓMPUTO Y PRESUPUESTO';
-    t.font = hFont(true, COLOR_WHITE, 13);
-    t.fill = hFill(COLOR_HEADER);
-    t.alignment = { horizontal: 'center', vertical: 'middle' };
-    ws.getRow(r).height = 22;
-
-    // ── Filas 3–10: datos institucionales ───────────────────────────────────
-    const infoRows = [
-      ['COMITENTE', 'GCBA - MINISTERIO DE EDUCACIÓN DE LA CIUDAD DE BUENOS AIRES - DGMESC'],
-      ['LICITACIÓN', form.licitacion || form.ada_numero || ''],
-    ];
-    for (const [label, val] of infoRows) {
-      r++;
-      ws.getRow(r).height = 14;
-      ws.mergeCells(`A${r}:C${r}`);
-      ws.getCell(`A${r}`).value = label;
-      ws.getCell(`A${r}`).font = hFont(true, '1A3A5C', 9);
-      ws.mergeCells(`D${r}:S${r}`);
-      ws.getCell(`D${r}`).value = val;
-      ws.getCell(`D${r}`).font = { size: 9, name: 'Calibri' };
-    }
-
-    // Fila con nombre de empresa y N° presupuesto
-    r++;
-    ws.getRow(r).height = 14;
-    ws.mergeCells(`A${r}:B${r}`);
-    ws.getCell(`A${r}`).value = comunaKey;
-    ws.getCell(`A${r}`).font = hFont(true, '1A3A5C', 11);
-    ws.mergeCells(`C${r}:K${r}`);
-    ws.getCell(`C${r}`).value = 'EMPRESA: MEJORES HOSPITALES S.A.';
-    ws.getCell(`C${r}`).font = hFont(true, '0F1C2E', 9);
-    ws.mergeCells(`L${r}:N${r}`);
-    ws.getCell(`L${r}`).value = 'Nº PRESUPUESTO';
-    ws.getCell(`L${r}`).font = hFont(true, '1A3A5C', 9);
-    ws.mergeCells(`O${r}:S${r}`);
-    ws.getCell(`O${r}`).value = form.codigo || '';
-    ws.getCell(`O${r}`).font = { size: 9, name: 'Calibri' };
-
-    // Dirección
-    r++;
-    ws.getRow(r).height = 14;
-    ws.mergeCells(`C${r}:K${r}`);
-    ws.getCell(`C${r}`).value = `DIRECCIÓN: ${form.direccion_obra || ''}`;
-    ws.getCell(`C${r}`).font = { size: 9, name: 'Calibri' };
-    ws.mergeCells(`L${r}:N${r}`);
-    ws.getCell(`L${r}`).value = 'FECHA ingreso SAP';
-    ws.getCell(`L${r}`).font = hFont(true, '1A3A5C', 9);
-    ws.mergeCells(`O${r}:S${r}`);
-    ws.getCell(`O${r}`).value = form.fecha_emision || '';
-    ws.getCell(`O${r}`).font = { size: 9, name: 'Calibri' };
-
-    // Escuela / Obra
-    r++;
-    ws.getRow(r).height = 14;
-    ws.mergeCells(`C${r}:K${r}`);
-    ws.getCell(`C${r}`).value = `ESCUELA: ${form.proyecto_nombre || ''}`;
-    ws.getCell(`C${r}`).font = { size: 9, name: 'Calibri' };
-    ws.mergeCells(`L${r}:N${r}`);
-    ws.getCell(`L${r}`).value = 'PLAZO';
-    ws.getCell(`L${r}`).font = hFont(true, '1A3A5C', 9);
-    ws.mergeCells(`O${r}:S${r}`);
-    ws.getCell(`O${r}`).value = form.plazo || '';
-
-    r++;
-    ws.getRow(r).height = 14;
-    ws.mergeCells(`C${r}:K${r}`);
-    ws.getCell(`C${r}`).value = `OBRA: ${form.titulo || ''}`;
-    ws.getCell(`C${r}`).font = { size: 9, name: 'Calibri' };
-    ws.mergeCells(`L${r}:N${r}`);
-    ws.getCell(`L${r}`).value = 'Preciario Utilizado';
-    ws.getCell(`L${r}`).font = hFont(true, '1A3A5C', 9);
-    ws.mergeCells(`O${r}:P${r}`);
-    ws.getCell(`O${r}`).value = form.preciario_fecha || '2023-02-01';
-
-    r++;
-    ws.getRow(r).height = 14;
-    ws.mergeCells(`L${r}:N${r}`);
-    ws.getCell(`L${r}`).value = 'Coef. Pase';
-    ws.getCell(`L${r}`).font = hFont(true, '1A3A5C', 9);
-    ws.mergeCells(`O${r}:P${r}`);
-    ws.getCell(`O${r}`).value = coefPase;
-    ws.getCell(`O${r}`).numFmt = '0.0000';
-
-    r++;
-    ws.getRow(r).height = 14;
-    ws.mergeCells(`A${r}:B${r}`);
-    ws.getCell(`A${r}`).value = 'MTOM Nº';
-    ws.getCell(`A${r}`).font = hFont(true, '1A3A5C', 9);
-    ws.mergeCells(`C${r}:K${r}`);
-    ws.getCell(`C${r}`).value = `SUPERVISOR: ${form.responsable || ''}`;
-    ws.getCell(`C${r}`).font = { size: 9, name: 'Calibri' };
-    ws.mergeCells(`L${r}:N${r}`);
-    ws.getCell(`L${r}`).value = 'Coef. Oferta';
-    ws.getCell(`L${r}`).font = hFont(true, '1A3A5C', 9);
-    ws.mergeCells(`O${r}:P${r}`);
-    ws.getCell(`O${r}`).value = coefOferta;
-    ws.getCell(`O${r}`).numFmt = '0.00';
-
-    // ── Espacio ──────────────────────────────────────────────────────────────
-    r++;
-    ws.getRow(r).height = 5;
-
-    // ── Encabezado tabla — fila 1 de 2 ─────────────────────────────────────
-    r++;
-    ws.getRow(r).height = 30;
-    const H1 = [
-      ['A', 'A', 'ITEM\nPRESUP'], ['B', 'B', 'ITEM\nPRECIARIO'], ['C', 'C', 'DESCRIPCIÓN'],
-      ['D', 'E', 'CÓMPUTO'], ['F', 'H', 'PRECIOS UNITARIOS'],
-      ['I', 'K', 'DEFLACIÓN DE MATERIALES\nFUERA DE PRECIARIO'],
-      ['L', 'M', 'COEFICIENTE DE PASE'], ['N', 'N', 'COEF.\nOFERTA'],
-      ['O', 'O', 'SUBTOTAL'], ['P', 'P', 'AVANCE'], ['Q', 'S', 'PORCENTAJE DE AVANCE'],
-    ];
-    for (const [from, to, label] of H1) {
-      const ref = from === to ? `${from}${r}` : `${from}${r}:${to}${r}`;
-      if (from !== to) ws.mergeCells(ref);
-      const cell = ws.getCell(`${from}${r}`);
-      cell.value = label;
-      cell.font = hFont(true, COLOR_WHITE, 8);
-      cell.fill = hFill(COLOR_HEADER);
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = thinBorder();
-    }
-
-    // ── Encabezado tabla — fila 2 de 2 ─────────────────────────────────────
-    r++;
-    ws.getRow(r).height = 22;
-    const H2 = ['', '', '', 'UNID.', 'CANT.', 'P.U.MAT.', 'P.U.M.O.', 'TOTAL',
-      'PRECIO ACTUAL\nSIN IVA', 'COEF.\nDEFLADOR', 'PRECIO\nDEFLACIONADO',
-      'COEF.', 'TOTAL', 'COEF.', 'PRECIO\nRESULTANTE',
-      '', 'ANTERIOR', 'ACTUAL', 'ACUMULADO'];
-    H2.forEach((val, i) => {
-      const col = String.fromCharCode(65 + i);
-      const cell = ws.getCell(`${col}${r}`);
-      cell.value = val;
-      cell.font = hFont(true, COLOR_WHITE, 7.5);
-      cell.fill = hFill(COLOR_HEADER);
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = thinBorder();
+    wb.creator = 'MEJORES HOSPITALES S.A.';
+    const ws = wb.addWorksheet('PCP', {
+      pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, paperSize: 9 }
     });
 
-    // ── Ítems ────────────────────────────────────────────────────────────────
-    let itemNum = 1;
-    let totalGeneral = 0;
-    const rubros = form.rubros || [];
+    ws.columns = COL_WIDTHS.map(w => ({ width: w }));
 
-    // Agrupar por ubicación si el presupuesto tiene ese campo, si no usar directamente
-    const ubicaciones = form.ubicaciones || [{ nombre: form.titulo || 'OBRA', rubros }];
+    let R = 0; // row index (1-based after increment)
 
-    for (const ubicacion of ubicaciones) {
-      // UBICACIÓN header
-      r++;
-      ws.getRow(r).height = 16;
-      ws.mergeCells(`A${r}:N${r}`);
-      const uCell = ws.getCell(`A${r}`);
-      uCell.value = `UBICACIÓN - ZONA DE TRABAJO: ${(ubicacion.nombre || '').toUpperCase()}`;
-      uCell.font = hFont(true, COLOR_WHITE, 9);
-      uCell.fill = hFill(COLOR_UBICACION);
-      uCell.alignment = { vertical: 'middle' };
-      uCell.border = thinBorder();
+    // ── FILA 1: Logo ─────────────────────────────────────────────────────────
+    R++;
+    ws.getRow(R).height = 46;
+    ws.mergeCells(`A${R}:${colLetter(NCOLS-1)}${R}`);
+    const logoCell = ws.getCell(`A${R}`);
+    logoCell.fill = fill(NAVY);
 
-      ws.getCell(`O${r}`).value = 'TOTAL';
-      ws.getCell(`O${r}`).font = hFont(true, COLOR_WHITE, 9);
-      ws.getCell(`O${r}`).fill = hFill(COLOR_UBICACION);
-      ws.getCell(`O${r}`).alignment = { horizontal: 'center' };
-      ws.mergeCells(`P${r}:S${r}`);
-      ws.getCell(`P${r}`).fill = hFill(COLOR_UBICACION);
+    const logoBuffer = await loadLogo();
+    if (logoBuffer) {
+      const imgId = wb.addImage({ buffer: logoBuffer, extension: 'jpeg' });
+      // Posicionar logo en la celda A1, tamaño aproximado
+      ws.addImage(imgId, {
+        tl: { col: 0, row: 0 },
+        br: { col: 3, row: 1 },
+        editAs: 'oneCell'
+      });
+    }
 
-      let ubicacionTotal = 0;
+    // Título a la derecha del logo
+    ws.getCell(`D${R}`).value = 'PLANILLA DE CÓMPUTO Y PRESUPUESTO';
+    ws.getCell(`D${R}`).font = font(true, WHITE, 13);
+    ws.getCell(`D${R}`).fill = fill(NAVY);
+    ws.getCell(`D${R}`).alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.mergeCells(`D${R}:${colLetter(NCOLS-1)}${R}`);
 
-      for (const rubro of (ubicacion.rubros || [])) {
-        // RUBRO header
-        r++;
-        ws.getRow(r).height = 15;
-        ws.mergeCells(`A${r}:S${r}`);
-        const rbCell = ws.getCell(`A${r}`);
-        rbCell.value = `  RUBRO: ${(rubro.nombre || '').toUpperCase()}`;
-        rbCell.font = hFont(true, '0A1834', 9);
-        rbCell.fill = hFill('DBEAFE');
-        rbCell.alignment = { vertical: 'middle' };
+    // ── FILAS 2–9: Bloque de metadatos ───────────────────────────────────────
+    // Estructura: col A-B = label, col C-K = valor izq | col L-N = label, col O-U = valor der
 
-        let rubroTotal = 0;
+    const metaLeft = [
+      ['COMITENTE',   form.cliente_nombre || 'GCBA - MINISTERIO DE EDUCACIÓN DE LA CIUDAD DE BUENOS AIRES - DGMESC'],
+      ['LICITACIÓN',  form.licitacion || ''],
+      ['',            `EMPRESA: MEJORES HOSPITALES S.A.    ZONA: ${form.comuna || ''}`],
+      ['',            `DIRECCIÓN: ${form.direccion_obra || ''}`],
+      ['',            `ESCUELA: ${form.proyecto_nombre || ''}`],
+      ['',            `OBRA: ${form.titulo || ''}`],
+      ['',            ''],
+      ['MTOM Nº',     `SUPERVISOR: ${form.responsable || ''}`],
+    ];
 
-        for (const item of (rubro.items || [])) {
-          r++;
-          ws.getRow(r).height = 13;
+    const metaRight = [
+      ['', ''],
+      ['', ''],
+      ['Nº PRESUPUESTO',    form.codigo || ''],
+      ['FECHA ingreso SAP', fmtDate(form.fecha_emision)],
+      ['PLAZO',             form.plazo || ''],
+      ['Preciario Utilizado', fmtDate(form.preciario_fecha)],
+      ['Coef. Pase',        cp],
+      ['Coef. Oferta',      co],
+    ];
 
-          // Buscar en preciario
-          const pi = precarioItems.find(p => p.codigo === item.precario_id || p.codigo === item.codigo);
-          const puMat = pi ? (pi.pu_mat || 0) : 0;
-          const puMo = pi ? (pi.pu_mo || 0) : 0;
-          const totalPU = puMat + puMo;
-          const totalConPase = pi ? (pi.total_coef_pase || 0) : totalPU * coefPase;
-          const precioResultante = (item.cantidad || 0) * (item.precio_unitario || pi?.total_coef_oferta || 0);
+    for (let i = 0; i < metaLeft.length; i++) {
+      R++;
+      ws.getRow(R).height = 14;
+      const [lbl, val] = metaLeft[i];
+      const [rlbl, rval] = metaRight[i];
 
-          rubroTotal += precioResultante;
-
-          const isAlt = (r % 2 === 0);
-          const bg = isAlt ? COLOR_ALT : COLOR_WHITE;
-
-          const vals = [
-            itemNum, item.precario_id || item.codigo || '', item.descripcion || '',
-            item.unidad || pi?.unidad || '', item.cantidad || 0,
-            puMat, puMo, totalPU,
-            0, 6.37, 0,
-            coefPase, totalConPase, coefOferta, precioResultante,
-            0, 0, 0, 0,
-          ];
-
-          vals.forEach((val, i) => {
-            const col = String.fromCharCode(65 + i);
-            const cell = ws.getCell(`${col}${r}`);
-            cell.value = val;
-            cell.fill = hFill(bg);
-            cell.border = thinBorder();
-            cell.font = { size: 8, name: 'Calibri', bold: i === 14 };
-            if (i === 2) cell.alignment = { vertical: 'middle' };
-            else if (i >= 4) cell.alignment = { horizontal: 'right', vertical: 'middle' };
-            else cell.alignment = { horizontal: 'center', vertical: 'middle' };
-            if ([5, 6, 7, 8, 10, 12, 14, 15].includes(i)) cell.numFmt = '#,##0.00';
-            if ([4, 9, 11, 13].includes(i)) cell.numFmt = '0.0000';
-          });
-
-          itemNum++;
-        }
-
-        // Subtotal rubro
-        r++;
-        ws.getRow(r).height = 13;
-        ws.mergeCells(`A${r}:N${r}`);
-        ws.getCell(`A${r}`).value = `  Subtotal ${rubro.nombre || ''}`;
-        ws.getCell(`A${r}`).font = { bold: true, italic: true, size: 8, name: 'Calibri', color: { argb: 'FF1A3A5C' } };
-        ws.getCell(`A${r}`).fill = hFill('EBF4FF');
-        ws.getCell(`A${r}`).alignment = { vertical: 'middle' };
-
-        const stCell = ws.getCell(`O${r}`);
-        stCell.value = rubroTotal;
-        stCell.numFmt = '#,##0.00';
-        stCell.font = { bold: true, size: 8, name: 'Calibri' };
-        stCell.fill = hFill('EBF4FF');
-        stCell.alignment = { horizontal: 'right', vertical: 'middle' };
-        ws.mergeCells(`P${r}:S${r}`);
-        ws.getCell(`P${r}`).fill = hFill('EBF4FF');
-
-        ubicacionTotal += rubroTotal;
-        totalGeneral += rubroTotal;
+      if (lbl) {
+        ws.getCell(`A${R}`).value = lbl;
+        ws.getCell(`A${R}`).font = font(true, NAVY2, 9);
+        ws.mergeCells(`A${R}:B${R}`);
       }
 
-      // Total ubicación
-      r++;
-      ws.getRow(r).height = 16;
-      ws.mergeCells(`A${r}:N${r}`);
-      ws.getCell(`A${r}`).value = `TOTAL ${(ubicacion.nombre || '').toUpperCase()}`;
-      ws.getCell(`A${r}`).font = hFont(true, COLOR_WHITE, 9);
-      ws.getCell(`A${r}`).fill = hFill(COLOR_UBICACION);
-      ws.getCell(`A${r}`).alignment = { vertical: 'middle' };
+      ws.getCell(`C${R}`).value = val;
+      ws.getCell(`C${R}`).font = font(false, '1D1D1D', 9);
+      ws.mergeCells(`C${R}:K${R}`);
 
-      const utCell = ws.getCell(`O${r}`);
-      utCell.value = ubicacionTotal;
-      utCell.numFmt = '#,##0.00';
-      utCell.font = hFont(true, 'F59E0B', 10);
-      utCell.fill = hFill(COLOR_UBICACION);
-      utCell.alignment = { horizontal: 'right', vertical: 'middle' };
-      ws.mergeCells(`P${r}:S${r}`);
-      ws.getCell(`P${r}`).fill = hFill(COLOR_UBICACION);
+      if (rlbl) {
+        ws.getCell(`L${R}`).value = rlbl;
+        ws.getCell(`L${R}`).font = font(true, NAVY2, 9);
+        ws.mergeCells(`L${R}:N${R}`);
+      }
 
-      r++;
-      ws.getRow(r).height = 5;
+      if (rval !== '') {
+        const rc = ws.getCell(`O${R}`);
+        if (typeof rval === 'number') {
+          rc.value = rval;
+          rc.numFmt = rval === cp ? '0.0000' : '0.00';
+          rc.font = font(false, '1D1D1D', 9);
+        } else {
+          rc.value = rval;
+          rc.font = font(false, '1D1D1D', 9);
+        }
+        ws.mergeCells(`O${R}:${colLetter(NCOLS-1)}${R}`);
+      }
     }
+
+    // ── Separador ─────────────────────────────────────────────────────────────
+    R++;
+    ws.getRow(R).height = 4;
+
+    // ── FILA ENCABEZADO TABLA — Fila 1 de 2 (grupos) ─────────────────────────
+    R++;
+    ws.getRow(R).height = 32;
+    const H1_GROUPS = [
+      [0, 0, 'ITEM\nPRESUP'],
+      [1, 1, 'ITEM\nPRECIARIO'],
+      [2, 2, 'DESCRIPCIÓN'],
+      [3, 4, 'CÓMPUTO'],
+      [5, 7, 'PRECIOS UNITARIOS'],
+      [8, 10, 'DEFLACIÓN DE MATERIALES\nFUERA DE PRECIARIO'],
+      [11, 12, 'COEFICIENTE\nDE PASE'],
+      [13, 13, 'COEF.\nOFERTA'],
+      [14, 14, 'PRECIO\nRESULTANTE'],
+      [15, 15, 'SUBTOTAL'],
+      [16, 16, '% AVANCE'],
+      [17, 19, 'AVANCE'],
+      [20, 20, ''],
+    ];
+    for (const [c1, c2, label] of H1_GROUPS) {
+      const ref = c1 === c2
+        ? `${colLetter(c1)}${R}`
+        : `${colLetter(c1)}${R}:${colLetter(c2)}${R}`;
+      if (c1 !== c2) ws.mergeCells(ref);
+      applyHeader(ws.getCell(`${colLetter(c1)}${R}`), label, NAVY, WHITE, 8);
+    }
+
+    // ── FILA ENCABEZADO TABLA — Fila 2 de 2 (sub-columnas) ───────────────────
+    R++;
+    ws.getRow(R).height = 28;
+    const H2_LABELS = [
+      '', '', '', 'UNID.', 'CANT.',
+      'P.U.MAT.', 'P.U.M.O.', 'TOTAL',
+      'PRECIO ACTUAL\nSIN IVA', 'COEF.\nDEFLACTOR', 'PRECIO\nDEFLACIONADO',
+      'COEF.', 'TOTAL',
+      'COEF.', 'PRECIO\nRESULTANTE',
+      '',
+      '',
+      'ANTERIOR', 'ACTUAL', 'ACUMULADO',
+      ''
+    ];
+    H2_LABELS.forEach((lbl, i) => {
+      applyHeader(ws.getCell(`${colLetter(i)}${R}`), lbl, BLUE_H, NAVY, 7.5);
+    });
+
+    // ── ÍTEMS ─────────────────────────────────────────────────────────────────
+    const rubros = form.rubros || [];
+    let itemNum = 1;
+    let grandTotal = 0;
+
+    for (const rubro of rubros) {
+      let rubroTotal = 0;
+
+      // RUBRO header
+      R++;
+      ws.getRow(R).height = 16;
+      ws.mergeCells(`A${R}:O${R}`);
+      const rbCell = ws.getCell(`A${R}`);
+      rbCell.value = `  RUBRO: ${(rubro.nombre || '').toUpperCase()}`;
+      rbCell.fill     = fill(BLUE_UB);
+      rbCell.font     = font(true, NAVY, 9);
+      rbCell.alignment = { horizontal: 'left', vertical: 'middle' };
+      rbCell.border   = borderMedium();
+      // rellenar resto
+      for (let c = 15; c < NCOLS; c++) {
+        ws.getCell(`${colLetter(c)}${R}`).fill = fill(BLUE_UB);
+        ws.getCell(`${colLetter(c)}${R}`).border = border(NAVY, 'thin');
+      }
+
+      for (const item of (rubro.items || [])) {
+        R++;
+        ws.getRow(R).height = 13;
+
+        const pu_mat   = Number(item.pu_mat)   || 0;
+        const pu_mo    = Number(item.pu_mo)    || 0;
+        const pu_total = pu_mat + pu_mo;
+
+        // Deflación (vacío para ítems de preciario)
+        const defl_precio = 0;
+        const defl_coef   = DEFL_COEF;
+        const defl_deflac = 0;
+
+        const total_pase    = pu_total * cp;
+        const precio_result = total_pase * co;
+        const subtotal      = precio_result * (Number(item.cantidad) || 0);
+
+        rubroTotal  += subtotal;
+        grandTotal  += subtotal;
+
+        const isAlt = itemNum % 2 === 0;
+        const bg = isAlt ? OFF_WHITE : WHITE;
+
+        // A: ítem
+        txtCell(ws.getCell(`A${R}`), String(itemNum), bg, 'center', false);
+        // B: código preciario
+        txtCell(ws.getCell(`B${R}`), item.codigo || '', bg, 'center', false);
+        // C: descripción
+        txtCell(ws.getCell(`C${R}`), item.descripcion || '', bg, 'left', false);
+        // D: unidad
+        txtCell(ws.getCell(`D${R}`), item.unidad || '', bg, 'center', false);
+        // E: cantidad
+        numCell(ws.getCell(`E${R}`), Number(item.cantidad) || 0, bg, '0.00');
+        // F: PU MAT
+        numCell(ws.getCell(`F${R}`), pu_mat, bg, '#,##0.00');
+        // G: PU MO
+        numCell(ws.getCell(`G${R}`), pu_mo, bg, '#,##0.00');
+        // H: TOTAL PU
+        numCell(ws.getCell(`H${R}`), pu_total, bg, '#,##0.00');
+        // I: Deflación precio actual sin IVA
+        numCell(ws.getCell(`I${R}`), defl_precio || null, ORANGE, '#,##0.00');
+        // J: Coef deflactor
+        numCell(ws.getCell(`J${R}`), defl_coef, ORANGE, '0.00');
+        // K: Precio deflacionado
+        numCell(ws.getCell(`K${R}`), defl_deflac || null, ORANGE, '#,##0.00');
+        // L: Coef pase
+        numCell(ws.getCell(`L${R}`), cp, bg, '0.0000');
+        // M: Total pase
+        numCell(ws.getCell(`M${R}`), total_pase, bg, '#,##0.00');
+        // N: Coef oferta
+        numCell(ws.getCell(`N${R}`), co, bg, '0.00');
+        // O: Precio resultante — amarillo
+        numCell(ws.getCell(`O${R}`), precio_result, YELLOW, '#,##0.00', NAVY, true);
+        // P: Subtotal — amarillo
+        numCell(ws.getCell(`P${R}`), subtotal, YELLOW, '#,##0.00', NAVY, true);
+        // Q: % avance
+        numCell(ws.getCell(`Q${R}`), 0, OFF_WHITE, '0%');
+        // R, S, T: avance anterior, actual, acumulado
+        numCell(ws.getCell(`R${R}`), 0, OFF_WHITE, '#,##0.00');
+        numCell(ws.getCell(`S${R}`), 0, OFF_WHITE, '#,##0.00');
+        numCell(ws.getCell(`T${R}`), 0, OFF_WHITE, '#,##0.00');
+        // U: vacío
+        ws.getCell(`U${R}`).fill = fill(OFF_WHITE);
+        ws.getCell(`U${R}`).border = border();
+
+        itemNum++;
+      }
+
+      // Subtotal rubro — fondo verde
+      R++;
+      ws.getRow(R).height = 14;
+      ws.mergeCells(`A${R}:O${R}`);
+      const subCell = ws.getCell(`A${R}`);
+      subCell.value     = `  Subtotal ${rubro.nombre || ''}`;
+      subCell.fill      = fill(GREEN);
+      subCell.font      = font(true, NAVY2, 9, true);
+      subCell.alignment = { horizontal: 'left', vertical: 'middle' };
+      subCell.border    = borderMedium();
+
+      const subTotalCell = ws.getCell(`P${R}`);
+      subTotalCell.value     = rubroTotal;
+      subTotalCell.numFmt    = '#,##0.00';
+      subTotalCell.fill      = fill(GREEN);
+      subTotalCell.font      = font(true, NAVY, 9);
+      subTotalCell.alignment = { horizontal: 'right', vertical: 'middle' };
+      subTotalCell.border    = borderMedium();
+
+      for (let c = 16; c < NCOLS; c++) {
+        ws.getCell(`${colLetter(c)}${R}`).fill = fill(GREEN);
+        ws.getCell(`${colLetter(c)}${R}`).border = border();
+      }
+
+      R++;
+      ws.getRow(R).height = 3;
+    }
+
+    // ── GENERALES - VOLQUETES - LIMPIEZA (filas vacías para completar a mano)
+    R++;
+    ws.getRow(R).height = 15;
+    ws.mergeCells(`A${R}:O${R}`);
+    const genCell = ws.getCell(`A${R}`);
+    genCell.value     = '  GENERALES - VOLQUETES - ANDAMIOS - LIMPIEZA DE OBRA';
+    genCell.fill      = fill(BLUE_L);
+    genCell.font      = font(true, NAVY, 9);
+    genCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    genCell.border    = borderMedium();
+    ws.getCell(`P${R}`).fill = fill(BLUE_L);
+    for (let c = 16; c < NCOLS; c++) ws.getCell(`${colLetter(c)}${R}`).fill = fill(BLUE_L);
+
+    for (let gi = 0; gi < 3; gi++) {
+      R++;
+      ws.getRow(R).height = 12;
+      for (let c = 0; c < NCOLS; c++) {
+        const cell = ws.getCell(`${colLetter(c)}${R}`);
+        cell.fill   = fill(OFF_WHITE);
+        cell.border = border();
+      }
+      // Pre-llenar coefs
+      numCell(ws.getCell(`L${R}`), cp, OFF_WHITE, '0.0000');
+      numCell(ws.getCell(`J${R}`), DEFL_COEF, ORANGE, '0.00');
+      numCell(ws.getCell(`N${R}`), co, OFF_WHITE, '0.00');
+      numCell(ws.getCell(`O${R}`), 0, YELLOW, '#,##0.00', NAVY, true);
+      numCell(ws.getCell(`P${R}`), 0, YELLOW, '#,##0.00', NAVY, true);
+    }
+
+    R++;
+    ws.getRow(R).height = 4;
 
     // ── TOTAL PRESUPUESTO ─────────────────────────────────────────────────────
-    r++;
-    ws.getRow(r).height = 20;
-    ws.mergeCells(`A${r}:N${r}`);
-    ws.getCell(`A${r}`).value = 'TOTAL PRESUPUESTO';
-    ws.getCell(`A${r}`).font = hFont(true, COLOR_WHITE, 12);
-    ws.getCell(`A${r}`).fill = hFill(COLOR_HEADER);
-    ws.getCell(`A${r}`).alignment = { vertical: 'middle' };
+    R++;
+    ws.getRow(R).height = 22;
+    ws.mergeCells(`A${R}:O${R}`);
+    const totCell = ws.getCell(`A${R}`);
+    totCell.value     = 'TOTAL PRESUPUESTO';
+    totCell.fill      = fill(TOTAL_BG);
+    totCell.font      = font(true, WHITE, 12);
+    totCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    totCell.border    = borderMedium();
 
-    const tgCell = ws.getCell(`O${r}`);
-    tgCell.value = totalGeneral;
-    tgCell.numFmt = '#,##0.00';
-    tgCell.font = { bold: true, size: 13, color: { argb: 'FFF59E0B' }, name: 'Calibri' };
-    tgCell.fill = hFill(COLOR_HEADER);
-    tgCell.alignment = { horizontal: 'right', vertical: 'middle' };
-    ws.mergeCells(`P${r}:S${r}`);
-    ws.getCell(`P${r}`).fill = hFill(COLOR_HEADER);
+    const grandCell = ws.getCell(`P${R}`);
+    grandCell.value     = grandTotal;
+    grandCell.numFmt    = '#,##0.00';
+    grandCell.fill      = fill(TOTAL_BG);
+    grandCell.font      = font(true, 'F59E0B', 12);  // amarillo/dorado
+    grandCell.alignment = { horizontal: 'right', vertical: 'middle' };
+    grandCell.border    = borderMedium();
 
-    // Notas
-    if (form.notas) {
-      r += 2;
-      ws.mergeCells(`A${r}:S${r}`);
-      ws.getCell(`A${r}`).value = `NOTAS: ${form.notas}`;
-      ws.getCell(`A${r}`).font = { italic: true, size: 8, name: 'Calibri', color: { argb: 'FF607D8B' } };
-      ws.getRow(r).height = 14;
+    for (let c = 16; c < NCOLS; c++) {
+      ws.getCell(`${colLetter(c)}${R}`).fill = fill(TOTAL_BG);
+      ws.getCell(`${colLetter(c)}${R}`).border = borderMedium();
     }
 
-    // Congelar encabezados
-    ws.views = [{ state: 'frozen', ySplit: 14, xSplit: 2 }];
+    // ── NOTAS ─────────────────────────────────────────────────────────────────
+    if (form.notas) {
+      R += 2;
+      ws.getRow(R).height = 14;
+      ws.mergeCells(`A${R}:${colLetter(NCOLS-1)}${R}`);
+      ws.getCell(`A${R}`).value = `NOTAS: ${form.notas}`;
+      ws.getCell(`A${R}`).font = font(false, '607D8B', 8, true);
+    }
 
-    // ── Generar buffer y subir ────────────────────────────────────────────────
+    // Congelar encabezado (debajo de los metadatos = fila 13 aprox)
+    ws.views = [{ state: 'frozen', ySplit: R < 15 ? 12 : 12, xSplit: 2 }];
+
+    // ── Exportar y subir ──────────────────────────────────────────────────────
     const buffer = await wb.xlsx.writeBuffer();
-
-    const uploadResult = await base44.integrations.Core.UploadFile({ file: buffer });
+    const uploadResult = await base44.asServiceRole.integrations.Core.UploadFile({ file: buffer });
 
     return Response.json({
       success: true,
