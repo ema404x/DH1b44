@@ -94,7 +94,7 @@ export default function PresupuestosLista({ presupuestos, isLoading, onEdit, onD
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
           <Input placeholder="Buscar presupuesto..." value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-9 h-9 border-[#BDD7EE] focus-visible:ring-[#1F4E79]" />
+            className="pl-9 h-9 border-[#E5E7EB] focus-visible:ring-[#C53030]" />
         </div>
         <div className="flex gap-1 flex-wrap">
           {FILTERS.map(f => (
