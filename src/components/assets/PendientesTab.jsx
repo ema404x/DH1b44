@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import PendienteDialog from '@/components/assets/PendienteDialog';
 import PendienteCard from '@/components/assets/PendienteCard';
 import ImportarPendientesSAP from '@/components/assets/ImportarPendientesSAP';
+import ExportarPendientesPDF from '@/components/assets/ExportarPendientesPDF';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const estadoColors = {
@@ -231,6 +232,15 @@ export default function PendientesTab() {
                 <LayoutGrid className="h-3.5 w-3.5" /> Cards
               </button>
             </div>
+            <ExportarPendientesPDF
+              pendientes={filtered}
+              filterInfo={[
+                filterEstado !== 'all' ? `Estado: ${filterEstado}` : '',
+                filterInspector !== 'all' ? `Inspector: ${filterInspector}` : '',
+                filterComuna !== 'all' ? `Comuna: ${filterComuna}` : '',
+                search ? `Búsqueda: "${search}"` : '',
+              ].filter(Boolean).join(' | ')}
+            />
             <Button variant="outline" className="gap-1.5" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" /> Importar SAP
             </Button>
