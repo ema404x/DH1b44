@@ -394,7 +394,10 @@ export async function exportPresupuestoExcel(form) {
   let itemNum = 1;
 
   for (const rubro of rubros) {
-    const rubroSubtotal = (rubro.items || []).reduce((a, i) => a + (Number(i.total) || 0), 0);
+    const rubroSubtotal = (rubro.items || []).reduce((a, i) => {
+      const pu = (Number(i.pu_mat) || 0) + (Number(i.pu_mo) || 0);
+      return a + pu * coef_pase * coef_oferta * (Number(i.cantidad) || 0);
+    }, 0);
 
     // UBICACIÓN - ZONA DE TRABAJO (= el nombre del rubro como sección mayor)
     rows.push(Object.assign([
@@ -487,7 +490,10 @@ export async function exportPresupuestoExcel(form) {
   rows.push(Object.assign(Array(NCOLS).fill(e()), { _h: 4 })); R++;
 
   // ── TOTAL PRESUPUESTO ─────────────────────────────────────────────────────
-  const grandTotal = rubros.reduce((a, r) => a + (r.items || []).reduce((b, i) => b + (Number(i.total) || 0), 0), 0);
+  const grandTotal = rubros.reduce((a, r) => a + (r.items || []).reduce((b, i) => {
+    const pu = (Number(i.pu_mat) || 0) + (Number(i.pu_mo) || 0);
+    return b + pu * coef_pase * coef_oferta * (Number(i.cantidad) || 0);
+  }, 0), 0);
 
   rows.push(Object.assign(Array(NCOLS).fill(e()), { _h: 5 })); R++;
 

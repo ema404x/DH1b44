@@ -29,15 +29,20 @@ export default function RubroSection({ rubro, idx, precario, coefPase, coefOfert
   const rubroSubtotal = (rubro.items || []).reduce((a, i) => a + calcItem(i, cp, co).subtotal, 0);
 
   const addFromPrecario = (p) => {
+    // Usar precios BASE del preciario (sin coefs), los coefs se aplican al renderizar/exportar
+    const pu_mat = Number(p.pu_mat) || 0;
+    const pu_mo  = Number(p.pu_mo)  || 0;
+    const p_res  = (pu_mat + pu_mo) * cp * co;
     const item = {
       precario_id: p.id,
       codigo: p.codigo || '',
       descripcion: p.descripcion,
       unidad: p.unidad,
       cantidad: 1,
-      pu_mat: p.pu_mat_coef_pase || p.pu_mat || 0,
-      pu_mo:  p.pu_mo_coef_pase  || p.pu_mo  || 0,
-      precio_unitario: p.total_coef_oferta || p.total_coef_pase || 0,
+      pu_mat,
+      pu_mo,
+      precio_unitario: p_res,   // precio resultante = base × cp × co
+      total: p_res * 1,         // subtotal (cantidad=1)
     };
     onChange({ ...rubro, items: [...(rubro.items || []), item] });
   };
@@ -49,10 +54,14 @@ export default function RubroSection({ rubro, idx, precario, coefPase, coefOfert
   const updateItem = (iIdx, key, value) => {
     const items = [...(rubro.items || [])];
     items[iIdx] = { ...items[iIdx], [key]: value };
-    // Recalculate precio_unitario based on coefs
-    const { p_res } = calcItem(items[iIdx], cp, co);
-    items[iIdx].precio_unitario = p_res;
-    items[iIdx].total = p_res * (Number(items[iIdx].cantidad) || 0);
+    // Recalculate derived fields
+    const pu_mat = Number(items[iIdx].pu_mat) || 0;
+    const pu_mo  = Number(items[iIdx].pu_mo)  || 0;
+    const t_pase  = (pu_mat + pu_mo) * cp;
+    const p_res   = t_pase * co;
+    const cantidad = Number(items[iIdx].cantidad) || 0;
+    items[iIdx].precio_unitario = p_res;           // precio resultante unitario
+    items[iIdx].total = p_res * cantidad;           // subtotal usado por PDF/Excel
     onChange({ ...rubro, items });
   };
 
