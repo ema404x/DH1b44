@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Plus, Save, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Save, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const MODULES = [
   'WorkOrder', 'Certificado', 'Project', 'Client', 'Employee', 
@@ -20,6 +21,19 @@ export default function Permisos() {
   const [editingId, setEditingId] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSaveAll = async () => {
+    setSaving(true);
+    try {
+      const res = await base44.functions.invoke('saveAccessConfig', { roles });
+      toast.success(res.data?.message || 'Configuración guardada correctamente');
+    } catch (err) {
+      toast.error('Error al guardar: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const { data: roles = [], isLoading } = useQuery({
     queryKey: ['rolePermissions'],
@@ -70,7 +84,13 @@ export default function Permisos() {
           <h1 className="text-3xl font-bold">Control de Acceso</h1>
           <p className="text-muted-foreground mt-1">Configura permisos por rol</p>
         </div>
-        <Button onClick={() => setShowNew(!showNew)} className="gap-2"><Plus className="h-4 w-4" />Nuevo Rol</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleSaveAll} disabled={saving || roles.length === 0} className="gap-2">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Guardar configuración
+          </Button>
+          <Button onClick={() => setShowNew(!showNew)} className="gap-2"><Plus className="h-4 w-4" />Nuevo Rol</Button>
+        </div>
       </div>
 
       {showNew && (
