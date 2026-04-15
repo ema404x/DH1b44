@@ -34,131 +34,250 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
       });
     } catch {}
 
+    // A4 landscape
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const W = 297, M = 10, C = W - M * 2;
-    // Usar importe presente si hay medición, sino el contrato completo
+    const W = 297, H = 210, M = 10, C = W - M * 2;
+    const FOOTER_H = 10;
+    const SAFE_BOTTOM = H - FOOTER_H - 5; // zona segura antes del footer
+
     const pdfSubtotal = hasMedicion ? totalPresente : subtotalContrato;
     const pdfAnticipo = pdfSubtotal * (form.anticipo_pct / 100);
     const pdfFondoReparo = pdfSubtotal * (form.fondo_reparo_pct / 100);
     const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
-    // Header
-    doc.setFillColor(15, 28, 46); doc.rect(0, 0, W, 22, 'F');
-    if (logoBase64) {
-      doc.addImage(logoBase64, 'JPEG', M, 1, 50, 19);
-    } else {
-      doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-      doc.text('MEJORES', M, 10);
-      doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-      doc.text('en mantenimiento, obras y servicios', M, 15);
-    }
-    doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-    doc.text(`CERTIFICADO N° ${form.numero}`, W - M, 10, { align: 'right' });
-    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-    doc.text(`${form.tipo === 'abono_mensual' ? 'ABONO MENSUAL' : 'OBRA'} · ${fmtDate(form.fecha_certificado)}`, W - M, 16, { align: 'right' });
+    // ── Dibujar header de página (reutilizable para cada página nueva) ──────
+    const drawPageHeader = (isFirstPage) => {
+      doc.setFillColor(15, 28, 46);
+      doc.rect(0, 0, W, 22, 'F');
+      if (logoBase64) {
+        doc.addImage(logoBase64, 'JPEG', M, 1.5, 46, 18);
+      } else {
+        doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
+        doc.text('MEJORES', M, 12);
+        doc.setFontSize(7); doc.setFont('helvetica','normal');
+        doc.text('en mantenimiento, obras y servicios', M, 17);
+      }
+      doc.setTextColor(255,255,255);
+      doc.setFontSize(12); doc.setFont('helvetica','bold');
+      doc.text(`CERTIFICADO N° ${form.numero}`, W - M, 10, { align: 'right' });
+      doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+      doc.text(
+        `${form.tipo === 'abono_mensual' ? 'ABONO MENSUAL' : 'OBRA'} · ${fmtDate(form.fecha_certificado)}`,
+        W - M, 17, { align: 'right' }
+      );
+    };
 
-    let y = 28;
-    // Info block
-    doc.setTextColor(60, 60, 60); doc.setFontSize(7.5);
+    // ── Dibujar footer de página ─────────────────────────────────────────────
+    const drawFooter = (pageNum, totalPages) => {
+      doc.setFillColor(15,28,46);
+      doc.rect(0, H - FOOTER_H, W, FOOTER_H, 'F');
+      doc.setTextColor(255,255,255); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+      doc.text('Av. Córdoba 1351 1°Piso · (C1055AAD) CABA · Tel 4816-0111 · www.mejores.ar', M, H - 3.5);
+      doc.text(`CERT N° ${form.numero} · Pág ${pageNum}/${totalPages}`, W - M, H - 3.5, { align: 'right' });
+    };
+
+    // ── Dibujar encabezado de tabla (también reutilizable) ───────────────────
+    const drawTableHeader = (atY) => {
+      const ROW_H = 8;
+      doc.setFillColor(15,28,46);
+      doc.rect(M, atY, C, ROW_H, 'F');
+      doc.setTextColor(255,255,255); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+
+      // Columnas: [x, ancho, label, align]
+      TABLE_COLS.forEach(({ x, w, label, align }) => {
+        const cx = align === 'right' ? x + w - 1 : x + 1;
+        doc.text(label, cx, atY + 5.5, { align: align === 'right' ? 'right' : 'left' });
+      });
+      return atY + ROW_H;
+    };
+
+    // Definición de columnas (x acumulado, ancho, label)
+    const TABLE_COLS = (() => {
+      const defs = [
+        { w: 7,  label: 'N°',         align: 'right' },
+        { w: 62, label: 'DESCRIPCIÓN', align: 'left'  },
+        { w: 9,  label: 'UM',         align: 'left'  },
+        { w: 12, label: 'CANT.',      align: 'right' },
+        { w: 18, label: 'IMP.UNIT.',  align: 'right' },
+        { w: 18, label: 'IMP.TOTAL',  align: 'right' },
+        { w: 9,  label: 'A.ANT U',    align: 'right' },
+        { w: 18, label: 'A.ANT $',    align: 'right' },
+        { w: 9,  label: 'PRES. U',    align: 'right' },
+        { w: 18, label: 'PRES. $',    align: 'right' },
+        { w: 9,  label: 'A.PR. U',    align: 'right' },
+        { w: 18, label: 'A.PR. $',    align: 'right' },
+        { w: 9,  label: 'SALDO U',    align: 'right' },
+        { w: 18, label: 'SALDO $',    align: 'right' },
+      ];
+      let cx = M;
+      return defs.map(d => { const col = { ...d, x: cx }; cx += d.w; return col; });
+    })();
+
+    const DESCR_COL = TABLE_COLS[1]; // columna descripción para wrap
+
+    // ── PÁGINA 1 ─────────────────────────────────────────────────────────────
+    drawPageHeader(true);
+    let y = 26;
+
+    // Bloque de información: dos columnas bien espaciadas
+    doc.setFontSize(8); doc.setTextColor(40,40,40);
     const leftInfo = [
       ['EMPRENDIMIENTO', form.emprendimiento],
       ['OBRA / SERVICIO', form.obra_servicio],
       ['CONTRATISTA', form.contratista],
+      ['BASE', form.base || '—'],
     ];
     const rightInfo = [
       ['ADA N°', form.ada_numero],
       ['OC N°', form.oc_numero || '—'],
       ['MES / PERÍODO', form.mes_periodo],
       ['FECHA INICIO', fmtDate(form.fecha_inicio)],
+      ['PLAZO', form.plazo_obra || '—'],
+      ['FIN', fmtDate(form.fecha_finalizacion)],
       ['MONTO CONTRATADO', fmt(form.monto_contratado)],
     ];
+    const INFO_LINE = 5.5;
     leftInfo.forEach(([k, v], i) => {
-      doc.setFont('helvetica', 'bold'); doc.text(k + ': ', M, y + i * 5);
-      doc.setFont('helvetica', 'normal'); doc.text(v || '—', M + 38, y + i * 5);
+      const ry = y + i * INFO_LINE;
+      doc.setFont('helvetica','bold'); doc.setTextColor(80,80,80); doc.text(k + ':', M, ry);
+      doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20);
+      doc.text(String(v || '—'), M + 40, ry);
     });
     rightInfo.forEach(([k, v], i) => {
-      doc.setFont('helvetica', 'bold'); doc.text(k + ': ', W / 2 + 5, y + i * 5);
-      doc.setFont('helvetica', 'normal'); doc.text(v || '—', W / 2 + 42, y + i * 5);
+      const ry = y + i * INFO_LINE;
+      doc.setFont('helvetica','bold'); doc.setTextColor(80,80,80); doc.text(k + ':', W / 2 + 5, ry);
+      doc.setFont('helvetica','normal'); doc.setTextColor(20,20,20);
+      doc.text(String(v || '—'), W / 2 + 48, ry);
     });
-    y += 28;
+    y += Math.max(leftInfo.length, rightInfo.length) * INFO_LINE + 4;
 
-    // Table header
-    doc.setFillColor(15, 28, 46); doc.rect(M, y, C, 6, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(6); doc.setFont('helvetica', 'bold');
-    const cols = [M+1, M+8, M+70, M+80, M+92, M+110, M+128, M+146, M+164, M+182, M+200, M+218, M+240, M+258];
-    ['N°','DESCRIPCIÓN','UM','CANT.T','IMP.UNIT','IMP.TOTAL','AC.ANT.U','AC.ANT.$','PRES.U','PRES.$','AC.PR.U','AC.PR.$','SALDO.U','SALDO.$'].forEach((h,i) => {
-      doc.text(h, cols[i], y + 4);
+    // Separador fino
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.3);
+    doc.line(M, y, W - M, y);
+    y += 4;
+
+    // Encabezado de tabla
+    y = drawTableHeader(y);
+
+    // ── Filas de ítems ───────────────────────────────────────────────────────
+    let pageNum = 1;
+    doc.setFont('helvetica','normal');
+
+    form.items.forEach((item, idx) => {
+      // Calcular cuántas líneas ocupa la descripción
+      doc.setFontSize(7);
+      const descLines = doc.splitTextToSize(item.descripcion || '', DESCR_COL.w - 2);
+      const ROW_H = Math.max(7, descLines.length * 4.2 + 2);
+
+      // Verificar si cabe en la página actual
+      if (y + ROW_H > SAFE_BOTTOM) {
+        drawFooter(pageNum, '??');
+        doc.addPage();
+        pageNum++;
+        drawPageHeader(false);
+        y = 26;
+        y = drawTableHeader(y);
+      }
+
+      // Fondo alternado
+      doc.setFillColor(idx % 2 === 0 ? 255 : 245, idx % 2 === 0 ? 255 : 247, idx % 2 === 0 ? 255 : 250);
+      doc.rect(M, y, C, ROW_H, 'F');
+      // Borde inferior fino
+      doc.setDrawColor(220,220,220); doc.setLineWidth(0.15);
+      doc.line(M, y + ROW_H, M + C, y + ROW_H);
+
+      const ty = y + ROW_H / 2 + 2; // centro vertical aproximado
+      doc.setFontSize(7); doc.setTextColor(40,40,40);
+
+      // N°
+      const col0 = TABLE_COLS[0];
+      doc.setFont('helvetica','normal');
+      doc.text(String(item.numero || idx + 1), col0.x + col0.w - 1, ty, { align: 'right' });
+
+      // Descripción (multilinea)
+      doc.setFont('helvetica','normal');
+      doc.text(descLines, DESCR_COL.x + 1, y + 4.5);
+
+      // UM
+      doc.text(item.um || '', TABLE_COLS[2].x + 1, ty);
+
+      // Resto de celdas numéricas
+      const numCell = (val, colIdx, bold = false) => {
+        const col = TABLE_COLS[colIdx];
+        if (bold) doc.setFont('helvetica','bold'); else doc.setFont('helvetica','normal');
+        doc.text(String(val ?? ''), col.x + col.w - 1, ty, { align: 'right' });
+      };
+
+      numCell(item.cantidad || '', 3);
+      numCell(fmt(item.importe_unitario), 4);
+      numCell(fmt(item.importe_total), 5, true);
+      numCell(item.med_acum_anterior_unidad || 0, 6);
+      numCell(fmt(item.med_acum_anterior_importe), 7);
+      numCell(item.med_presente_unidad || 0, 8);
+      numCell(fmt(item.med_presente_importe), 9);
+      numCell(item.med_acum_presente_unidad || 0, 10);
+      numCell(fmt(item.med_acum_presente_importe), 11);
+      numCell(item.saldo_pendiente_unidad || 0, 12);
+      numCell(fmt(item.saldo_pendiente_importe), 13);
+
+      y += ROW_H;
     });
-    y += 7;
 
-    // Rows
-    doc.setTextColor(50, 50, 50); doc.setFont('helvetica', 'normal');
-    form.items.forEach((item, i) => {
-      if (y > 178) { doc.addPage(); y = 15; }
-      if (i % 2 === 0) { doc.setFillColor(247,247,247); doc.rect(M, y-1, C, 5.5, 'F'); }
-      doc.setFontSize(5.5);
-      doc.text(String(item.numero || i+1), cols[0], y+3);
-      doc.text(doc.splitTextToSize(item.descripcion || '', 58)[0], cols[1], y+3);
-      doc.text(item.um || '', cols[2], y+3);
-      doc.text(String(item.cantidad || ''), cols[3], y+3);
-      doc.text(fmt(item.importe_unitario), cols[4], y+3);
-      doc.setFont('helvetica', 'bold');
-      doc.text(fmt(item.importe_total), cols[5], y+3);
-      doc.setFont('helvetica', 'normal');
-      doc.text(String(item.med_acum_anterior_unidad||0), cols[6], y+3);
-      doc.text(fmt(item.med_acum_anterior_importe), cols[7], y+3);
-      doc.text(String(item.med_presente_unidad||0), cols[8], y+3);
-      doc.text(fmt(item.med_presente_importe), cols[9], y+3);
-      doc.text(String(item.med_acum_presente_unidad||0), cols[10], y+3);
-      doc.text(fmt(item.med_acum_presente_importe), cols[11], y+3);
-      doc.text(String(item.saldo_pendiente_unidad||0), cols[12], y+3);
-      doc.text(fmt(item.saldo_pendiente_importe), cols[13], y+3);
-      y += 5.5;
-    });
-
-    // Totals
-    y += 3;
-    if (hasMedicion) {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(80,80,80);
-      doc.text(`Total contrato: ${fmt(subtotalContrato)}`, W - M - 1, y, { align: 'right' }); y += 5;
-      doc.text(`Saldo pendiente: ${fmt(totalSaldo)}`, W - M - 1, y, { align: 'right' }); y += 5;
+    // ── Bloque de totales — verificar que entren en la página actual ─────────
+    const TOTALS_H = hasMedicion ? 52 : 38;
+    if (y + TOTALS_H > SAFE_BOTTOM) {
+      drawFooter(pageNum, '??');
+      doc.addPage();
+      pageNum++;
+      drawPageHeader(false);
+      y = 26;
     }
-    doc.setFillColor(230, 240, 255); doc.rect(M + C - 80, y, 80, 5, 'F');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(15,28,46);
-    doc.text(hasMedicion ? 'IMP. CERTIFICADO:' : 'SUBTOTAL:', M + C - 78, y + 3.5);
-    doc.text(fmt(pdfSubtotal), W - M - 1, y + 3.5, { align: 'right' });
-    y += 6;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(80,80,80);
-    doc.text(`Anticipo/Desacopio (${form.anticipo_pct}%): ${fmt(pdfAnticipo)}`, W - M - 1, y, { align: 'right' }); y += 5;
-    doc.text(`Fondo de Reparo (${form.fondo_reparo_pct}%): ${fmt(pdfFondoReparo)}`, W - M - 1, y, { align: 'right' }); y += 5;
-    doc.setFillColor(15,28,46); doc.rect(M + C - 80, y, 80, 7, 'F');
-    doc.setTextColor(255,255,255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-    doc.text('TOTAL NETO:', M + C - 78, y + 5);
-    doc.text(fmt(pdfTotalNeto), W - M - 1, y + 5, { align: 'right' });
+
+    y += 5;
+
+    if (hasMedicion) {
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90,90,90);
+      doc.text(`Total contrato: ${fmt(subtotalContrato)}`, W - M, y, { align: 'right' }); y += 6;
+      doc.text(`Saldo pendiente: ${fmt(totalSaldo)}`, W - M, y, { align: 'right' }); y += 6;
+    }
+
+    // Importe certificado / subtotal
+    doc.setFillColor(235, 243, 255);
+    doc.rect(W - M - 90, y, 90, 8, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(15,28,46);
+    doc.text(hasMedicion ? 'IMP. CERTIFICADO:' : 'SUBTOTAL:', W - M - 88, y + 5.5);
+    doc.text(fmt(pdfSubtotal), W - M - 1, y + 5.5, { align: 'right' });
     y += 10;
 
-    // Barra de % certificado
-    if (hasMedicion) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90,90,90);
+    doc.text(`Anticipo/Desacopio (${form.anticipo_pct}%):   -${fmt(pdfAnticipo)}`, W - M, y, { align: 'right' }); y += 7;
+    doc.text(`Fondo de Reparo (${form.fondo_reparo_pct}%):   -${fmt(pdfFondoReparo)}`, W - M, y, { align: 'right' }); y += 7;
+
+    // Total Neto — caja destacada
+    doc.setFillColor(15,28,46);
+    doc.rect(W - M - 90, y, 90, 10, 'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    doc.text('TOTAL NETO:', W - M - 88, y + 7);
+    doc.text(fmt(pdfTotalNeto), W - M - 1, y + 7, { align: 'right' });
+    y += 14;
+
+    // Barra de avance
+    if (hasMedicion && y + 16 < SAFE_BOTTOM) {
       const pct = subtotalContrato > 0 ? (totalPresente / subtotalContrato) * 100 : 0;
-      const barW = 120, barH = 5, barX = M;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(15,28,46);
-      doc.text(`Avance certificado: ${pct.toFixed(1)}%`, barX, y); y += 4;
-      // fondo gris
-      doc.setFillColor(220,220,220); doc.rect(barX, y, barW, barH, 'F');
-      // barra azul
-      doc.setFillColor(30, 100, 220); doc.rect(barX, y, barW * Math.min(pct / 100, 1), barH, 'F');
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(6); doc.setTextColor(80,80,80);
-      doc.text(`${fmt(totalPresente)} certificado de ${fmt(subtotalContrato)} total contrato`, barX, y + barH + 4);
+      const barW = 130, barH = 6;
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(15,28,46);
+      doc.text(`Avance: ${pct.toFixed(1)}%`, M, y + 5);
+      doc.setFillColor(220,228,240); doc.rect(M + 30, y, barW, barH, 'F');
+      doc.setFillColor(30,100,220); doc.rect(M + 30, y, barW * Math.min(pct / 100, 1), barH, 'F');
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(80,80,80);
+      doc.text(`${fmt(totalPresente)} de ${fmt(subtotalContrato)}`, M + 32, y + barH + 5);
     }
 
-    // Footer
-    const pages = doc.getNumberOfPages();
-    for (let p = 1; p <= pages; p++) {
+    // ── Pies definitivos ─────────────────────────────────────────────────────
+    const totalPages = doc.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
       doc.setPage(p);
-      doc.setFillColor(15,28,46); doc.rect(0, 197, W, 8, 'F');
-      doc.setTextColor(255,255,255); doc.setFontSize(6); doc.setFont('helvetica', 'normal');
-      doc.text('Av. Córdoba 1351 1°Piso · (C1055AAD) Ciudad Aut. de Bs. As. · Tel 4816-0111 · www.mejores.ar', M, 202);
-      doc.text(`CERT N° ${form.numero} · Pág ${p}/${pages}`, W - M, 202, { align: 'right' });
+      drawFooter(p, totalPages);
     }
 
     doc.save(`Certificado_N${form.numero}_${form.contratista?.replace(/ /g,'_') || ''}.pdf`);
