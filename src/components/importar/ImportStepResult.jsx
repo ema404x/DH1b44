@@ -1,77 +1,154 @@
-import React from 'react';
-import { CheckCircle2, AlertCircle, RefreshCw, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { CheckCircle2, AlertCircle, RefreshCw, ArrowRight, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
 
 const ENTITY_ROUTES = {
-  Client: '/clientes',
-  Employee: '/empleados',
-  Material: '/inventario',
-  Project: '/proyectos',
-  WorkOrder: '/ordenes',
-  Asset: '/activos',
-  PrecarioMinisterio: '/presupuestos-obra',
-  Quote: '/presupuestos',
-  Invoice: '/facturacion',
+  Client: '/clientes', Employee: '/empleados', Material: '/inventario',
+  Project: '/proyectos', WorkOrder: '/ordenes', Asset: '/activos',
+  PrecarioMinisterio: '/presupuestos-obra', Quote: '/presupuestos', Invoice: '/facturacion',
 };
 
 export default function ImportStepResult({ result, onReset }) {
+  const [expandedErrors, setExpandedErrors] = useState(null);
+
   const totalImported = (result.results || []).reduce((acc, r) => acc + (r.imported || 0), 0);
   const totalErrors = (result.results || []).reduce((acc, r) => acc + (r.errors || 0), 0);
   const success = totalErrors === 0;
+  const partial = totalImported > 0 && totalErrors > 0;
+
+  const downloadErrors = () => {
+    const lines = ['Entidad,Fila,Error'];
+    (result.results || []).forEach(r => {
+      (r.error_details || []).forEach(err => {
+        lines.push(`"${r.entity}","","${err.replace(/"/g, '""')}"`);
+      });
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'errores_importacion.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Summary */}
-      <div className={`flex items-center gap-4 p-6 rounded-2xl border ${
-        success ? 'bg-emerald-50 border-emerald-200' : 'bg-yellow-50 border-yellow-200'
+      {/* Hero result */}
+      <div className={`p-6 rounded-2xl border-2 ${
+        success ? 'bg-emerald-50 border-emerald-200' :
+        partial ? 'bg-amber-50 border-amber-200' :
+        'bg-red-50 border-red-200'
       }`}>
-        {success
-          ? <CheckCircle2 className="h-10 w-10 text-emerald-600 flex-shrink-0" />
-          : <AlertCircle className="h-10 w-10 text-yellow-600 flex-shrink-0" />
-        }
-        <div>
-          <p className={`font-bold text-xl ${success ? 'text-emerald-800' : 'text-yellow-800'}`}>
-            {success ? '¡Importación exitosa!' : 'Importación con advertencias'}
-          </p>
-          <p className={`text-sm mt-1 ${success ? 'text-emerald-700' : 'text-yellow-700'}`}>
-            {totalImported} registros importados correctamente
-            {totalErrors > 0 && ` · ${totalErrors} registros con errores`}
-          </p>
+        <div className="flex items-start gap-4">
+          <div className={`h-14 w-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+            success ? 'bg-emerald-100' : partial ? 'bg-amber-100' : 'bg-red-100'
+          }`}>
+            {success
+              ? <CheckCircle2 className="h-7 w-7 text-emerald-600" />
+              : <AlertCircle className={`h-7 w-7 ${partial ? 'text-amber-600' : 'text-red-600'}`} />
+            }
+          </div>
+          <div className="flex-1">
+            <p className={`font-bold text-xl ${
+              success ? 'text-emerald-800' : partial ? 'text-amber-800' : 'text-red-800'
+            }`}>
+              {success ? '¡Importación exitosa!' : partial ? 'Importación con advertencias' : 'Importación fallida'}
+            </p>
+            <div className="flex flex-wrap gap-4 mt-3">
+              <div className="text-center">
+                <div className={`text-3xl font-bold ${success ? 'text-emerald-700' : 'text-amber-700'}`}>{totalImported.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">registros importados</div>
+              </div>
+              {totalErrors > 0 && (
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-red-600">{totalErrors.toLocaleString()}</div>
+                  <div className="text-xs text-muted-foreground">registros con error</div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* Overall progress bar */}
+        {(totalImported + totalErrors) > 0 && (
+          <div className="mt-4">
+            <div className="h-2 bg-white/60 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full transition-all"
+                style={{ width: `${Math.round((totalImported / (totalImported + totalErrors)) * 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {Math.round((totalImported / (totalImported + totalErrors)) * 100)}% de éxito
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Per-entity results */}
       <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Detalle por entidad</p>
+          {totalErrors > 0 && (
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={downloadErrors}>
+              <Download className="h-3 w-3" /> Exportar errores
+            </Button>
+          )}
+        </div>
         {(result.results || []).map((r, i) => (
           <Card key={i}>
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="font-semibold text-sm">{r.entity}</p>
-                <div className="flex gap-3 mt-1">
-                  <span className="text-xs text-emerald-600 font-medium">✓ {r.imported} importados</span>
-                  {r.errors > 0 && <span className="text-xs text-red-500 font-medium">✗ {r.errors} errores</span>}
-                </div>
-                {r.error_details && r.error_details.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {r.error_details.slice(0, 3).map((err, ei) => (
-                      <p key={ei} className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">{err}</p>
-                    ))}
-                    {r.error_details.length > 3 && (
-                      <p className="text-xs text-muted-foreground">+{r.error_details.length - 3} más...</p>
-                    )}
+            <CardHeader
+              className={`py-3 px-4 ${r.errors > 0 ? 'cursor-pointer hover:bg-muted/20' : ''}`}
+              onClick={() => r.errors > 0 && setExpandedErrors(expandedErrors === i ? null : i)}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    r.errors === 0 ? 'bg-emerald-100' : r.imported > 0 ? 'bg-amber-100' : 'bg-red-100'
+                  }`}>
+                    {r.errors === 0
+                      ? <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      : <AlertCircle className={`h-4 w-4 ${r.imported > 0 ? 'text-amber-600' : 'text-red-600'}`} />
+                    }
                   </div>
-                )}
+                  <div>
+                    <p className="font-semibold text-sm">{r.entity}</p>
+                    <div className="flex gap-3 mt-0.5">
+                      {r.imported > 0 && <span className="text-xs text-emerald-600 font-medium">✓ {r.imported.toLocaleString()} importados</span>}
+                      {r.errors > 0 && <span className="text-xs text-red-500 font-medium">✗ {r.errors} errores</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {ENTITY_ROUTES[r.entity_key] && (
+                    <Link to={ENTITY_ROUTES[r.entity_key]} onClick={(e) => e.stopPropagation()}>
+                      <Button variant="outline" size="sm" className="gap-1 text-xs h-7">
+                        Ver <ArrowRight className="h-3 w-3" />
+                      </Button>
+                    </Link>
+                  )}
+                  {r.errors > 0 && (
+                    expandedErrors === i ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
               </div>
-              {ENTITY_ROUTES[r.entity_key] && (
-                <Link to={ENTITY_ROUTES[r.entity_key]}>
-                  <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                    Ver datos <ArrowRight className="h-3 w-3" />
-                  </Button>
-                </Link>
-              )}
-            </CardContent>
+            </CardHeader>
+            {expandedErrors === i && r.error_details?.length > 0 && (
+              <CardContent className="pt-0 pb-3 px-4 border-t border-border">
+                <div className="space-y-1 mt-2">
+                  {r.error_details.slice(0, 5).map((err, ei) => (
+                    <p key={ei} className="text-xs text-red-600 bg-red-50 px-3 py-1.5 rounded-lg font-mono">{err}</p>
+                  ))}
+                  {r.error_details.length > 5 && (
+                    <p className="text-xs text-muted-foreground pl-1">+{r.error_details.length - 5} errores más (exportá el CSV para verlos todos)</p>
+                  )}
+                </div>
+              </CardContent>
+            )}
           </Card>
         ))}
       </div>
