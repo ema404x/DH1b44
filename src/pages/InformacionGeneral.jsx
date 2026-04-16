@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner';
 import ImportadorLocations from '@/components/informacion-general/ImportadorLocations';
 import JefeSitioPanel from '@/components/informacion-general/JefeSitioPanel';
+import DireccionPanel from '@/components/informacion-general/DireccionPanel';
 import LocationsGrid from '@/components/informacion-general/LocationsGrid';
 import EstadisticasAvanzadas from '@/components/informacion-general/EstadisticasAvanzadas';
 import ExportadorDatos from '@/components/informacion-general/ExportadorDatos';
@@ -28,6 +29,7 @@ export default function InformacionGeneral() {
   const [search, setSearch] = useState('');
   const [selectedComuna, setSelectedComuna] = useState('all');
   const [expandedJefe, setExpandedJefe] = useState(null);
+  const [expandedDireccion, setExpandedDireccion] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const queryClient = useQueryClient();
@@ -92,6 +94,46 @@ export default function InformacionGeneral() {
     });
 
     return Object.values(byJefe).sort((a, b) => b.locations.length - a.locations.length);
+  }, [locations, search, selectedComuna]);
+
+  // Organización por direcciones
+  const porDirecciones = useMemo(() => {
+    let filtered = locations;
+
+    if (selectedComuna !== 'all') {
+      filtered = filtered.filter(l => l.comuna === selectedComuna);
+    }
+
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter(l =>
+        l.establecimiento?.toLowerCase().includes(q) ||
+        l.direccion?.toLowerCase().includes(q) ||
+        l.ubic_tecnica?.toLowerCase().includes(q) ||
+        l.jefe_sitio?.toLowerCase().includes(q)
+      );
+    }
+
+    const byDir = {};
+    filtered.forEach(loc => {
+      const dir = loc.direccion || 'Sin dirección';
+      if (!byDir[dir]) {
+        byDir[dir] = {
+          direccion: dir,
+          comunas: {},
+          locations: [],
+        };
+      }
+      byDir[dir].locations.push(loc);
+
+      const comuna = loc.comuna || 'Otra';
+      if (!byDir[dir].comunas[comuna]) {
+        byDir[dir].comunas[comuna] = [];
+      }
+      byDir[dir].comunas[comuna].push(loc);
+    });
+
+    return Object.values(byDir).sort((a, b) => b.locations.length - a.locations.length);
   }, [locations, search, selectedComuna]);
 
   const stats = useMemo(() => ({
@@ -166,8 +208,9 @@ export default function InformacionGeneral() {
             <div className="flex gap-2 border-b border-slate-200 -mb-6 overflow-x-auto">
               {[
                 { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+                { key: 'jefes', label: 'Por Jefes', icon: Users },
+                { key: 'direcciones', label: 'Por Direcciones', icon: MapPin },
                 { key: 'locations', label: 'Escuelas', icon: Building2 },
-                { key: 'mapa', label: 'Mapa', icon: Map },
                 { key: 'reportes', label: 'Reportes', icon: TrendingUp },
               ].map(tab => (
                 <button
@@ -310,6 +353,62 @@ export default function InformacionGeneral() {
                 />
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Por Jefes Tab */}
+      {activeTab === 'jefes' && (
+        <div className="max-w-7xl mx-auto px-6 py-8 space-y-3">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin h-8 w-8 border-4 border-slate-200 border-t-primary rounded-full" />
+            </div>
+          ) : organizados.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center">
+                <Users className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground font-medium">Sin resultados</p>
+              </CardContent>
+            </Card>
+          ) : (
+            organizados.map(jefeData => (
+              <JefeSitioPanel
+                key={jefeData.nombre}
+                jefeData={jefeData}
+                isExpanded={expandedJefe === jefeData.nombre}
+                onToggle={() => setExpandedJefe(expandedJefe === jefeData.nombre ? null : jefeData.nombre)}
+                comunas={COMUNAS}
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Por Direcciones Tab */}
+      {activeTab === 'direcciones' && (
+        <div className="max-w-7xl mx-auto px-6 py-8 space-y-3">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin h-8 w-8 border-4 border-slate-200 border-t-primary rounded-full" />
+            </div>
+          ) : porDirecciones.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center">
+                <MapPin className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground font-medium">Sin resultados</p>
+              </CardContent>
+            </Card>
+          ) : (
+            porDirecciones.map(dirData => (
+              <DireccionPanel
+                key={dirData.direccion}
+                direccionData={dirData}
+                isExpanded={expandedDireccion === dirData.direccion}
+                onToggle={() => setExpandedDireccion(expandedDireccion === dirData.direccion ? null : dirData.direccion)}
+                comunas={COMUNAS}
+              />
+            ))
           )}
         </div>
       )}
