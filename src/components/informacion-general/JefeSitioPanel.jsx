@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronUp, Users, MapPin, Zap } from 'lucide-react';
 
-export default function JefeSitioPanel({ jefeData, isExpanded, onToggle, comunas }) {
+export default function JefeSitioPanel({ jefeData, isExpanded, onToggle, comunas, onEdit, onDelete }) {
   const getCountByComuna = (comunaId) => jefeData.comunas[comunaId]?.length || 0;
   const getColorByComunaId = (comunaId) => comunas.find(c => c.id === comunaId)?.color || 'bg-slate-100 text-slate-700';
 
