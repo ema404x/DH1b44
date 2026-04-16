@@ -1,14 +1,14 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LogIn, LogOut, MapPin, Users, Activity, Calendar, Loader2 } from 'lucide-react';
-import { format, startOfDay, isToday, isYesterday, subDays } from 'date-fns';
+import { LogIn, LogOut, MapPin, Users, Activity, Calendar, Loader2, QrCode, ClipboardList, Pencil } from 'lucide-react';
+import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import QRCodeModal from '@/components/shared/QRCodeModal';
 
 const COLOR_MAP = {
   blue: '#3b82f6', green: '#10b981', purple: '#a855f7',
@@ -45,11 +45,16 @@ const DAYS_OPTIONS = [
   { label: '30 días', value: 30 },
 ];
 
-export default function MapaFichajes({ locations, logs, logsLoading, onLocationUpdate, onClickToAdd }) {
+export default function MapaFichajes({ locations, logs, logsLoading, onLocationUpdate, onClickToAdd, onEditLocation, onGotoGestion }) {
   const mapRef = useRef(null);
   const [daysFilter, setDaysFilter] = useState(7);
   const [typeFilter, setTypeFilter] = useState('all');
   const [selectedEmployee, setSelectedEmployee] = useState('all');
+  const [qrFichaje, setQrFichaje] = useState(null);
+  const [qrOT, setQrOT] = useState(null);
+
+  const getQRUrl = (loc) => `${window.location.origin}/fichar?loc=${loc.id}`;
+  const getQROTUrl = (loc) => `${window.location.origin}/ejecutar-ot?loc=${loc.id}`;
 
   const validLocations = locations.filter(l =>
     l.latitude && l.longitude && !isNaN(l.latitude) && !isNaN(l.longitude)
@@ -193,15 +198,43 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
                   }),
                 }}
               >
-                <Popup>
-                  <div className="min-w-48">
-                    <p className="font-semibold text-sm">{loc.name}</p>
-                    {loc.address && <p className="text-xs text-gray-500 mt-0.5">{loc.address}</p>}
-                    <div className="flex gap-3 mt-2 text-xs">
+                <Popup minWidth={220}>
+                  <div style={{ minWidth: 220 }}>
+                    <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{loc.name}</p>
+                    {loc.project_name && <p style={{ fontSize: 11, color: '#6366f1', marginBottom: 2 }}>📁 {loc.project_name}</p>}
+                    {loc.address && <p style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>📍 {loc.address}</p>}
+                    <div style={{ display: 'flex', gap: 12, fontSize: 12, marginBottom: 8 }}>
                       <span><strong>{loc.total_scans || 0}</strong> escaneos</span>
-                      <span className={loc.is_active ? 'text-emerald-600' : 'text-gray-400'}>
+                      <span style={{ color: loc.is_active ? '#10b981' : '#9ca3af' }}>
                         {loc.is_active ? '✓ Activo' : '✗ Inactivo'}
                       </span>
+                    </div>
+                    {loc.assigned_employees?.length > 0 && (
+                      <p style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>
+                        👷 {loc.assigned_employees.slice(0, 3).join(', ')}{loc.assigned_employees.length > 3 ? ` +${loc.assigned_employees.length - 3}` : ''}
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 8, borderTop: '1px solid #e5e7eb' }}>
+                      <button
+                        onClick={() => setQrFichaje(loc)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, borderRadius: 6, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', cursor: 'pointer' }}
+                      >
+                        🔲 QR Fichaje
+                      </button>
+                      <button
+                        onClick={() => setQrOT(loc)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, borderRadius: 6, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', cursor: 'pointer' }}
+                      >
+                        📋 QR OT
+                      </button>
+                      {onGotoGestion && (
+                        <button
+                          onClick={() => onGotoGestion(loc)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, borderRadius: 6, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', cursor: 'pointer' }}
+                        >
+                          ✏️ Gestionar
+                        </button>
+                      )}
                     </div>
                   </div>
                 </Popup>
@@ -244,8 +277,24 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
         <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-blue-500 border-2 border-white shadow" />Ubicación QR</div>
         <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-emerald-500 border-2 border-white shadow" />Fichaje entrada</div>
         <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-blue-400 border-2 border-white shadow" />Fichaje salida</div>
-        <span className="text-muted-foreground/60">· Arrastrá los marcadores de ubicación para moverlos · Clic derecho para crear nueva ubicación</span>
+        <span className="text-muted-foreground/60">· Clic en marcador para acciones · Arrastrá para mover · Clic derecho para crear</span>
       </div>
+
+      {/* QR Modals */}
+      <QRCodeModal
+        open={!!qrFichaje}
+        onClose={() => setQrFichaje(null)}
+        title={qrFichaje?.name || ''}
+        subtitle={qrFichaje?.address || qrFichaje?.project_name || 'QR de fichaje'}
+        value={qrFichaje ? getQRUrl(qrFichaje) : ''}
+      />
+      <QRCodeModal
+        open={!!qrOT}
+        onClose={() => setQrOT(null)}
+        title={`OT — ${qrOT?.name || ''}`}
+        subtitle="QR fijo · Ejecutar Orden de Trabajo"
+        value={qrOT ? getQROTUrl(qrOT) : ''}
+      />
     </div>
   );
 }

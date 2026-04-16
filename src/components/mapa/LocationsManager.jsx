@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,15 +30,29 @@ const emptyForm = {
   latitude: '', longitude: '',
 };
 
-export default function LocationsManager({ locations, isLoading, onUpdate, onDelete, onCreate }) {
+export default function LocationsManager({ locations, isLoading, onUpdate, onDelete, onCreate, highlightedLocId, onClearHighlight }) {
   const [search, setSearch] = useState('');
   const [filterActive, setFilterActive] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const [qrLoc, setQrLoc] = useState(null);   // QR de fichaje
-  const [qrOTLoc, setQrOTLoc] = useState(null); // QR de ejecución de OT
+  const [qrLoc, setQrLoc] = useState(null);
+  const [qrOTLoc, setQrOTLoc] = useState(null);
   const [saving, setSaving] = useState(false);
+  const cardRefs = useRef({});
+
+  // Scroll to highlighted location and open edit dialog
+  useEffect(() => {
+    if (!highlightedLocId) return;
+    const loc = locations.find(l => l.id === highlightedLocId);
+    if (!loc) return;
+    // Scroll to card
+    setTimeout(() => {
+      const el = cardRefs.current[highlightedLocId];
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+    if (onClearHighlight) setTimeout(onClearHighlight, 3000);
+  }, [highlightedLocId]);
 
   const filtered = locations.filter(loc => {
     const matchSearch = !search ||
@@ -139,8 +153,13 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(loc => {
             const colorCfg = COLOR_OPTIONS.find(c => c.value === loc.color) || COLOR_OPTIONS[0];
+            const isHighlighted = loc.id === highlightedLocId;
             return (
-              <Card key={loc.id} className={`overflow-hidden transition-all hover:shadow-md ${!loc.is_active ? 'opacity-60' : ''}`}>
+              <Card
+                key={loc.id}
+                ref={el => { cardRefs.current[loc.id] = el; }}
+                className={`overflow-hidden transition-all hover:shadow-md ${!loc.is_active ? 'opacity-60' : ''} ${isHighlighted ? 'ring-2 ring-primary ring-offset-2 shadow-lg' : ''}`}
+              >
                 <div className="h-1.5 w-full" style={{ background: colorCfg.hex }} />
                 <CardContent className="pt-4 pb-4 px-4">
                   {/* Header row */}

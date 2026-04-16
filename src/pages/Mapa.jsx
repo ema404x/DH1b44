@@ -10,6 +10,7 @@ import AsignacionesUbicacion from '@/components/mapa/AsignacionesUbicacion';
 
 export default function Mapa() {
   const [tab, setTab] = useState('mapa');
+  const [highlightedLoc, setHighlightedLoc] = useState(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -88,6 +89,7 @@ export default function Mapa() {
             logsLoading={logsLoading}
             onLocationUpdate={(id, data) => updateLocation.mutate({ id, data })}
             onClickToAdd={(coords) => createLocation.mutate({ ...coords, name: 'Nueva ubicación', color: 'blue', is_active: true, event_type: 'ambos' })}
+            onGotoGestion={(loc) => { setHighlightedLoc(loc); setTab('gestion'); }}
           />
         </TabsContent>
 
@@ -98,6 +100,8 @@ export default function Mapa() {
             onUpdate={(id, data) => updateLocation.mutate({ id, data })}
             onDelete={(id) => deleteLocation.mutate(id)}
             onCreate={(data) => createLocation.mutate(data)}
+            highlightedLocId={highlightedLoc?.id}
+            onClearHighlight={() => setHighlightedLoc(null)}
           />
         </TabsContent>
 
