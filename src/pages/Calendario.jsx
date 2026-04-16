@@ -1,70 +1,109 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, Calendar, Clock, User, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, ClipboardList, FileText, Wrench, Calendar, User, MapPin, Edit2, Check } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isSameDay, isToday, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import EventDetailPanel from '@/components/calendario/EventDetailPanel';
 
-const priorityColors = {
+const PRIORITY_COLORS = {
   urgente: 'bg-red-500',
   alta: 'bg-orange-500',
   media: 'bg-blue-500',
   baja: 'bg-slate-400',
 };
-const statusDot = {
-  pendiente: 'bg-amber-400',
-  asignada: 'bg-blue-400',
-  en_progreso: 'bg-indigo-500',
-  completada: 'bg-emerald-500',
-  cancelada: 'bg-gray-400',
+
+const TYPE_COLORS = {
+  ot: 'bg-blue-500',
+  informe: 'bg-violet-500',
+  maintenance: 'bg-purple-400',
 };
+
+const LEGEND = [
+  ['bg-blue-500', 'OT - Media'],
+  ['bg-red-500', 'OT - Urgente'],
+  ['bg-orange-500', 'OT - Alta'],
+  ['bg-violet-500', 'Informe'],
+  ['bg-purple-400', 'Mantenimiento'],
+];
+
+function buildEvents(orders, informes, assets) {
+  const otEvents = orders
+    .filter(o => o.scheduled_date)
+    .map(o => ({
+      id: o.id,
+      title: o.title,
+      date: o.scheduled_date,
+      type: 'ot',
+      status: o.status,
+      priority: o.priority,
+      assignee: o.assigned_name,
+      location: o.location,
+      color: PRIORITY_COLORS[o.priority] || 'bg-blue-500',
+      raw: o,
+    }));
+
+  const informeEvents = informes
+    .filter(i => i.fecha_limite)
+    .map(i => ({
+      id: i.id,
+      title: i.titulo,
+      date: i.fecha_limite,
+      type: 'informe',
+      status: i.estado,
+      priority: i.prioridad,
+      assignee: i.responsable,
+      location: i.proyecto_nombre,
+      color: 'bg-violet-500',
+      raw: i,
+    }));
+
+  const maintEvents = assets
+    .filter(a => a.next_maintenance)
+    .map(a => ({
+      id: a.id,
+      title: `Mant: ${a.name}`,
+      date: a.next_maintenance,
+      type: 'maintenance',
+      status: 'pendiente',
+      priority: a.criticality === 'critica' ? 'urgente' : a.criticality,
+      assignee: a.location,
+      location: a.location,
+      color: a.criticality === 'critica' ? 'bg-red-500' : a.criticality === 'alta' ? 'bg-orange-400' : 'bg-purple-400',
+      raw: a,
+    }));
+
+  return [...otEvents, ...informeEvents, ...maintEvents];
+}
 
 export default function Calendario() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState('month'); // month | week
   const [selectedDay, setSelectedDay] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const queryClient = useQueryClient();
 
   const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
+  const { data: informes = [] } = useQuery({ queryKey: ['informes'], queryFn: () => base44.entities.Informe.list() });
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list() });
 
-  // Combine work orders + asset maintenances as events
-  const events = useMemo(() => {
-    const otEvents = orders
-      .filter(o => o.scheduled_date)
-      .map(o => ({
-        id: o.id,
-        title: o.title,
-        date: o.scheduled_date,
-        type: 'ot',
-        status: o.status,
-        priority: o.priority,
-        assignee: o.assigned_name,
-        color: priorityColors[o.priority] || 'bg-blue-500',
-      }));
+  const updateOT = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.WorkOrder.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workorders'] }),
+  });
 
-    const maintEvents = assets
-      .filter(a => a.next_maintenance)
-      .map(a => ({
-        id: a.id,
-        title: `Mant: ${a.name}`,
-        date: a.next_maintenance,
-        type: 'maintenance',
-        status: 'pendiente',
-        priority: a.criticality === 'critica' ? 'urgente' : a.criticality,
-        assignee: a.location,
-        color: a.criticality === 'critica' ? 'bg-red-500' : a.criticality === 'alta' ? 'bg-orange-400' : 'bg-purple-500',
-      }));
+  const updateInforme = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Informe.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['informes'] }),
+  });
 
-    return [...otEvents, ...maintEvents];
-  }, [orders, assets]);
+  const events = useMemo(() => buildEvents(orders, informes, assets), [orders, informes, assets]);
 
   const getEventsForDay = (date) => events.filter(e => isSameDay(parseISO(e.date), date));
 
-  // Build calendar grid
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const calStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -74,50 +113,89 @@ export default function Calendario() {
   let day = calStart;
   while (day <= calEnd) { days.push(day); day = addDays(day, 1); }
 
-  const selectedEvents = selectedDay ? getEventsForDay(selectedDay) : [];
   const todayEvents = getEventsForDay(new Date());
+  const selectedDayEvents = selectedDay ? getEventsForDay(selectedDay) : [];
+
+  const upcoming = useMemo(() =>
+    events
+      .filter(e => { const d = parseISO(e.date); return d >= new Date() && d <= addDays(new Date(), 7); })
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 8),
+    [events]
+  );
+
+  const handleEventClick = (ev, e) => {
+    e.stopPropagation();
+    setSelectedEvent(ev);
+    setSelectedDay(null);
+  };
+
+  const handleDayClick = (d) => {
+    setSelectedEvent(null);
+    setSelectedDay(isSameDay(d, selectedDay) ? null : d);
+  };
+
+  const handleSaveDate = async (event, newDate) => {
+    if (event.type === 'ot') {
+      await updateOT.mutateAsync({ id: event.id, data: { scheduled_date: newDate } });
+    } else if (event.type === 'informe') {
+      await updateInforme.mutateAsync({ id: event.id, data: { fecha_limite: newDate } });
+    }
+    // Refresh the event in panel
+    setSelectedEvent(ev => ev ? { ...ev, date: newDate, raw: { ...ev.raw, scheduled_date: newDate, fecha_limite: newDate } } : ev);
+  };
+
+  const handleClosePanel = () => setSelectedEvent(null);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Calendario</h1>
-          <p className="text-muted-foreground mt-1">Órdenes de trabajo y mantenimientos programados</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex border rounded-lg overflow-hidden">
-            <Button variant={view === 'month' ? 'default' : 'ghost'} size="sm" className="rounded-none" onClick={() => setView('month')}>Mes</Button>
-            <Button variant={view === 'week' ? 'default' : 'ghost'} size="sm" className="rounded-none" onClick={() => setView('week')}>Semana</Button>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight">Calendario</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">Órdenes de trabajo, informes y mantenimientos programados</p>
         </div>
       </div>
 
       {/* Legend */}
       <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-        {[['bg-blue-500','OT - Media'],['bg-red-500','OT - Urgente'],['bg-orange-500','OT - Alta'],['bg-purple-500','Mantenimiento'],['bg-red-500','Mant. Crítico']].map(([c,l]) => (
-          <div key={l} className="flex items-center gap-1.5"><div className={`h-2.5 w-2.5 rounded-full ${c}`} />{l}</div>
+        {LEGEND.map(([c, l]) => (
+          <div key={l} className="flex items-center gap-1.5">
+            <div className={`h-2.5 w-2.5 rounded-full ${c}`} />
+            {l}
+          </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Calendar */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
+        {/* Calendar grid */}
         <Card className="lg:col-span-3">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <Button variant="ghost" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronLeft className="h-4 w-4" /></Button>
-              <h2 className="font-semibold text-lg capitalize">{format(currentDate, 'MMMM yyyy', { locale: es })}</h2>
-              <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))}><ChevronRight className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-3">
+                <h2 className="font-semibold text-base capitalize">
+                  {format(currentDate, 'MMMM yyyy', { locale: es })}
+                </h2>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCurrentDate(new Date())}>
+                  Hoy
+                </Button>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="p-3">
             {/* Day names */}
             <div className="grid grid-cols-7 mb-1">
-              {['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => (
+              {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => (
                 <div key={d} className="text-center text-xs font-semibold text-muted-foreground py-2">{d}</div>
               ))}
             </div>
-            {/* Days */}
+            {/* Days grid */}
             <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
               {days.map((d, i) => {
                 const dayEvents = getEventsForDay(d);
@@ -127,13 +205,13 @@ export default function Calendario() {
                 return (
                   <div
                     key={i}
-                    onClick={() => setSelectedDay(isSameDay(d, selectedDay) ? null : d)}
+                    onClick={() => handleDayClick(d)}
                     className={cn(
-                      'bg-card min-h-[72px] p-1.5 cursor-pointer transition-colors',
+                      'bg-card min-h-[80px] p-1.5 cursor-pointer transition-colors select-none',
                       !isCurrentMonth && 'opacity-40',
-                      isSelected && 'bg-primary/8 ring-1 ring-inset ring-primary/30',
+                      isSelected && 'ring-1 ring-inset ring-primary/40 bg-primary/5',
                       isT && !isSelected && 'bg-primary/5',
-                      'hover:bg-accent'
+                      'hover:bg-accent/60'
                     )}
                   >
                     <div className={cn(
@@ -144,7 +222,11 @@ export default function Calendario() {
                     </div>
                     <div className="space-y-0.5">
                       {dayEvents.slice(0, 3).map((ev, idx) => (
-                        <div key={idx} className={`text-[10px] font-medium text-white rounded px-1 py-0.5 truncate ${ev.color}`}>
+                        <div
+                          key={idx}
+                          onClick={(e) => handleEventClick(ev, e)}
+                          className={`text-[10px] font-medium text-white rounded px-1 py-0.5 truncate cursor-pointer hover:opacity-80 transition-opacity ${ev.color}`}
+                        >
                           {ev.title}
                         </div>
                       ))}
@@ -161,42 +243,32 @@ export default function Calendario() {
 
         {/* Side panel */}
         <div className="space-y-4">
-          {/* Today */}
-          <Card>
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-primary" />
-                Hoy — {format(new Date(), 'd MMM', { locale: es })}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pb-3">
-              {todayEvents.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Sin eventos hoy</p>
-              ) : (
-                <div className="space-y-2">
-                  {todayEvents.map(ev => (
-                    <EventCard key={ev.id} event={ev} />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Event detail panel */}
+          {selectedEvent && (
+            <EventDetailPanel
+              event={selectedEvent}
+              onClose={handleClosePanel}
+              onSaveDate={handleSaveDate}
+              isSaving={updateOT.isPending || updateInforme.isPending}
+            />
+          )}
 
-          {/* Selected day */}
-          {selectedDay && (
+          {/* Today */}
+          {!selectedEvent && (
             <Card>
-              <CardHeader className="pb-2 pt-4">
-                <CardTitle className="text-sm capitalize">
-                  {format(selectedDay, 'EEEE d MMM', { locale: es })}
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-primary" />
+                  Hoy — {format(new Date(), 'd MMM', { locale: es })}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pb-3">
-                {selectedEvents.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Sin eventos</p>
+              <CardContent className="pb-3 px-4">
+                {todayEvents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Sin eventos hoy</p>
                 ) : (
-                  <div className="space-y-2">
-                    {selectedEvents.map(ev => (
-                      <EventCard key={ev.id} event={ev} />
+                  <div className="space-y-1.5">
+                    {todayEvents.map(ev => (
+                      <MiniEventRow key={ev.id} event={ev} onClick={() => setSelectedEvent(ev)} />
                     ))}
                   </div>
                 )}
@@ -204,52 +276,73 @@ export default function Calendario() {
             </Card>
           )}
 
-          {/* Upcoming */}
-          <Card>
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="text-sm">Próximos 7 días</CardTitle>
-            </CardHeader>
-            <CardContent className="pb-3">
-              {(() => {
-                const upcoming = events
-                  .filter(e => {
-                    const d = parseISO(e.date);
-                    return d >= new Date() && d <= addDays(new Date(), 7);
-                  })
-                  .sort((a, b) => a.date.localeCompare(b.date))
-                  .slice(0, 8);
-                return upcoming.length === 0 ? (
+          {/* Selected day */}
+          {!selectedEvent && selectedDay && (
+            <Card>
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm capitalize">
+                  {format(selectedDay, 'EEEE d MMM', { locale: es })}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pb-3 px-4">
+                {selectedDayEvents.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Sin eventos</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {selectedDayEvents.map(ev => (
+                      <MiniEventRow key={ev.id} event={ev} onClick={() => setSelectedEvent(ev)} />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Upcoming 7 days */}
+          {!selectedEvent && (
+            <Card>
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm">Próximos 7 días</CardTitle>
+              </CardHeader>
+              <CardContent className="pb-3 px-4">
+                {upcoming.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Sin eventos próximos</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {upcoming.map(ev => (
-                      <div key={ev.id} className="flex items-start gap-2">
+                      <div key={ev.id} className="flex items-start gap-2 cursor-pointer hover:bg-muted/50 rounded p-1 transition-colors" onClick={() => setSelectedEvent(ev)}>
                         <div className={`h-2 w-2 rounded-full mt-1.5 flex-shrink-0 ${ev.color}`} />
-                        <div>
-                          <div className="text-xs font-medium leading-tight">{ev.title}</div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium leading-tight truncate">{ev.title}</div>
                           <div className="text-[10px] text-muted-foreground">{format(parseISO(ev.date), 'd MMM', { locale: es })}</div>
                         </div>
                       </div>
                     ))}
                   </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function EventCard({ event }) {
+function MiniEventRow({ event, onClick }) {
+  const typeIcon = event.type === 'ot' ? ClipboardList : event.type === 'informe' ? FileText : Wrench;
+  const Icon = typeIcon;
   return (
-    <div className="flex items-start gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-      <div className={`h-2 w-2 rounded-full mt-1.5 flex-shrink-0 ${event.color}`} />
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium leading-tight truncate">{event.title}</div>
-        {event.assignee && <div className="text-[10px] text-muted-foreground mt-0.5 truncate">{event.assignee}</div>}
-        <Badge variant="outline" className="text-[10px] mt-1 h-4 px-1">{event.type === 'ot' ? 'OT' : 'Mantenimiento'}</Badge>
+    <div
+      onClick={onClick}
+      className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted/60 cursor-pointer transition-colors"
+    >
+      <div className={`h-6 w-6 rounded flex items-center justify-center flex-shrink-0 ${event.color}`}>
+        <Icon className="h-3 w-3 text-white" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-medium truncate">{event.title}</div>
+        {event.assignee && <div className="text-[10px] text-muted-foreground truncate">{event.assignee}</div>}
       </div>
     </div>
   );
