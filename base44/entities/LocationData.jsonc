@@ -1,0 +1,60 @@
+{
+  "name": "LocationData",
+  "type": "object",
+  "properties": {
+    "ubic_tecnica": {
+      "type": "string",
+      "description": "Ubicaci\u00f3n t\u00e9cnica (c\u00f3digo \u00fanico)"
+    },
+    "elem_pep": {
+      "type": "string",
+      "description": "Elemento PEP"
+    },
+    "direccion": {
+      "type": "string",
+      "description": "Direcci\u00f3n del establecimiento"
+    },
+    "establecimiento": {
+      "type": "string",
+      "description": "Nombre del establecimiento/escuela"
+    },
+    "m2": {
+      "type": "number",
+      "description": "Superficie en metros cuadrados"
+    },
+    "inspector": {
+      "type": "string",
+      "description": "Inspector asignado"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Jefe de sitio responsable"
+    },
+    "comuna": {
+      "type": "string",
+      "enum": [
+        "8A",
+        "8B",
+        "10A"
+      ],
+      "description": "Comuna a la que pertenece"
+    },
+    "sup": {
+      "type": "number",
+      "description": "Superficie de supervisi\u00f3n"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "activo",
+        "inactivo"
+      ],
+      "default": "activo"
+    }
+  },
+  "required": [
+    "ubic_tecnica",
+    "establecimiento",
+    "comuna"
+  ]
+}
