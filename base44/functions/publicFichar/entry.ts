@@ -73,6 +73,16 @@ Deno.serve(async (req) => {
       return Response.json({ workOrder: active, locationName: location.name });
     }
 
+    // UPLOAD file (public — operario uploads photos/signature as base64)
+    if (action === 'uploadFile') {
+      const { fileBase64, fileName, mimeType } = body;
+      if (!fileBase64) return Response.json({ error: 'fileBase64 requerido' }, { status: 400 });
+      const binary = Uint8Array.from(atob(fileBase64), c => c.charCodeAt(0));
+      const file = new File([binary], fileName || 'upload.png', { type: mimeType || 'image/png' });
+      const result = await base44.asServiceRole.integrations.Core.UploadFile({ file });
+      return Response.json({ file_url: result.file_url });
+    }
+
     // UPDATE work order (public — operario saves checklist, photos, signature)
     if (action === 'updateWorkOrder') {
       const { workOrderId, updates } = body;

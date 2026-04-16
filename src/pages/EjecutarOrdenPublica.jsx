@@ -7,6 +7,7 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
+import { appParams } from '@/lib/app-params';
 import {
   CheckCircle2, Clock, MapPin, Loader2, AlertTriangle,
   Wrench, Zap, Eye, ClipboardList, User, Calendar,
@@ -18,6 +19,21 @@ import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+
+// ── Helper: llamar funciones públicas sin token de auth ──────────────────────
+const callPublicFn = async (fnName, payload) => {
+  const appId = appParams.appId;
+  const version = appParams.functionsVersion || 'v3';
+  const baseUrl = appParams.appBaseUrl || '';
+  const url = `${baseUrl}/api/apps/${appId}/functions/${fnName}/invoke`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  return res.json();
+};
 
 // ── Configuraciones visuales ─────────────────────────────────────────────────
 const typeConfig = {
@@ -92,19 +108,24 @@ function FirmaGrande({ onFirmado }) {
   };
 
   const guardarFirma = async () => {
-    if (!hasStrokes || !nombre.trim()) return;
-    setSaving(true);
-    const canvas = canvasRef.current;
-    canvas.toBlob(async (blob) => {
-      try {
-        const file = new File([blob], 'firma.png', { type: 'image/png' });
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
-        onFirmado({ signatureUrl: file_url, signatureName: nombre.trim() });
-      } catch {
-        toast.error('Error al guardar la firma');
-      }
+  if (!hasStrokes || !nombre.trim()) return;
+  setSaving(true);
+  const canvas = canvasRef.current;
+  canvas.toBlob(async (blob) => {
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result.split(',')[1];
+        const res = await callPublicFn('publicFichar', { action: 'uploadFile', fileBase64: base64, fileName: 'firma.png', mimeType: 'image/png' });
+        onFirmado({ signatureUrl: res.file_url, signatureName: nombre.trim() });
+        setSaving(false);
+      };
+      reader.readAsDataURL(blob);
+    } catch {
+      toast.error('Error al guardar la firma');
       setSaving(false);
-    });
+    }
+  });
   };
 
   return (
@@ -167,8 +188,16 @@ function FotosGrandes({ label, photos, onAdd, onRemove }) {
     if (!files?.length) return;
     setUploading(true);
     for (const file of Array.from(files)) {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      onAdd(file_url);
+      const reader = new FileReader();
+      await new Promise((resolve) => {
+        reader.onloadend = async () => {
+          const base64 = reader.result.split(',')[1];
+          const res = await callPublicFn('publicFichar', { action: 'uploadFile', fileBase64: base64, fileName: file.name, mimeType: file.type });
+          onAdd(res.file_url);
+          resolve();
+        };
+        reader.readAsDataURL(file);
+      });
     }
     setUploading(false);
   };
@@ -231,14 +260,14 @@ export default function EjecutarOrdenPublica() {
 
         if (otId) {
           // QR directo a una OT específica
-          const res = await base44.functions.invoke('publicFichar', { action: 'getWorkOrder', workOrderId: otId });
-          ot = res.data?.workOrder || null;
+          const res = await callPublicFn('publicFichar', { action: 'getWorkOrder', workOrderId: otId });
+          ot = res.workOrder || null;
           locName = ot?.location || 'Establecimiento';
         } else if (locId) {
           // QR del establecimiento → buscar OT activa
-          const res = await base44.functions.invoke('publicFichar', { action: 'getWorkOrderForLocation', locationId: locId });
-          ot = res.data?.workOrder || null;
-          locName = res.data?.locationName || 'Establecimiento';
+          const res = await callPublicFn('publicFichar', { action: 'getWorkOrderForLocation', locationId: locId });
+          ot = res.workOrder || null;
+          locName = res.locationName || 'Establecimiento';
         }
 
         if (!ot) {
@@ -281,7 +310,7 @@ export default function EjecutarOrdenPublica() {
     setSaving(true);
     try {
       const allPhotos = [...fotosAntes, ...fotosDespues];
-      await base44.functions.invoke('publicFichar', {
+      await callPublicFn('publicFichar', {
         action: 'updateWorkOrder',
         workOrderId: order.id,
         updates: {
