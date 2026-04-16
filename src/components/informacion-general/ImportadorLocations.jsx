@@ -24,44 +24,25 @@ export default function ImportadorLocations({ onImportSuccess }) {
       reader.onload = async (e) => {
         try {
           const wb = XLSX.read(e.target.result);
-          const locationsToImport = [];
+          const sheetData = [];
 
-          // Parsear Excel
+          // Procesar cada hoja
           for (const sheetName of SHEET_NAMES) {
             if (!wb.SheetNames.includes(sheetName)) continue;
             const ws = wb.Sheets[sheetName];
-            const data = XLSX.utils.sheet_to_json(ws);
-            const comuna = COMUNA_MAP[sheetName];
-
-            for (const row of data) {
-              const ubic = (row['Ubic. Técnica'] || row['Ubic.Tecnica'] || '').trim();
-              const establecimiento = (row.Establecimiento || '').trim();
-              if (!ubic || !establecimiento) continue;
-
-              locationsToImport.push({
-                ubic_tecnica: ubic.toLowerCase(),
-                elem_pep: (row['Elem. PEP'] || '').trim(),
-                direccion: (row.Dirección || '').trim(),
-                establecimiento,
-                m2: row.M2 ? parseFloat(String(row.M2).replace(/,/g, '.')) : null,
-                inspector: (row.INSPECTOR || '').trim(),
-                jefe_sitio: (row['JEFE SITIO'] || row['JEFE '] || '').trim() || null,
-                comuna,
-                sup: row.SUP ? parseFloat(String(row.SUP).replace(/,/g, '.')) : null,
-                estado: 'activo',
-              });
-            }
+            const rows = XLSX.utils.sheet_to_json(ws);
+            sheetData.push({ name: sheetName, rows });
           }
 
-          if (locationsToImport.length === 0) {
-            toast.error('❌ No se encontraron registros válidos en el Excel');
+          if (sheetData.length === 0) {
+            toast.error('❌ No se encontraron hojas válidas en el Excel');
             setUploading(false);
             return;
           }
 
-          // Llamar función backend para hacer bulk import
-          const res = await base44.functions.invoke('importLocations', {
-            locations: locationsToImport,
+          // Llamar función backend que respeta la jerarquía dirección → colegios
+          const res = await base44.functions.invoke('importarEscuelasJerarquico', {
+            sheetData,
           });
 
           if (res.data?.success) {
@@ -69,7 +50,7 @@ export default function ImportadorLocations({ onImportSuccess }) {
               imported: res.data.imported,
               errors: res.data.errors,
               errorsList: res.data.errorsList || [],
-              hasMore: (res.data.errorsList || []).length > 10,
+              hasMore: res.data.hasMore || false,
             });
 
             toast.success(`✅ Importadas ${res.data.imported} escuelas`);
