@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -212,14 +214,30 @@ export default function WorkOrders() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const queryClient = useQueryClient();
 
+  const { isOnline, pendingCount, queueCreate } = useOfflineQueue((count) => {
+    toast.success(`${count} OT${count !== 1 ? 's' : ''} sincronizada${count !== 1 ? 's' : ''}`);
+    queryClient.invalidateQueries({ queryKey: ['workorders'] });
+  });
+
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['workorders'],
     queryFn: () => base44.entities.WorkOrder.list('-created_date')
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.WorkOrder.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['workorders'] }); setNewDialogOpen(false); }
+    mutationFn: async (data) => {
+      if (!isOnline) {
+        // Guardar en cola offline
+        const offline = await queueCreate(data);
+        toast.warning('Sin conexión — OT guardada localmente y se sincronizará al recuperar la conexión.');
+        return offline;
+      }
+      return base44.entities.WorkOrder.create(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      setNewDialogOpen(false);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -249,7 +267,11 @@ export default function WorkOrders() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Órdenes de Trabajo</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{orders.length} órdenes en total</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {orders.length} órdenes en total
+            {!isOnline && <span className="ml-2 text-amber-600 font-medium text-xs">• Modo offline</span>}
+            {pendingCount > 0 && <span className="ml-1 text-indigo-600 font-medium text-xs">· {pendingCount} en cola</span>}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="gap-1.5 border-red-300 text-red-700 hover:bg-red-50" onClick={() => exportOTsPDF(filtered, null, null)}>
