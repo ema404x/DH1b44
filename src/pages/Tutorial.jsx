@@ -192,10 +192,11 @@ export default function Tutorial() {
                       <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
                     </div>
                   </CardContent>
-                </Card>
-              </button>
-            ))}
-          </div>
+                  </Card>
+                  </button>
+                  );
+                  })}
+                  </div>
         ) : (
           <div className="flex items-center justify-center py-12">
             <div className="text-center space-y-2">
@@ -244,6 +245,7 @@ export default function Tutorial() {
            onClose={() => setShowCertificate(null)}
          />
         )}
+        </div>
         </div>
         );
         }
