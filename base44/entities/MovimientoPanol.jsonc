@@ -1,0 +1,84 @@
+{
+  "name": "MovimientoPanol",
+  "type": "object",
+  "properties": {
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "entrada",
+        "salida"
+      ],
+      "description": "Tipo de movimiento"
+    },
+    "material_id": {
+      "type": "string",
+      "description": "ID del material"
+    },
+    "material_nombre": {
+      "type": "string",
+      "description": "Nombre del material (desnormalizado)"
+    },
+    "material_codigo": {
+      "type": "string",
+      "description": "C\u00f3digo del material (desnormalizado)"
+    },
+    "material_unidad": {
+      "type": "string",
+      "description": "Unidad del material"
+    },
+    "cantidad": {
+      "type": "number",
+      "description": "Cantidad del movimiento"
+    },
+    "stock_anterior": {
+      "type": "number",
+      "description": "Stock antes del movimiento"
+    },
+    "stock_nuevo": {
+      "type": "number",
+      "description": "Stock despu\u00e9s del movimiento"
+    },
+    "proyecto_id": {
+      "type": "string",
+      "description": "ID del proyecto (para salidas)"
+    },
+    "proyecto_nombre": {
+      "type": "string",
+      "description": "Nombre del proyecto (para salidas)"
+    },
+    "motivo": {
+      "type": "string",
+      "enum": [
+        "compra",
+        "devolucion",
+        "ajuste_entrada",
+        "asignacion_proyecto",
+        "consumo",
+        "perdida",
+        "ajuste_salida"
+      ],
+      "description": "Motivo del movimiento"
+    },
+    "responsable": {
+      "type": "string",
+      "description": "Nombre del responsable"
+    },
+    "remito": {
+      "type": "string",
+      "description": "N\u00famero de remito o referencia"
+    },
+    "costo_unitario": {
+      "type": "number",
+      "description": "Costo unitario al momento del movimiento"
+    },
+    "notas": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "tipo",
+    "material_id",
+    "cantidad",
+    "motivo"
+  ]
+}
