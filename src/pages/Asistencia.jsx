@@ -5,10 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, LogIn, LogOut, MapPin, Clock, Users, Calendar, QrCode } from 'lucide-react';
+import { Search, LogIn, LogOut, MapPin, Clock, Users, Calendar } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
-import LocationQRManager from '@/components/asistencia/LocationQRManager';
 import { format, startOfDay, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -46,18 +44,7 @@ export default function Asistencia() {
         subtitle="Historial de fichajes y gestión de puntos QR"
       />
 
-      <Tabs defaultValue="registros">
-        <TabsList>
-          <TabsTrigger value="registros" className="gap-1.5">
-            <Calendar className="h-3.5 w-3.5" /> Registros
-          </TabsTrigger>
-          <TabsTrigger value="ubicaciones" className="gap-1.5">
-            <QrCode className="h-3.5 w-3.5" /> QRs por Ubicación
-          </TabsTrigger>
-        </TabsList>
-
-        {/* ── REGISTROS ── */}
-        <TabsContent value="registros" className="space-y-5 mt-5">
+      <div className="space-y-5">
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
@@ -146,13 +133,7 @@ export default function Asistencia() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* ── QRs UBICACIÓN ── */}
-        <TabsContent value="ubicaciones" className="mt-5">
-          <LocationQRManager />
-        </TabsContent>
-      </Tabs>
+      </div>
     </div>
   );
 }
