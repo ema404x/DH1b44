@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Bell, BellOff, Plus, Trash2, Save, ShieldAlert, Package, Clock,
-  Mail, Monitor, AlertTriangle, CheckCircle2, Loader2, Play, Settings
+  AlertTriangle, CheckCircle2, Loader2, Play
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -48,44 +48,7 @@ const DEFAULT_CONFIGS = {
   pendiente_vencido: { tipo: 'pendiente_vencido', nombre: 'Pendientes Vencidos', dias_vencimiento_pendiente: 7, notificar_email: true, notificar_banner: true, email_destinatarios: [], activo: true },
 };
 
-function EmailTagInput({ value = [], onChange }) {
-  const [input, setInput] = useState('');
 
-  const addEmail = () => {
-    const email = input.trim();
-    if (!email || !email.includes('@')) return;
-    if (!value.includes(email)) onChange([...value, email]);
-    setInput('');
-  };
-
-  return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
-        <Input
-          type="email"
-          placeholder="email@ejemplo.com"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addEmail())}
-          className="h-8 text-sm"
-        />
-        <Button type="button" variant="outline" size="sm" className="h-8 px-3" onClick={addEmail}>
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {value.map(email => (
-            <span key={email} className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">
-              {email}
-              <button onClick={() => onChange(value.filter(e => e !== email))} className="hover:text-red-500 transition-colors">×</button>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function ConfigCard({ config, onSave, onDelete, onTest }) {
   const [form, setForm] = useState({ ...config });
@@ -104,14 +67,6 @@ function ConfigCard({ config, onSave, onDelete, onTest }) {
   };
 
   const handleTest = async () => {
-    if (!form.email_destinatarios || form.email_destinatarios.length === 0) {
-      toast.error('Agregá al menos un email destinatario y guardá antes de probar.');
-      return;
-    }
-    // Guardar primero para asegurarse de que los datos estén en la DB
-    setSaving(true);
-    await onSave(form);
-    setSaving(false);
     setTesting(true);
     await onTest(form);
     setTesting(false);
@@ -196,46 +151,10 @@ function ConfigCard({ config, onSave, onDelete, onTest }) {
             </div>
           )}
 
-          {/* Notificaciones */}
-          <div className="space-y-2">
-            <Label className="text-xs">Canales de notificación</Label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Switch size="sm"
-                  checked={form.notificar_email}
-                  onCheckedChange={v => setForm(f => ({ ...f, notificar_email: v }))}
-                />
-                <span className="text-xs flex items-center gap-1"><Mail className="h-3 w-3" /> Email</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Switch size="sm"
-                  checked={form.notificar_banner}
-                  onCheckedChange={v => setForm(f => ({ ...f, notificar_banner: v }))}
-                />
-                <span className="text-xs flex items-center gap-1"><Monitor className="h-3 w-3" /> Banner</span>
-              </label>
-            </div>
-          </div>
+
         </div>
 
-        {/* Emails destinatarios */}
-        {form.notificar_email && (
-          <div className="space-y-1.5">
-            <Label className="text-xs">Destinatarios de email</Label>
-            <EmailTagInput
-              value={form.email_destinatarios || []}
-              onChange={v => setForm(f => ({ ...f, email_destinatarios: v }))}
-            />
-            {(!form.email_destinatarios || form.email_destinatarios.length === 0) && (
-              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
-                <p className="text-xs text-amber-700 font-medium">
-                  No se enviarán emails hasta que agregues al menos un destinatario.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+
 
         {/* Última notificación */}
         {config.ultima_notificacion && (
@@ -294,19 +213,14 @@ export default function ConfigAlertas() {
     try {
       const res = await base44.functions.invoke('checkAlertas', {});
       if (res.data?.success) {
-        const { totalAlertas, resumen, emailsEnviados } = res.data;
+        const { resumen } = res.data;
         const cfgResumen = resumen?.find(r => r.tipo === form.tipo);
-        const alertasDetectadas = cfgResumen?.alertas ?? totalAlertas;
-        const emailSent = cfgResumen?.emailEnviado;
+        const alertasDetectadas = cfgResumen?.alertas ?? 0;
 
         if (alertasDetectadas === 0) {
           toast.info('No se detectaron alertas activas para esta configuración.');
-        } else if (emailSent) {
-          toast.success(`✅ Email enviado a ${form.email_destinatarios?.join(', ')} con ${alertasDetectadas} alerta(s).`);
-        } else if (form.notificar_email && form.email_destinatarios?.length > 0) {
-          toast.warning(`⚠️ Se detectaron ${alertasDetectadas} alerta(s) pero el email falló. Revisá los logs.`);
         } else {
-          toast.success(`${alertasDetectadas} alerta(s) detectada(s). Email no configurado.`);
+          toast.success(`${alertasDetectadas} alerta(s) detectada(s) y registrada(s).`);
         }
         qc.invalidateQueries({ queryKey: ['alerta-logs'] });
         qc.invalidateQueries({ queryKey: ['alertas-activas'] });
