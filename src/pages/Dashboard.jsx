@@ -12,6 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Link } from 'react-router-dom';
 import RevenueChart from '@/components/dashboard/RevenueChart';
+import OTsPendientesPanel from '@/components/dashboard/OTsPendientesPanel';
+import CertificadosPanel from '@/components/dashboard/CertificadosPanel';
+import MetricasOperacion from '@/components/dashboard/MetricasOperacion';
 import { format, differenceInDays, isPast, parseISO, startOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -188,6 +191,21 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* OTs + Certificados */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <OTsPendientesPanel orders={orders} />
+        <CertificadosPanel />
+      </div>
+
+      {/* Métricas de operación */}
+      <MetricasOperacion
+        orders={orders}
+        projects={projects}
+        materials={materials}
+        assets={assets}
+        employees={employees}
+      />
 
       {/* Bottom row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
