@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Search, FolderKanban, MapPin, Calendar, Trash2, Pencil, FileText } from 'lucide-react';
+import { Search, FolderKanban, MapPin, Calendar, Trash2, Pencil, FileText, Upload } from 'lucide-react';
 import { exportProyectosPDF } from '@/utils/exportPDF';
 import { format } from 'date-fns';
 import PageHeader from '@/components/shared/PageHeader';
@@ -14,6 +14,8 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import ProjectDetailPanel from '@/components/projects/ProjectDetailPanel';
+import ProjectImporter from '@/components/projects/ProjectImporter';
 
 const typeLabels = {
   obra_nueva: 'Obra Nueva', remodelacion: 'Remodelación', mantenimiento_preventivo: 'Mant. Preventivo',
@@ -45,6 +47,8 @@ export default function Projects() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [showImporter, setShowImporter] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: projects = [], isLoading } = useQuery({ queryKey: ['projects'], queryFn: () => base44.entities.Project.list('-created_date') });
@@ -69,9 +73,14 @@ export default function Projects() {
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-0">
         <PageHeader title="Proyectos" subtitle="Gestión de obras y proyectos" actionLabel="Nuevo Proyecto" onAction={() => { setEditing(null); setDialogOpen(true); }} />
-        <Button variant="outline" size="sm" className="gap-1.5 border-red-300 text-red-700 hover:bg-red-50 -mt-8 mr-1 hidden sm:flex" onClick={() => exportProyectosPDF(filtered)}>
-          <FileText className="h-3.5 w-3.5" /> PDF
-        </Button>
+        <div className="flex items-center gap-2 -mt-8 mr-1">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowImporter(true)}>
+            <Upload className="h-3.5 w-3.5" /> Importar
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5 border-red-300 text-red-700 hover:bg-red-50 hidden sm:flex" onClick={() => exportProyectosPDF(filtered)}>
+            <FileText className="h-3.5 w-3.5" /> PDF
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -96,15 +105,15 @@ export default function Projects() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(project => (
-            <Card key={project.id} className="hover:shadow-md transition-shadow group">
+            <Card key={project.id} className="hover:shadow-md transition-shadow group cursor-pointer" onClick={() => setSelectedProject(project)}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold truncate">{project.name}</p>
                     <p className="text-xs text-muted-foreground">{project.code}</p>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(project); setDialogOpen(true); }}>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditing(project); setDialogOpen(true); }}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
                     <AlertDialog>
@@ -158,6 +167,21 @@ export default function Projects() {
         onSave={(data) => saveMutation.mutate(data)}
         saving={saveMutation.isPending}
       />
+
+      {selectedProject && (
+        <ProjectDetailPanel
+          project={projects.find(p => p.id === selectedProject.id) || selectedProject}
+          onClose={() => setSelectedProject(null)}
+          onEdit={() => { setEditing(selectedProject); setDialogOpen(true); setSelectedProject(null); }}
+        />
+      )}
+
+      {showImporter && (
+        <ProjectImporter
+          onClose={() => setShowImporter(false)}
+          onImported={() => setShowImporter(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,0 +1,118 @@
+{
+  "name": "Project",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del proyecto/obra"
+    },
+    "code": {
+      "type": "string",
+      "description": "C\u00f3digo interno del proyecto"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "ID del cliente"
+    },
+    "client_name": {
+      "type": "string",
+      "description": "Nombre del cliente"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "obra_nueva",
+        "remodelacion",
+        "mantenimiento_preventivo",
+        "mantenimiento_correctivo",
+        "emergencia",
+        "inspeccion"
+      ],
+      "description": "Tipo de proyecto"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pendiente",
+        "en_progreso",
+        "pausado",
+        "completado",
+        "cancelado"
+      ],
+      "default": "pendiente"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "baja",
+        "media",
+        "alta",
+        "urgente"
+      ],
+      "default": "media"
+    },
+    "description": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string",
+      "description": "Direcci\u00f3n de la obra"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "estimated_budget": {
+      "type": "number"
+    },
+    "actual_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "progress": {
+      "type": "number",
+      "default": 0,
+      "description": "Porcentaje de avance 0-100"
+    },
+    "assigned_team": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de empleados asignados"
+    },
+    "documents": {
+      "type": "array",
+      "description": "Archivos adjuntos del proyecto",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "uploaded_at": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "type",
+    "status"
+  ]
+}
