@@ -6,17 +6,28 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode } from 'lucide-react';
+import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode, SettingsIcon } from 'lucide-react';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
+import AsignacionAutomatica from '@/components/employees/AsignacionAutomatica';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const roleLabels = {
-  operario: 'Operario', tecnico: 'Técnico', capataz: 'Capataz', supervisor: 'Supervisor',
-  ingeniero: 'Ingeniero', administrativo: 'Administrativo', gerente: 'Gerente',
+  operario: 'Operario',
+  tecnico: 'Técnico',
+  capataz: 'Capataz',
+  supervisor: 'Supervisor',
+  ingeniero: 'Ingeniero',
+  administrativo: 'Administrativo',
+  gerente: 'Gerente',
+  jefe_sitio: 'Jefe de Sitio',
+  presupuestista: 'Presupuestista',
+  desarrollador: 'Desarrollador',
+  compras: 'Compras',
 };
 const specialtyLabels = {
   electricidad: 'Electricidad', plomeria: 'Plomería', pintura: 'Pintura', albañileria: 'Albañilería',
@@ -26,8 +37,15 @@ const specialtyLabels = {
 const employeeFields = [
   { key: 'full_name', label: 'Nombre Completo', required: true },
   { key: 'dni', label: 'DNI' },
-  { key: 'role', label: 'Cargo', type: 'select', options: Object.entries(roleLabels).map(([value, label]) => ({ value, label })) },
+  { key: 'role', label: 'Cargo', type: 'select', required: true, options: Object.entries(roleLabels).map(([value, label]) => ({ value, label })) },
   { key: 'specialty', label: 'Especialidad', type: 'select', options: Object.entries(specialtyLabels).map(([value, label]) => ({ value, label })) },
+  { key: 'assigned_location', label: 'Ubicación Asignada', type: 'text', description: 'Escuela/Dirección (Se sincroniza automáticamente)' },
+  { key: 'assigned_jefe_sitio', label: 'Jefe de Sitio Asignado', type: 'text', description: 'Se sincroniza del módulo de Información General' },
+  { key: 'assigned_comuna', label: 'Comuna', type: 'select', options: [
+    { value: '8A', label: 'Comuna 8A' },
+    { value: '8B', label: 'Comuna 8B' },
+    { value: '10A', label: 'Comuna 10A' },
+  ]},
   { key: 'status', label: 'Estado', type: 'select', options: [
     { value: 'activo', label: 'Activo' }, { value: 'licencia', label: 'Licencia' },
     { value: 'vacaciones', label: 'Vacaciones' }, { value: 'inactivo', label: 'Inactivo' }
@@ -47,9 +65,11 @@ export default function Employees() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [qrEmployee, setQrEmployee] = useState(null);
+  const [syncLoading, setSyncLoading] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: employees = [], isLoading } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list('-created_date') });
+  const { data: locations = [] } = useQuery({ queryKey: ['locations'], queryFn: () => base44.entities.LocationData.list('-created_date', 500) });
 
   const saveMutation = useMutation({
     mutationFn: (data) => editing ? base44.entities.Employee.update(editing.id, data) : base44.entities.Employee.create(data),
@@ -60,6 +80,34 @@ export default function Employees() {
     mutationFn: (id) => base44.entities.Employee.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] })
   });
+
+  // Sincronizar jefes de sitio con Información General
+  const syncJefeSitios = async () => {
+    setSyncLoading(true);
+    try {
+      const jefesUnicos = [...new Set(locations.map(l => l.jefe_sitio).filter(Boolean))];
+      let syncCount = 0;
+
+      for (const jefeName of jefesUnicos) {
+        const existing = employees.find(e => e.full_name?.toLowerCase() === jefeName?.toLowerCase() && e.role === 'jefe_sitio');
+        if (!existing) {
+          await base44.entities.Employee.create({
+            full_name: jefeName,
+            role: 'jefe_sitio',
+            status: 'activo',
+            assigned_jefe_sitio: jefeName,
+          });
+          syncCount++;
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      alert(`✅ Sincronización completada: ${syncCount} jefes de sitio agregados`);
+    } catch (error) {
+      alert('Error en sincronización: ' + error.message);
+    }
+    setSyncLoading(false);
+  };
 
   const filtered = employees.filter(e => {
     const matchSearch = !search || e.full_name?.toLowerCase().includes(search.toLowerCase());
@@ -72,6 +120,22 @@ export default function Employees() {
   return (
     <div className="space-y-6">
       <PageHeader title="Empleados" subtitle={`${employees.filter(e => e.status === 'activo').length} activos de ${employees.length} total`} actionLabel="Nuevo Empleado" onAction={() => { setEditing(null); setDialogOpen(true); }} />
+
+      <Collapsible defaultOpen={false} className="space-y-3">
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="gap-2 w-full sm:w-auto">
+            <SettingsIcon className="h-4 w-4" />
+            Herramientas de Sincronización
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4">
+          <AsignacionAutomatica
+            employees={employees}
+            locations={locations}
+            onSyncComplete={() => queryClient.invalidateQueries({ queryKey: ['employees'] })}
+          />
+        </CollapsibleContent>
+      </Collapsible>
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -104,7 +168,8 @@ export default function Employees() {
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="font-semibold truncate">{emp.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{roleLabels[emp.role] || emp.role} · {specialtyLabels[emp.specialty] || emp.specialty}</p>
+                        <p className="text-xs text-muted-foreground">{roleLabels[emp.role] || emp.role}</p>
+                        {emp.assigned_location && <p className="text-xs text-primary mt-0.5">{emp.assigned_location}</p>}
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => setQrEmployee(emp)} title="QR Fichaje">
