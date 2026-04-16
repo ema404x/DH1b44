@@ -94,6 +94,7 @@ Deno.serve(async (req) => {
       }
 
       const alertasGeneradas = [];
+      let emailEnviado = false;
 
       // ── 1. GARANTÍA DE ACTIVOS ─────────────────────────────────────────
       if (cfg.tipo === 'garantia_activo') {
@@ -143,6 +144,7 @@ Deno.serve(async (req) => {
           );
           const result = await sendEmail(cfg.email_destinatarios, `⚠️ Alerta de Garantías — ${alertasGeneradas.length} activo(s)`, html);
           console.log('Email garantias:', JSON.stringify(result));
+          emailEnviado = result.ok;
           if (result.ok) {
             await sb.entities.AlertaConfig.update(cfg.id, { ultima_notificacion: ahora.toISOString() });
           }
@@ -192,6 +194,7 @@ Deno.serve(async (req) => {
           );
           const result = await sendEmail(cfg.email_destinatarios, `🚨 Alerta de Stock Crítico — ${alertasGeneradas.length} material(es)`, html);
           console.log('Email stock:', JSON.stringify(result));
+          emailEnviado = result.ok;
           if (result.ok) {
             await sb.entities.AlertaConfig.update(cfg.id, { ultima_notificacion: ahora.toISOString() });
           }
@@ -242,13 +245,14 @@ Deno.serve(async (req) => {
           );
           const result = await sendEmail(cfg.email_destinatarios, `⏰ Alerta de Pendientes Vencidos — ${alertasGeneradas.length}`, html);
           console.log('Email pendientes:', JSON.stringify(result));
+          emailEnviado = result.ok;
           if (result.ok) {
             await sb.entities.AlertaConfig.update(cfg.id, { ultima_notificacion: ahora.toISOString() });
           }
         }
       }
 
-      resumen.push({ config: cfg.nombre, tipo: cfg.tipo, alertas: alertasGeneradas.length });
+      resumen.push({ config: cfg.nombre, tipo: cfg.tipo, alertas: alertasGeneradas.length, emailEnviado });
     }
 
     return Response.json({ success: true, totalAlertas, resumen });

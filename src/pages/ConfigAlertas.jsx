@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -94,6 +94,9 @@ function ConfigCard({ config, onSave, onDelete, onTest }) {
   const tipo = TIPO_CONFIG[form.tipo];
   const Icon = tipo.icon;
 
+  // Sync form when config changes from outside (after save)
+  React.useEffect(() => { setForm({ ...config }); }, [config.updated_date]);
+
   const handleSave = async () => {
     setSaving(true);
     await onSave(form);
@@ -101,8 +104,16 @@ function ConfigCard({ config, onSave, onDelete, onTest }) {
   };
 
   const handleTest = async () => {
+    if (!form.email_destinatarios || form.email_destinatarios.length === 0) {
+      toast.error('Agregá al menos un email destinatario y guardá antes de probar.');
+      return;
+    }
+    // Guardar primero para asegurarse de que los datos estén en la DB
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
     setTesting(true);
-    await onTest(config.id);
+    await onTest(form);
     setTesting(false);
   };
 
@@ -279,13 +290,27 @@ export default function ConfigAlertas() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['alerta-configs'] }); toast.success('Configuración eliminada'); },
   });
 
-  const testConfig = async (configId) => {
+  const testConfig = async (form) => {
     try {
       const res = await base44.functions.invoke('checkAlertas', {});
       if (res.data?.success) {
-        toast.success(`Verificación completada: ${res.data.totalAlertas} alerta(s) detectada(s)`);
+        const { totalAlertas, resumen, emailsEnviados } = res.data;
+        const cfgResumen = resumen?.find(r => r.tipo === form.tipo);
+        const alertasDetectadas = cfgResumen?.alertas ?? totalAlertas;
+        const emailSent = cfgResumen?.emailEnviado;
+
+        if (alertasDetectadas === 0) {
+          toast.info('No se detectaron alertas activas para esta configuración.');
+        } else if (emailSent) {
+          toast.success(`✅ Email enviado a ${form.email_destinatarios?.join(', ')} con ${alertasDetectadas} alerta(s).`);
+        } else if (form.notificar_email && form.email_destinatarios?.length > 0) {
+          toast.warning(`⚠️ Se detectaron ${alertasDetectadas} alerta(s) pero el email falló. Revisá los logs.`);
+        } else {
+          toast.success(`${alertasDetectadas} alerta(s) detectada(s). Email no configurado.`);
+        }
         qc.invalidateQueries({ queryKey: ['alerta-logs'] });
         qc.invalidateQueries({ queryKey: ['alertas-activas'] });
+        qc.invalidateQueries({ queryKey: ['alerta-configs'] });
       } else {
         toast.error(res.data?.error || 'Error al ejecutar');
       }
