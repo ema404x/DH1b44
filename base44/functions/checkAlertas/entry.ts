@@ -3,18 +3,19 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
 async function sendEmail(to, subject, html) {
-  if (!RESEND_API_KEY || !to || to.length === 0) return false;
+  if (!RESEND_API_KEY || !to || to.length === 0) return { ok: false, error: 'Sin API key o destinatarios' };
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: 'Mejores ERP <notificaciones@mejores.com.ar>',
+      from: 'Mejores ERP <onboarding@resend.dev>',
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
     }),
   });
-  return res.ok;
+  const body = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, body };
 }
 
 function emailTemplate(titulo, items, color = '#F59E0B') {
@@ -64,9 +65,12 @@ Deno.serve(async (req) => {
 
     // Verificar autenticación (puede ser llamado por automatización o admin)
     const isScheduled = req.headers.get('x-automation-trigger') === 'scheduled';
+    let isManualTest = false;
     if (!isScheduled) {
       const user = await base44.auth.me();
       if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      // Si lo llama un usuario manualmente, es un test — no aplicar filtro de "ya notificado hoy"
+      isManualTest = true;
     }
 
     const sb = base44.asServiceRole;
@@ -83,8 +87,8 @@ Deno.serve(async (req) => {
     const resumen = [];
 
     for (const cfg of configs) {
-      // Evitar re-notificar en el mismo día
-      if (cfg.ultima_notificacion) {
+      // Evitar re-notificar en el mismo día (solo para ejecuciones automáticas)
+      if (!isManualTest && cfg.ultima_notificacion) {
         const ultimaFecha = cfg.ultima_notificacion.split('T')[0];
         if (ultimaFecha === hoy) continue;
       }
@@ -137,8 +141,9 @@ Deno.serve(async (req) => {
             alertasGeneradas,
             '#8B5CF6'
           );
-          const sent = await sendEmail(cfg.email_destinatarios, `⚠️ Alerta de Garantías — ${alertasGeneradas.length} activo(s)`, html);
-          if (sent) {
+          const result = await sendEmail(cfg.email_destinatarios, `⚠️ Alerta de Garantías — ${alertasGeneradas.length} activo(s)`, html);
+          console.log('Email garantias:', JSON.stringify(result));
+          if (result.ok) {
             await sb.entities.AlertaConfig.update(cfg.id, { ultima_notificacion: ahora.toISOString() });
           }
         }
@@ -185,8 +190,11 @@ Deno.serve(async (req) => {
             alertasGeneradas,
             '#EF4444'
           );
-          await sendEmail(cfg.email_destinatarios, `🚨 Alerta de Stock Crítico — ${alertasGeneradas.length} material(es)`, html);
-          await sb.entities.AlertaConfig.update(cfg.id, { ultima_notificacion: ahora.toISOString() });
+          const result = await sendEmail(cfg.email_destinatarios, `🚨 Alerta de Stock Crítico — ${alertasGeneradas.length} material(es)`, html);
+          console.log('Email stock:', JSON.stringify(result));
+          if (result.ok) {
+            await sb.entities.AlertaConfig.update(cfg.id, { ultima_notificacion: ahora.toISOString() });
+          }
         }
       }
 
@@ -232,8 +240,11 @@ Deno.serve(async (req) => {
             alertasGeneradas,
             '#F59E0B'
           );
-          await sendEmail(cfg.email_destinatarios, `⏰ Alerta de Pendientes Vencidos — ${alertasGeneradas.length}`, html);
-          await sb.entities.AlertaConfig.update(cfg.id, { ultima_notificacion: ahora.toISOString() });
+          const result = await sendEmail(cfg.email_destinatarios, `⏰ Alerta de Pendientes Vencidos — ${alertasGeneradas.length}`, html);
+          console.log('Email pendientes:', JSON.stringify(result));
+          if (result.ok) {
+            await sb.entities.AlertaConfig.update(cfg.id, { ultima_notificacion: ahora.toISOString() });
+          }
         }
       }
 
