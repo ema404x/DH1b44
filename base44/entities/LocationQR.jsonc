@@ -40,10 +40,25 @@
       "default": "blue",
       "description": "Color identificador"
     },
+    "latitude": {
+      "type": "number",
+      "description": "Latitud GPS de la ubicaci\u00f3n"
+    },
+    "longitude": {
+      "type": "number",
+      "description": "Longitud GPS de la ubicaci\u00f3n"
+    },
     "total_scans": {
       "type": "number",
       "default": 0,
       "description": "Total de escaneos registrados"
+    },
+    "assigned_employees": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Nombres de empleados/cuadrilla asignados a esta ubicaci\u00f3n"
     }
   },
   "required": [
