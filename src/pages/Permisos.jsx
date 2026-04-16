@@ -10,8 +10,28 @@ import { Plus, Save, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const MODULES = [
-  'WorkOrder', 'Certificado', 'Project', 'Client', 'Employee', 
-  'Asset', 'Inventory', 'Invoice', 'Quote', 'AuditLog'
+  { key: 'Dashboard', label: 'Dashboard' },
+  { key: 'Project', label: 'Proyectos' },
+  { key: 'WorkOrder', label: 'Órdenes de Trabajo' },
+  { key: 'Pendientes', label: 'Pendientes SAP' },
+  { key: 'Informes', label: 'Informes' },
+  { key: 'Reportes', label: 'Reportes & KPIs' },
+  { key: 'Automatizaciones', label: 'Automatizaciones' },
+  { key: 'Client', label: 'Proveedores' },
+  { key: 'Quote', label: 'Presupuestos' },
+  { key: 'PresupuestosObra', label: 'Presupuestos Obra' },
+  { key: 'Certificado', label: 'Certificados' },
+  { key: 'Invoice', label: 'Facturación' },
+  { key: 'Finanzas', label: 'Finanzas' },
+  { key: 'Employee', label: 'Empleados' },
+  { key: 'Mapa', label: 'Mapa de Ubicaciones' },
+  { key: 'Inventory', label: 'Inventario' },
+  { key: 'Asset', label: 'Activos / Pendientes' },
+  { key: 'Alertas', label: 'Alertas Proactivas' },
+  { key: 'Permisos', label: 'Control de Acceso' },
+  { key: 'AuditLog', label: 'Auditoría' },
+  { key: 'Seguridad', label: 'Centro de Seguridad' },
+  { key: 'ImportarDatos', label: 'Importar Datos' },
 ];
 
 const ACTIONS = ['read', 'create', 'update', 'delete', 'export', 'approve'];
@@ -70,7 +90,7 @@ export default function Permisos() {
     if (!newRoleName.trim()) return;
     const permissions = {};
     MODULES.forEach(mod => {
-      permissions[mod] = ACTIONS.reduce((acc, act) => ({ ...acc, [act]: false }), {});
+      permissions[mod.key] = ACTIONS.reduce((acc, act) => ({ ...acc, [act]: false }), {});
     });
     createMutation.mutate({ role_name: newRoleName, permissions, description: `Rol personalizado: ${newRoleName}` });
   };
@@ -130,13 +150,13 @@ export default function Permisos() {
                 </thead>
                 <tbody>
                   {MODULES.map(mod => (
-                    <tr key={mod} className="border-b hover:bg-muted/40">
-                      <td className="px-4 py-2 font-medium">{mod}</td>
+                    <tr key={mod.key} className="border-b hover:bg-muted/40">
+                      <td className="px-4 py-2 font-medium">{mod.label}</td>
                       {ACTIONS.map(act => (
                         <td key={act} className="px-4 py-2 text-center">
                           <Checkbox
-                            checked={role.permissions[mod]?.[act] || false}
-                            onCheckedChange={() => handlePermissionToggle(role.id, mod, act, role.permissions[mod]?.[act])}
+                            checked={role.permissions[mod.key]?.[act] || false}
+                            onCheckedChange={() => handlePermissionToggle(role.id, mod.key, act, role.permissions[mod.key]?.[act])}
                           />
                         </td>
                       ))}
