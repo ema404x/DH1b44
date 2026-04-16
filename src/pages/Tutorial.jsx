@@ -1,16 +1,50 @@
-import React, { useState, useMemo } from 'react';
-import { BookOpen, ChevronRight, Search, Grid, List, Play, FileText } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { BookOpen, ChevronRight, Search, Grid, List, Play, FileText, CheckCircle2, Trophy } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import TutorialGuide from '@/components/tutorial/TutorialGuide';
+import CompletionCertificate from '@/components/tutorial/CompletionCertificate';
 import { TUTORIAL_MODULES } from '@/components/tutorial/tutorialContent';
+import { base44 } from '@/api/base44Client';
 
 export default function Tutorial() {
   const [selectedModule, setSelectedModule] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState('grid');
+  const [completedModules, setCompletedModules] = useState(new Set());
+  const [user, setUser] = useState(null);
+  const [showCertificate, setShowCertificate] = useState(null);
+
+  // Cargar usuario y módulos completados
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const currentUser = await base44.auth.me();
+        setUser(currentUser);
+        
+        // Recuperar módulos completados del localStorage
+        const saved = localStorage.getItem('completedTutorialModules') || '[]';
+        setCompletedModules(new Set(JSON.parse(saved)));
+      } catch (err) {
+        console.log('Error loading user:', err);
+      }
+    };
+    loadData();
+  }, []);
+
+  const handleModuleComplete = (moduleId) => {
+    const updated = new Set(completedModules);
+    updated.add(moduleId);
+    setCompletedModules(updated);
+    localStorage.setItem('completedTutorialModules', JSON.stringify(Array.from(updated)));
+
+    const module = TUTORIAL_MODULES.find(m => m.id === moduleId);
+    if (module) {
+      setShowCertificate(module);
+    }
+  };
 
   const filteredModules = useMemo(() => {
     if (!searchTerm) return TUTORIAL_MODULES;
@@ -26,6 +60,8 @@ export default function Tutorial() {
     return (
       <TutorialGuide
         module={selectedModule}
+        isCompleted={completedModules.has(selectedModule.id)}
+        onComplete={() => handleModuleComplete(selectedModule.id)}
         onBack={() => setSelectedModule(null)}
       />
     );
@@ -84,30 +120,63 @@ export default function Tutorial() {
           </Button>
         </div>
 
-        {/* Modules Grid/List */}
-        {filteredModules.length > 0 ? (
-          <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
-            {filteredModules.map((module) => (
-              <button
-                key={module.id}
-                onClick={() => setSelectedModule(module)}
-                className="group text-left"
-              >
-                <Card className="h-full hover:shadow-lg hover:border-primary/50 transition-all duration-300 hover:scale-105">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-4 mb-2">
-                      <div className={`h-12 w-12 rounded-lg flex items-center justify-center text-2xl`}
-                        style={{ backgroundColor: module.color + '20' }}>
-                        {module.icon}
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        {module.steps.length} pasos
-                      </Badge>
-                    </div>
-                    <CardTitle className="group-hover:text-primary transition-colors">
-                      {module.title}
-                    </CardTitle>
-                  </CardHeader>
+        {/* Progreso General */}
+         <div className="mb-8 p-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
+           <div className="flex items-center justify-between">
+             <div>
+               <h3 className="font-semibold text-lg flex items-center gap-2">
+                 <Trophy className="h-5 w-5 text-primary" />
+                 Tu Progreso
+               </h3>
+               <p className="text-sm text-muted-foreground mt-1">
+                 {completedModules.size} de {TUTORIAL_MODULES.length} módulos completados
+               </p>
+             </div>
+             <div className="text-3xl font-bold text-primary">
+               {Math.round((completedModules.size / TUTORIAL_MODULES.length) * 100)}%
+             </div>
+           </div>
+           <div className="mt-4 w-full bg-slate-200 rounded-full h-2">
+             <div
+               className="bg-gradient-to-r from-primary to-primary/70 h-2 rounded-full transition-all"
+               style={{ width: `${(completedModules.size / TUTORIAL_MODULES.length) * 100}%` }}
+             />
+           </div>
+         </div>
+
+         {/* Modules Grid/List */}
+         {filteredModules.length > 0 ? (
+           <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+             {filteredModules.map((module) => {
+               const isCompleted = completedModules.has(module.id);
+               return (
+                 <button
+                   key={module.id}
+                   onClick={() => setSelectedModule(module)}
+                   className="group text-left"
+                 >
+                   <Card className={`h-full hover:shadow-lg transition-all duration-300 ${isCompleted ? 'border-emerald-300 bg-emerald-50/30 hover:border-primary/50 hover:scale-105' : 'hover:border-primary/50 hover:scale-105'}`}>
+                     <CardHeader>
+                       <div className="flex items-start justify-between gap-4 mb-2">
+                         <div className={`h-12 w-12 rounded-lg flex items-center justify-center text-2xl`}
+                           style={{ backgroundColor: module.color + '20' }}>
+                           {module.icon}
+                         </div>
+                         <div className="flex gap-2 items-start">
+                           {isCompleted && (
+                             <Badge variant="default" className="text-xs bg-emerald-600 hover:bg-emerald-700 gap-1">
+                               <CheckCircle2 className="h-3 w-3" /> Completado
+                             </Badge>
+                           )}
+                           <Badge variant="secondary" className="text-xs">
+                             {module.steps.length} pasos
+                           </Badge>
+                         </div>
+                       </div>
+                       <CardTitle className="group-hover:text-primary transition-colors">
+                         {module.title}
+                       </CardTitle>
+                     </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-sm text-muted-foreground">
                       {module.description}
@@ -146,26 +215,35 @@ export default function Tutorial() {
         )}
 
         {/* Footer */}
-        <div className="mt-16 pt-8 border-t border-border">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center space-y-2">
-              <Play className="h-8 w-8 text-primary mx-auto" />
-              <p className="font-semibold text-foreground">Guías paso a paso</p>
-              <p className="text-sm text-muted-foreground">Instrucciones detalladas y claras</p>
-            </div>
-            <div className="text-center space-y-2">
-              <FileText className="h-8 w-8 text-primary mx-auto" />
-              <p className="font-semibold text-foreground">Explicaciones prácticas</p>
-              <p className="text-sm text-muted-foreground">Ejemplos reales y contextuales</p>
-            </div>
-            <div className="text-center space-y-2">
-              <BookOpen className="h-8 w-8 text-primary mx-auto" />
-              <p className="font-semibold text-foreground">Contenido completo</p>
-              <p className="text-sm text-muted-foreground">Todo lo que necesitas saber</p>
-            </div>
-          </div>
+         <div className="mt-16 pt-8 border-t border-border">
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+             <div className="text-center space-y-2">
+               <Play className="h-8 w-8 text-primary mx-auto" />
+               <p className="font-semibold text-foreground">Guías paso a paso</p>
+               <p className="text-sm text-muted-foreground">Instrucciones detalladas y claras</p>
+             </div>
+             <div className="text-center space-y-2">
+               <FileText className="h-8 w-8 text-primary mx-auto" />
+               <p className="font-semibold text-foreground">Explicaciones prácticas</p>
+               <p className="text-sm text-muted-foreground">Ejemplos reales y contextuales</p>
+             </div>
+             <div className="text-center space-y-2">
+               <BookOpen className="h-8 w-8 text-primary mx-auto" />
+               <p className="font-semibold text-foreground">Contenido completo</p>
+               <p className="text-sm text-muted-foreground">Todo lo que necesitas saber</p>
+             </div>
+           </div>
+         </div>
         </div>
-      </div>
-    </div>
-  );
-}
+
+        {/* Certificado */}
+        {showCertificate && (
+         <CompletionCertificate
+           module={showCertificate}
+           userName={user?.full_name || 'Usuario'}
+           onClose={() => setShowCertificate(null)}
+         />
+        )}
+        </div>
+        );
+        }

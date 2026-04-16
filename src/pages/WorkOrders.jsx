@@ -13,6 +13,7 @@ import {
   AlertTriangle, CheckCircle2, Clock, Zap, Wrench, Eye, Trash2, FileText, QrCode
 } from 'lucide-react';
 import WorkOrderQRButton from '@/components/workorders/WorkOrderQRButton';
+import DeleteWorkOrderButton from '@/components/workorders/DeleteWorkOrderButton';
 import { exportOTsPDF } from '@/utils/exportPDF';
 import { format, isPast, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -352,12 +353,13 @@ export default function WorkOrders() {
       />
 
       {/* Detail panel */}
-      {selectedOrder && (
-        <WorkOrderDetailPanel
-          order={selectedOrder}
-          onClose={() => setSelectedOrder(null)}
-        />
-      )}
+       {selectedOrder && (
+         <WorkOrderDetailPanel
+           order={selectedOrder}
+           onClose={() => setSelectedOrder(null)}
+           onDelete={deleteMutation.mutate}
+         />
+       )}
     </div>
   );
 }

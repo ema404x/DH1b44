@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default function TutorialGuide({ module, onBack }) {
+export default function TutorialGuide({ module, onBack, isCompleted: moduleCompleted, onComplete }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState([]);
 
@@ -12,10 +12,17 @@ export default function TutorialGuide({ module, onBack }) {
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === module.steps.length - 1;
   const isCompleted = completedSteps.includes(currentStep);
+  const allStepsCompleted = completedSteps.length === module.steps.length;
 
   const handleMarkComplete = () => {
     if (!completedSteps.includes(currentStep)) {
-      setCompletedSteps([...completedSteps, currentStep]);
+      const updated = [...completedSteps, currentStep];
+      setCompletedSteps(updated);
+      
+      // Si es el último paso y se completa, marcar módulo como completado
+      if (isLastStep && updated.length === module.steps.length && onComplete) {
+        setTimeout(() => onComplete(), 300);
+      }
     }
   };
 
@@ -66,12 +73,13 @@ export default function TutorialGuide({ module, onBack }) {
           <div className="space-y-2">
             <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-primary to-primary/70 transition-all duration-300"
+                className={`h-full transition-all duration-300 ${allStepsCompleted ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : 'bg-gradient-to-r from-primary to-primary/70'}`}
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
             <p className="text-xs text-muted-foreground text-right">
               {completedSteps.length} de {module.steps.length} pasos completados
+              {allStepsCompleted && ' ✓'}
             </p>
           </div>
         </div>

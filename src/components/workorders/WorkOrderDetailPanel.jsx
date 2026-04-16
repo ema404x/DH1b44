@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode } from 'lucide-react';
+import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode, Trash2 } from 'lucide-react';
 import WorkOrderQRButton from './WorkOrderQRButton';
+import DeleteWorkOrderButton from './DeleteWorkOrderButton';
 import WorkOrderChecklist from './WorkOrderChecklist';
 import WorkOrderPhotos from './WorkOrderPhotos';
 import WorkOrderSignature from './WorkOrderSignature';
@@ -27,7 +28,7 @@ const typeLabels = {
   instalacion: 'Instalación', inspeccion: 'Inspección', reparacion: 'Reparación', emergencia: 'Emergencia'
 };
 
-export default function WorkOrderDetailPanel({ order, onClose }) {
+export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [data, setData] = useState({ ...order });
   const queryClient = useQueryClient();
 
@@ -191,23 +192,30 @@ export default function WorkOrderDetailPanel({ order, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border flex gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            className="flex-shrink-0"
-            title="Exportar PDF"
-            onClick={() => exportWorkOrderPDF(data, timeLogs)}
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-          <WorkOrderQRButton order={data} variant="outline" size="icon" />
-          <Button className="flex-1 gap-2" onClick={save} disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Guardar Cambios
-          </Button>
-          <Button variant="outline" onClick={onClose}>Cerrar</Button>
-        </div>
+         <div className="p-4 border-t border-border flex gap-2 flex-wrap justify-between">
+           <div className="flex gap-2">
+             <Button
+               variant="outline"
+               size="icon"
+               className="flex-shrink-0"
+               title="Exportar PDF"
+               onClick={() => exportWorkOrderPDF(data, timeLogs)}
+             >
+               <Download className="h-4 w-4" />
+             </Button>
+             <WorkOrderQRButton order={data} variant="outline" size="icon" />
+           </div>
+           <div className="flex gap-2 flex-1 justify-end">
+             {onDelete && (
+               <DeleteWorkOrderButton order={data} onDelete={onDelete} />
+             )}
+             <Button className="gap-2" onClick={save} disabled={saveMutation.isPending}>
+               {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+               Guardar
+             </Button>
+             <Button variant="outline" onClick={onClose}>Cerrar</Button>
+           </div>
+         </div>
       </div>
     </div>
   );
