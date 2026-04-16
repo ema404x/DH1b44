@@ -63,7 +63,7 @@ export default function ImportadorLocations({ onImportSuccess }) {
               totalImported++;
             } catch (err) {
               totalErrors++;
-              errors.push(`Fila ${row.N° || '?'}: ${err.message}`);
+              errors.push(`Fila ${row['N°'] || '?'}: ${err.message}`);
             }
           }
         }
