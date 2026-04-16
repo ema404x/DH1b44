@@ -160,7 +160,7 @@ export default function Auditoria() {
             )}
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Búsqueda</label>
               <Input 
@@ -202,15 +202,13 @@ export default function Auditoria() {
                 className="h-8 text-sm"
               />
             </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Desde</label>
-                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-sm" />
-              </div>
-              <div className="flex-1">
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Hasta</label>
-                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-sm" />
-              </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Desde</label>
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Hasta</label>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-sm" />
             </div>
           </div>
 
