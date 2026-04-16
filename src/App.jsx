@@ -28,7 +28,6 @@ import Permisos from '@/pages/Permisos';
 import Seguridad from '@/pages/Seguridad';
 import Fichar from '@/pages/Fichar';
 import FicharUbicacion from '@/pages/FicharUbicacion';
-import Asistencia from '@/pages/Asistencia';
 import Mapa from '@/pages/Mapa';
 import Tutorial from '@/pages/Tutorial';
 import ImportarDatos from '@/pages/ImportarDatos';
@@ -98,7 +97,6 @@ const AuthenticatedApp = () => {
         <Route path="/auditoria" element={<Auditoria />} />
         <Route path="/permisos" element={<Permisos />} />
         <Route path="/seguridad" element={<Seguridad />} />
-        <Route path="/asistencia" element={<Asistencia />} />
         <Route path="/mapa" element={<Mapa />} />
         <Route path="/tutorial" element={<Tutorial />} />
         <Route path="/importar" element={<ImportarDatos />} />
