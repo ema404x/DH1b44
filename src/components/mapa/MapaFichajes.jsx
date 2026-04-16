@@ -4,7 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LogIn, LogOut, MapPin, Users, Activity, Calendar, Loader2, QrCode, ClipboardList, Pencil } from 'lucide-react';
+import { LogIn, LogOut, MapPin, Users, Activity, Calendar, Loader2, QrCode } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -50,10 +50,8 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
   const [daysFilter, setDaysFilter] = useState(7);
   const [typeFilter, setTypeFilter] = useState('all');
   const [selectedEmployee, setSelectedEmployee] = useState('all');
-  const [qrFichaje, setQrFichaje] = useState(null);
-  const [qrOT, setQrOT] = useState(null);
+  const [qrLoc, setQrLoc] = useState(null);
 
-  const getQRUrl = (loc) => `${window.location.origin}/fichar?loc=${loc.id}`;
   const getQROTUrl = (loc) => `${window.location.origin}/ejecutar-ot?loc=${loc.id}`;
 
   const validLocations = locations.filter(l =>
@@ -215,26 +213,20 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
                       </p>
                     )}
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 8, borderTop: '1px solid #e5e7eb' }}>
-                      <button
-                        onClick={() => setQrFichaje(loc)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, borderRadius: 6, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', cursor: 'pointer' }}
-                      >
-                        🔲 QR Fichaje
-                      </button>
-                      <button
-                        onClick={() => setQrOT(loc)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, borderRadius: 6, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', cursor: 'pointer' }}
-                      >
-                        📋 QR OT
-                      </button>
-                      {onGotoGestion && (
-                        <button
-                          onClick={() => onGotoGestion(loc)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, borderRadius: 6, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', cursor: 'pointer' }}
-                        >
-                          ✏️ Gestionar
-                        </button>
-                      )}
+                       <button
+                         onClick={() => setQrLoc(loc)}
+                         style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, borderRadius: 6, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', cursor: 'pointer' }}
+                       >
+                         🔲 Ver QR
+                       </button>
+                       {onGotoGestion && (
+                         <button
+                           onClick={() => onGotoGestion(loc)}
+                           style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', fontSize: 11, borderRadius: 6, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', cursor: 'pointer' }}
+                         >
+                           ✏️ Gestionar
+                         </button>
+                       )}
                     </div>
                   </div>
                 </Popup>
@@ -280,20 +272,13 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
         <span className="text-muted-foreground/60">· Clic en marcador para acciones · Arrastrá para mover · Clic derecho para crear</span>
       </div>
 
-      {/* QR Modals */}
+      {/* QR Modal */}
       <QRCodeModal
-        open={!!qrFichaje}
-        onClose={() => setQrFichaje(null)}
-        title={qrFichaje?.name || ''}
-        subtitle={qrFichaje?.address || qrFichaje?.project_name || 'QR de fichaje'}
-        value={qrFichaje ? getQRUrl(qrFichaje) : ''}
-      />
-      <QRCodeModal
-        open={!!qrOT}
-        onClose={() => setQrOT(null)}
-        title={`OT — ${qrOT?.name || ''}`}
-        subtitle="QR fijo · Ejecutar Orden de Trabajo"
-        value={qrOT ? getQROTUrl(qrOT) : ''}
+        open={!!qrLoc}
+        onClose={() => setQrLoc(null)}
+        title={qrLoc?.name || ''}
+        subtitle={qrLoc?.address || qrLoc?.project_name || 'Escanear para ver y completar la OT'}
+        value={qrLoc ? getQROTUrl(qrLoc) : ''}
       />
     </div>
   );

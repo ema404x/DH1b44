@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, QrCode, MapPin, Pencil, Trash2, Building2, Search, ClipboardList } from 'lucide-react';
+import { Plus, QrCode, MapPin, Pencil, Trash2, Building2, Search } from 'lucide-react';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { toast } from 'sonner';
 
@@ -37,7 +37,6 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [qrLoc, setQrLoc] = useState(null);
-  const [qrOTLoc, setQrOTLoc] = useState(null);
   const [saving, setSaving] = useState(false);
   const cardRefs = useRef({});
 
@@ -69,7 +68,6 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
   const openEdit = (loc) => { setEditing(loc); setForm({ ...loc }); setDialogOpen(true); };
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  const getQRUrl = (loc) => `${window.location.origin}/fichar?loc=${loc.id}`;
   const getQROTUrl = (loc) => `${window.location.origin}/ejecutar-ot?loc=${loc.id}`;
 
   const handleSave = async () => {
@@ -214,11 +212,8 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
 
                   {/* Actions */}
                    <div className="flex items-center justify-end gap-0.5 pt-2 border-t border-border/50">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => setQrLoc(loc)} title="QR Fichaje">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600" onClick={() => setQrLoc(loc)} title="QR Orden de Trabajo">
                       <QrCode className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600" onClick={() => setQrOTLoc(loc)} title="QR Orden de Trabajo (fijo)">
-                      <ClipboardList className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(loc)} title="Editar">
                       <Pencil className="h-3.5 w-3.5" />
@@ -248,22 +243,13 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
         </div>
       )}
 
-      {/* QR Fichaje Modal */}
+      {/* QR Orden de Trabajo */}
       <QRCodeModal
         open={!!qrLoc}
         onClose={() => setQrLoc(null)}
         title={qrLoc?.name || ''}
-        subtitle={qrLoc?.address || qrLoc?.project_name || 'QR de fichaje'}
-        value={qrLoc ? getQRUrl(qrLoc) : ''}
-      />
-
-      {/* QR Orden de Trabajo Modal */}
-      <QRCodeModal
-        open={!!qrOTLoc}
-        onClose={() => setQrOTLoc(null)}
-        title={`OT — ${qrOTLoc?.name || ''}`}
-        subtitle="QR fijo · Ejecutar Orden de Trabajo"
-        value={qrOTLoc ? getQROTUrl(qrOTLoc) : ''}
+        subtitle={qrLoc?.address || qrLoc?.project_name || 'Escanear para ver y completar la OT'}
+        value={qrLoc ? getQROTUrl(qrLoc) : ''}
       />
 
       {/* Form Dialog */}
