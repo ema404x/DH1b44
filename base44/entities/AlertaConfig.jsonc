@@ -1,0 +1,65 @@
+{
+  "name": "AlertaConfig",
+  "type": "object",
+  "properties": {
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "garantia_activo",
+        "stock_material",
+        "pendiente_vencido"
+      ],
+      "description": "Tipo de alerta"
+    },
+    "nombre": {
+      "type": "string",
+      "description": "Nombre descriptivo de la alerta"
+    },
+    "activo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si la alerta est\u00e1 habilitada"
+    },
+    "dias_anticipacion": {
+      "type": "number",
+      "default": 30,
+      "description": "D\u00edas de anticipaci\u00f3n para alertas de vencimiento"
+    },
+    "umbral_stock_pct": {
+      "type": "number",
+      "default": 0,
+      "description": "Umbral de stock como porcentaje adicional sobre min_stock (0 = exactamente min_stock)"
+    },
+    "dias_vencimiento_pendiente": {
+      "type": "number",
+      "default": 7,
+      "description": "D\u00edas vencidos para considerar pendiente cr\u00edtico"
+    },
+    "email_destinatarios": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Emails que recibir\u00e1n las notificaciones"
+    },
+    "notificar_email": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enviar notificaci\u00f3n por email"
+    },
+    "notificar_banner": {
+      "type": "boolean",
+      "default": true,
+      "description": "Mostrar banner en dashboard"
+    },
+    "ultima_notificacion": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Cu\u00e1ndo se envi\u00f3 la \u00faltima notificaci\u00f3n"
+    }
+  },
+  "required": [
+    "tipo",
+    "nombre"
+  ]
+}

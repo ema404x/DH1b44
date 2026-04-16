@@ -15,6 +15,7 @@ import RevenueChart from '@/components/dashboard/RevenueChart';
 import OTsPendientesPanel from '@/components/dashboard/OTsPendientesPanel';
 import CertificadosPanel from '@/components/dashboard/CertificadosPanel';
 import MetricasOperacion from '@/components/dashboard/MetricasOperacion';
+import AlertasBanner from '@/components/dashboard/AlertasBanner';
 import { format, differenceInDays, isPast, parseISO, startOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -120,7 +121,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Alerts */}
+      {/* Alertas proactivas del sistema */}
+      <AlertasBanner />
+
+      {/* Alerts legacy */}
       {hasAlerts && (
         <div className="flex flex-wrap gap-2">
           {overdueOrders > 0 && (

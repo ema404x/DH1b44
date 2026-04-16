@@ -1,0 +1,60 @@
+{
+  "name": "AlertaLog",
+  "type": "object",
+  "properties": {
+    "config_id": {
+      "type": "string",
+      "description": "ID de la AlertaConfig que la gener\u00f3"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "garantia_activo",
+        "stock_material",
+        "pendiente_vencido"
+      ]
+    },
+    "nivel": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ],
+      "default": "warning"
+    },
+    "titulo": {
+      "type": "string"
+    },
+    "mensaje": {
+      "type": "string"
+    },
+    "entidad_tipo": {
+      "type": "string",
+      "description": "Tipo de entidad afectada (Asset, Material, Pendiente)"
+    },
+    "entidad_id": {
+      "type": "string"
+    },
+    "entidad_nombre": {
+      "type": "string"
+    },
+    "email_enviado": {
+      "type": "boolean",
+      "default": false
+    },
+    "leida": {
+      "type": "boolean",
+      "default": false
+    },
+    "fecha_alerta": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "tipo",
+    "titulo",
+    "mensaje"
+  ]
+}

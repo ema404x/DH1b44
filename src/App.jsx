@@ -32,6 +32,7 @@ import Asistencia from '@/pages/Asistencia';
 import Mapa from '@/pages/Mapa';
 import Tutorial from '@/pages/Tutorial';
 import ImportarDatos from '@/pages/ImportarDatos';
+import ConfigAlertas from '@/pages/ConfigAlertas';
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -101,6 +102,7 @@ const AuthenticatedApp = () => {
         <Route path="/mapa" element={<Mapa />} />
         <Route path="/tutorial" element={<Tutorial />} />
         <Route path="/importar" element={<ImportarDatos />} />
+        <Route path="/alertas" element={<ConfigAlertas />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
