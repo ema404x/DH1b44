@@ -40,6 +40,17 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, log });
     }
 
+    // GET work order data (public, no auth needed)
+    if (action === 'getWorkOrder') {
+      const { workOrderId } = body;
+      if (!workOrderId) {
+        return Response.json({ error: 'workOrderId requerido' }, { status: 400 });
+      }
+      const orders = await base44.asServiceRole.entities.WorkOrder.list('-created_date', 500);
+      const workOrder = orders.find(o => o.id === workOrderId) || null;
+      return Response.json({ workOrder });
+    }
+
     return Response.json({ error: 'Acción no válida' }, { status: 400 });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

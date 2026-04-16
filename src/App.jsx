@@ -32,6 +32,7 @@ import Mapa from '@/pages/Mapa';
 import Tutorial from '@/pages/Tutorial';
 import ImportarDatos from '@/pages/ImportarDatos';
 import ConfigAlertas from '@/pages/ConfigAlertas';
+import OrdenTrabajoPublica from '@/pages/OrdenTrabajoPublica';
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -116,6 +117,7 @@ function App() {
             {/* Rutas públicas — sin autenticación */}
             <Route path="/fichar" element={<Fichar />} />
             <Route path="/fichar-ubicacion" element={<FicharUbicacion />} />
+            <Route path="/orden-trabajo" element={<OrdenTrabajoPublica />} />
             {/* Rutas autenticadas */}
             <Route path="/*" element={
               <AuthProvider>

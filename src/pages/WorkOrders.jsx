@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Search, Plus, ClipboardList, User, Calendar, MapPin,
-  AlertTriangle, CheckCircle2, Clock, Zap, Wrench, Eye, Trash2, FileText
+  AlertTriangle, CheckCircle2, Clock, Zap, Wrench, Eye, Trash2, FileText, QrCode
 } from 'lucide-react';
+import WorkOrderQRButton from '@/components/workorders/WorkOrderQRButton';
 import { exportOTsPDF } from '@/utils/exportPDF';
 import { format, isPast, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -123,7 +124,7 @@ function NewOrderDialog({ open, onOpenChange, onSave, saving }) {
   );
 }
 
-function WorkOrderCard({ order, onOpen, onDelete }) {
+function WorkOrderCard({ order, onOpen }) {
   const sc = statusConfig[order.status] || statusConfig.pendiente;
   const pc = priorityConfig[order.priority] || priorityConfig.media;
   const TypeIcon = typeIcons[order.type] || Wrench;
@@ -133,9 +134,13 @@ function WorkOrderCard({ order, onOpen, onDelete }) {
 
   return (
     <div
-      className={`group bg-card border rounded-xl p-4 hover:shadow-md transition-all cursor-pointer ${isOverdue ? 'border-red-300 bg-red-50/30' : 'border-border'}`}
+      className={`group relative bg-card border rounded-xl p-4 hover:shadow-md transition-all cursor-pointer ${isOverdue ? 'border-red-300 bg-red-50/30' : 'border-border'}`}
       onClick={() => onOpen(order)}
     >
+      {/* QR button — top-right absolute */}
+      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={e => e.stopPropagation()}>
+        <WorkOrderQRButton order={order} />
+      </div>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 flex-1 min-w-0">
           <div className={`mt-0.5 h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${pc.bg}`}>

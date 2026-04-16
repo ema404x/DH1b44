@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle } from 'lucide-react';
+import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode } from 'lucide-react';
+import WorkOrderQRButton from './WorkOrderQRButton';
 import WorkOrderChecklist from './WorkOrderChecklist';
 import WorkOrderPhotos from './WorkOrderPhotos';
 import WorkOrderSignature from './WorkOrderSignature';
@@ -200,6 +201,7 @@ export default function WorkOrderDetailPanel({ order, onClose }) {
           >
             <Download className="h-4 w-4" />
           </Button>
+          <WorkOrderQRButton order={data} variant="outline" size="icon" />
           <Button className="flex-1 gap-2" onClick={save} disabled={saveMutation.isPending}>
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Guardar Cambios
