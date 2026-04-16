@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Upload, CheckCircle2, AlertCircle, Loader2, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -19,15 +18,15 @@ export default function ImportadorLocations({ onImportSuccess }) {
     if (!file) return;
     setResult(null);
     setUploading(true);
+
     try {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
           const wb = XLSX.read(e.target.result);
-          let totalImported = 0;
-          let totalErrors = 0;
-          const errors = [];
+          const locationsToImport = [];
 
+          // Parsear Excel
           for (const sheetName of SHEET_NAMES) {
             if (!wb.SheetNames.includes(sheetName)) continue;
             const ws = wb.Sheets[sheetName];
@@ -35,70 +34,60 @@ export default function ImportadorLocations({ onImportSuccess }) {
             const comuna = COMUNA_MAP[sheetName];
 
             for (const row of data) {
-              try {
-                const ubic = (row['Ubic. Técnica'] || row['Ubic.Tecnica'] || '').trim();
-                const establecimiento = (row.Establecimiento || '').trim();
-                if (!ubic || !establecimiento) continue;
+              const ubic = (row['Ubic. Técnica'] || row['Ubic.Tecnica'] || '').trim();
+              const establecimiento = (row.Establecimiento || '').trim();
+              if (!ubic || !establecimiento) continue;
 
-                const payload = {
-                  ubic_tecnica: ubic.toLowerCase(),
-                  elem_pep: (row['Elem. PEP'] || '').trim(),
-                  direccion: (row.Dirección || '').trim(),
-                  establecimiento,
-                  m2: row.M2 ? parseFloat(String(row.M2).replace(/,/g, '.')) : null,
-                  inspector: (row.INSPECTOR || '').trim(),
-                  jefe_sitio: (row['JEFE SITIO'] || row['JEFE '] || '').trim() || null,
-                  comuna,
-                  sup: row.SUP ? parseFloat(String(row.SUP).replace(/,/g, '.')) : null,
-                  estado: 'activo',
-                };
-
-                try {
-                  const existing = await base44.entities.LocationData.filter({
-                    ubic_tecnica: payload.ubic_tecnica,
-                  });
-                  if (existing.length > 0) {
-                    await base44.entities.LocationData.update(existing[0].id, payload);
-                  } else {
-                    await base44.entities.LocationData.create(payload);
-                  }
-                } catch (updateErr) {
-                  // Si falla la búsqueda/actualización, intenta crear directo
-                  await base44.entities.LocationData.create(payload);
-                }
-                totalImported++;
-              } catch (err) {
-                totalErrors++;
-                const escuela = row.Establecimiento || 'Sin nombre';
-                errors.push(`${escuela}: ${err.message}`);
-              }
+              locationsToImport.push({
+                ubic_tecnica: ubic.toLowerCase(),
+                elem_pep: (row['Elem. PEP'] || '').trim(),
+                direccion: (row.Dirección || '').trim(),
+                establecimiento,
+                m2: row.M2 ? parseFloat(String(row.M2).replace(/,/g, '.')) : null,
+                inspector: (row.INSPECTOR || '').trim(),
+                jefe_sitio: (row['JEFE SITIO'] || row['JEFE '] || '').trim() || null,
+                comuna,
+                sup: row.SUP ? parseFloat(String(row.SUP).replace(/,/g, '.')) : null,
+                estado: 'activo',
+              });
             }
           }
 
-          setResult({
-            imported: totalImported,
-            errors: totalErrors,
-            errorsList: errors.slice(0, 5),
-            hasMore: errors.length > 5,
+          if (locationsToImport.length === 0) {
+            toast.error('❌ No se encontraron registros válidos en el Excel');
+            setUploading(false);
+            return;
+          }
+
+          // Llamar función backend para hacer bulk import
+          const res = await base44.functions.invoke('importLocations', {
+            locations: locationsToImport,
           });
 
-          if (totalImported > 0) {
-            toast.success(`✅ Importadas ${totalImported} escuelas`);
+          if (res.data?.success) {
+            setResult({
+              imported: res.data.imported,
+              errors: res.data.errors,
+              errorsList: res.data.errorsList || [],
+              hasMore: (res.data.errorsList || []).length > 10,
+            });
+
+            toast.success(`✅ Importadas ${res.data.imported} escuelas`);
+            if (res.data.errors > 0) {
+              toast.warning(`⚠️ ${res.data.errors} errores encontrados`);
+            }
             onImportSuccess?.();
           } else {
-            toast.error('❌ No se importaron registros. Revisa el formato del Excel');
+            toast.error('Error en importación: ' + (res.data?.error || 'Unknown'));
           }
-          if (totalErrors > 0) toast.warning(`⚠️ ${totalErrors} errores encontrados`);
         } catch (parseError) {
-          toast.error('Error al leer el archivo: ' + parseError.message);
-          setResult(null);
+          toast.error('Error al procesar Excel: ' + parseError.message);
         }
+        setUploading(false);
       };
       reader.readAsArrayBuffer(file);
     } catch (error) {
       toast.error('Error al importar: ' + error.message);
-      setResult(null);
-    } finally {
       setUploading(false);
     }
   };
@@ -180,7 +169,7 @@ export default function ImportadorLocations({ onImportSuccess }) {
             {result.errorsList.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-slate-800">Detalles de errores:</p>
-                <div className="bg-white rounded-lg p-3 border border-orange-200 space-y-1.5">
+                <div className="bg-white rounded-lg p-3 border border-orange-200 space-y-1.5 max-h-40 overflow-y-auto">
                   {result.errorsList.map((err, idx) => (
                     <p key={idx} className="text-xs text-slate-700 font-mono">
                       <span className="text-orange-600 font-bold">✕</span> {err}
