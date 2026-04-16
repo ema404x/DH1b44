@@ -235,8 +235,6 @@ export default function Tutorial() {
              </div>
            </div>
          </div>
-        </div>
-
         {/* Certificado */}
         {showCertificate && (
          <CompletionCertificate
