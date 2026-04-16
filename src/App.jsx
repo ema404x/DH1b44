@@ -33,6 +33,7 @@ import Tutorial from '@/pages/Tutorial';
 import ImportarDatos from '@/pages/ImportarDatos';
 import ConfigAlertas from '@/pages/ConfigAlertas';
 import OrdenTrabajoPublica from '@/pages/OrdenTrabajoPublica';
+import EjecutarOrdenPublica from '@/pages/EjecutarOrdenPublica';
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -118,6 +119,7 @@ function App() {
             <Route path="/fichar" element={<Fichar />} />
             <Route path="/fichar-ubicacion" element={<FicharUbicacion />} />
             <Route path="/orden-trabajo" element={<OrdenTrabajoPublica />} />
+            <Route path="/ejecutar-ot" element={<EjecutarOrdenPublica />} />
             {/* Rutas autenticadas */}
             <Route path="/*" element={
               <AuthProvider>

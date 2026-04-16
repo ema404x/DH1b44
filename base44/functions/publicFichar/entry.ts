@@ -40,15 +40,45 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, log });
     }
 
-    // GET work order data (public, no auth needed)
+    // GET work order by ID (public)
     if (action === 'getWorkOrder') {
       const { workOrderId } = body;
-      if (!workOrderId) {
-        return Response.json({ error: 'workOrderId requerido' }, { status: 400 });
-      }
+      if (!workOrderId) return Response.json({ error: 'workOrderId requerido' }, { status: 400 });
       const orders = await base44.asServiceRole.entities.WorkOrder.list('-created_date', 500);
       const workOrder = orders.find(o => o.id === workOrderId) || null;
       return Response.json({ workOrder });
+    }
+
+    // GET active work order for a location/establecimiento (public)
+    if (action === 'getWorkOrderForLocation') {
+      const { locationId } = body;
+      if (!locationId) return Response.json({ error: 'locationId requerido' }, { status: 400 });
+
+      // Get location info
+      const locations = await base44.asServiceRole.entities.LocationQR.list('name', 200);
+      const location = locations.find(l => l.id === locationId) || null;
+      if (!location) return Response.json({ workOrder: null, locationName: '' });
+
+      // Find active OT matching this location (by name or project)
+      const orders = await base44.asServiceRole.entities.WorkOrder.list('-created_date', 500);
+      const active = orders.find(o =>
+        !['completada', 'cancelada'].includes(o.status) &&
+        (
+          o.location?.toLowerCase().includes(location.name.toLowerCase()) ||
+          location.name.toLowerCase().includes(o.location?.toLowerCase() || '') ||
+          (location.project_name && o.project_name === location.project_name)
+        )
+      ) || null;
+
+      return Response.json({ workOrder: active, locationName: location.name });
+    }
+
+    // UPDATE work order (public — operario saves checklist, photos, signature)
+    if (action === 'updateWorkOrder') {
+      const { workOrderId, updates } = body;
+      if (!workOrderId || !updates) return Response.json({ error: 'Parámetros requeridos' }, { status: 400 });
+      const updated = await base44.asServiceRole.entities.WorkOrder.update(workOrderId, updates);
+      return Response.json({ success: true, workOrder: updated });
     }
 
     return Response.json({ error: 'Acción no válida' }, { status: 400 });
