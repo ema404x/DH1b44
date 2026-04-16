@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Package, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { Search, Package, Pencil, Trash2, AlertTriangle, Upload, Sparkles } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import EmptyState from '@/components/shared/EmptyState';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import InventoryImporter from '@/components/inventory/InventoryImporter';
 
 const categoryLabels = {
   electrico: 'Eléctrico', plomeria: 'Plomería', pintura: 'Pintura', construccion: 'Construcción',
@@ -39,6 +40,7 @@ export default function Inventory() {
   const [catFilter, setCatFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [showImporter, setShowImporter] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: materials = [], isLoading } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list('-created_date') });
@@ -64,7 +66,12 @@ export default function Inventory() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Inventario" subtitle={`${materials.length} materiales · Valor total: $${totalValue.toLocaleString()}`} actionLabel="Nuevo Material" onAction={() => { setEditing(null); setDialogOpen(true); }} />
+      <div className="flex items-center justify-between">
+        <PageHeader title="Inventario" subtitle={`${materials.length} materiales · Valor total: $${totalValue.toLocaleString()}`} actionLabel="Nuevo Material" onAction={() => { setEditing(null); setDialogOpen(true); }} />
+        <Button variant="outline" size="sm" className="gap-1.5 -mt-8 mr-1 border-primary/40 text-primary hover:bg-primary/5" onClick={() => setShowImporter(true)}>
+          <Sparkles className="h-3.5 w-3.5" /> Importar Stock
+        </Button>
+      </div>
 
       {lowStockCount > 0 && (
         <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -163,6 +170,13 @@ export default function Inventory() {
         onSave={(data) => saveMutation.mutate(data)}
         saving={saveMutation.isPending}
       />
+
+      {showImporter && (
+        <InventoryImporter
+          onClose={() => setShowImporter(false)}
+          onImported={() => setShowImporter(false)}
+        />
+      )}
     </div>
   );
 }
