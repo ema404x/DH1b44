@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import ImportadorLocations from '@/components/informacion-general/ImportadorLocations';
 import JefeSitioPanel from '@/components/informacion-general/JefeSitioPanel';
 import DireccionPanel from '@/components/informacion-general/DireccionPanel';
+import DireccionesManager from '@/components/informacion-general/DireccionesManager';
 import LocationsGrid from '@/components/informacion-general/LocationsGrid';
 import EstadisticasAvanzadas from '@/components/informacion-general/EstadisticasAvanzadas';
 import ExportadorDatos from '@/components/informacion-general/ExportadorDatos';
@@ -25,7 +26,7 @@ const COMUNAS = [
 ];
 
 export default function InformacionGeneral() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('direcciones');
   const [search, setSearch] = useState('');
   const [selectedComuna, setSelectedComuna] = useState('all');
   const [expandedJefe, setExpandedJefe] = useState(null);
@@ -204,15 +205,15 @@ export default function InformacionGeneral() {
           </div>
 
           {/* Tabs */}
-          {activeTab !== 'import' && (
-            <div className="flex gap-2 border-b border-slate-200 -mb-6 overflow-x-auto">
-              {[
-                { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-                { key: 'jefes', label: 'Por Jefes', icon: Users },
-                { key: 'direcciones', label: 'Por Direcciones', icon: MapPin },
-                { key: 'locations', label: 'Escuelas', icon: Building2 },
-                { key: 'reportes', label: 'Reportes', icon: TrendingUp },
-              ].map(tab => (
+           {activeTab !== 'import' && (
+             <div className="flex gap-2 border-b border-slate-200 -mb-6 overflow-x-auto">
+               {[
+                 { key: 'direcciones', label: 'Direcciones (Principal)', icon: MapPin },
+                 { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+                 { key: 'jefes', label: 'Por Jefes', icon: Users },
+                 { key: 'locations', label: 'Escuelas', icon: Building2 },
+                 { key: 'reportes', label: 'Reportes', icon: TrendingUp },
+               ].map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
@@ -385,36 +386,23 @@ export default function InformacionGeneral() {
         </div>
       )}
 
-      {/* Por Direcciones Tab */}
-      {activeTab === 'direcciones' && (
-        <div className="max-w-7xl mx-auto px-6 py-8 space-y-3">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin h-8 w-8 border-4 border-slate-200 border-t-primary rounded-full" />
-            </div>
-          ) : porDirecciones.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-12 text-center">
-                <MapPin className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-                <p className="text-muted-foreground font-medium">Sin resultados</p>
-              </CardContent>
-            </Card>
-          ) : (
-            porDirecciones.map(dirData => (
-              <DireccionPanel
-                key={dirData.direccion}
-                direccionData={dirData}
-                isExpanded={expandedDireccion === dirData.direccion}
-                onToggle={() => setExpandedDireccion(expandedDireccion === dirData.direccion ? null : dirData.direccion)}
-                comunas={COMUNAS}
-                onEdit={handleEdit}
-                onDelete={(id) => deleteMutation.mutate(id)}
-                jefesDisponibles={[...new Set(locations.map(l => l.jefe_sitio).filter(Boolean))].sort()}
-              />
-            ))
-          )}
-        </div>
-      )}
+      {/* Por Direcciones Tab - NOW PRINCIPAL */}
+       {activeTab === 'direcciones' && (
+         <div className="max-w-7xl mx-auto px-6 py-8">
+           <div className="mb-6">
+             <h2 className="text-2xl font-bold text-slate-900 mb-2">Gestión de Direcciones y Jefes de Sitio</h2>
+             <p className="text-sm text-muted-foreground">
+               Las direcciones son el nivel principal. Cada dirección puede tener asignado un jefe de sitio que supervisa todas las escuelas en esa ubicación.
+             </p>
+           </div>
+           <DireccionesManager
+             locations={locations}
+             comunas={COMUNAS}
+             isLoading={isLoading}
+             onLocationUpdate={() => refetch()}
+           />
+         </div>
+       )}
 
       {/* Locations Grid Tab */}
       {activeTab === 'locations' && (
