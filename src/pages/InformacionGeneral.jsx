@@ -114,8 +114,8 @@ export default function InformacionGeneral() {
           </div>
 
           {/* Tabs */}
-          {activeTab === 'dashboard' && (
-            <div className="flex gap-2 border-b border-slate-200 -mb-4">
+          {activeTab !== 'import' && (
+            <div className="flex gap-2 border-b border-slate-200 -mb-4 overflow-x-auto">
               {[
                 { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
                 { key: 'locations', label: 'Escuelas', icon: Building2 },
@@ -123,7 +123,7 @@ export default function InformacionGeneral() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-all flex items-center gap-2 ${
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
                     activeTab === tab.key
                       ? 'border-primary text-primary'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
