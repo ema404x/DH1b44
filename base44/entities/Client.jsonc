@@ -1,0 +1,77 @@
+{
+  "name": "Client",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre o raz\u00f3n social del proveedor"
+    },
+    "rubro": {
+      "type": "string",
+      "description": "Rubro o actividad principal",
+      "enum": [
+        "construccion",
+        "electricidad",
+        "plomeria",
+        "pintura",
+        "carpinteria",
+        "herreria",
+        "climatizacion",
+        "albanileria",
+        "impermeabilizacion",
+        "materiales",
+        "equipos",
+        "limpieza",
+        "seguridad",
+        "transporte",
+        "tecnologia",
+        "otro"
+      ]
+    },
+    "cuit": {
+      "type": "string"
+    },
+    "contact_name": {
+      "type": "string",
+      "description": "Persona de contacto"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono de contacto"
+    },
+    "address": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "activo",
+        "inactivo",
+        "suspendido"
+      ],
+      "default": "activo"
+    },
+    "valoracion": {
+      "type": "number",
+      "description": "Valoraci\u00f3n del proveedor del 1 al 5",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "notas_valoracion": {
+      "type": "string",
+      "description": "Comentarios sobre el desempe\u00f1o del proveedor"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

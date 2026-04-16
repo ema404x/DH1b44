@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  Wrench, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell
+  Wrench, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,7 +29,7 @@ const navGroups = [
   {
     label: 'Comercial',
     items: [
-      { label: 'Clientes', icon: Users, path: '/clientes' },
+      { label: 'Proveedores', icon: Truck, path: '/clientes' },
       { label: 'Presupuestos', icon: FileText, path: '/presupuestos' },
       { label: 'Presupuestos Obra', icon: Calculator, path: '/presupuestos-obra' },
       { label: 'Certificados', icon: Award, path: '/certificados' },
