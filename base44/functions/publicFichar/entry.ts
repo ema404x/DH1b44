@@ -78,7 +78,8 @@ Deno.serve(async (req) => {
       const { fileBase64, fileName, mimeType } = body;
       if (!fileBase64) return Response.json({ error: 'fileBase64 requerido' }, { status: 400 });
       const binary = Uint8Array.from(atob(fileBase64), c => c.charCodeAt(0));
-      const file = new File([binary], fileName || 'upload.png', { type: mimeType || 'image/png' });
+      const blob = new Blob([binary], { type: mimeType || 'image/png' });
+      const file = new File([blob], fileName || 'upload.png', { type: mimeType || 'image/png' });
       const result = await base44.asServiceRole.integrations.Core.UploadFile({ file });
       return Response.json({ file_url: result.file_url });
     }
