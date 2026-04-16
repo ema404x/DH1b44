@@ -12,7 +12,7 @@ import Projects from '@/pages/Projects';
 import WorkOrders from '@/pages/WorkOrders';
 import Clients from '@/pages/Clients';
 import Employees from '@/pages/Employees';
-import Inventory from '@/pages/Inventory';
+import Inventory from '@/pages/Inventory.jsx';
 import Quotes from '@/pages/Quotes';
 import Invoices from '@/pages/Invoices';
 import Finanzas from '@/pages/Finanzas';
