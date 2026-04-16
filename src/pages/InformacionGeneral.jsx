@@ -407,6 +407,9 @@ export default function InformacionGeneral() {
                 isExpanded={expandedDireccion === dirData.direccion}
                 onToggle={() => setExpandedDireccion(expandedDireccion === dirData.direccion ? null : dirData.direccion)}
                 comunas={COMUNAS}
+                onEdit={handleEdit}
+                onDelete={(id) => deleteMutation.mutate(id)}
+                jefesDisponibles={[...new Set(locations.map(l => l.jefe_sitio).filter(Boolean))].sort()}
               />
             ))
           )}
