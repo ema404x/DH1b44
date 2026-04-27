@@ -9,29 +9,25 @@ export default function QRCodeModal({ open, onClose, title, subtitle, value }) {
   const [copied, setCopied] = useState(false);
   const [qrReady, setQrReady] = useState(false);
 
-  const renderQR = (node) => {
-    if (!node || !value) return;
-    setQrReady(false);
-    QRCode.toCanvas(node, value, {
-      width: 220,
-      margin: 2,
-      color: { dark: '#0a1628', light: '#ffffff' },
-      errorCorrectionLevel: 'M',
-    }).then(() => setQrReady(true)).catch(() => {});
-  };
-
-  // Ref callback — fires when canvas mounts inside the dialog
-  const canvasCallbackRef = (node) => {
-    if (!node) return;
-    canvasRef.current = node;
-    renderQR(node);
-  };
-
-  // Re-render if value changes while dialog stays open
   useEffect(() => {
-    if (open && value && canvasRef.current) {
-      renderQR(canvasRef.current);
-    }
+    if (!open || !value) return;
+    setQrReady(false);
+
+    // Esperar al siguiente frame para que el Dialog esté visible en el DOM
+    const timer = setTimeout(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      QRCode.toCanvas(canvas, value, {
+        width: 220,
+        margin: 2,
+        color: { dark: '#0a1628', light: '#ffffff' },
+        errorCorrectionLevel: 'M',
+      })
+        .then(() => setQrReady(true))
+        .catch(() => {});
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [open, value]);
 
   const handleDownload = () => {
@@ -85,8 +81,8 @@ export default function QRCodeModal({ open, onClose, title, subtitle, value }) {
           <div className="bg-white border-2 border-border rounded-2xl p-4 shadow-sm flex flex-col items-center gap-2 w-full">
             <p className="font-bold text-sm text-center text-foreground leading-tight">{title}</p>
             {subtitle && <p className="text-xs text-muted-foreground text-center">{subtitle}</p>}
-            <div className="relative">
-              <canvas ref={canvasCallbackRef} className="rounded-lg" />
+            <div className="relative" style={{ minWidth: 220, minHeight: 220 }}>
+              <canvas ref={canvasRef} className="rounded-lg" />
               {!qrReady && (
                 <div className="absolute inset-0 flex items-center justify-center bg-white rounded-lg">
                   <div className="w-6 h-6 border-2 border-slate-200 border-t-slate-600 rounded-full animate-spin" />
