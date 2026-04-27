@@ -6,6 +6,7 @@ import {
   Wrench, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/AuthContext';
 
 const navGroups = [
   {
@@ -106,13 +107,26 @@ function NavItem({ item, collapsed, active, onClick }) {
 
 export default function Sidebar() {
   const location = useLocation();
+  const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isJefeSitio = user?.role === 'jefe_sitio';
 
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
+
+  // Filtrar grupos de navegación según rol
+  const visibleGroups = navGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item => {
+      if (!isJefeSitio) return true;
+      // Para jefe_sitio: solo mostrar Dashboard, Órdenes, Pendientes, Informes, Mapa
+      const jefeSitioRoutes = ['/', '/ordenes', '/activos', '/informes', '/mapa'];
+      return jefeSitioRoutes.includes(item.path);
+    })
+  })).filter(group => group.items.length > 0);
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -139,7 +153,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-4 scrollbar-thin">
-        {navGroups.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label}>
             {!collapsed && (
               <div className="px-3 mb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-sidebar-foreground/30 flex items-center gap-2">
