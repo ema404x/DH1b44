@@ -7,7 +7,6 @@
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { appParams } from '@/lib/app-params';
 import {
   CheckCircle2, Clock, MapPin, Loader2, AlertTriangle,
   Wrench, Zap, Eye, ClipboardList, User, Calendar,
@@ -20,19 +19,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
-// ── Helper: llamar funciones públicas sin token de auth ──────────────────────
+// ── Helper: llamar funciones públicas via SDK (no requiere auth) ─────────────
 const callPublicFn = async (fnName, payload) => {
-  const appId = appParams.appId;
-  const version = appParams.functionsVersion || 'v3';
-  const baseUrl = appParams.appBaseUrl || '';
-  const url = `${baseUrl}/api/apps/${appId}/functions/${fnName}/invoke`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error(`Error ${res.status}`);
-  return res.json();
+  const res = await base44.functions.invoke(fnName, payload);
+  return res.data;
 };
 
 // ── Configuraciones visuales ─────────────────────────────────────────────────

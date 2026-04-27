@@ -9,21 +9,31 @@ export default function QRCodeModal({ open, onClose, title, subtitle, value, log
   const [copied, setCopied] = useState(false);
   const [qrReady, setQrReady] = useState(false);
 
+  // Use a ref callback so we render as soon as the canvas node is in the DOM
+  const canvasCallbackRef = (node) => {
+    if (!node) return;
+    canvasRef.current = node;
+    if (open && value) {
+      setQrReady(false);
+      QRCode.toCanvas(node, value, {
+        width: 280,
+        margin: 2,
+        color: { dark: '#0a1628', light: '#ffffff' },
+        errorCorrectionLevel: 'H',
+      }).then(() => setQrReady(true)).catch(() => {});
+    }
+  };
+
+  // Also re-render if value changes while dialog is already open
   useEffect(() => {
-    if (!open || !value) return;
+    if (!open || !value || !canvasRef.current) return;
     setQrReady(false);
-    // Small delay to ensure the Dialog has fully mounted the canvas
-    const timer = setTimeout(() => {
-      if (canvasRef.current) {
-        QRCode.toCanvas(canvasRef.current, value, {
-          width: 280,
-          margin: 2,
-          color: { dark: '#0a1628', light: '#ffffff' },
-          errorCorrectionLevel: 'H',
-        }).then(() => setQrReady(true));
-      }
-    }, 100);
-    return () => clearTimeout(timer);
+    QRCode.toCanvas(canvasRef.current, value, {
+      width: 280,
+      margin: 2,
+      color: { dark: '#0a1628', light: '#ffffff' },
+      errorCorrectionLevel: 'H',
+    }).then(() => setQrReady(true)).catch(() => {});
   }, [open, value]);
 
   const handleDownload = () => {
@@ -119,7 +129,7 @@ export default function QRCodeModal({ open, onClose, title, subtitle, value, log
             <p className="font-bold text-sm text-center text-foreground leading-tight">{title}</p>
             {subtitle && <p className="text-xs text-muted-foreground text-center">{subtitle}</p>}
             <div className="relative">
-              <canvas ref={canvasRef} className="rounded-lg" />
+              <canvas ref={canvasCallbackRef} className="rounded-lg" />
               {!qrReady && (
                 <div className="absolute inset-0 flex items-center justify-center bg-white rounded-lg">
                   <div className="w-6 h-6 border-2 border-slate-200 border-t-slate-600 rounded-full animate-spin" />
