@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode, Trash2 } from 'lucide-react';
 import WorkOrderQRButton from './WorkOrderQRButton';
+import QRCodeModal from '@/components/shared/QRCodeModal';
 import DeleteWorkOrderButton from './DeleteWorkOrderButton';
 import WorkOrderChecklist from './WorkOrderChecklist';
 import WorkOrderPhotos from './WorkOrderPhotos';
@@ -30,6 +31,7 @@ const typeLabels = {
 
 export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [data, setData] = useState({ ...order });
+  const [qrOpen, setQrOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: timeLogs = [] } = useQuery({
@@ -203,7 +205,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
              >
                <Download className="h-4 w-4" />
              </Button>
-             <WorkOrderQRButton order={data} variant="outline" size="icon" />
+             <WorkOrderQRButton order={data} variant="outline" size="icon" onShowQR={() => setQrOpen(true)} />
            </div>
            <div className="flex gap-2 flex-1 justify-end">
              {onDelete && (
@@ -217,6 +219,15 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
            </div>
          </div>
       </div>
-    </div>
-  );
-}
+
+      {/* QR Modal — una sola instancia por panel */}
+      <QRCodeModal
+       open={qrOpen}
+       onClose={() => setQrOpen(false)}
+       title={data.title}
+       subtitle={data.location || data.asset_name || `OT ${data.code || ''}`}
+       value={`${window.location.origin}/orden-trabajo?ot=${data.id}`}
+      />
+      </div>
+      );
+      }

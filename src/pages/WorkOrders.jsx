@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import WorkOrderQRButton from '@/components/workorders/WorkOrderQRButton';
 import DeleteWorkOrderButton from '@/components/workorders/DeleteWorkOrderButton';
+import QRCodeModal from '@/components/shared/QRCodeModal';
 import { exportOTsPDF } from '@/utils/exportPDF';
 import { format, isPast, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -125,7 +126,7 @@ function NewOrderDialog({ open, onOpenChange, onSave, saving }) {
   );
 }
 
-function WorkOrderCard({ order, onOpen }) {
+function WorkOrderCard({ order, onOpen, onShowQR }) {
   const sc = statusConfig[order.status] || statusConfig.pendiente;
   const pc = priorityConfig[order.priority] || priorityConfig.media;
   const TypeIcon = typeIcons[order.type] || Wrench;
@@ -140,7 +141,7 @@ function WorkOrderCard({ order, onOpen }) {
     >
       {/* QR button — top-right absolute */}
       <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={e => e.stopPropagation()}>
-        <WorkOrderQRButton order={order} />
+        <WorkOrderQRButton order={order} onShowQR={onShowQR} />
       </div>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -218,6 +219,7 @@ export default function WorkOrders() {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [qrOrder, setQrOrder] = useState(null);
   const queryClient = useQueryClient();
 
   const { isOnline, pendingCount, queueCreate } = useOfflineQueue((count) => {
@@ -339,7 +341,7 @@ export default function WorkOrders() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {filtered.map(order => (
-            <WorkOrderCard key={order.id} order={order} onOpen={setSelectedOrder} onDelete={deleteMutation.mutate} />
+            <WorkOrderCard key={order.id} order={order} onOpen={setSelectedOrder} onDelete={deleteMutation.mutate} onShowQR={setQrOrder} />
           ))}
         </div>
       )}
@@ -360,6 +362,15 @@ export default function WorkOrders() {
            onDelete={deleteMutation.mutate}
          />
        )}
+
+      {/* ÚNICO QR Modal — compartido por todas las cards */}
+      <QRCodeModal
+        open={!!qrOrder}
+        onClose={() => setQrOrder(null)}
+        title={qrOrder?.title || ''}
+        subtitle={qrOrder?.location || qrOrder?.asset_name || `OT ${qrOrder?.code || ''}`}
+        value={qrOrder ? `${window.location.origin}/orden-trabajo?ot=${qrOrder.id}` : ''}
+      />
     </div>
   );
 }

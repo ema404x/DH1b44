@@ -156,14 +156,16 @@ export default function LocationQRManager() {
         </div>
       )}
 
-      {/* QR Modal */}
-      <QRCodeModal
-        open={!!qrLoc}
-        onClose={() => setQrLoc(null)}
-        title={qrLoc?.name || ''}
-        subtitle={qrLoc?.address || qrLoc?.project_name || 'Pilar de ubicación — Control de OT'}
-        value={qrLoc ? getQRUrl(qrLoc) : ''}
-      />
+      {/* ÚNICO QR Modal — compartido por todas las ubicaciones */}
+      {qrLoc && (
+        <QRCodeModal
+          open={!!qrLoc}
+          onClose={() => setQrLoc(null)}
+          title={qrLoc.name}
+          subtitle={qrLoc.address || qrLoc.project_name || 'Pilar de ubicación — Control de OT'}
+          value={getQRUrl(qrLoc)}
+        />
+      )}
 
       {/* Form Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
