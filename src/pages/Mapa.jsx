@@ -2,11 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Activity, List, Users } from 'lucide-react';
+import { MapPin, Activity, List, Users, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import MapaFichajes from '@/components/mapa/MapaFichajes';
 import LocationsManager from '@/components/mapa/LocationsManager';
 import AsignacionesUbicacion from '@/components/mapa/AsignacionesUbicacion';
+import MapaProyectosOTs from '@/components/mapa/MapaProyectosOTs';
 
 export default function Mapa() {
   const [tab, setTab] = useState('mapa');
@@ -71,6 +72,9 @@ export default function Mapa() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="h-10">
+          <TabsTrigger value="proyectos-ots" className="gap-2">
+            <Globe className="h-4 w-4" /> Proyectos & OTs
+          </TabsTrigger>
           <TabsTrigger value="mapa" className="gap-2">
             <Activity className="h-4 w-4" /> Mapa GPS
           </TabsTrigger>
@@ -81,6 +85,10 @@ export default function Mapa() {
             <Users className="h-4 w-4" /> Asignaciones
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="proyectos-ots" className="mt-5">
+          <MapaProyectosOTs />
+        </TabsContent>
 
         <TabsContent value="mapa" className="mt-5">
           <MapaFichajes
