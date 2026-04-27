@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ImportadorLocations from '@/components/informacion-general/ImportadorLocations';
+import ImportadorJefesSitio from '@/components/informacion-general/ImportadorJefesSitio';
 import JefeSitioPanel from '@/components/informacion-general/JefeSitioPanel';
 import DireccionPanel from '@/components/informacion-general/DireccionPanel';
 import DireccionesManager from '@/components/informacion-general/DireccionesManager';
@@ -234,8 +235,25 @@ export default function InformacionGeneral() {
 
       {/* Import Tab */}
       {activeTab === 'import' && (
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <ImportadorLocations onImportSuccess={() => { refetch(); setActiveTab('dashboard'); }} />
+        <div className="max-w-7xl mx-auto px-6 py-8 space-y-10">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 mb-1">Importar Escuelas (Excel por Comunas)</h2>
+            <p className="text-sm text-muted-foreground mb-4">Importa el padrón completo de escuelas con hojas por comuna.</p>
+            <ImportadorLocations onImportSuccess={() => { refetch(); setActiveTab('dashboard'); }} />
+          </div>
+          <hr className="border-slate-200" />
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 mb-1 flex items-center gap-2">
+              <Users className="h-5 w-5 text-blue-600" /> Asignar Jefes de Sitio por Dirección
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Cargá el Excel de distribución de direcciones para asignar automáticamente los jefes de sitio a cada escuela.
+            </p>
+            <ImportadorJefesSitio
+              locations={locations}
+              onSuccess={() => { refetch(); }}
+            />
+          </div>
         </div>
       )}
 
