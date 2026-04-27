@@ -363,14 +363,16 @@ export default function WorkOrders() {
          />
        )}
 
-      {/* ÚNICO QR Modal — compartido por todas las cards */}
-      <QRCodeModal
-        open={!!qrOrder}
-        onClose={() => setQrOrder(null)}
-        title={qrOrder?.title || ''}
-        subtitle={qrOrder?.location || qrOrder?.asset_name || `OT ${qrOrder?.code || ''}`}
-        value={qrOrder ? `${window.location.origin}/orden-trabajo?ot=${qrOrder.id}` : ''}
-      />
+      {/* ÚNICO QR Modal — solo se monta cuando hay una OT seleccionada */}
+      {qrOrder && (
+        <QRCodeModal
+          open={true}
+          onClose={() => setQrOrder(null)}
+          title={qrOrder.title}
+          subtitle={qrOrder.location || qrOrder.asset_name || `OT ${qrOrder.code || ''}`}
+          value={`${window.location.origin}/orden-trabajo?ot=${qrOrder.id}`}
+        />
+      )}
     </div>
   );
 }
