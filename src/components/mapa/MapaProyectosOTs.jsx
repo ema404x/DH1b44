@@ -144,8 +144,8 @@ export default function MapaProyectosOTs() {
           <div className="lg:col-span-2 rounded-lg overflow-hidden shadow-lg border border-slate-200">
             <MapContainer center={center} zoom={12} style={{ height: '100%', width: '100%' }}>
               <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; OpenStreetMap contributors'
+                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                attribution='&copy; OpenStreetMap contributors, &copy; CARTO'
               />
               {filteredOrders.map(order => (
                 <Marker
