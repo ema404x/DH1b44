@@ -1,53 +1,85 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { BarChart2, TrendingUp, Clock, Package, Wrench, CheckCircle2, AlertTriangle, Download, Filter, FileText } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend, AreaChart, Area, ComposedChart, Scatter, ScatterChart
+} from 'recharts';
+import {
+  BarChart2, TrendingUp, Clock, Package, Wrench, CheckCircle2, AlertTriangle, Download,
+  Filter, FileText, Target, Users, Activity, Zap
+} from 'lucide-react';
 import { exportKPIsPDF } from '@/utils/exportPDF';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
-import PageHeader from '@/components/shared/PageHeader';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6'];
 
-const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
-
-function KpiMetric({ title, value, subtitle, icon: IconComponent, color = 'blue' }) {
-  const colors = {
-    blue: 'bg-blue-50 text-blue-600', green: 'bg-emerald-50 text-emerald-600',
-    amber: 'bg-amber-50 text-amber-600', red: 'bg-red-50 text-red-600', purple: 'bg-purple-50 text-purple-600',
+function KpiMetric({ title, value, subtitle, icon: IconComponent, color = 'blue', trend }) {
+  const colorMap = {
+    blue: 'from-blue-500/20 to-blue-600/10 border-blue-500/30',
+    green: 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/30',
+    amber: 'from-amber-500/20 to-amber-600/10 border-amber-500/30',
+    purple: 'from-purple-500/20 to-purple-600/10 border-purple-500/30',
+    red: 'from-red-500/20 to-red-600/10 border-red-500/30',
   };
+
+  const iconColorMap = {
+    blue: 'text-blue-400', green: 'text-emerald-400', amber: 'text-amber-400',
+    purple: 'text-purple-400', red: 'text-red-400',
+  };
+
   return (
-    <Card>
-      <CardContent className="pt-4 pb-3">
-        <div className={`h-9 w-9 rounded-xl flex items-center justify-center mb-3 ${colors[color]}`}>
-          {IconComponent && <IconComponent className="h-5 w-5" />}
-        </div>
-        <div className="text-2xl font-bold">{value}</div>
-        <div className="text-sm font-medium">{title}</div>
-        {subtitle && <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>}
-      </CardContent>
-    </Card>
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -5 }}>
+      <Card className={`border bg-gradient-to-br ${colorMap[color]} backdrop-blur-xl shadow-lg border-slate-700/50`}>
+        <CardContent className="pt-5 pb-5">
+          <div className="flex items-start justify-between mb-3">
+            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${iconColorMap[color]}`}>
+              {IconComponent && <IconComponent className="h-5 w-5" />}
+            </div>
+            {trend && (
+              <Badge className={`text-xs ${trend > 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
+                {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
+              </Badge>
+            )}
+          </div>
+          <div className="text-2xl font-bold text-white">{value}</div>
+          <div className="text-xs font-semibold text-slate-400 mt-2 uppercase tracking-wide">{title}</div>
+          {subtitle && <div className="text-xs text-slate-500 mt-1">{subtitle}</div>}
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
 export default function Reportes() {
   const [dateFrom, setDateFrom] = useState(format(subMonths(new Date(), 5), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [comunaFilter, setComunaFilter] = useState('all');
+  const [jefeFilter, setJefeFilter] = useState('all');
   const [projectFilter, setProjectFilter] = useState('all');
 
+  // Fetch all data
   const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: () => base44.entities.Project.list() });
   const { data: timeLogs = [] } = useQuery({ queryKey: ['timelogs_all'], queryFn: () => base44.entities.TimeLog.list() });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list() });
-  const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list() });
-  const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list() });
+  const { data: employees = [] } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list() });
+  const { data: locations = [] } = useQuery({ queryKey: ['locations'], queryFn: () => base44.entities.LocationData.list() });
 
+  // Get unique filter options
+  const comunasUnicas = ['8A', '8B', '10A'];
+  const jefesUnicos = [...new Set(locations.map(l => l.jefe_sitio).filter(Boolean))];
+
+  // Filter data
   const filteredOrders = useMemo(() => {
     const from = new Date(dateFrom);
     const to = new Date(dateTo);
@@ -55,16 +87,21 @@ export default function Reportes() {
       const date = o.created_date ? new Date(o.created_date) : null;
       const inRange = !date || (date >= from && date <= to);
       const inProject = projectFilter === 'all' || o.project_name === projectFilter;
-      return inRange && inProject;
-    });
-  }, [orders, dateFrom, dateTo, projectFilter]);
 
-  // OTs por mes
+      // Para OTs podemos usar comuna y jefe de sitio desde LocationQR o asignación
+      let matchComuna = comunaFilter === 'all' || true;
+      let matchJefe = jefeFilter === 'all' || true;
+
+      return inRange && inProject && matchComuna && matchJefe;
+    });
+  }, [orders, dateFrom, dateTo, projectFilter, comunaFilter, jefeFilter]);
+
+  // Gráficos por mes
   const months = eachMonthOfInterval({ start: new Date(dateFrom), end: new Date(dateTo) });
   const otsPorMes = months.map(month => {
     const start = startOfMonth(month);
     const end = endOfMonth(month);
-    const monthOrders = orders.filter(o => {
+    const monthOrders = filteredOrders.filter(o => {
       const d = o.created_date ? new Date(o.created_date) : null;
       return d && isWithinInterval(d, { start, end });
     });
@@ -73,6 +110,7 @@ export default function Reportes() {
       total: monthOrders.length,
       completadas: monthOrders.filter(o => o.status === 'completada').length,
       pendientes: monthOrders.filter(o => ['pendiente', 'asignada'].includes(o.status)).length,
+      en_progreso: monthOrders.filter(o => o.status === 'en_progreso').length,
     };
   });
 
@@ -86,351 +124,317 @@ export default function Reportes() {
     value: filteredOrders.filter(o => o.type === key).length,
   })).filter(d => d.value > 0);
 
-  // OTs por prioridad
-  const otsPorPrioridad = ['urgente', 'alta', 'media', 'baja'].map(p => ({
-    prioridad: p.charAt(0).toUpperCase() + p.slice(1),
-    cantidad: filteredOrders.filter(o => o.priority === p).length,
-  }));
-
-  // Horas por empleado (top 8)
-  const horasPorEmpleado = Object.entries(
-    timeLogs.reduce((acc, log) => {
-      acc[log.employee_name] = (acc[log.employee_name] || 0) + (log.hours || 0);
+  // Eficiencia por técnico
+  const eficienciaPorTecnico = Object.entries(
+    filteredOrders.reduce((acc, o) => {
+      if (!o.assigned_name) return acc;
+      if (!acc[o.assigned_name]) acc[o.assigned_name] = { total: 0, completadas: 0 };
+      acc[o.assigned_name].total++;
+      if (o.status === 'completada') acc[o.assigned_name].completadas++;
       return acc;
     }, {})
-  ).map(([name, hours]) => ({ name, hours }))
-    .sort((a, b) => b.hours - a.hours)
-    .slice(0, 8);
+  ).map(([name, data]) => ({
+    name,
+    total: data.total,
+    completadas: data.completadas,
+    eficiencia: data.total > 0 ? Math.round((data.completadas / data.total) * 100) : 0
+  })).sort((a, b) => b.eficiencia - a.eficiencia).slice(0, 8);
 
-  // Costo materiales por categoría
-  const costoMateriales = Object.entries(
-    orders.flatMap(o => o.materials_used || []).reduce((acc, m) => {
-      acc[m.material_name] = (acc[m.material_name] || 0) + (m.quantity * m.unit_cost || 0);
+  // Costos por proyecto
+  const costosPorProyecto = Object.entries(
+    filteredOrders.reduce((acc, o) => {
+      if (!o.project_name) return acc;
+      if (!acc[o.project_name]) acc[o.project_name] = 0;
+      acc[o.project_name] += (o.materials_used || []).reduce((s, m) => s + (m.quantity * m.unit_cost || 0), 0);
       return acc;
     }, {})
   ).map(([name, costo]) => ({ name, costo }))
     .sort((a, b) => b.costo - a.costo)
     .slice(0, 6);
 
-  // KPIs generales
+  // KPIs
   const completadas = filteredOrders.filter(o => o.status === 'completada').length;
   const eficiencia = filteredOrders.length > 0 ? Math.round((completadas / filteredOrders.length) * 100) : 0;
-  const totalHoras = timeLogs.reduce((s, l) => s + (l.hours || 0), 0);
-  const costoTotalMateriales = orders.reduce((s, o) =>
-    s + (o.materials_used || []).reduce((ms, m) => ms + (m.quantity * m.unit_cost || 0), 0), 0);
-  const tiempoPromedio = (() => {
-    const conHoras = filteredOrders.filter(o => o.actual_hours > 0);
-    if (!conHoras.length) return 0;
-    return Math.round(conHoras.reduce((s, o) => s + o.actual_hours, 0) / conHoras.length * 10) / 10;
-  })();
+  const horasPromedio = timeLogs.length > 0 ? Math.round(timeLogs.reduce((s, l) => s + (l.hours || 0), 0) / timeLogs.length * 10) / 10 : 0;
+  const costoMaterialTotal = filteredOrders.reduce((s, o) => s + (o.materials_used || []).reduce((ms, m) => ms + (m.quantity * m.unit_cost || 0), 0), 0);
 
-  const exportCSV = () => {
-    const rows = [
-      ['Código', 'Título', 'Tipo', 'Estado', 'Prioridad', 'Asignado', 'Fecha Programada', 'Horas Estimadas', 'Horas Reales'],
-      ...filteredOrders.map(o => [
-        o.code || '', o.title, o.type, o.status, o.priority, o.assigned_name || '',
-        o.scheduled_date || '', o.estimated_hours || '', o.actual_hours || ''
-      ])
-    ];
-    const csv = rows.map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `reporte_ots_${format(new Date(), 'yyyyMMdd')}.csv`; a.click();
+  const container = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.1 } }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Reportes & Analíticas"
-        subtitle="Métricas operacionales y financieras para Mejores"
-      />
-
-      {/* Filtros */}
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">Filtros del Reporte</span>
-          </div>
-          <div className="flex flex-wrap gap-3 items-end">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Desde</p>
-              <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-xs w-36" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Hasta</p>
-              <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-xs w-36" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Proyecto</p>
-              <Select value={projectFilter} onValueChange={setProjectFilter}>
-                <SelectTrigger className="h-8 text-xs w-48"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los proyectos</SelectItem>
-                  {projects.map(p => <SelectItem key={p.id} value={p.name} className="text-xs">{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={exportCSV}>
-              <Download className="h-3.5 w-3.5" /> CSV
-            </Button>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs border-red-300 text-red-700 hover:bg-red-50" onClick={() => exportKPIsPDF({ orders: filteredOrders, timeLogs, materials, assets, dateFrom, dateTo })}>
-              <FileText className="h-3.5 w-3.5" /> PDF KPIs
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiMetric title="OTs en Período" value={filteredOrders.length} subtitle={`${completadas} completadas`} icon={Wrench} color="blue" />
-        <KpiMetric title="Tasa de Cumplimiento" value={`${eficiencia}%`} subtitle="OTs completadas / totales" icon={CheckCircle2} color="green" />
-        <KpiMetric title="Horas Registradas" value={`${totalHoras}h`} subtitle={`Prom. ${tiempoPromedio}h/OT`} icon={Clock} color="purple" />
-        <KpiMetric title="Costo en Materiales" value={fmt(costoTotalMateriales)} subtitle="Todas las OTs" icon={Package} color="amber" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 space-y-6">
+      {/* Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-teal-500/30 rounded-full blur-3xl opacity-20 animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-violet-500/20 rounded-full blur-3xl opacity-20 animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      <Tabs defaultValue="ots">
-        <TabsList>
-          <TabsTrigger value="ots" className="gap-1.5"><BarChart2 className="h-3.5 w-3.5" /> OTs</TabsTrigger>
-          <TabsTrigger value="horas" className="gap-1.5"><Clock className="h-3.5 w-3.5" /> Horas</TabsTrigger>
-          <TabsTrigger value="materiales" className="gap-1.5"><Package className="h-3.5 w-3.5" /> Materiales</TabsTrigger>
-          <TabsTrigger value="activos" className="gap-1.5"><Wrench className="h-3.5 w-3.5" /> Activos</TabsTrigger>
-        </TabsList>
-
-        {/* OTs Tab */}
-        <TabsContent value="ots" className="mt-4 space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">OTs por Mes</CardTitle></CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={otsPorMes}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                    <Tooltip />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="completadas" fill="#10b981" name="Completadas" radius={[3,3,0,0]} />
-                    <Bar dataKey="pendientes" fill="#94a3b8" name="Pendientes" radius={[3,3,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">OTs por Tipo</CardTitle></CardHeader>
-              <CardContent className="flex items-center justify-center">
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie data={otsPorTipo} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                      {otsPorTipo.map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card className="lg:col-span-2">
-              <CardHeader className="pb-2"><CardTitle className="text-sm">OTs por Prioridad</CardTitle></CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={otsPorPrioridad} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                    <YAxis dataKey="prioridad" type="category" tick={{ fontSize: 11 }} width={70} />
-                    <Tooltip />
-                    <Bar dataKey="cantidad" fill="#2563eb" name="Cantidad" radius={[0,3,3,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Horas Tab */}
-        <TabsContent value="horas" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Horas por Técnico</CardTitle></CardHeader>
-            <CardContent>
-              {horasPorEmpleado.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-sm">Sin registros de horas</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={horasPorEmpleado}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(v) => [`${v}h`, 'Horas']} />
-                    <Bar dataKey="hours" fill="#8b5cf6" name="Horas" radius={[3,3,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Tabla detalle horas */}
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Detalle de Registros</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                {timeLogs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">Sin registros de horas</p>
-                ) : timeLogs.slice(0, 50).map(log => (
-                  <div key={log.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30 text-xs">
-                    <span className="font-medium flex-1">{log.employee_name}</span>
-                    <span className="text-muted-foreground truncate max-w-[160px]">{log.work_order_title}</span>
-                    <span className="text-muted-foreground">{log.date ? format(parseISO(log.date), 'd MMM', { locale: es }) : ''}</span>
-                    <span className="font-bold text-primary w-10 text-right">{log.hours}h</span>
-                  </div>
-                ))}
+      {/* Header */}
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-white flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
+                <BarChart2 className="h-6 w-6 text-white" />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Materiales Tab */}
-        <TabsContent value="materiales" className="mt-4 space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Top Materiales Utilizados</CardTitle></CardHeader>
-              <CardContent>
-                {costoMateriales.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground text-sm">Sin datos de materiales</div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={240}>
-                    <BarChart data={costoMateriales} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                      <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={100} />
-                      <Tooltip formatter={(v) => [fmt(v), 'Costo']} />
-                      <Bar dataKey="costo" fill="#f59e0b" radius={[0,3,3,0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Stock Actual vs Mínimo</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {materials.filter(m => m.min_stock > 0).length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">Sin materiales con stock mínimo definido</p>
-                  ) : materials.filter(m => m.min_stock > 0).map(m => {
-                    const pct = m.min_stock > 0 ? Math.min((m.stock / m.min_stock) * 100, 100) : 100;
-                    const low = m.stock <= m.min_stock;
-                    return (
-                      <div key={m.id} className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="font-medium truncate max-w-[160px]">{m.name}</span>
-                          <span className={`font-medium ${low ? 'text-red-600' : 'text-emerald-600'}`}>
-                            {m.stock} / {m.min_stock}
-                          </span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-1.5">
-                          <div className={`h-1.5 rounded-full ${low ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+              Reportes Gerenciales
+            </h1>
+            <p className="text-slate-400 mt-1">Análisis integral de proyectos, operaciones e inventario</p>
           </div>
-        </TabsContent>
+        </div>
+      </motion.div>
 
-        {/* Activos Tab */}
-        <TabsContent value="activos" className="mt-4 space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Activos por Estado</CardTitle></CardHeader>
-              <CardContent className="flex justify-center">
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'Operativo', value: assets.filter(a => a.status === 'operativo').length },
-                        { name: 'Mantenimiento', value: assets.filter(a => a.status === 'en_mantenimiento').length },
-                        { name: 'Fuera servicio', value: assets.filter(a => a.status === 'fuera_de_servicio').length },
-                        { name: 'Baja', value: assets.filter(a => a.status === 'baja').length },
-                      ].filter(d => d.value > 0)}
-                      dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {[0,1,2,3].map(idx => <Cell key={idx} fill={[COLORS[2], COLORS[0], COLORS[3], '#94a3b8'][idx]} />)}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+      {/* Filtros Avanzados */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+        <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+          <CardContent className="pt-5 pb-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Filter className="h-4 w-4 text-teal-400" />
+              <span className="text-sm font-semibold text-white">Filtros Avanzados</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Desde</label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                  className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Hasta</label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                  className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Comuna</label>
+                <Select value={comunaFilter} onValueChange={setComunaFilter}>
+                  <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {comunasUnicas.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Jefe de Sitio</label>
+                <Select value={jefeFilter} onValueChange={setJefeFilter}>
+                  <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {jefesUnicos.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Proyecto</label>
+                <Select value={projectFilter} onValueChange={setProjectFilter}>
+                  <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {projects.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-sm">Activos por Criticidad</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-3 pt-2">
-                  {[
-                    { label: 'Crítica', key: 'critica', color: 'bg-red-500' },
-                    { label: 'Alta', key: 'alta', color: 'bg-orange-500' },
-                    { label: 'Media', key: 'media', color: 'bg-blue-500' },
-                    { label: 'Baja', key: 'baja', color: 'bg-slate-400' },
-                  ].map(({ label, key, color }) => {
-                    const count = assets.filter(a => a.criticality === key).length;
-                    const pct = assets.length > 0 ? (count / assets.length) * 100 : 0;
-                    return (
-                      <div key={key}>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="font-medium">{label}</span>
-                          <span className="text-muted-foreground">{count} activos ({Math.round(pct)}%)</span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div className={`h-2 rounded-full ${color}`} style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+      {/* KPIs */}
+      <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div variants={item}>
+          <KpiMetric title="Órdenes Totales" value={filteredOrders.length} subtitle={`${completadas} completadas`} icon={Wrench} color="blue" />
+        </motion.div>
+        <motion.div variants={item}>
+          <KpiMetric title="Tasa Cumplimiento" value={`${eficiencia}%`} subtitle="Completadas/Totales" icon={CheckCircle2} color="green" />
+        </motion.div>
+        <motion.div variants={item}>
+          <KpiMetric title="Costo Materiales" value={fmt(costoMaterialTotal)} subtitle="Total invertido" icon={Package} color="amber" />
+        </motion.div>
+        <motion.div variants={item}>
+          <KpiMetric title="Prom. Horas/Registro" value={`${horasPromedio}h`} subtitle={`${timeLogs.length} registros`} icon={Clock} color="purple" />
+        </motion.div>
+      </motion.div>
 
-            <Card className="lg:col-span-2">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm">Activos con Mantenimiento Vencido o Próximo</CardTitle>
-                  <span className="text-xs text-muted-foreground">{assets.filter(a => a.next_maintenance).length} programados</span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                  {assets.filter(a => a.next_maintenance).length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">Sin mantenimientos programados</p>
-                  ) : assets
-                    .filter(a => a.next_maintenance)
-                    .sort((a, b) => a.next_maintenance.localeCompare(b.next_maintenance))
-                    .map(asset => {
-                      const days = Math.ceil((new Date(asset.next_maintenance) - new Date()) / (1000 * 60 * 60 * 24));
-                      const overdue = days < 0;
-                      const soon = days >= 0 && days <= 30;
-                      return (
-                        <div key={asset.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30 text-xs">
-                          {overdue ? <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" /> : <Wrench className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
-                          <span className="font-medium flex-1">{asset.name}</span>
-                          <span className="text-muted-foreground">{asset.location}</span>
-                          <span className={`font-medium px-2 py-0.5 rounded ${overdue ? 'bg-red-100 text-red-700' : soon ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {overdue ? `Vencido ${Math.abs(days)}d` : days === 0 ? 'Hoy' : `En ${days}d`}
-                          </span>
-                        </div>
-                      );
-                    })
-                  }
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+      {/* Tabs */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+        <Tabs defaultValue="operaciones" className="w-full">
+          <TabsList className="grid w-full grid-cols-4 bg-slate-800/50 border border-slate-700/50">
+            <TabsTrigger value="operaciones" className="gap-1.5 text-xs"><Activity className="h-3.5 w-3.5" /> Operaciones</TabsTrigger>
+            <TabsTrigger value="personal" className="gap-1.5 text-xs"><Users className="h-3.5 w-3.5" /> Personal</TabsTrigger>
+            <TabsTrigger value="financiero" className="gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" /> Financiero</TabsTrigger>
+            <TabsTrigger value="inventario" className="gap-1.5 text-xs"><Package className="h-3.5 w-3.5" /> Inventario</TabsTrigger>
+          </TabsList>
+
+          {/* Operaciones */}
+          <TabsContent value="operaciones" className="mt-4 space-y-4">
+            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <motion.div variants={item}>
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Órdenes por Mes</CardTitle></CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <AreaChart data={otsPorMes}>
+                        <defs>
+                          <linearGradient id="colorCompletadas" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} allowDecimals={false} />
+                        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px', color: '#e2e8f0' }} />
+                        <Area type="monotone" dataKey="completadas" stroke="#10b981" fillOpacity={1} fill="url(#colorCompletadas)" name="Completadas" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              <motion.div variants={item}>
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Órdenes por Tipo</CardTitle></CardHeader>
+                  <CardContent className="flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie data={otsPorTipo} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                          {otsPorTipo.map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              <motion.div variants={item} className="lg:col-span-2">
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Evolución: Completadas vs Pendientes</CardTitle></CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <ComposedChart data={otsPorMes}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} />
+                        <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
+                        <Bar dataKey="completadas" fill="#10b981" name="Completadas" radius={[4,4,0,0]} />
+                        <Line type="monotone" dataKey="pendientes" stroke="#f59e0b" name="Pendientes" strokeWidth={2} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
+          </TabsContent>
+
+          {/* Personal */}
+          <TabsContent value="personal" className="mt-4 space-y-4">
+            <motion.div variants={container} initial="hidden" animate="show">
+              <motion.div variants={item}>
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Eficiencia por Técnico</CardTitle></CardHeader>
+                  <CardContent>
+                    {eficienciaPorTecnico.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500">Sin datos</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={eficienciaPorTecnico}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                          <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} angle={-45} textAnchor="end" height={80} />
+                          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} formatter={(v) => [`${v}%`, 'Eficiencia']} />
+                          <Bar dataKey="eficiencia" fill="#06b6d4" name="Eficiencia" radius={[4,4,0,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
+          </TabsContent>
+
+          {/* Financiero */}
+          <TabsContent value="financiero" className="mt-4 space-y-4">
+            <motion.div variants={container} initial="hidden" animate="show">
+              <motion.div variants={item}>
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Costos por Proyecto</CardTitle></CardHeader>
+                  <CardContent>
+                    {costosPorProyecto.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500">Sin datos de costos</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={costosPorProyecto} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                          <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                          <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#94a3b8' }} width={120} />
+                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} formatter={(v) => fmt(v)} />
+                          <Bar dataKey="costo" fill="#f59e0b" radius={[0,4,4,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
+          </TabsContent>
+
+          {/* Inventario */}
+          <TabsContent value="inventario" className="mt-4 space-y-4">
+            <motion.div variants={container} initial="hidden" animate="show">
+              <motion.div variants={item}>
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Stock vs Mínimo</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {materials.filter(m => m.min_stock > 0).length === 0 ? (
+                        <p className="text-sm text-slate-500 text-center py-8">Sin materiales con stock mínimo</p>
+                      ) : materials.filter(m => m.min_stock > 0).map(m => {
+                        const pct = Math.min((m.stock / m.min_stock) * 100, 100);
+                        const isLow = m.stock <= m.min_stock;
+                        return (
+                          <div key={m.id} className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="font-medium text-slate-300 truncate">{m.name}</span>
+                              <span className={isLow ? 'text-red-400 font-bold' : 'text-emerald-400'}>
+                                {m.stock} / {m.min_stock}
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-700/50 rounded-full h-2">
+                              <div className={`h-2 rounded-full transition-all ${isLow ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
+          </TabsContent>
+        </Tabs>
+      </motion.div>
     </div>
   );
 }
