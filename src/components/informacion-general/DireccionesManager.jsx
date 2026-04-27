@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronUp, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +33,17 @@ export default function DireccionesManager({ locations, comunas, onLocationUpdat
   const [bulkJefe, setBulkJefe] = useState('');
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const queryClient = useQueryClient();
+
+  // Cargar jefes de sitio desde Employee
+  const { data: empleados = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => base44.entities.Employee.filter({ role: 'jefe_sitio' }),
+  });
+
+  const jefesSitioDisponibles = useMemo(
+    () => empleados.map(e => e.full_name).sort(),
+    [empleados]
+  );
 
   // Agrupar por direcciones
   const direccionesData = useMemo(() => {
@@ -57,8 +68,9 @@ export default function DireccionesManager({ locations, comunas, onLocationUpdat
   }, [locations]);
 
   const jefesUnicos = useMemo(() => {
-    return [...new Set(locations.map(l => l.jefe_sitio).filter(Boolean))].sort();
-  }, [locations]);
+    const asignados = new Set(locations.map(l => l.jefe_sitio).filter(Boolean));
+    return [...new Set([...asignados, ...jefesSitioDisponibles])].sort();
+  }, [locations, jefesSitioDisponibles]);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.LocationData.update(id, data),
