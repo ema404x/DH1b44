@@ -30,12 +30,12 @@ Deno.serve(async (req) => {
     const ws = wb.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
-    // Headers están en fila 0
-    const headers = rows[0];
-    const jefeCol = headers.findIndex(h => String(h || '').toLowerCase().includes('jefe'));
-    const comunaCol = headers.findIndex(h => String(h || '').toLowerCase().includes('comuna'));
-    const direccionCol = headers.findIndex(h => String(h || '').toLowerCase().includes('dirección') || String(h || '').toLowerCase().includes('direccion'));
-    const escuelaCol = headers.findIndex(h => String(h || '').toLowerCase().includes('escuela') || String(h || '').toLowerCase().includes('establecimiento'));
+    // Los headers están en fila 0 pero con nombres raros como "col_1", "col_2", etc
+    // Detectar por posición: Jefe (0), Comuna (1), Dirección (2), Escuela (3)
+    const jefeCol = 0;    // Primera columna
+    const comunaCol = 1;  // Segunda columna
+    const direccionCol = 2; // Tercera columna
+    const escuelaCol = 3; // Cuarta columna
 
     // Agrupar datos
     const direccionesMap = {}; // direccion -> { jefe, comuna, escuelas: [] }
@@ -73,39 +73,52 @@ Deno.serve(async (req) => {
     let escuelasCreadas = 0;
     const errors = [];
 
-    for (const [key, dirData] of Object.entries(direccionesMap)) {
-      try {
-        // Crear Dirección
-        const direccionRecord = await base44.asServiceRole.entities.Direccion.create({
-          direccion: dirData.direccion,
-          comuna: dirData.comuna,
-          jefe_sitio: dirData.jefe,
-          estado: 'activo',
-        });
+    // Primero crear todas las direcciones
+    const direccionesIds = {};
+    const direccionesList = Object.entries(direccionesMap).map(([key, dirData]) => ({
+      direccion: dirData.direccion,
+      comuna: dirData.comuna,
+      jefe_sitio: dirData.jefe,
+      estado: 'activo',
+    }));
 
-        direccionesCreadas++;
+    try {
+      const dirsCreated = await base44.asServiceRole.entities.Direccion.bulkCreate(direccionesList);
+      direccionesCreadas = dirsCreated.length;
 
-        // Crear Escuelas
-        for (const escuela of dirData.escuelas) {
-          try {
-            await base44.asServiceRole.entities.LocationData.create({
-              establecimiento: escuela,
-              ubic_tecnica: escuela.substring(0, 20),
-              comuna: dirData.comuna,
-              direccion_id: direccionRecord.id,
-              jefe_sitio: dirData.jefe,
-              inspector: dirData.jefe,
-              m2: 0,
-              estado: 'activo',
-            });
-            escuelasCreadas++;
-          } catch (err) {
-            errors.push(`Escuela "${escuela}" en ${dirData.direccion}: ${err.message}`);
-          }
+      // Mapear direcciones creadas
+      Object.entries(direccionesMap).forEach(([key, dirData], idx) => {
+        if (dirsCreated[idx]) {
+          direccionesIds[key] = dirsCreated[idx].id;
         }
-      } catch (err) {
-        errors.push(`Dirección "${dirData.direccion}": ${err.message}`);
+      });
+
+      // Luego crear todas las escuelas en bulk
+      const escuelasList = [];
+      Object.entries(direccionesMap).forEach(([key, dirData]) => {
+        const dirId = direccionesIds[key];
+        if (!dirId) return;
+
+        for (const escuela of dirData.escuelas) {
+          escuelasList.push({
+            establecimiento: escuela,
+            ubic_tecnica: escuela.substring(0, 30),
+            comuna: dirData.comuna,
+            direccion_id: dirId,
+            jefe_sitio: dirData.jefe,
+            inspector: dirData.jefe,
+            m2: 0,
+            estado: 'activo',
+          });
+        }
+      });
+
+      if (escuelasList.length > 0) {
+        const escsCreated = await base44.asServiceRole.entities.LocationData.bulkCreate(escuelasList);
+        escuelasCreadas = escsCreated.length;
       }
+    } catch (err) {
+      errors.push(`Error en creación bulk: ${err.message}`);
     }
 
     return Response.json({
