@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/card';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Search, FolderKanban, MapPin, Calendar, Trash2, Pencil, FileText, Upload } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Search, FolderKanban, MapPin, Calendar, Trash2, Pencil, FileText, Upload, Plus, TrendingUp, Zap } from 'lucide-react';
 import { exportProyectosPDF } from '@/utils/exportPDF';
 import { format } from 'date-fns';
 import PageHeader from '@/components/shared/PageHeader';
@@ -53,6 +55,13 @@ export default function Projects() {
 
   const { data: projects = [], isLoading } = useQuery({ queryKey: ['projects'], queryFn: () => base44.entities.Project.list('-created_date') });
 
+  const stats = useMemo(() => ({
+    total: projects.length,
+    activos: projects.filter(p => p.status === 'en_progreso').length,
+    completados: projects.filter(p => p.status === 'completado').length,
+    presupuesto: projects.reduce((s, p) => s + (p.estimated_budget || 0), 0),
+  }), [projects]);
+
   const saveMutation = useMutation({
     mutationFn: (data) => editing ? base44.entities.Project.update(editing.id, data) : base44.entities.Project.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); setDialogOpen(false); setEditing(null); }
@@ -69,27 +78,78 @@ export default function Projects() {
     return matchSearch && matchStatus;
   });
 
+  const container = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.05 } }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between mb-0">
-        <PageHeader title="Proyectos" subtitle="Gestión de obras y proyectos" actionLabel="Nuevo Proyecto" onAction={() => { setEditing(null); setDialogOpen(true); }} />
-        <div className="flex items-center gap-2 -mt-8 mr-1">
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowImporter(true)}>
-            <Upload className="h-3.5 w-3.5" /> Importar
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 border-red-300 text-red-700 hover:bg-red-50 hidden sm:flex" onClick={() => exportProyectosPDF(filtered)}>
-            <FileText className="h-3.5 w-3.5" /> PDF
-          </Button>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 space-y-6">
+      {/* Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/30 rounded-full blur-3xl opacity-20 animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl opacity-20 animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
+      {/* Header */}
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-white flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+                <FolderKanban className="h-6 w-6 text-white" />
+              </div>
+              Proyectos
+            </h1>
+            <p className="text-slate-400 mt-1">Gestión integral de obras y proyectos</p>
+          </div>
+          <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:shadow-lg shadow-primary/50 transition-all">
+            <Plus className="h-4 w-4" /> Nuevo Proyecto
+          </Button>
+        </div>
+
+        {/* Stats */}
+        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: 'Total', value: stats.total, icon: FolderKanban, color: 'from-blue-500' },
+            { label: 'En Progreso', value: stats.activos, icon: Zap, color: 'from-emerald-500' },
+            { label: 'Completados', value: stats.completados, icon: TrendingUp, color: 'from-green-500' },
+          ].map((stat, i) => (
+            <motion.div key={i} variants={item}>
+              <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border border-slate-700/50 rounded-lg p-4 hover:border-slate-600/50 transition-all">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-slate-400 uppercase tracking-wide">{stat.label}</p>
+                  <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${stat.color} to-transparent flex items-center justify-center`}>
+                    <stat.icon className="h-4 w-4 text-white" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-white">{stat.value}</p>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      </motion.div>
+
+      {/* Filtros */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar proyectos..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+          <Input
+            placeholder="Buscar proyectos..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500 focus:border-primary/50"
+          />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-40 bg-slate-800/50 border-slate-700/50 text-white">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="pendiente">Pendiente</SelectItem>
@@ -98,64 +158,78 @@ export default function Projects() {
             <SelectItem value="completado">Completado</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowImporter(true)}>
+          <Upload className="h-3.5 w-3.5" /> Importar
+        </Button>
+      </motion.div>
 
+      {/* Grid */}
       {filtered.length === 0 && !isLoading ? (
-        <EmptyState icon={FolderKanban} title="No hay proyectos" description="Creá tu primer proyecto para empezar a gestionar tus obras" actionLabel="Nuevo Proyecto" onAction={() => { setEditing(null); setDialogOpen(true); }} />
+        <EmptyState icon={FolderKanban} title="No hay proyectos" description="Creá tu primer proyecto" actionLabel="Nuevo Proyecto" onAction={() => { setEditing(null); setDialogOpen(true); }} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(project => (
-            <Card key={project.id} className="hover:shadow-md transition-shadow group cursor-pointer" onClick={() => setSelectedProject(project)}>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">{project.name}</p>
-                    <p className="text-xs text-muted-foreground">{project.code}</p>
+            <motion.div key={project.id} variants={item}>
+              <Card
+                className="group cursor-pointer border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur hover:shadow-xl hover:shadow-primary/20 transition-all hover:border-primary/30 border border-slate-700/50"
+                onClick={() => setSelectedProject(project)}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-white truncate">{project.name}</p>
+                      {project.code && <p className="text-xs text-slate-500 font-mono mt-1">{project.code}</p>}
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white" onClick={(e) => { e.stopPropagation(); setEditing(project); setDialogOpen(true); }}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-500/10"><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Eliminar proyecto?</AlertDialogTitle>
+                            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteMutation.mutate(project.id)}>Eliminar</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditing(project); setDialogOpen(true); }}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>¿Eliminar proyecto?</AlertDialogTitle>
-                          <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteMutation.mutate(project.id)}>Eliminar</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <StatusBadge value={project.status} />
+                    <StatusBadge value={project.priority} type="priority" />
+                    {project.type && <Badge variant="secondary" className="text-xs">{typeLabels[project.type]}</Badge>}
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  <StatusBadge value={project.status} />
-                  <StatusBadge value={project.priority} type="priority" />
-                  {project.type && <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{typeLabels[project.type] || project.type}</span>}
-                </div>
-                {project.client_name && <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1"><span>👤</span> {project.client_name}</p>}
-                {project.address && <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1"><MapPin className="h-3 w-3" /> {project.address}</p>}
-                {project.start_date && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mb-3">
-                    <Calendar className="h-3 w-3" /> {format(new Date(project.start_date), 'dd/MM/yy')} {project.end_date && `→ ${format(new Date(project.end_date), 'dd/MM/yy')}`}
-                  </p>
-                )}
-                <div className="flex items-center gap-2">
-                  <Progress value={project.progress || 0} className="h-1.5 flex-1" />
-                  <span className="text-xs font-medium text-muted-foreground">{project.progress || 0}%</span>
-                </div>
-                {project.estimated_budget > 0 && (
-                  <p className="text-xs text-muted-foreground mt-2">Presupuesto: <span className="font-medium text-foreground">${project.estimated_budget?.toLocaleString()}</span></p>
-                )}
-              </CardContent>
-            </Card>
+
+                  {project.client_name && <p className="text-xs text-slate-400 mb-2">👤 {project.client_name}</p>}
+                  {project.address && <p className="text-xs text-slate-400 mb-2 flex items-center gap-1"><MapPin className="h-3 w-3" /> {project.address}</p>}
+
+                  {project.start_date && (
+                    <p className="text-xs text-slate-500 mb-4 flex items-center gap-1">
+                      <Calendar className="h-3 w-3" /> {format(new Date(project.start_date), 'dd/MM/yy')} {project.end_date && `→ ${format(new Date(project.end_date), 'dd/MM/yy')}`}
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <Progress value={project.progress || 0} className="h-1.5 flex-1 bg-slate-700" />
+                    <span className="text-xs font-bold text-primary">{project.progress || 0}%</span>
+                  </div>
+
+                  {project.estimated_budget > 0 && (
+                    <p className="text-xs text-slate-400 mt-3">Presupuesto: <span className="font-semibold text-white">${project.estimated_budget?.toLocaleString()}</span></p>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
 
       <EntityFormDialog

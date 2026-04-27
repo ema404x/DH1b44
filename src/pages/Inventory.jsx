@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card } from '@/components/ui/card';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Search, Package, Pencil, Trash2, AlertTriangle, Sparkles,
-  ArrowDownCircle, ArrowUpCircle, History, Plus
+  ArrowDownCircle, ArrowUpCircle, History, Plus, Zap, TrendingUp, Layers
 } from 'lucide-react';
 import EmptyState from '@/components/shared/EmptyState';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
@@ -24,7 +25,7 @@ const categoryLabels = {
   herreria: 'Herrería', herramientas: 'Herramientas', seguridad: 'Seguridad', climatizacion: 'Climatización', otros: 'Otros',
 };
 const unitLabels = {
-  unidad: 'Unidad', metro: 'Metro', metro2: 'm²', metro3: 'm³', kg: 'Kg', litro: 'Litro', bolsa: 'Bolsa', caja: 'Caja', rollo: 'Rollo',
+  unidad: 'Unidad', metro: 'Metro', metro2: 'm²', metro3: 'm³', kg: 'Kg', litro: 'Litro', bolsa: 'Bolsa', caja: 'Caja',
 };
 
 const materialFields = [
@@ -54,6 +55,12 @@ export default function Inventory() {
     queryFn: () => base44.entities.Material.list('-created_date'),
   });
 
+  const stats = useMemo(() => ({
+    total: materials.length,
+    totalValue: materials.reduce((sum, m) => sum + (m.stock || 0) * (m.unit_cost || 0), 0),
+    lowStock: materials.filter(m => m.stock <= m.min_stock && m.min_stock > 0).length,
+  }), [materials]);
+
   const saveMutation = useMutation({
     mutationFn: (data) => editing ? base44.entities.Material.update(editing.id, data) : base44.entities.Material.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['materials'] }); setDialogOpen(false); setEditing(null); }
@@ -70,152 +77,195 @@ export default function Inventory() {
     return matchSearch && matchCat;
   });
 
-  const totalValue = materials.reduce((sum, m) => sum + (m.stock || 0) * (m.unit_cost || 0), 0);
-  const lowStockCount = materials.filter(m => m.stock <= m.min_stock && m.min_stock > 0).length;
+  const container = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.05 } }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Inventario · Pañol</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {materials.length} materiales · Valor total: <span className="font-semibold">${totalValue.toLocaleString()}</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowImporter(true)}>
-            <Sparkles className="h-3.5 w-3.5 text-primary" /> Importar
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-            onClick={() => setMovimientoDialog({ tipo: 'entrada' })}>
-            <ArrowDownCircle className="h-3.5 w-3.5" /> Entrada
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 border-orange-300 text-orange-600 hover:bg-orange-50"
-            onClick={() => setMovimientoDialog({ tipo: 'salida' })}>
-            <ArrowUpCircle className="h-3.5 w-3.5" /> Salida
-          </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => { setEditing(null); setDialogOpen(true); }}>
-            <Plus className="h-3.5 w-3.5" /> Nuevo
-          </Button>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 space-y-6">
+      {/* Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-emerald-500/30 rounded-full blur-3xl opacity-20 animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-orange-500/20 rounded-full blur-3xl opacity-20 animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      {/* Low stock alert */}
-      {lowStockCount > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-          <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-          <span className="text-sm text-amber-800 font-medium">{lowStockCount} material(es) con stock bajo o agotado</span>
+      {/* Header */}
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-white flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                <Package className="h-6 w-6 text-white" />
+              </div>
+              Inventario · Pañol
+            </h1>
+            <p className="text-slate-400 mt-1">{stats.total} materiales • ${stats.totalValue.toLocaleString()}</p>
+          </div>
+          <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg shadow-emerald-500/50 transition-all">
+            <Plus className="h-4 w-4" /> Nuevo Material
+          </Button>
         </div>
+
+        {/* Stats */}
+        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: 'Total', value: stats.total, icon: Layers, color: 'from-blue-500' },
+            { label: 'Stock Bajo', value: stats.lowStock, icon: AlertTriangle, color: 'from-red-500', highlight: stats.lowStock > 0 },
+          ].map((stat, i) => (
+            <motion.div key={i} variants={item}>
+              <div className={`bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border rounded-lg p-4 transition-all ${
+                stat.highlight ? 'border-red-500/30 bg-red-500/5' : 'border-slate-700/50'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-slate-400 uppercase">{stat.label}</p>
+                  <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${stat.color} to-transparent flex items-center justify-center`}>
+                    <stat.icon className="h-4 w-4 text-white" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-white">{stat.value}</p>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      </motion.div>
+
+      {/* Alert */}
+      {stats.lowStock > 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 p-4 rounded-lg bg-red-500/20 border border-red-500/30 backdrop-blur">
+          <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0" />
+          <span className="text-sm text-red-300 font-medium">{stats.lowStock} material{stats.lowStock > 1 ? 'es' : ''} con stock bajo</span>
+        </motion.div>
       )}
 
-      <Tabs defaultValue="stock">
-        <TabsList className="w-full sm:w-auto">
-          <TabsTrigger value="stock" className="gap-1.5"><Package className="h-4 w-4" /> Stock actual</TabsTrigger>
-          <TabsTrigger value="movimientos" className="gap-1.5"><History className="h-4 w-4" /> Movimientos</TabsTrigger>
-        </TabsList>
+      {/* Tabs */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+        <Tabs defaultValue="stock" className="w-full">
+          <TabsList className="grid w-full sm:w-auto grid-cols-2 bg-slate-800/50 border border-slate-700/50">
+            <TabsTrigger value="stock" className="gap-1.5"><Package className="h-4 w-4" /> Stock</TabsTrigger>
+            <TabsTrigger value="movimientos" className="gap-1.5"><History className="h-4 w-4" /> Movimientos</TabsTrigger>
+          </TabsList>
 
-        {/* ── Tab: Stock ── */}
-        <TabsContent value="stock" className="space-y-4 mt-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar materiales..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-            </div>
-            <Select value={catFilter} onValueChange={setCatFilter}>
-              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las categorías</SelectItem>
-                {Object.entries(categoryLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Stock Tab */}
+          <TabsContent value="stock" className="space-y-4 mt-4">
+            <motion.div variants={container} initial="hidden" animate="show" className="flex flex-col sm:flex-row gap-3">
+              <motion.div variants={item} className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <Input
+                  placeholder="Buscar materiales..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500"
+                />
+              </motion.div>
+              <motion.div variants={item}>
+                <Select value={catFilter} onValueChange={setCatFilter}>
+                  <SelectTrigger className="w-full sm:w-44 bg-slate-800/50 border-slate-700/50 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {Object.entries(categoryLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </motion.div>
+              <motion.div variants={item}>
+                <Button variant="outline" size="sm" className="gap-1.5 w-full" onClick={() => setShowImporter(true)}>
+                  <Sparkles className="h-3.5 w-3.5" /> Importar
+                </Button>
+              </motion.div>
+            </motion.div>
 
-          {filtered.length === 0 && !isLoading ? (
-            <EmptyState icon={Package} title="No hay materiales" description="Agregá materiales al inventario" actionLabel="Nuevo Material" onAction={() => { setEditing(null); setDialogOpen(true); }} />
-          ) : (
-            <Card>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Material</TableHead>
-                      <TableHead>Categoría</TableHead>
-                      <TableHead className="text-right">Stock</TableHead>
-                      <TableHead className="hidden md:table-cell text-right">Mín.</TableHead>
-                      <TableHead className="hidden md:table-cell text-right">Costo Unit.</TableHead>
-                      <TableHead className="hidden lg:table-cell text-right">Valor Total</TableHead>
-                      <TableHead className="hidden lg:table-cell">Proveedor</TableHead>
-                      <TableHead className="w-32"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.map(mat => {
-                      const isLow = mat.stock <= mat.min_stock && mat.min_stock > 0;
-                      return (
-                        <TableRow key={mat.id} className="group">
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{mat.name}</p>
-                              {mat.code && <p className="text-xs text-muted-foreground font-mono">{mat.code}</p>}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">{categoryLabels[mat.category] || mat.category}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className={isLow ? 'text-red-600 font-semibold' : 'font-medium'}>
-                              {mat.stock} {unitLabels[mat.unit] || mat.unit}
-                            </span>
-                            {isLow && <AlertTriangle className="h-3 w-3 text-red-500 inline ml-1" />}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell text-right text-muted-foreground">{mat.min_stock || '-'}</TableCell>
-                          <TableCell className="hidden md:table-cell text-right">${mat.unit_cost?.toLocaleString() || 0}</TableCell>
-                          <TableCell className="hidden lg:table-cell text-right font-medium">${((mat.stock || 0) * (mat.unit_cost || 0)).toLocaleString()}</TableCell>
-                          <TableCell className="hidden lg:table-cell text-sm">{mat.supplier || '-'}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
-                                title="Entrada rápida"
-                                onClick={() => setMovimientoDialog({ tipo: 'entrada', material: mat })}>
-                                <ArrowDownCircle className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-orange-500 hover:bg-orange-50"
-                                title="Salida rápida"
-                                onClick={() => setMovimientoDialog({ tipo: 'salida', material: mat })}>
-                                <ArrowUpCircle className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(mat); setDialogOpen(true); }}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader><AlertDialogTitle>¿Eliminar material?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
-                                  <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => deleteMutation.mutate(mat.id)}>Eliminar</AlertDialogAction></AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </TableCell>
+            {filtered.length === 0 && !isLoading ? (
+              <EmptyState icon={Package} title="No hay materiales" description="Agregá materiales al inventario" actionLabel="Nuevo Material" onAction={() => { setEditing(null); setDialogOpen(true); }} />
+            ) : (
+              <motion.div variants={container} initial="hidden" animate="show">
+                <Card className="border-0 bg-slate-800/50 backdrop-blur overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-slate-700/50">
+                          <TableHead className="text-slate-300">Material</TableHead>
+                          <TableHead className="text-slate-300">Categoría</TableHead>
+                          <TableHead className="text-right text-slate-300">Stock</TableHead>
+                          <TableHead className="text-right text-slate-300">Costo Unit.</TableHead>
+                          <TableHead className="text-right text-slate-300">Total</TableHead>
+                          <TableHead className="w-24"></TableHead>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
-          )}
-        </TabsContent>
+                      </TableHeader>
+                      <TableBody>
+                        {filtered.map((mat, idx) => {
+                          const isLow = mat.stock <= mat.min_stock && mat.min_stock > 0;
+                          return (
+                            <motion.tr key={mat.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.05 }} className={`border-slate-700/50 group hover:bg-slate-700/20 transition-colors ${isLow ? 'bg-red-500/5' : ''}`}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium text-white">{mat.name}</p>
+                                  {mat.code && <p className="text-xs text-slate-500 font-mono">{mat.code}</p>}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-xs bg-slate-700 text-slate-200">{categoryLabels[mat.category]}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={isLow ? 'text-red-400 font-semibold' : 'text-white font-medium'}>
+                                  {mat.stock} {unitLabels[mat.unit]}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right text-slate-400">${mat.unit_cost?.toLocaleString() || 0}</TableCell>
+                              <TableCell className="text-right text-white font-medium">${((mat.stock || 0) * (mat.unit_cost || 0)).toLocaleString()}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-400 hover:bg-emerald-500/10" onClick={() => setMovimientoDialog({ tipo: 'entrada', material: mat })}>
+                                    <ArrowDownCircle className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-orange-400 hover:bg-orange-500/10" onClick={() => setMovimientoDialog({ tipo: 'salida', material: mat })}>
+                                    <ArrowUpCircle className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400" onClick={() => { setEditing(mat); setDialogOpen(true); }}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500"><Trash2 className="h-3.5 w-3.5" /></Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Eliminar material?</AlertDialogTitle>
+                                        <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => deleteMutation.mutate(mat.id)}>Eliminar</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
+                              </TableCell>
+                            </motion.tr>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+          </TabsContent>
 
-        {/* ── Tab: Movimientos ── */}
-        <TabsContent value="movimientos" className="mt-4">
-          <MovimientosLog />
-        </TabsContent>
-      </Tabs>
+          {/* Movimientos Tab */}
+          <TabsContent value="movimientos" className="mt-4">
+            <MovimientosLog />
+          </TabsContent>
+        </Tabs>
+      </motion.div>
 
       {/* Dialogs */}
       <EntityFormDialog
