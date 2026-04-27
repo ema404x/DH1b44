@@ -11,7 +11,7 @@ import {
   Edit2, Save, X, TrendingUp, Map, FileJson, FileSpreadsheet
 } from 'lucide-react';
 import { toast } from 'sonner';
-import ImportadorLocations from '@/components/informacion-general/ImportadorLocations';
+import ImportadorLocations from '@/components/informacion-general/ImportadorLocaciones';
 import ImportadorJefesSitio from '@/components/informacion-general/ImportadorJefesSitio';
 import JefeSitioPanel from '@/components/informacion-general/JefeSitioPanel';
 import DireccionPanel from '@/components/informacion-general/DireccionPanel';
@@ -19,6 +19,7 @@ import DireccionesManager from '@/components/informacion-general/DireccionesMana
 import LocationsGrid from '@/components/informacion-general/LocationsGrid';
 import EstadisticasAvanzadas from '@/components/informacion-general/EstadisticasAvanzadas';
 import ExportadorDatos from '@/components/informacion-general/ExportadorDatos';
+import AsignadorJefesEscuelas from '@/components/informacion-general/AsignadorJefesEscuelas';
 
 const COMUNAS = [
   { id: '8A', label: 'Comuna 8A', color: 'bg-blue-100 text-blue-700' },
@@ -236,6 +237,12 @@ export default function InformacionGeneral() {
       {/* Import Tab */}
       {activeTab === 'import' && (
         <div className="max-w-7xl mx-auto px-6 py-8 space-y-10">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 mb-1">Asignar Jefes a Escuelas</h2>
+            <p className="text-sm text-muted-foreground mb-4">Cargá el listado de escuelas con jefes de sitio asignados para actualizar automáticamente.</p>
+            <AsignadorJefesEscuelas onSuccess={() => { refetch(); setActiveTab('dashboard'); }} />
+          </div>
+          <hr className="border-slate-200" />
           <div>
             <h2 className="text-xl font-bold text-slate-900 mb-1">Importar Escuelas (Excel por Comunas)</h2>
             <p className="text-sm text-muted-foreground mb-4">Importa el padrón completo de escuelas con hojas por comuna.</p>
