@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Filter, MapPin, Zap, AlertTriangle, CheckCircle2, Clock, Building2, Eye } from 'lucide-react';
+import { Search, Filter, MapPin, Zap, AlertTriangle, CheckCircle2, Clock, Building2, Eye, Globe } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 
 // Fixes para iconos de Leaflet
