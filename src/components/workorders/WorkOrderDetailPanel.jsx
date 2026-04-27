@@ -47,6 +47,17 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
 
   const set = (key, val) => setData(prev => ({ ...prev, [key]: val }));
 
+  // Guarda inmediatamente un campo específico (para fotos y firma)
+  const saveField = (key, val) => {
+    setData(prev => ({ ...prev, [key]: val }));
+    saveMutation.mutate({ ...data, [key]: val });
+  };
+
+  const saveFields = (fields) => {
+    setData(prev => ({ ...prev, ...fields }));
+    saveMutation.mutate({ ...data, ...fields });
+  };
+
   // Checklist completion check
   const checklist = data.checklist || [];
   const pendingTasks = checklist.filter(t => !t.completed);
@@ -208,13 +219,13 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
 
             {/* Media */}
             <TabsContent value="media" className="flex-1 overflow-y-auto p-5 space-y-5 mt-0">
-              <WorkOrderPhotos photos={data.photos || []} onChange={val => set('photos', val)} />
+              <WorkOrderPhotos photos={data.photos || []} onChange={val => saveField('photos', val)} />
               <hr className="border-border" />
               <WorkOrderSignature
                 signatureUrl={data.signature_url}
                 signatureName={data.signature_name}
                 onChange={({ signatureUrl, signatureName }) => {
-                  setData(prev => ({ ...prev, signature_url: signatureUrl, signature_name: signatureName }));
+                  saveFields({ signature_url: signatureUrl, signature_name: signatureName });
                 }}
               />
             </TabsContent>
@@ -249,9 +260,14 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
              {onDelete && (
                <DeleteWorkOrderButton order={data} onDelete={onDelete} />
              )}
-             <Button className="gap-2" onClick={save} disabled={saveMutation.isPending}>
+             <Button
+               className="gap-2"
+               onClick={save}
+               disabled={saveMutation.isPending || checklistBlocked}
+               title={checklistBlocked ? `${pendingTasks.length} tarea(s) del checklist sin completar` : ''}
+             >
                {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-               Guardar
+               {checklistBlocked ? `Faltan ${pendingTasks.length} tarea(s)` : 'Guardar'}
              </Button>
              <Button variant="outline" onClick={onClose}>Cerrar</Button>
            </div>
