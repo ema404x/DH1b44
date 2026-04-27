@@ -1,23 +1,28 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Upload, FileSpreadsheet, Brain, CheckCircle2, AlertCircle, Loader2, ArrowRight, RefreshCw, Trash2, Download } from 'lucide-react';
+import { Upload, FileSpreadsheet, Brain, CheckCircle2, AlertCircle, Loader2, ArrowRight, RefreshCw, Trash2, Download, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import ImportStepUpload from '@/components/importar/ImportStepUpload';
 import ImportStepMapping from '@/components/importar/ImportStepMapping';
 import ImportStepConfirm from '@/components/importar/ImportStepConfirm';
 import ImportStepResult from '@/components/importar/ImportStepResult';
+import AsignadorJefesEscuelas from '@/components/informacion-general/AsignadorJefesEscuelas';
+import ImportadorJefesSitio from '@/components/informacion-general/ImportadorJefesSitio';
 
 const STEPS = ['Subir Archivo', 'Mapeo IA', 'Confirmar', 'Resultado'];
 
 export default function ImportarDatos() {
+  const [activeTab, setActiveTab] = useState('general');
   const [step, setStep] = useState(0);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [mappingResult, setMappingResult] = useState(null);
   const [importResult, setImportResult] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleFileUploaded = async (file, fileUrl, rawData) => {
     setUploadedFile({ file, fileUrl, rawData });
@@ -74,76 +79,118 @@ export default function ImportarDatos() {
     <div className="p-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-3 mb-4">
           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
             <Brain className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Importación Inteligente</h1>
-            <p className="text-sm text-muted-foreground">La IA detecta y mapea automáticamente tus datos</p>
+            <h1 className="text-2xl font-bold">Importación de Datos</h1>
+            <p className="text-sm text-muted-foreground">Importa escuelas, direcciones y asignaciones de jefes</p>
           </div>
         </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="general" className="gap-2">
+              <Brain className="h-4 w-4" />
+              <span className="hidden sm:inline">Importación IA</span>
+            </TabsTrigger>
+            <TabsTrigger value="jefes" className="gap-2">
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">Jefes de Sitio</span>
+            </TabsTrigger>
+            <TabsTrigger value="escuelas" className="gap-2">
+              <Building2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Escuelas</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      {/* Steps */}
-      <div className="flex items-center gap-2 mb-8">
-        {STEPS.map((label, i) => (
-          <React.Fragment key={i}>
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-              i === step ? 'bg-primary text-primary-foreground' :
-              i < step ? 'bg-emerald-100 text-emerald-700' :
-              'bg-muted text-muted-foreground'
-            }`}>
-              {i < step ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span className="h-4 w-4 text-xs flex items-center justify-center rounded-full border border-current">{i + 1}</span>}
-              <span className="hidden sm:inline">{label}</span>
-            </div>
-            {i < STEPS.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
-          </React.Fragment>
-        ))}
-        {step > 0 && (
-          <Button variant="ghost" size="sm" onClick={handleReset} className="ml-auto gap-1.5 text-muted-foreground">
-            <RefreshCw className="h-3.5 w-3.5" /> Nueva importación
-          </Button>
-        )}
-      </div>
+      {/* Tab Content */}
+      {activeTab === 'general' && (
+        <>
+          {/* Steps */}
+          <div className="flex items-center gap-2 mb-8">
+            {STEPS.map((label, i) => (
+              <React.Fragment key={i}>
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  i === step ? 'bg-primary text-primary-foreground' :
+                  i < step ? 'bg-emerald-100 text-emerald-700' :
+                  'bg-muted text-muted-foreground'
+                }`}>
+                  {i < step ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span className="h-4 w-4 text-xs flex items-center justify-center rounded-full border border-current">{i + 1}</span>}
+                  <span className="hidden sm:inline">{label}</span>
+                </div>
+                {i < STEPS.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+              </React.Fragment>
+            ))}
+            {step > 0 && (
+              <Button variant="ghost" size="sm" onClick={handleReset} className="ml-auto gap-1.5 text-muted-foreground">
+                <RefreshCw className="h-3.5 w-3.5" /> Nueva importación
+              </Button>
+            )}
+          </div>
 
-      {/* Step Content */}
-      {step === 0 && <ImportStepUpload onFileUploaded={handleFileUploaded} />}
-      {step === 1 && (
-        isProcessing ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-20 gap-4">
-              <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Brain className="h-8 w-8 text-primary animate-pulse" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold text-lg">Analizando con IA...</p>
-                <p className="text-sm text-muted-foreground mt-1">Detectando entidades y mapeando columnas automáticamente</p>
-              </div>
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </CardContent>
-          </Card>
-        ) : mappingResult ? (
-          <ImportStepMapping
-            mappingResult={mappingResult}
-            onConfirm={handleMappingConfirmed}
-            onBack={() => setStep(0)}
+          {/* Step Content */}
+          {step === 0 && <ImportStepUpload onFileUploaded={handleFileUploaded} />}
+          {step === 1 && (
+            isProcessing ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-20 gap-4">
+                  <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <Brain className="h-8 w-8 text-primary animate-pulse" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold text-lg">Analizando con IA...</p>
+                    <p className="text-sm text-muted-foreground mt-1">Detectando entidades y mapeando columnas automáticamente</p>
+                  </div>
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </CardContent>
+              </Card>
+            ) : mappingResult ? (
+              <ImportStepMapping
+                mappingResult={mappingResult}
+                onConfirm={handleMappingConfirmed}
+                onBack={() => setStep(0)}
+              />
+            ) : null
+          )}
+          {step === 2 && mappingResult && (
+            <ImportStepConfirm
+              mappingResult={mappingResult}
+              onConfirm={handleImportConfirmed}
+              onBack={() => setStep(1)}
+              isLoading={isProcessing}
+            />
+          )}
+          {step === 3 && importResult && (
+            <ImportStepResult
+              result={importResult}
+              onReset={handleReset}
+            />
+          )}
+        </>
+      )}
+
+      {/* Jefes de Sitio Tab */}
+      {activeTab === 'jefes' && (
+        <div key={`jefes-${refreshKey}`}>
+          <ImportadorJefesSitio 
+            locations={[]} 
+            onSuccess={() => setRefreshKey(prev => prev + 1)}
           />
-        ) : null
+        </div>
       )}
-      {step === 2 && mappingResult && (
-        <ImportStepConfirm
-          mappingResult={mappingResult}
-          onConfirm={handleImportConfirmed}
-          onBack={() => setStep(1)}
-          isLoading={isProcessing}
-        />
-      )}
-      {step === 3 && importResult && (
-        <ImportStepResult
-          result={importResult}
-          onReset={handleReset}
-        />
+
+      {/* Escuelas Tab */}
+      {activeTab === 'escuelas' && (
+        <div key={`escuelas-${refreshKey}`}>
+          <AsignadorJefesEscuelas 
+            onSuccess={() => setRefreshKey(prev => prev + 1)}
+          />
+        </div>
       )}
     </div>
   );
