@@ -175,6 +175,7 @@ export default function ImportStepMapping({ mappingResult, onConfirm, onBack }) 
 
   const validSheets = sheets.filter(s => s.target_entity && s.target_entity !== 'skip');
   const totalRows = validSheets.reduce((acc, s) => acc + (s.row_count || 0), 0);
+  const highConfidence = validSheets.filter(s => s.confidence >= 0.85).length;
 
   return (
     <div className="space-y-4">
@@ -184,8 +185,8 @@ export default function ImportStepMapping({ mappingResult, onConfirm, onBack }) 
         <div className="flex-1">
           <p className="font-semibold text-emerald-800 text-sm">Análisis completado</p>
           <p className="text-xs text-emerald-700 mt-0.5">
-            Se detectaron <strong>{sheets.length} hojas</strong> con <strong>{totalRows.toLocaleString()} filas</strong> para importar en <strong>{validSheets.length} entidades</strong>.
-            Revisá el mapeo y ajustá si es necesario.
+            Se detectaron <strong>{sheets.length} hojas</strong> con <strong>{totalRows.toLocaleString()} filas</strong> listas para importar en <strong>{validSheets.length} entidades</strong>.
+            {highConfidence > 0 && <> · <span className="text-emerald-800 font-semibold">{highConfidence} con alta confianza</span></>}
           </p>
         </div>
       </div>

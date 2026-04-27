@@ -52,7 +52,8 @@ export default function ImportarDatos() {
         mapping: finalMapping,
         raw_data: uploadedFile.rawData,
       });
-      setImportResult(response.data);
+      const result = response.data?.results ? response.data : response.data?.response;
+      setImportResult(result);
       setStep(3);
     } catch (error) {
       toast.error('Error al importar: ' + error.message);

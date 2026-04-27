@@ -1,5 +1,6 @@
-import React from 'react';
-import { AlertTriangle, Loader2, CheckCircle2, Database, ArrowRight } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertTriangle, Loader2, CheckCircle2, Database, ArrowRight, Zap } from 'lucide-react';
+// Loader2 kept for potential future use
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -9,11 +10,52 @@ const ENTITY_LABELS = {
   PrecarioMinisterio: 'Preciario Ministerial', Quote: 'Presupuestos', Invoice: 'Facturas'
 };
 
+const LOADING_MESSAGES = [
+  'Procesando registros...',
+  'Creando registros en la base de datos...',
+  'Importando en lotes para mayor velocidad...',
+  'Casi listo...',
+];
+
 export default function ImportStepConfirm({ mappingResult, onConfirm, onBack, isLoading }) {
+  const [loadingMsg, setLoadingMsg] = useState(0);
   const validSheets = (mappingResult.sheets || []).filter(s => s.target_entity && s.target_entity !== 'skip');
   const totalRows = validSheets.reduce((acc, s) => acc + (s.row_count || 0), 0);
   const totalMapped = validSheets.reduce((acc, s) => acc + Object.values(s.field_mapping || {}).filter(v => v).length, 0);
   const totalIgnored = validSheets.reduce((acc, s) => acc + Object.values(s.field_mapping || {}).filter(v => !v).length, 0);
+
+  useEffect(() => {
+    if (!isLoading) return;
+    const interval = setInterval(() => {
+      setLoadingMsg(prev => (prev + 1) % LOADING_MESSAGES.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-20 gap-5">
+          <div className="relative">
+            <div className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Zap className="h-10 w-10 text-primary" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-emerald-100 flex items-center justify-center">
+              <Loader2 className="h-4 w-4 text-emerald-600 animate-spin" />
+            </div>
+          </div>
+          <div className="text-center space-y-1">
+            <p className="font-bold text-lg">Importando {totalRows.toLocaleString()} registros</p>
+            <p className="text-sm text-muted-foreground transition-all">{LOADING_MESSAGES[loadingMsg]}</p>
+          </div>
+          <div className="w-64 h-2 bg-muted rounded-full overflow-hidden">
+            <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }} />
+          </div>
+          <p className="text-xs text-muted-foreground">No cierres esta ventana hasta que termine</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -84,17 +126,9 @@ export default function ImportStepConfirm({ mappingResult, onConfirm, onBack, is
       </div>
 
       <div className="flex gap-3">
-        <Button variant="outline" onClick={onBack} disabled={isLoading}>Volver a editar</Button>
-        <Button
-          onClick={() => onConfirm(mappingResult)}
-          disabled={isLoading}
-          className="flex-1 gap-2"
-        >
-          {isLoading ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Importando {totalRows.toLocaleString()} registros...</>
-          ) : (
-            <><CheckCircle2 className="h-4 w-4" /> Importar {totalRows.toLocaleString()} registros</>
-          )}
+        <Button variant="outline" onClick={onBack}>Volver a editar</Button>
+        <Button onClick={() => onConfirm(mappingResult)} className="flex-1 gap-2">
+          <Zap className="h-4 w-4" /> Importar {totalRows.toLocaleString()} registros en {validSheets.length} entidad{validSheets.length !== 1 ? 'es' : ''}
         </Button>
       </div>
     </div>
