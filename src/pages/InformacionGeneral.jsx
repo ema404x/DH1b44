@@ -11,7 +11,7 @@ import {
   Edit2, Save, X, TrendingUp, Map, FileJson, FileSpreadsheet
 } from 'lucide-react';
 import { toast } from 'sonner';
-import ImportadorLocations from '@/components/informacion-general/ImportadorLocaciones';
+import ImportadorLocations from '@/components/informacion-general/ImportadorLocations';
 import ImportadorJefesSitio from '@/components/informacion-general/ImportadorJefesSitio';
 import JefeSitioPanel from '@/components/informacion-general/JefeSitioPanel';
 import DireccionPanel from '@/components/informacion-general/DireccionPanel';
