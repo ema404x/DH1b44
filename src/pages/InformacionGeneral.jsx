@@ -13,6 +13,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import DirectorioJerarquico from '@/components/informacion-general/DirectorioJerarquico';
 import ImportadorSimple from '@/components/informacion-general/ImportadorSimple';
+import ImportadorDireccionesJefes from '@/components/informacion-general/ImportadorDireccionesJefes';
 
 const COMUNAS = [
   { id: '8A', label: 'Comuna 8A', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
@@ -246,22 +247,34 @@ export default function InformacionGeneral() {
 
           {/* Content Importar */}
           {activeTab === 'importar' && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 rounded-xl backdrop-blur p-6"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
-                  <Brain className="h-5 w-5 text-white" />
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-6">
+              {/* Importador de Direcciones y Jefes */}
+              <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 rounded-xl backdrop-blur p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Importador de Direcciones y Jefes</h3>
+                    <p className="text-sm text-slate-400">Excel con estructura: Jefe → Dirección → Escuelas</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">Importador Simple</h3>
-                  <p className="text-sm text-slate-400">Carga Excel directamente sin pasos manuales</p>
-                </div>
+                <ImportadorDireccionesJefes onSuccess={() => { refetch(); setActiveTab('directorio'); }} />
               </div>
-              <ImportadorSimple onSuccess={() => { refetch(); setActiveTab('directorio'); }} />
+
+              {/* Importador Simple */}
+              <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 rounded-xl backdrop-blur p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+                    <Brain className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Importador Simple</h3>
+                    <p className="text-sm text-slate-400">Carga Excel directamente sin pasos manuales</p>
+                  </div>
+                </div>
+                <ImportadorSimple onSuccess={() => { refetch(); setActiveTab('directorio'); }} />
+              </div>
             </motion.div>
           )}
         </div>
