@@ -150,7 +150,9 @@ export default function Fichar() {
             }
           </div>
           <h1 className="font-bold text-xl">{employee.full_name}</h1>
-          <p className="text-sm text-muted-foreground capitalize">{employee.role} · {employee.specialty}</p>
+          <p className="text-sm text-muted-foreground capitalize">
+            {[employee.role, employee.specialty].filter(Boolean).join(' · ')}
+          </p>
         </div>
 
         {/* Info */}
@@ -178,7 +180,7 @@ export default function Fichar() {
         <Button
           className={`w-full h-12 text-base font-semibold gap-2 ${isEntrada ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}
           onClick={handleFichar}
-          disabled={submitting || locationLoading}
+          disabled={submitting}
         >
           {submitting
             ? <Loader2 className="h-5 w-5 animate-spin" />

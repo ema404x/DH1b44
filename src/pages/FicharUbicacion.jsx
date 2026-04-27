@@ -302,8 +302,12 @@ export default function FicharUbicacion() {
             }
           </Button>
 
-          {(!fullName.trim() || fullName.trim().length <= 2) && (
-            <p className="text-center text-xs text-slate-400">Completá tu nombre y firma para continuar</p>
+          {(!fullName.trim() || fullName.trim().length <= 2 || !signatureData) && (
+            <p className="text-center text-xs text-slate-400">
+              {!fullName.trim() || fullName.trim().length <= 2
+                ? 'Ingresá tu nombre completo para continuar'
+                : 'Dibujá tu firma para continuar'}
+            </p>
           )}
         </div>
       </div>

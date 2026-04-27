@@ -159,7 +159,7 @@ function FirmaGrande({ onFirmado }) {
       </div>
       <Button
         className="w-full h-14 text-base font-bold gap-2 bg-slate-800 hover:bg-slate-700"
-        disabled={!hasStrokes || !nombre.trim() || saving}
+        disabled={!hasStrokes || nombre.trim().length < 3 || saving}
         onClick={guardarFirma}
       >
         {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}

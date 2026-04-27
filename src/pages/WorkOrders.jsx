@@ -51,8 +51,11 @@ const typeIcons = {
 const STATUS_TABS = [
   { value: 'all', label: 'Todas' },
   { value: 'pendiente', label: 'Pendientes' },
+  { value: 'asignada', label: 'Asignadas' },
   { value: 'en_progreso', label: 'En Progreso' },
+  { value: 'en_espera', label: 'En Espera' },
   { value: 'completada', label: 'Completadas' },
+  { value: 'cancelada', label: 'Canceladas' },
 ];
 
 function NewOrderDialog({ open, onOpenChange, onSave, saving }) {

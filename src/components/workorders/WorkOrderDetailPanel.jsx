@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode, Trash2, Navigation } from 'lucide-react';
+import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode, Navigation } from 'lucide-react';
+import { toast } from 'sonner';
 import WorkOrderQRButton from './WorkOrderQRButton';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import DeleteWorkOrderButton from './DeleteWorkOrderButton';
@@ -42,20 +43,29 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
 
   const saveMutation = useMutation({
     mutationFn: (d) => base44.entities.WorkOrder.update(order.id, d),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workorders'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      toast.success('Orden de trabajo guardada');
+    },
   });
 
   const set = (key, val) => setData(prev => ({ ...prev, [key]: val }));
 
-  // Guarda inmediatamente un campo específico (para fotos y firma)
+  // Guarda inmediatamente — usa callback para tener el estado más reciente
   const saveField = (key, val) => {
-    setData(prev => ({ ...prev, [key]: val }));
-    saveMutation.mutate({ ...data, [key]: val });
+    setData(prev => {
+      const next = { ...prev, [key]: val };
+      saveMutation.mutate(next);
+      return next;
+    });
   };
 
   const saveFields = (fields) => {
-    setData(prev => ({ ...prev, ...fields }));
-    saveMutation.mutate({ ...data, ...fields });
+    setData(prev => {
+      const next = { ...prev, ...fields };
+      saveMutation.mutate(next);
+      return next;
+    });
   };
 
   // Checklist completion check
@@ -68,18 +78,27 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     set('status', v);
   };
 
-  const save = () => saveMutation.mutate(data);
+  const save = () => {
+    if (checklistBlocked) {
+      toast.warning(`Faltan ${pendingTasks.length} tarea(s) del checklist por completar`);
+      return;
+    }
+    saveMutation.mutate(data);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/40" onClick={onClose} />
+      <div className="flex-1 bg-black/40" onClick={() => {
+        if (saveMutation.isPending) return;
+        onClose();
+      }} />
       <div className="w-full max-w-2xl bg-card shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex-1 min-w-0 pr-4">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="text-xs font-mono text-muted-foreground">{data.code || 'OT'}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${priorityColors[data.priority]}`}>{data.priority}</span>
+              {data.code && <span className="text-xs font-mono text-muted-foreground">{data.code}</span>}
+              <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${priorityColors[data.priority]}`}>{data.priority}</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{typeLabels[data.type]}</span>
             </div>
             <h2 className="text-lg font-bold leading-tight">{data.title}</h2>
@@ -142,7 +161,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                   <p className="text-sm text-foreground/80 leading-relaxed">{data.description}</p>
                 </div>
               )}
-              <WorkOrderChecklist checklist={data.checklist || []} onChange={val => set('checklist', val)} />
+              <WorkOrderChecklist checklist={data.checklist || []} onChange={val => saveField('checklist', val)} />
               <hr className="border-border" />
               <div>
                 <p className="text-xs font-semibold uppercase text-muted-foreground mb-3">Tiempo Estimado</p>
@@ -209,7 +228,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
 
             {/* Materiales */}
             <TabsContent value="materiales" className="flex-1 overflow-y-auto p-5 mt-0">
-              <WorkOrderMaterials materials={data.materials_used || []} onChange={val => set('materials_used', val)} />
+              <WorkOrderMaterials materials={data.materials_used || []} onChange={val => saveField('materials_used', val)} />
             </TabsContent>
 
             {/* Horas */}

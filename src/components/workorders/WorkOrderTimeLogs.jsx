@@ -87,20 +87,25 @@ export default function WorkOrderTimeLogs({ workOrderId, workOrderTitle }) {
       {adding && (
         <div className="border border-border rounded-lg p-3 space-y-2 bg-muted/20">
           <p className="text-xs font-semibold text-muted-foreground uppercase">Nuevo registro</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <p className="text-[10px] text-muted-foreground mb-1">Técnico</p>
+          <div>
+            <p className="text-[10px] text-muted-foreground mb-1">Técnico</p>
+            {employees.length > 0 ? (
               <Select value={form.employee_name} onValueChange={v => set('employee_name', v)}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Seleccionar técnico..." /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__manual__" className="text-xs italic text-muted-foreground">— Escribir manualmente —</SelectItem>
                   {employees.map(e => <SelectItem key={e.id} value={e.full_name} className="text-xs">{e.full_name}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div>
-              <p className="text-[10px] text-muted-foreground mb-1">O escribir nombre</p>
-              <Input className="h-8 text-xs" value={form.employee_name} onChange={e => set('employee_name', e.target.value)} placeholder="Nombre técnico" />
-            </div>
+            ) : null}
+            {(employees.length === 0 || form.employee_name === '__manual__' || (form.employee_name && !employees.find(e => e.full_name === form.employee_name))) && (
+              <Input
+                className="h-8 text-xs mt-1"
+                value={form.employee_name === '__manual__' ? '' : form.employee_name}
+                onChange={e => set('employee_name', e.target.value)}
+                placeholder="Nombre del técnico"
+              />
+            )}
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div>
