@@ -10,10 +10,6 @@
       "type": "string",
       "description": "Elemento PEP"
     },
-    "direccion": {
-      "type": "string",
-      "description": "Direcci\u00f3n del establecimiento"
-    },
     "establecimiento": {
       "type": "string",
       "description": "Nombre del establecimiento/escuela"
@@ -21,14 +17,6 @@
     "m2": {
       "type": "number",
       "description": "Superficie en metros cuadrados"
-    },
-    "inspector": {
-      "type": "string",
-      "description": "Inspector asignado"
-    },
-    "jefe_sitio": {
-      "type": "string",
-      "description": "Jefe de sitio responsable"
     },
     "comuna": {
       "type": "string",
@@ -39,9 +27,17 @@
       ],
       "description": "Comuna a la que pertenece"
     },
-    "sup": {
-      "type": "number",
-      "description": "Superficie de supervisi\u00f3n"
+    "direccion_id": {
+      "type": "string",
+      "description": "ID de la direcci\u00f3n principal asociada"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Jefe de sitio (denormalizado de Direccion)"
+    },
+    "inspector": {
+      "type": "string",
+      "description": "Inspector (denormalizado de Direccion)"
     },
     "estado": {
       "type": "string",

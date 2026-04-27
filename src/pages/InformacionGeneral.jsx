@@ -11,14 +11,7 @@ import {
   Edit2, Save, X, TrendingUp, Map, FileJson, FileSpreadsheet, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import ImportadorLocations from '@/components/informacion-general/ImportadorLocations';
-import ImportadorJefesSitio from '@/components/informacion-general/ImportadorJefesSitio';
-import JefeSitioPanel from '@/components/informacion-general/JefeSitioPanel';
-import DireccionPanel from '@/components/informacion-general/DireccionPanel';
-import DireccionesManager from '@/components/informacion-general/DireccionesManager';
-import LocationsGrid from '@/components/informacion-general/LocationsGrid';
-import EstadisticasAvanzadas from '@/components/informacion-general/EstadisticasAvanzadas';
-import ExportadorDatos from '@/components/informacion-general/ExportadorDatos';
+import DirectorioJerarquico from '@/components/informacion-general/DirectorioJerarquico';
 import AsignadorJefesEscuelas from '@/components/informacion-general/AsignadorJefesEscuelas';
 
 const COMUNAS = [
@@ -28,7 +21,7 @@ const COMUNAS = [
 ];
 
 export default function InformacionGeneral() {
-  const [activeTab, setActiveTab] = useState('direcciones');
+  const [activeTab, setActiveTab] = useState('directorio');
   const [search, setSearch] = useState('');
   const [selectedComuna, setSelectedComuna] = useState('all');
   const [expandedJefe, setExpandedJefe] = useState(null);
@@ -212,11 +205,8 @@ export default function InformacionGeneral() {
            {activeTab !== 'import' && (
              <div className="flex gap-2 border-b border-slate-200 -mb-6 overflow-x-auto">
                {[
-                 { key: 'direcciones', label: 'Direcciones (Principal)', icon: MapPin },
+                 { key: 'directorio', label: 'Directorio Jerárquico', icon: MapPin },
                  { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-                 { key: 'jefes', label: 'Por Jefes', icon: Users },
-                 { key: 'locations', label: 'Escuelas', icon: Building2 },
-                 { key: 'reportes', label: 'Reportes', icon: TrendingUp },
                ].map(tab => (
                 <button
                   key={tab.key}
@@ -240,29 +230,17 @@ export default function InformacionGeneral() {
       {activeTab === 'import' && (
         <div className="max-w-7xl mx-auto px-6 py-8 space-y-10">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 mb-1">Asignar Jefes a Escuelas</h2>
-            <p className="text-sm text-muted-foreground mb-4">Cargá el listado de escuelas con jefes de sitio asignados para actualizar automáticamente.</p>
-            <AsignadorJefesEscuelas onSuccess={() => { refetch(); setActiveTab('dashboard'); }} />
-          </div>
-          <hr className="border-slate-200" />
-          <div>
             <h2 className="text-xl font-bold text-slate-900 mb-1">Importar Escuelas (Excel por Comunas)</h2>
-            <p className="text-sm text-muted-foreground mb-4">Importa el padrón completo de escuelas con hojas por comuna.</p>
-            <ImportadorLocations onImportSuccess={() => { refetch(); setActiveTab('dashboard'); }} />
+            <p className="text-sm text-muted-foreground mb-4">Importa el padrón completo respetando la estructura jerárquica: Dirección → Escuelas.</p>
+            <AsignadorJefesEscuelas onSuccess={() => { refetch(); setActiveTab('directorio'); }} />
           </div>
-          <hr className="border-slate-200" />
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 mb-1 flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-600" /> Asignar Jefes de Sitio por Dirección
-            </h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Cargá el Excel de distribución de direcciones para asignar automáticamente los jefes de sitio a cada escuela.
-            </p>
-            <ImportadorJefesSitio
-              locations={locations}
-              onSuccess={() => { refetch(); }}
-            />
-          </div>
+        </div>
+      )}
+
+      {/* Directorio Tab */}
+      {activeTab === 'directorio' && (
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <DirectorioJerarquico />
         </div>
       )}
 
@@ -409,65 +387,7 @@ export default function InformacionGeneral() {
         </div>
       )}
 
-      {/* Por Jefes Tab */}
-      {activeTab === 'jefes' && (
-        <div className="max-w-7xl mx-auto px-6 py-8 space-y-3">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin h-8 w-8 border-4 border-slate-200 border-t-primary rounded-full" />
-            </div>
-          ) : organizados.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-12 text-center">
-                <Users className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-                <p className="text-muted-foreground font-medium">Sin resultados</p>
-              </CardContent>
-            </Card>
-          ) : (
-            organizados.map(jefeData => (
-              <JefeSitioPanel
-                key={jefeData.nombre}
-                jefeData={jefeData}
-                isExpanded={expandedJefe === jefeData.nombre}
-                onToggle={() => setExpandedJefe(expandedJefe === jefeData.nombre ? null : jefeData.nombre)}
-                comunas={COMUNAS}
-              />
-            ))
-          )}
-        </div>
-      )}
 
-      {/* Por Direcciones Tab - NOW PRINCIPAL */}
-       {activeTab === 'direcciones' && (
-         <div className="max-w-7xl mx-auto px-6 py-8">
-           <div className="mb-6">
-             <h2 className="text-2xl font-bold text-slate-900 mb-2">Gestión de Direcciones y Jefes de Sitio</h2>
-             <p className="text-sm text-muted-foreground">
-               Las direcciones son el nivel principal. Cada dirección puede tener asignado un jefe de sitio que supervisa todas las escuelas en esa ubicación.
-             </p>
-           </div>
-           <DireccionesManager
-             locations={locations}
-             comunas={COMUNAS}
-             isLoading={isLoading}
-             onLocationUpdate={() => refetch()}
-           />
-         </div>
-       )}
-
-      {/* Locations Grid Tab */}
-      {activeTab === 'locations' && (
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <LocationsGrid locations={locations} isLoading={isLoading} />
-        </div>
-      )}
-
-      {/* Reportes Tab */}
-      {activeTab === 'reportes' && (
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <EstadisticasAvanzadas locations={locations} comunas={COMUNAS} />
-        </div>
-      )}
     </div>
   );
 }

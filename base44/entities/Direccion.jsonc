@@ -1,0 +1,55 @@
+{
+  "name": "Direccion",
+  "type": "object",
+  "properties": {
+    "direccion": {
+      "type": "string",
+      "description": "Direcci\u00f3n principal"
+    },
+    "comuna": {
+      "type": "string",
+      "enum": [
+        "8A",
+        "8B",
+        "10A"
+      ],
+      "description": "Comuna a la que pertenece"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Jefe de sitio responsable de esta direcci\u00f3n"
+    },
+    "inspector": {
+      "type": "string",
+      "description": "Inspector asignado"
+    },
+    "m2": {
+      "type": "number",
+      "description": "Superficie total en m2"
+    },
+    "sup": {
+      "type": "number",
+      "description": "Superficie de supervisi\u00f3n"
+    },
+    "cantidad_escuelas": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad de escuelas en esta direcci\u00f3n"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "activo",
+        "inactivo"
+      ],
+      "default": "activo"
+    },
+    "notas": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "direccion",
+    "comuna"
+  ]
+}
