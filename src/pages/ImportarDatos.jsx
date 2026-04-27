@@ -29,7 +29,9 @@ export default function ImportarDatos() {
         file_url: fileUrl,
         raw_data: rawData,
       });
-      setMappingResult(response.data);
+      // El SDK wrappea la respuesta en response.data, y la función retorna el objeto directo
+      const result = response.data?.sheets ? response.data : response.data?.response;
+      setMappingResult(result);
     } catch (error) {
       toast.error('Error al analizar el archivo: ' + error.message);
       setStep(0);
