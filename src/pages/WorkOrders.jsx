@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
@@ -253,21 +253,21 @@ export default function WorkOrders() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['workorders'] }); setSelectedOrder(null); }
   });
 
-  const filtered = orders.filter(o => {
+  const filtered = useMemo(() => orders.filter(o => {
     const matchSearch = !search || o.title?.toLowerCase().includes(search.toLowerCase()) || o.assigned_name?.toLowerCase().includes(search.toLowerCase()) || o.asset_name?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusTab === 'all' || o.status === statusTab;
     const matchPriority = priorityFilter === 'all' || o.priority === priorityFilter;
     return matchSearch && matchStatus && matchPriority;
-  });
+  }), [orders, search, statusTab, priorityFilter]);
 
   // Stats
-  const stats = {
+  const stats = useMemo(() => ({
     total: orders.length,
     pendientes: orders.filter(o => o.status === 'pendiente').length,
     en_progreso: orders.filter(o => o.status === 'en_progreso').length,
     urgentes: orders.filter(o => o.priority === 'urgente' && !['completada','cancelada'].includes(o.status)).length,
     completadas: orders.filter(o => o.status === 'completada').length,
-  };
+  }), [orders]);
 
   return (
     <div className="space-y-5">

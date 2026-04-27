@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -82,28 +82,43 @@ export default function Dashboard() {
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list() });
   const { data: employees = [] } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list() });
 
-  const activeProjects = projects.filter(p => p.status === 'en_progreso').length;
-  const pendingOrders = orders.filter(o => ['pendiente', 'asignada'].includes(o.status)).length;
-  const overdueOrders = orders.filter(o => o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada', 'cancelada'].includes(o.status)).length;
-  const activeClients = clients.filter(c => c.status === 'activo').length;
-  const activeEmployees = employees.filter(e => e.status === 'activo').length;
+  const metrics = useMemo(() => {
+    const thisMonth = startOfMonth(new Date());
+    const lastMonth = startOfMonth(subMonths(new Date(), 1));
 
-  const thisMonth = startOfMonth(new Date());
-  const lastMonth = startOfMonth(subMonths(new Date(), 1));
-  const revenueThisMonth = invoices.filter(i => i.status === 'pagada' && i.payment_date && parseISO(i.payment_date) >= thisMonth).reduce((s, i) => s + (i.total || 0), 0);
-  const revenueLastMonth = invoices.filter(i => i.status === 'pagada' && i.payment_date && parseISO(i.payment_date) >= lastMonth && parseISO(i.payment_date) < thisMonth).reduce((s, i) => s + (i.total || 0), 0);
-  const revenueTrend = revenueLastMonth > 0 ? Math.round(((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100) : 0;
+    const activeProjects = projects.filter(p => p.status === 'en_progreso').length;
+    const pendingOrders = orders.filter(o => ['pendiente', 'asignada'].includes(o.status)).length;
+    const overdueOrders = orders.filter(o => o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada', 'cancelada'].includes(o.status)).length;
+    const activeClients = clients.filter(c => c.status === 'activo').length;
+    const activeEmployees = employees.filter(e => e.status === 'activo').length;
 
-  const pendingInvoices = invoices.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0);
-  const lowStockItems = materials.filter(m => m.stock <= m.min_stock && m.min_stock > 0);
-  const overdueAssets = assets.filter(a => a.next_maintenance && isPast(parseISO(a.next_maintenance)));
-  const completedThisMonth = orders.filter(o => o.completed_date && parseISO(o.completed_date) >= thisMonth && o.status === 'completada').length;
-  const efficiency = orders.length > 0 ? Math.round((orders.filter(o => o.status === 'completada').length / orders.length) * 100) : 0;
+    const revenueThisMonth = invoices.filter(i => i.status === 'pagada' && i.payment_date && parseISO(i.payment_date) >= thisMonth).reduce((s, i) => s + (i.total || 0), 0);
+    const revenueLastMonth = invoices.filter(i => i.status === 'pagada' && i.payment_date && parseISO(i.payment_date) >= lastMonth && parseISO(i.payment_date) < thisMonth).reduce((s, i) => s + (i.total || 0), 0);
+    const revenueTrend = revenueLastMonth > 0 ? Math.round(((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100) : 0;
+    const pendingInvoices = invoices.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0);
 
-  const recentProjects = projects.filter(p => p.status === 'en_progreso').slice(0, 5);
-  const urgentOrders = orders.filter(o => ['pendiente', 'asignada', 'en_progreso'].includes(o.status) && ['urgente', 'alta'].includes(o.priority)).slice(0, 5);
+    const lowStockItems = materials.filter(m => m.stock <= m.min_stock && m.min_stock > 0);
+    const overdueAssets = assets.filter(a => a.next_maintenance && isPast(parseISO(a.next_maintenance)));
+    const completedThisMonth = orders.filter(o => o.completed_date && parseISO(o.completed_date) >= thisMonth && o.status === 'completada').length;
+    const efficiency = orders.length > 0 ? Math.round((orders.filter(o => o.status === 'completada').length / orders.length) * 100) : 0;
+    const recentProjects = projects.filter(p => p.status === 'en_progreso').slice(0, 5);
+    const urgentOrders = orders.filter(o => ['pendiente', 'asignada', 'en_progreso'].includes(o.status) && ['urgente', 'alta'].includes(o.priority)).slice(0, 5);
+    const hasAlerts = overdueOrders > 0 || lowStockItems.length > 0 || overdueAssets.length > 0;
 
-  const hasAlerts = overdueOrders > 0 || lowStockItems.length > 0 || overdueAssets.length > 0;
+    return {
+      activeProjects, pendingOrders, overdueOrders, activeClients, activeEmployees,
+      revenueThisMonth, revenueTrend, pendingInvoices,
+      lowStockItems, overdueAssets, completedThisMonth, efficiency,
+      recentProjects, urgentOrders, hasAlerts,
+    };
+  }, [projects, orders, clients, invoices, materials, assets, employees]);
+
+  const {
+    activeProjects, pendingOrders, overdueOrders, activeClients, activeEmployees,
+    revenueThisMonth, revenueTrend, pendingInvoices,
+    lowStockItems, overdueAssets, completedThisMonth, efficiency,
+    recentProjects, urgentOrders, hasAlerts,
+  } = metrics;
 
   return (
     <div className="space-y-5 max-w-[1600px]">
