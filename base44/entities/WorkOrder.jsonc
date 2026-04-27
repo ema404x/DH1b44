@@ -22,7 +22,15 @@
     },
     "location": {
       "type": "string",
-      "description": "Ubicaci\u00f3n del trabajo"
+      "description": "Ubicaci\u00f3n del trabajo (texto libre o nombre del QR)"
+    },
+    "location_qr_id": {
+      "type": "string",
+      "description": "ID de la ubicaci\u00f3n QR vinculada (para escaneo autom\u00e1tico)"
+    },
+    "location_qr_name": {
+      "type": "string",
+      "description": "Nombre de la ubicaci\u00f3n QR (desnormalizado)"
     },
     "type": {
       "type": "string",

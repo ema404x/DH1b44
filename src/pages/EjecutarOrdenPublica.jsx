@@ -11,7 +11,7 @@ import {
   CheckCircle2, Clock, MapPin, Loader2, AlertTriangle,
   Wrench, Zap, Eye, ClipboardList, User, Calendar,
   Camera, PenTool, ChevronDown, ChevronUp, Upload,
-  RotateCcw, Check, X, Sparkles, Info
+  RotateCcw, Check, X, Sparkles, Info, ListChecks
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -232,15 +232,33 @@ export default function EjecutarOrdenPublica() {
   const locId = params.get('loc');
   const otId = params.get('ot');
 
-  const [phase, setPhase] = useState('loading'); // loading | not_found | no_ot | work | done
+  const [phase, setPhase] = useState('loading'); // loading | not_found | no_ot | select_ot | work | done
   const [order, setOrder] = useState(null);
+  const [availableOrders, setAvailableOrders] = useState([]);
   const [locationName, setLocationName] = useState('');
+  const [locationAddress, setLocationAddress] = useState('');
   const [checklist, setChecklist] = useState([]);
   const [fotosAntes, setFotosAntes] = useState([]);
   const [fotosDespues, setFotosDespues] = useState([]);
   const [firma, setFirma] = useState(null); // { signatureUrl, signatureName }
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState('checklist');
+
+  const loadOrder = (ot, locName) => {
+    if (['completada', 'cancelada'].includes(ot.status)) {
+      setOrder(ot);
+      setLocationName(ot.location || locName);
+      setPhase('done');
+      return;
+    }
+    setOrder(ot);
+    setLocationName(ot.location_qr_name || ot.location || locName);
+    setChecklist(ot.checklist || []);
+    setFotosAntes([]);
+    setFotosDespues([]);
+    setFirma(null);
+    setPhase('work');
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -252,33 +270,38 @@ export default function EjecutarOrdenPublica() {
           // QR directo a una OT específica
           const res = await callPublicFn('publicFichar', { action: 'getWorkOrder', workOrderId: otId });
           ot = res.workOrder || null;
-          locName = ot?.location || 'Establecimiento';
-        } else if (locId) {
-          // QR del establecimiento → buscar OT activa
+          locName = ot?.location_qr_name || ot?.location || 'Establecimiento';
+          if (!ot) { setPhase('not_found'); return; }
+          loadOrder(ot, locName);
+          return;
+        }
+
+        if (locId) {
+          // QR del establecimiento → buscar OTs activas
           const res = await callPublicFn('publicFichar', { action: 'getWorkOrderForLocation', locationId: locId });
-          ot = res.workOrder || null;
           locName = res.locationName || 'Establecimiento';
-        }
-
-        if (!ot) {
-          setPhase(locId || otId ? 'no_ot' : 'not_found');
           setLocationName(locName);
+          setLocationAddress(res.locationAddress || '');
+
+          const ots = res.workOrders || (res.workOrder ? [res.workOrder] : []);
+
+          if (ots.length === 0) {
+            setPhase('no_ot');
+            return;
+          }
+
+          if (ots.length === 1) {
+            loadOrder(ots[0], locName);
+            return;
+          }
+
+          // Múltiples OTs → pantalla de selección
+          setAvailableOrders(ots);
+          setPhase('select_ot');
           return;
         }
 
-        if (['completada', 'cancelada'].includes(ot.status)) {
-          setOrder(ot);
-          setLocationName(ot.location || locName);
-          setPhase('done');
-          return;
-        }
-
-        setOrder(ot);
-        setLocationName(ot.location || locName);
-        setChecklist(ot.checklist || []);
-        setFotosAntes(ot.photos?.filter((_, i) => i % 2 === 0) || []);
-        setFotosDespues(ot.photos?.filter((_, i) => i % 2 === 1) || []);
-        setPhase('work');
+        setPhase('not_found');
       } catch (e) {
         setPhase('not_found');
       }
@@ -345,6 +368,79 @@ export default function EjecutarOrdenPublica() {
       </div>
     </div>
   );
+
+  // ── Selección de OT (múltiples OTs activas) ─────────────────────────────────
+  if (phase === 'select_ot') {
+    const priorityColors = {
+      urgente: 'border-l-red-500 bg-red-50',
+      alta: 'border-l-orange-500 bg-orange-50',
+      media: 'border-l-blue-500 bg-blue-50',
+      baja: 'border-l-slate-400 bg-slate-50',
+    };
+    const priorityBadge = {
+      urgente: 'bg-red-100 text-red-700',
+      alta: 'bg-orange-100 text-orange-700',
+      media: 'bg-blue-100 text-blue-700',
+      baja: 'bg-slate-100 text-slate-600',
+    };
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-800 to-slate-900 px-5 pt-8 pb-10">
+        <div className="max-w-lg mx-auto">
+          <div className="text-center mb-6">
+            <img
+              src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png"
+              alt="DH1"
+              className="h-8 object-contain mix-blend-screen mx-auto mb-4 opacity-70"
+            />
+            <div className="inline-flex items-center gap-2 bg-white/10 text-white/70 px-3 py-1.5 rounded-full text-sm mb-3">
+              <MapPin className="h-3.5 w-3.5" /> {locationName}
+            </div>
+            {locationAddress && <p className="text-white/40 text-xs">{locationAddress}</p>}
+            <h1 className="text-white font-bold text-2xl mt-3">Seleccioná una orden</h1>
+            <p className="text-white/50 text-sm mt-1">Hay {availableOrders.length} órdenes activas en este establecimiento</p>
+          </div>
+
+          <div className="space-y-3">
+            {availableOrders.map(ot => {
+              const tc = typeConfig[ot.type] || typeConfig.mantenimiento_correctivo;
+              const TypeIcon = tc.icon;
+              return (
+                <button
+                  key={ot.id}
+                  onClick={() => loadOrder(ot, locationName)}
+                  className={`w-full bg-white rounded-2xl p-4 text-left shadow-lg border-l-4 ${priorityColors[ot.priority] || priorityColors.media} hover:shadow-xl transition-all active:scale-[0.98]`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${tc.color}`}>
+                      <TypeIcon className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${priorityBadge[ot.priority] || priorityBadge.media}`}>
+                          {ot.priority?.toUpperCase()}
+                        </span>
+                        <span className="text-[10px] text-slate-400">{tc.label}</span>
+                      </div>
+                      <p className="font-bold text-slate-800 text-base leading-tight">{ot.title}</p>
+                      {ot.assigned_name && (
+                        <p className="text-sm text-slate-500 mt-1 flex items-center gap-1">
+                          <User className="h-3.5 w-3.5" /> {ot.assigned_name}
+                        </p>
+                      )}
+                      {ot.description && (
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">{ot.description}</p>
+                      )}
+                    </div>
+                    <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0 rotate-[-90deg]" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Sin OT asignada ──────────────────────────────────────────────────────────
   if (phase === 'no_ot') return (

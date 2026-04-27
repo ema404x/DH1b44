@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       return Response.json({ workOrder });
     }
 
-    // GET active work order for a location/establecimiento (public)
+    // GET active work orders for a location/establecimiento (public)
     if (action === 'getWorkOrderForLocation') {
       const { locationId } = body;
       if (!locationId) return Response.json({ error: 'locationId requerido' }, { status: 400 });
@@ -57,20 +57,35 @@ Deno.serve(async (req) => {
       // Get location info
       const locations = await base44.asServiceRole.entities.LocationQR.list('name', 200);
       const location = locations.find(l => l.id === locationId) || null;
-      if (!location) return Response.json({ workOrder: null, locationName: '' });
+      if (!location) return Response.json({ workOrders: [], workOrder: null, locationName: '' });
 
-      // Find active OT matching this location (by name or project)
+      // Find active OTs: primero por location_qr_id exacto, luego fallback por nombre
       const orders = await base44.asServiceRole.entities.WorkOrder.list('-created_date', 500);
-      const active = orders.find(o =>
-        !['completada', 'cancelada'].includes(o.status) &&
-        (
-          o.location?.toLowerCase().includes(location.name.toLowerCase()) ||
-          location.name.toLowerCase().includes(o.location?.toLowerCase() || '') ||
+      const activeOrders = orders.filter(o => {
+        if (['completada', 'cancelada'].includes(o.status)) return false;
+        // Match exacto por ID (vinculado al crear la OT)
+        if (o.location_qr_id === locationId) return true;
+        // Fallback: match por nombre/dirección
+        const locNameLower = location.name.toLowerCase();
+        const locAddrLower = (location.address || '').toLowerCase();
+        const oLocLower = (o.location || '').toLowerCase();
+        return (
+          (oLocLower && (oLocLower.includes(locNameLower) || locNameLower.includes(oLocLower))) ||
+          (locAddrLower && oLocLower && oLocLower.includes(locAddrLower)) ||
           (location.project_name && o.project_name === location.project_name)
-        )
-      ) || null;
+        );
+      });
 
-      return Response.json({ workOrder: active, locationName: location.name });
+      // Ordenar: urgente primero, luego por fecha creación
+      const priorityOrder = { urgente: 0, alta: 1, media: 2, baja: 3 };
+      activeOrders.sort((a, b) => (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2));
+
+      return Response.json({
+        workOrders: activeOrders,
+        workOrder: activeOrders[0] || null, // compatibilidad retroactiva
+        locationName: location.name,
+        locationAddress: location.address || '',
+      });
     }
 
     // UPLOAD file (public — operario uploads photos/signature as base64)

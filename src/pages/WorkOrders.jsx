@@ -59,6 +59,29 @@ function NewOrderDialog({ open, onOpenChange, onSave, saving }) {
   const [form, setForm] = useState({ title: '', type: 'mantenimiento_correctivo', priority: 'media', status: 'pendiente' });
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
+  const { data: locationQRs = [] } = useQuery({
+    queryKey: ['locations'],
+    queryFn: () => base44.entities.LocationQR.list('name', 200),
+    enabled: open,
+    staleTime: 60000,
+  });
+
+  const activeLocations = locationQRs.filter(l => l.is_active);
+
+  const handleSelectLocation = (locId) => {
+    if (locId === '__manual__') {
+      set('location_qr_id', '');
+      set('location_qr_name', '');
+      return;
+    }
+    const loc = activeLocations.find(l => l.id === locId);
+    if (loc) {
+      set('location_qr_id', loc.id);
+      set('location_qr_name', loc.name);
+      set('location', loc.address || loc.name);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -88,13 +111,42 @@ function NewOrderDialog({ open, onOpenChange, onSave, saving }) {
               </Select>
             </div>
           </div>
+
+          {/* Ubicación QR — selector principal */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground uppercase flex items-center gap-1.5">
+              <QrCode className="h-3 w-3 text-emerald-600" /> Establecimiento / Ubicación QR
+            </label>
+            <Select value={form.location_qr_id || '__manual__'} onValueChange={handleSelectLocation}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Seleccionar ubicación QR..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__manual__">— Sin vincular a QR —</SelectItem>
+                {activeLocations.map(loc => (
+                  <SelectItem key={loc.id} value={loc.id}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{loc.name}</span>
+                      {loc.address && <span className="text-xs text-muted-foreground">{loc.address}</span>}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.location_qr_id && (
+              <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1">
+                <QrCode className="h-3 w-3" /> El operario podrá ejecutar esta OT escaneando el QR del establecimiento
+              </p>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground uppercase">Activo / Equipo</label>
               <Input className="mt-1" placeholder="Nombre del activo" value={form.asset_name || ''} onChange={e => set('asset_name', e.target.value)} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground uppercase">Ubicación</label>
+              <label className="text-xs font-medium text-muted-foreground uppercase">Dirección / Referencia</label>
               <Input className="mt-1" placeholder="Ej: Planta Norte" value={form.location || ''} onChange={e => set('location', e.target.value)} />
             </div>
           </div>
@@ -160,9 +212,13 @@ function WorkOrderCard({ order, onOpen, onShowQR }) {
                   <Wrench className="h-3 w-3" />{order.asset_name}
                 </span>
               )}
-              {order.location && (
+              {(order.location_qr_name || order.location) && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />{order.location}
+                  {order.location_qr_id
+                    ? <QrCode className="h-3 w-3 text-emerald-500" />
+                    : <MapPin className="h-3 w-3" />
+                  }
+                  {order.location_qr_name || order.location}
                 </span>
               )}
               {order.assigned_name && (
