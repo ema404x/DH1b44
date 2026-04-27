@@ -345,45 +345,8 @@ export default function InformacionGeneral() {
               ))}
             </div>
 
-            <div className="flex gap-2">
-              <ExportadorDatos locations={locations.filter(l => {
-                const matchSearch = !search || 
-                  l.establecimiento?.toLowerCase().includes(search.toLowerCase()) ||
-                  l.direccion?.toLowerCase().includes(search.toLowerCase());
-                const matchComuna = selectedComuna === 'all' || l.comuna === selectedComuna;
-                return matchSearch && matchComuna;
-              })} />
             </div>
           </div>
-
-          {/* Jefes de Sitio Accordion */}
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin h-8 w-8 border-4 border-slate-200 border-t-primary rounded-full" />
-            </div>
-          ) : organizados.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-12 text-center">
-                <Users className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-                <p className="text-muted-foreground font-medium">Sin resultados</p>
-                <p className="text-sm text-muted-foreground mt-1">Importa datos o ajusta los filtros</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {organizados.map(jefeData => (
-                <JefeSitioPanel
-                  key={jefeData.nombre}
-                  jefeData={jefeData}
-                  isExpanded={expandedJefe === jefeData.nombre}
-                  onToggle={() => setExpandedJefe(expandedJefe === jefeData.nombre ? null : jefeData.nombre)}
-                  comunas={COMUNAS}
-                  onEdit={handleEdit}
-                  onDelete={(id) => deleteMutation.mutate(id)}
-                />
-              ))}
-            </div>
-          )}
         </div>
       )}
 
