@@ -2,46 +2,57 @@ import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function AsignadorJefesEscuelas({ onSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [selectedComuna, setSelectedComuna] = useState('');
   const fileInputRef = useRef(null);
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !selectedComuna) {
+      toast.error('Selecciona una comuna primero');
+      return;
+    }
 
     setIsLoading(true);
     setResult(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      // Subir el archivo
+      const uploadRes = await base44.integrations.Core.UploadFile({ file });
+      const fileUrl = uploadRes.file_url;
 
-      const response = await base44.functions.invoke('asignarJefesEscuelas', formData);
+      // Procesar con la función backend
+      const response = await base44.functions.invoke('procesarAsignacionJefes', {
+        fileUrl,
+        comunaId: selectedComuna,
+      });
 
       setResult({
         success: response.data.success,
-        updated: response.data.updated,
+        updatedLocations: response.data.updatedLocations,
         errors: response.data.errors,
-        totalErrors: response.data.totalErrors,
+        message: response.data.message,
       });
 
       if (response.data.success) {
-        toast.success(`✅ ${response.data.updated} escuelas asignadas correctamente`);
+        toast.success(`✅ ${response.data.updatedLocations} escuelas actualizadas`);
         setTimeout(() => {
           onSuccess?.();
           setResult(null);
+          setSelectedComuna('');
         }, 2000);
       }
     } catch (error) {
       toast.error('Error al procesar archivo');
       setResult({
         success: false,
-        error: error.message,
+        message: error.message,
       });
     } finally {
       setIsLoading(false);
@@ -51,11 +62,25 @@ export default function AsignadorJefesEscuelas({ onSuccess }) {
 
   return (
     <div className="space-y-4">
-      <Card className="border-dashed border-2 hover:border-primary/50 transition-colors cursor-pointer">
-        <CardContent className="pt-6">
+      <Card className="border-dashed border-2 hover:border-primary/50 transition-colors">
+        <CardContent className="pt-6 space-y-4">
+          <div>
+            <label className="text-sm font-semibold block mb-2">Selecciona Comuna</label>
+            <Select value={selectedComuna} onValueChange={setSelectedComuna}>
+              <SelectTrigger>
+                <SelectValue placeholder="8A, 8B o 10A" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="8A">Comuna 8A</SelectItem>
+                <SelectItem value="8B">Comuna 8B</SelectItem>
+                <SelectItem value="10A">Comuna 10A</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="flex flex-col items-center justify-center gap-3 py-8 cursor-pointer"
+            className="flex flex-col items-center justify-center gap-3 py-8 cursor-pointer hover:bg-slate-50 rounded-lg transition-colors"
           >
             <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
               <Upload className="h-6 w-6 text-primary" />
@@ -71,7 +96,7 @@ export default function AsignadorJefesEscuelas({ onSuccess }) {
               type="file"
               accept=".xlsx,.xls"
               onChange={handleFileChange}
-              disabled={isLoading}
+              disabled={isLoading || !selectedComuna}
               className="hidden"
             />
           </div>
@@ -99,25 +124,13 @@ export default function AsignadorJefesEscuelas({ onSuccess }) {
                   <>
                     <p className="font-semibold text-emerald-900">Asignación completada</p>
                     <p className="text-sm text-emerald-700 mt-1">
-                      ✅ {result.updated} escuelas asignadas a sus jefes de sitio
+                      ✅ {result.message}
                     </p>
-                    {result.totalErrors > 0 && (
-                      <div className="mt-2 text-xs text-emerald-600">
-                        ⚠️ {result.totalErrors} escuela(s) no encontrada(s)
-                        {result.errors.length > 0 && (
-                          <div className="mt-1 space-y-1 bg-white/60 rounded p-1.5">
-                            {result.errors.map((err, i) => (
-                              <div key={i}>{err}</div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </>
                 ) : (
                   <>
                     <p className="font-semibold text-red-900">Error en la asignación</p>
-                    <p className="text-sm text-red-700 mt-1">{result.error}</p>
+                    <p className="text-sm text-red-700 mt-1">{result.message}</p>
                   </>
                 )}
               </div>
