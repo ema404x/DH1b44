@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DirectorioJerarquico from '@/components/informacion-general/DirectorioJerarquico';
+import ImportadorSimple from '@/components/informacion-general/ImportadorSimple';
 import AsignadorJefesEscuelas from '@/components/informacion-general/AsignadorJefesEscuelas';
 
 const COMUNAS = [
@@ -230,9 +231,9 @@ export default function InformacionGeneral() {
       {activeTab === 'import' && (
         <div className="max-w-7xl mx-auto px-6 py-8 space-y-10">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 mb-1">Importar Escuelas (Excel por Comunas)</h2>
-            <p className="text-sm text-muted-foreground mb-4">Importa el padrón completo respetando la estructura jerárquica: Dirección → Escuelas.</p>
-            <AsignadorJefesEscuelas onSuccess={() => { refetch(); setActiveTab('directorio'); }} />
+            <h2 className="text-xl font-bold text-slate-900 mb-1">Importar Escuelas y Direcciones</h2>
+            <p className="text-sm text-muted-foreground mb-4">Carga tu Excel con escuelas, direcciones y jefes. El sistema automáticamente crea las direcciones y escuelas con sus asignaciones.</p>
+            <ImportadorSimple onSuccess={() => { refetch(); setActiveTab('directorio'); }} />
           </div>
         </div>
       )}
