@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Upload, Search, Filter, MapPin, Users, Building2, FileText,
   ChevronDown, ChevronUp, Download, Settings, Zap, BarChart3,
-  Edit2, Save, X, TrendingUp, Map, FileJson, FileSpreadsheet
+  Edit2, Save, X, TrendingUp, Map, FileJson, FileSpreadsheet, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ImportadorLocations from '@/components/informacion-general/ImportadorLocations';
@@ -312,6 +312,33 @@ export default function InformacionGeneral() {
               </Card>
             ))}
           </div>
+
+          {/* Alerta de pendientes */}
+          {useMemo(() => {
+            const sinAsignar = locations.filter(l => !l.jefe_sitio);
+            return sinAsignar.length > 0 ? (
+              <Card className="border-orange-200 bg-orange-50 mb-4">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-orange-900">⚠️ {sinAsignar.length} escuela(s) sin jefe de sitio</p>
+                      <p className="text-sm text-orange-700 mt-1">Asigna jefes a todas las direcciones y escuelas para completar la configuración.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-emerald-200 bg-emerald-50 mb-4">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+                    <p className="font-semibold text-emerald-900">✅ Todas las escuelas tienen jefe de sitio asignado</p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          }, [locations])}
 
           {/* Filtros Mejorados */}
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
