@@ -143,6 +143,32 @@
         }
       }
     },
+    "gps_latitude": {
+      "type": "number",
+      "description": "Latitud GPS capturada al guardar la OT desde campo"
+    },
+    "gps_longitude": {
+      "type": "number",
+      "description": "Longitud GPS capturada al guardar la OT desde campo"
+    },
+    "gps_accuracy": {
+      "type": "number",
+      "description": "Precisi\u00f3n GPS en metros"
+    },
+    "gps_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Momento en que se captur\u00f3 la ubicaci\u00f3n GPS"
+    },
+    "gps_status": {
+      "type": "string",
+      "enum": [
+        "capturado",
+        "denegado",
+        "no_disponible"
+      ],
+      "description": "Estado de la captura GPS"
+    },
     "notes": {
       "type": "string"
     }

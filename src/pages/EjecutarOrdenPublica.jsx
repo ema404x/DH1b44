@@ -243,6 +243,8 @@ export default function EjecutarOrdenPublica() {
   const [firma, setFirma] = useState(null); // { signatureUrl, signatureName }
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState('checklist');
+  const [gpsData, setGpsData] = useState(null); // { lat, lng, accuracy, timestamp } | 'denied' | 'unavailable'
+  const [gpsLoading, setGpsLoading] = useState(false);
 
   const loadOrder = (ot, locName) => {
     if (['completada', 'cancelada'].includes(ot.status)) {
@@ -318,9 +320,31 @@ export default function EjecutarOrdenPublica() {
   const pct = checklistTotal > 0 ? Math.round((checklistDone / checklistTotal) * 100) : 100;
   const allDone = checklistTotal === 0 || checklistDone === checklistTotal;
 
+  const captureGPS = () => new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve({ status: 'no_disponible' }); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({
+        status: 'capturado',
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: Math.round(pos.coords.accuracy),
+        timestamp: new Date().toISOString(),
+      }),
+      () => resolve({ status: 'denegado' }),
+      { timeout: 8000, maximumAge: 30000, enableHighAccuracy: true }
+    );
+  });
+
   const handleGuardar = async () => {
     if (!firma) { toast.error('Necesitás firmar antes de guardar'); return; }
     setSaving(true);
+    setGpsLoading(true);
+
+    // Capturar GPS antes de guardar
+    const gps = await captureGPS();
+    setGpsData(gps);
+    setGpsLoading(false);
+
     try {
       const allPhotos = [...fotosAntes, ...fotosDespues];
       await callPublicFn('publicFichar', {
@@ -333,6 +357,12 @@ export default function EjecutarOrdenPublica() {
           signature_name: firma.signatureName,
           status: allDone ? 'completada' : 'en_progreso',
           completed_date: allDone ? new Date().toISOString().split('T')[0] : undefined,
+          // Datos GPS
+          gps_latitude: gps.lat ?? null,
+          gps_longitude: gps.lng ?? null,
+          gps_accuracy: gps.accuracy ?? null,
+          gps_timestamp: gps.timestamp ?? null,
+          gps_status: gps.status,
         },
       });
       setPhase('done');
@@ -667,13 +697,26 @@ export default function EjecutarOrdenPublica() {
             disabled={!firma || saving}
             className="w-full h-16 rounded-2xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-white/20 disabled:text-white/30 text-white font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-lg shadow-emerald-900/30"
           >
-            {saving
+            {gpsLoading
+              ? <><Loader2 className="h-6 w-6 animate-spin" /> Obteniendo ubicación...</>
+              : saving
               ? <><Loader2 className="h-6 w-6 animate-spin" /> Guardando...</>
               : <><Sparkles className="h-6 w-6" /> Guardar y Finalizar</>
             }
           </button>
           {!firma && (
             <p className="text-center text-white/40 text-sm">Necesitás firmar para poder guardar</p>
+          )}
+          {/* Info GPS */}
+          {gpsData && gpsData.status === 'capturado' && (
+            <p className="text-center text-emerald-300 text-xs flex items-center justify-center gap-1">
+              <MapPin className="h-3.5 w-3.5" /> Ubicación capturada — precisión {gpsData.accuracy}m
+            </p>
+          )}
+          {gpsData && gpsData.status === 'denegado' && (
+            <p className="text-center text-amber-300 text-xs flex items-center justify-center gap-1">
+              <AlertTriangle className="h-3.5 w-3.5" /> Ubicación no disponible (permiso denegado)
+            </p>
           )}
         </div>
       </div>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode, Trash2 } from 'lucide-react';
+import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode, Trash2, Navigation } from 'lucide-react';
 import WorkOrderQRButton from './WorkOrderQRButton';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import DeleteWorkOrderButton from './DeleteWorkOrderButton';
@@ -146,6 +146,44 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                   </div>
                 </div>
               </div>
+              {/* GPS de campo */}
+              {data.gps_status && (
+                <>
+                  <hr className="border-border" />
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Navigation className="h-3.5 w-3.5" /> Ubicación GPS de campo
+                    </p>
+                    {data.gps_status === 'capturado' ? (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-1.5">
+                        <p className="text-sm font-medium text-emerald-800">
+                          {data.gps_latitude?.toFixed(6)}, {data.gps_longitude?.toFixed(6)}
+                        </p>
+                        <div className="flex items-center gap-3 text-xs text-emerald-600">
+                          {data.gps_accuracy && <span>Precisión: {data.gps_accuracy}m</span>}
+                          {data.gps_timestamp && <span>{new Date(data.gps_timestamp).toLocaleString('es-AR')}</span>}
+                        </div>
+                        <a
+                          href={`https://www.google.com/maps?q=${data.gps_latitude},${data.gps_longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-emerald-700 underline flex items-center gap-1 mt-1"
+                        >
+                          <MapPin className="h-3 w-3" /> Ver en Google Maps
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <p className="text-sm text-amber-700 flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                          {data.gps_status === 'denegado' ? 'El operario denegó el permiso de ubicación' : 'Ubicación no disponible en el dispositivo'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
               <hr className="border-border" />
               <div>
                 <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Notas</p>
