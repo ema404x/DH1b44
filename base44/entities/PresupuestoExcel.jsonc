@@ -1,0 +1,44 @@
+{
+  "name": "PresupuestoExcel",
+  "type": "object",
+  "properties": {
+    "nombre": {
+      "type": "string",
+      "description": "Nombre del presupuesto"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripci\u00f3n o notas del presupuesto"
+    },
+    "archivo_url": {
+      "type": "string",
+      "description": "URL del archivo Excel subido"
+    },
+    "archivo_nombre": {
+      "type": "string",
+      "description": "Nombre original del archivo"
+    },
+    "archivo_size": {
+      "type": "number",
+      "description": "Tama\u00f1o del archivo en bytes"
+    },
+    "obra": {
+      "type": "string",
+      "description": "Nombre de la obra o proyecto asociado"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "borrador",
+        "enviado",
+        "aprobado",
+        "rechazado"
+      ],
+      "default": "borrador"
+    }
+  },
+  "required": [
+    "nombre",
+    "archivo_url"
+  ]
+}
