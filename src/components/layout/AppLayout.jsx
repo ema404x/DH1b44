@@ -19,7 +19,7 @@ export default function AppLayout() {
       <Sidebar />
       <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${!isOnline || isSyncing || pendingCount > 0 ? 'pt-8' : ''}`}>
         {/* Top bar */}
-        <header className="h-13 border-b border-border/70 bg-white/90 backdrop-blur-sm flex items-center gap-3 px-4 lg:px-5 flex-shrink-0 z-30 shadow-sm">
+        <header className="h-13 border-b border-border/70 bg-white/90 backdrop-blur-sm flex items-center gap-3 pl-14 pr-4 lg:px-5 flex-shrink-0 z-30 shadow-sm">
           <div className="flex-1 max-w-lg">
             <GlobalSearch />
           </div>
