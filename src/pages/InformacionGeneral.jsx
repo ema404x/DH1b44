@@ -344,8 +344,6 @@ export default function InformacionGeneral() {
                 </button>
               ))}
             </div>
-
-            </div>
           </div>
         </div>
       )}
