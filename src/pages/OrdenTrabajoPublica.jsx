@@ -75,6 +75,11 @@ export default function OrdenTrabajoPublica() {
           setLoading(false);
           return;
         }
+        // Si la orden está activa, redirigir automáticamente a ejecutar
+        if (!['completada', 'cancelada'].includes(ot.status)) {
+          window.location.replace(`/ejecutar-ot?ot=${otId}`);
+          return;
+        }
         setOrder(ot);
       } catch (e) {
         setError('Error al cargar la orden. Intentá de nuevo.');
@@ -289,8 +294,28 @@ export default function OrdenTrabajoPublica() {
           </div>
         )}
 
+        {/* CTA — Ejecutar OT */}
+        {!['completada', 'cancelada'].includes(order.status) && (
+          <div className="sticky bottom-4">
+            <a
+              href={`/ejecutar-ot?ot=${otId}`}
+              className="flex items-center justify-center gap-3 w-full h-16 rounded-2xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold text-lg shadow-xl shadow-emerald-900/40 transition-all"
+            >
+              <Wrench className="h-6 w-6" />
+              Ejecutar esta orden
+            </a>
+          </div>
+        )}
+
+        {order.status === 'completada' && (
+          <div className="flex items-center justify-center gap-2 py-4 text-emerald-400 font-semibold">
+            <CheckCircle2 className="h-5 w-5" />
+            Esta orden ya fue completada
+          </div>
+        )}
+
         {/* Footer */}
-        <div className="text-center pt-2 pb-2">
+        <div className="text-center pt-2 pb-8">
           <img
             src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png"
             alt="DH1 Software"
