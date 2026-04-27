@@ -213,7 +213,7 @@ function FotosGrandes({ label, photos, onAdd, onRemove }) {
           ))}
         </div>
       )}
-      <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={e => handleFiles(e.target.files)} />
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
       <button
         onClick={() => fileRef.current?.click()}
         disabled={uploading}
