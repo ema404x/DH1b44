@@ -17,6 +17,7 @@ import OTsPendientesPanel from '@/components/dashboard/OTsPendientesPanel';
 import CertificadosPanel from '@/components/dashboard/CertificadosPanel';
 import MetricasOperacion from '@/components/dashboard/MetricasOperacion';
 import AlertasBanner from '@/components/dashboard/AlertasBanner';
+import EmergenciasWidget from '@/components/dashboard/EmergenciasWidget';
 import { format, differenceInDays, isPast, parseISO, startOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -211,6 +212,11 @@ export default function Dashboard() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Emergencias */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+        <EmergenciasWidget />
+      </motion.div>
 
       {/* OTs + Certificados */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
