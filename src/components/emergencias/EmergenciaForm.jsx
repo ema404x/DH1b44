@@ -1,10 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  AlertTriangle, Loader2, Camera, X, Phone, User, Building2, MapPin
+  AlertTriangle, Loader2, Camera, X, Phone, User, Building2, Search
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,48 +19,15 @@ const TIPOS = [
   { id: 'otro', label: '⚠️ Otro', color: 'border-slate-500 bg-slate-500/20 text-slate-300' },
 ];
 
-function AutocompleteField({ label, icon: Icon, placeholder, value, onChange, suggestions, onSelect, renderSuggestion, confirmed }) {
-  const [show, setShow] = useState(false);
-
-  return (
-    <div className="relative">
-      <label className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
-        {Icon && <Icon className="h-4 w-4" />} {label}
-      </label>
-      <Input
-        placeholder={placeholder}
-        value={value}
-        onChange={e => { onChange(e.target.value); setShow(true); }}
-        onFocus={() => setShow(true)}
-        onBlur={() => setTimeout(() => setShow(false), 150)}
-        className={`bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 ${confirmed ? 'border-emerald-500/60' : ''}`}
-      />
-      {show && suggestions.length > 0 && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-52 overflow-y-auto">
-          {suggestions.map((s, i) => (
-            <button
-              key={i}
-              type="button"
-              onMouseDown={() => { onSelect(s); setShow(false); }}
-              className="w-full text-left px-3 py-2.5 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
-            >
-              {renderSuggestion(s)}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function EmergenciaForm({ onSuccess, onCancel }) {
   const [form, setForm] = useState({
     titulo: '', tipo: '', descripcion: '',
     establecimiento: '', direccion: '', comuna: '',
     reportado_por: '', telefono_contacto: '', jefe_sitio_asignado: '', fotos: [],
   });
-  const [estSearch, setEstSearch] = useState('');
-  const [dirSearch, setDirSearch] = useState('');
+  const [search, setSearch] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [locationSelected, setLocationSelected] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
@@ -69,43 +36,50 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
     queryFn: () => base44.entities.LocationData.list('-created_date', 500),
   });
 
-  const jefes = [...new Set(locations.map(l => l.jefe_sitio).filter(Boolean))];
+  const { data: direcciones = [] } = useQuery({
+    queryKey: ['direcciones'],
+    queryFn: () => base44.entities.Direccion.list('-created_date', 200),
+  });
 
-  // Sugerencias por establecimiento
-  const estSuggestions = estSearch.length >= 1
-    ? locations.filter(l => l.establecimiento?.toLowerCase().includes(estSearch.toLowerCase())).slice(0, 8)
-    : [];
+  // Mapa de direcciones por id para lookup rápido
+  const direccionesMap = useMemo(() => {
+    const map = {};
+    direcciones.forEach(d => { map[d.id] = d; });
+    return map;
+  }, [direcciones]);
 
-  // Sugerencias por dirección (ubic_tecnica o jefe_sitio)
-  const dirSuggestions = dirSearch.length >= 1
-    ? locations.filter(l =>
-        l.ubic_tecnica?.toLowerCase().includes(dirSearch.toLowerCase()) ||
-        l.jefe_sitio?.toLowerCase().includes(dirSearch.toLowerCase())
-      ).slice(0, 8)
-    : [];
+  // Suggestions: buscar por nombre de establecimiento O por nombre de dirección (calle)
+  const suggestions = useMemo(() => {
+    if (search.length < 1) return [];
+    const q = search.toLowerCase();
+    return locations.filter(loc => {
+      const matchEstablecimiento = loc.establecimiento?.toLowerCase().includes(q);
+      const dir = loc.direccion_id ? direccionesMap[loc.direccion_id] : null;
+      const matchDireccion = dir?.direccion?.toLowerCase().includes(q);
+      return matchEstablecimiento || matchDireccion;
+    }).slice(0, 10);
+  }, [search, locations, direccionesMap]);
 
-  const selectByEstablecimiento = (loc) => {
-    setEstSearch(loc.establecimiento);
-    setDirSearch(loc.ubic_tecnica || '');
+  const jefes = useMemo(() => [...new Set(locations.map(l => l.jefe_sitio).filter(Boolean))], [locations]);
+
+  const handleSelect = (loc) => {
+    const dir = loc.direccion_id ? direccionesMap[loc.direccion_id] : null;
+    setLocationSelected(loc);
+    setSearch(loc.establecimiento);
+    setShowSuggestions(false);
     setForm(f => ({
       ...f,
-      establecimiento: loc.establecimiento,
-      direccion: loc.ubic_tecnica || f.direccion,
-      comuna: loc.comuna || f.comuna,
-      jefe_sitio_asignado: loc.jefe_sitio || f.jefe_sitio_asignado,
+      establecimiento: loc.establecimiento || '',
+      direccion: dir?.direccion || '',
+      comuna: loc.comuna || '',
+      jefe_sitio_asignado: loc.jefe_sitio || '',
     }));
   };
 
-  const selectByDireccion = (loc) => {
-    setDirSearch(loc.ubic_tecnica || '');
-    setEstSearch(loc.establecimiento || '');
-    setForm(f => ({
-      ...f,
-      establecimiento: loc.establecimiento || f.establecimiento,
-      direccion: loc.ubic_tecnica || f.direccion,
-      comuna: loc.comuna || f.comuna,
-      jefe_sitio_asignado: loc.jefe_sitio || f.jefe_sitio_asignado,
-    }));
+  const handleClearSelection = () => {
+    setLocationSelected(null);
+    setSearch('');
+    setForm(f => ({ ...f, establecimiento: '', direccion: '', comuna: '', jefe_sitio_asignado: '' }));
   };
 
   const handlePhoto = async (e) => {
@@ -131,7 +105,7 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
       title: `[EMERGENCIA] ${form.titulo}`,
       type: 'emergencia', status: 'pendiente', priority: 'urgente',
       description: form.descripcion,
-      location: `${form.establecimiento} - ${form.direccion}`,
+      location: [form.establecimiento, form.direccion].filter(Boolean).join(' - '),
       assigned_name: form.jefe_sitio_asignado,
       gps_status: 'no_disponible',
       photos: form.fotos,
@@ -186,54 +160,67 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
         />
       </div>
 
-      {/* Establecimiento + Dirección — autocomplete bidireccional */}
+      {/* Búsqueda de establecimiento */}
       <div>
-        <p className="text-xs text-slate-500 mb-3">Podés buscar por nombre del establecimiento o por dirección — los campos se completan automáticamente.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <AutocompleteField
-            label="Establecimiento *"
-            icon={Building2}
-            placeholder="Escribí para buscar escuela..."
-            value={estSearch}
-            confirmed={!!form.establecimiento}
-            onChange={v => {
-              setEstSearch(v);
-              if (!v) { setForm(f => ({ ...f, establecimiento: '', direccion: '', comuna: '', jefe_sitio_asignado: '' })); setDirSearch(''); }
-            }}
-            suggestions={estSuggestions}
-            onSelect={selectByEstablecimiento}
-            renderSuggestion={loc => (
-              <>
-                <p className="text-sm text-white font-medium">{loc.establecimiento}</p>
-                <p className="text-xs text-slate-400">{loc.ubic_tecnica || ''}{loc.jefe_sitio ? ` · ${loc.jefe_sitio}` : ''}</p>
-              </>
+        <label className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+          <Building2 className="h-4 w-4" /> Establecimiento *
+        </label>
+        <p className="text-xs text-slate-500 mb-2">Buscá por nombre del establecimiento o por dirección (calle)</p>
+
+        {locationSelected ? (
+          /* Selección confirmada */
+          <div className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-4 py-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-white font-semibold text-sm">{form.establecimiento}</p>
+              {form.direccion && <p className="text-slate-400 text-xs mt-0.5">📍 {form.direccion}</p>}
+              <div className="flex gap-3 mt-1 text-xs text-slate-400">
+                {form.comuna && <span>🏘️ {form.comuna}</span>}
+                {form.jefe_sitio_asignado && <span>👤 {form.jefe_sitio_asignado}</span>}
+              </div>
+            </div>
+            <button onClick={handleClearSelection} className="text-slate-400 hover:text-white transition-colors mt-0.5">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          /* Campo de búsqueda */
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <Input
+              placeholder="Ej: Escuela N°5  o  Av. Rivadavia 1234..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setShowSuggestions(true); }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              className="pl-9 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                {suggestions.map(loc => {
+                  const dir = loc.direccion_id ? direccionesMap[loc.direccion_id] : null;
+                  return (
+                    <button
+                      key={loc.id}
+                      type="button"
+                      onMouseDown={() => handleSelect(loc)}
+                      className="w-full text-left px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
+                    >
+                      <p className="text-sm text-white font-medium">{loc.establecimiento}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {dir?.direccion ? `📍 ${dir.direccion}` : ''}
+                        {loc.jefe_sitio ? `  ·  👤 ${loc.jefe_sitio}` : ''}
+                        {loc.comuna ? `  ·  ${loc.comuna}` : ''}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
             )}
-          />
-          <AutocompleteField
-            label="Dirección / Ubicación técnica"
-            icon={MapPin}
-            placeholder="Escribí dirección para buscar..."
-            value={dirSearch}
-            confirmed={!!form.direccion}
-            onChange={v => {
-              setDirSearch(v);
-              setForm(f => ({ ...f, direccion: v }));
-              if (!v) { setForm(f => ({ ...f, establecimiento: '', direccion: '', comuna: '', jefe_sitio_asignado: '' })); setEstSearch(''); }
-            }}
-            suggestions={dirSuggestions}
-            onSelect={selectByDireccion}
-            renderSuggestion={loc => (
-              <>
-                <p className="text-sm text-white font-medium">{loc.ubic_tecnica}</p>
-                <p className="text-xs text-slate-400">{loc.establecimiento}{loc.jefe_sitio ? ` · ${loc.jefe_sitio}` : ''}</p>
-              </>
+            {showSuggestions && search.length >= 1 && suggestions.length === 0 && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl px-4 py-3">
+                <p className="text-sm text-slate-400">No se encontraron resultados para "{search}"</p>
+              </div>
             )}
-          />
-        </div>
-        {form.establecimiento && (
-          <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-400">
-            {form.comuna && <span>🏘️ {form.comuna}</span>}
-            {form.jefe_sitio_asignado && <span>👤 Jefe: {form.jefe_sitio_asignado}</span>}
           </div>
         )}
       </div>
