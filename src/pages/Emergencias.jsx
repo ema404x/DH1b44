@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import EmergenciaForm from '@/components/emergencias/EmergenciaForm';
 import EmergenciaCard from '@/components/emergencias/EmergenciaCard';
 import EmergenciasDashboard from '@/components/emergencias/EmergenciasDashboard';
+import { useAuth } from '@/lib/AuthContext';
 
 const FILTROS = [
   { id: 'all', label: 'Todas' },
@@ -23,6 +24,8 @@ export default function Emergencias() {
   const [filtro, setFiltro] = useState('all');
   const [tab, setTab] = useState('lista'); // 'lista' | 'dashboard'
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const { data: emergencias = [], isLoading, refetch } = useQuery({
     queryKey: ['emergencias'],
@@ -203,7 +206,7 @@ export default function Emergencias() {
               ) : (
                 <AnimatePresence>
                   {filtradas.map(e => (
-                    <EmergenciaCard key={e.id} emergencia={e} onUpdate={refetch} />
+                    <EmergenciaCard key={e.id} emergencia={e} onUpdate={refetch} isAdmin={isAdmin} />
                   ))}
                 </AnimatePresence>
               )}

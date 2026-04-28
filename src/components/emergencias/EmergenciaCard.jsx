@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  AlertTriangle, Clock, MapPin, User, CheckCircle2, Loader2, ChevronDown, ChevronUp, ExternalLink
+  AlertTriangle, Clock, MapPin, User, CheckCircle2, Loader2, ChevronDown, ChevronUp, ExternalLink, Trash2
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -28,9 +28,18 @@ const ESTADO_CONFIG = {
   cancelada: { label: 'Cancelada', class: 'bg-slate-500/20 text-slate-400 border border-slate-500/50' },
 };
 
-export default function EmergenciaCard({ emergencia, onUpdate }) {
+export default function EmergenciaCard({ emergencia, onUpdate, isAdmin }) {
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirm('¿Estás seguro de que querés eliminar esta emergencia?')) return;
+    setDeleting(true);
+    await base44.entities.Emergencia.delete(emergencia.id);
+    toast.success('Emergencia eliminada');
+    onUpdate?.();
+  };
 
   const tipo = TIPO_CONFIG[emergencia.tipo] || TIPO_CONFIG.otro;
   const estado = ESTADO_CONFIG[emergencia.estado] || ESTADO_CONFIG.activa;
@@ -112,6 +121,16 @@ export default function EmergenciaCard({ emergencia, onUpdate }) {
               <Button size="sm" onClick={() => cambiarEstado('resuelta')} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-2">
                 {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <><CheckCircle2 className="h-3 w-3" /> Resolver</>}
               </Button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="text-slate-500 hover:text-red-400 transition-colors p-1 rounded"
+                title="Eliminar emergencia"
+              >
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              </button>
             )}
             <button
               onClick={() => setExpanded(!expanded)}
