@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -14,6 +14,12 @@ const navGroups = [
     items: [
       { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
       { label: 'Calendario', icon: CalendarDays, path: '/calendario' },
+    ]
+  },
+  {
+    label: 'Emergencias',
+    items: [
+      { label: '🚨 Emergencias', icon: AlertTriangle, path: '/emergencias' },
     ]
   },
   {

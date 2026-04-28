@@ -1,0 +1,112 @@
+{
+  "name": "Emergencia",
+  "type": "object",
+  "properties": {
+    "codigo": {
+      "type": "string",
+      "description": "C\u00f3digo \u00fanico de la emergencia (ej: EMG-001)"
+    },
+    "titulo": {
+      "type": "string",
+      "description": "T\u00edtulo breve de la emergencia"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripci\u00f3n detallada de la situaci\u00f3n"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "incendio",
+        "inundacion",
+        "corte_electrico",
+        "derrumbe",
+        "rotura_gas",
+        "vandalismo",
+        "accidente",
+        "otro"
+      ],
+      "description": "Tipo de emergencia"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "activa",
+        "en_atencion",
+        "resuelta",
+        "cancelada"
+      ],
+      "default": "activa"
+    },
+    "establecimiento": {
+      "type": "string",
+      "description": "Nombre del establecimiento/escuela afectada"
+    },
+    "direccion": {
+      "type": "string",
+      "description": "Direcci\u00f3n del lugar"
+    },
+    "comuna": {
+      "type": "string",
+      "enum": [
+        "8A",
+        "8B",
+        "10A"
+      ],
+      "description": "Comuna"
+    },
+    "gps_latitude": {
+      "type": "number"
+    },
+    "gps_longitude": {
+      "type": "number"
+    },
+    "reportado_por": {
+      "type": "string",
+      "description": "Nombre de quien reporta"
+    },
+    "telefono_contacto": {
+      "type": "string",
+      "description": "Tel\u00e9fono de contacto del reportante"
+    },
+    "jefe_sitio_asignado": {
+      "type": "string",
+      "description": "Jefe de sitio asignado a resolver"
+    },
+    "cuadrilla_asignada": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Miembros de la cuadrilla asignada"
+    },
+    "work_order_id": {
+      "type": "string",
+      "description": "ID de la OT creada para esta emergencia"
+    },
+    "fotos": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "URLs de fotos de la emergencia"
+    },
+    "notas_resolucion": {
+      "type": "string",
+      "description": "Notas sobre c\u00f3mo se resolvi\u00f3"
+    },
+    "fecha_resolucion": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tiempo_respuesta_min": {
+      "type": "number",
+      "description": "Tiempo de respuesta en minutos"
+    }
+  },
+  "required": [
+    "titulo",
+    "tipo",
+    "establecimiento"
+  ]
+}
