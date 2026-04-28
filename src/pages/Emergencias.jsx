@@ -156,57 +156,60 @@ export default function Emergencias() {
           </motion.div>
         )}
 
-        {/* Filtros (solo en lista) */}
-        {tab === 'lista' && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex gap-2 flex-wrap mb-5">
-          {FILTROS.map(f => (
-            <button
-              key={f.id}
-              onClick={() => setFiltro(f.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
-                filtro === f.id
-                  ? 'bg-red-600/20 border-red-500/50 text-red-300'
-                  : 'border-slate-700/50 text-slate-400 hover:border-slate-600 bg-slate-800/30'
-              }`}
-            >
-              {f.label}
-              {f.id !== 'all' && (
-                <span className="ml-1.5 text-xs opacity-70">
-                  ({f.id === 'activa' ? stats.activas : f.id === 'en_atencion' ? stats.enAtencion : stats.resueltas})
-                </span>
-              )}
-            </button>
-          ))}
-        </motion.div>
+        {/* Vista Lista */}
+        {tab === 'lista' && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex gap-2 flex-wrap mb-5">
+              {FILTROS.map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setFiltro(f.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
+                    filtro === f.id
+                      ? 'bg-red-600/20 border-red-500/50 text-red-300'
+                      : 'border-slate-700/50 text-slate-400 hover:border-slate-600 bg-slate-800/30'
+                  }`}
+                >
+                  {f.label}
+                  {f.id !== 'all' && (
+                    <span className="ml-1.5 text-xs opacity-70">
+                      ({f.id === 'activa' ? stats.activas : f.id === 'en_atencion' ? stats.enAtencion : stats.resueltas})
+                    </span>
+                  )}
+                </button>
+              ))}
+            </motion.div>
 
-        {/* Lista */}
-        {tab === 'lista' && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="space-y-3">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="h-10 w-10 rounded-full border-2 border-slate-700 border-t-red-500 animate-spin" />
-            </div>
-          ) : filtradas.length === 0 ? (
-            <div className="text-center py-16">
-              {stats.activas === 0 && filtro !== 'all' ? (
-                <div>
-                  <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
-                  <p className="text-slate-400 font-medium">No hay emergencias en este estado</p>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="space-y-3">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="h-10 w-10 rounded-full border-2 border-slate-700 border-t-red-500 animate-spin" />
+                </div>
+              ) : filtradas.length === 0 ? (
+                <div className="text-center py-16">
+                  {stats.activas === 0 && filtro !== 'all' ? (
+                    <div>
+                      <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
+                      <p className="text-slate-400 font-medium">No hay emergencias en este estado</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <Zap className="h-12 w-12 text-slate-600 mx-auto mb-3" />
+                      <p className="text-slate-400 font-medium">No hay emergencias registradas</p>
+                      <p className="text-slate-500 text-sm mt-1">Presioná "Nueva Emergencia" para registrar una</p>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div>
-                  <Zap className="h-12 w-12 text-slate-600 mx-auto mb-3" />
-                  <p className="text-slate-400 font-medium">No hay emergencias registradas</p>
-                  <p className="text-slate-500 text-sm mt-1">Presioná "Nueva Emergencia" para registrar una</p>
-                </div>
+                <AnimatePresence>
+                  {filtradas.map(e => (
+                    <EmergenciaCard key={e.id} emergencia={e} onUpdate={refetch} />
+                  ))}
+                </AnimatePresence>
               )}
-            </div>
-          ) : (
-            <AnimatePresence>
-              {filtradas.map(e => (
-                <EmergenciaCard key={e.id} emergencia={e} onUpdate={refetch} />
-              ))}
-            </AnimatePresence>
-          )}
-        </motion.div>}
+            </motion.div>
+          </>
+        )}
       </div>
     </div>
   );
