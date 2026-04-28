@@ -3,11 +3,9 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import {
-  AlertTriangle, MapPin, Loader2, Camera, X, Phone, User, Building2
+  AlertTriangle, Loader2, Camera, X, Phone, User, Building2, MapPin
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
 const TIPOS = [
@@ -21,53 +19,93 @@ const TIPOS = [
   { id: 'otro', label: '⚠️ Otro', color: 'border-slate-500 bg-slate-500/20 text-slate-300' },
 ];
 
+function AutocompleteField({ label, icon: Icon, placeholder, value, onChange, suggestions, onSelect, renderSuggestion, confirmed }) {
+  const [show, setShow] = useState(false);
+
+  return (
+    <div className="relative">
+      <label className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+        {Icon && <Icon className="h-4 w-4" />} {label}
+      </label>
+      <Input
+        placeholder={placeholder}
+        value={value}
+        onChange={e => { onChange(e.target.value); setShow(true); }}
+        onFocus={() => setShow(true)}
+        onBlur={() => setTimeout(() => setShow(false), 150)}
+        className={`bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 ${confirmed ? 'border-emerald-500/60' : ''}`}
+      />
+      {show && suggestions.length > 0 && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+          {suggestions.map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              onMouseDown={() => { onSelect(s); setShow(false); }}
+              className="w-full text-left px-3 py-2.5 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
+            >
+              {renderSuggestion(s)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EmergenciaForm({ onSuccess, onCancel }) {
   const [form, setForm] = useState({
-    titulo: '',
-    tipo: '',
-    descripcion: '',
-    establecimiento: '',
-    direccion: '',
-    comuna: '',
-    reportado_por: '',
-    telefono_contacto: '',
-    jefe_sitio_asignado: '',
-    fotos: [],
+    titulo: '', tipo: '', descripcion: '',
+    establecimiento: '', direccion: '', comuna: '',
+    reportado_por: '', telefono_contacto: '', jefe_sitio_asignado: '', fotos: [],
   });
-  const [gps, setGps] = useState(null);
-  const [gpsLoading, setGpsLoading] = useState(false);
+  const [estSearch, setEstSearch] = useState('');
+  const [dirSearch, setDirSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [estSearch, setEstSearch] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const estRef = useRef(null);
 
   const { data: locations = [] } = useQuery({
     queryKey: ['locations'],
     queryFn: () => base44.entities.LocationData.list('-created_date', 500),
   });
 
-  const { data: direcciones = [] } = useQuery({
-    queryKey: ['direcciones'],
-    queryFn: () => base44.entities.Direccion.list(),
-  });
-
   const jefes = [...new Set(locations.map(l => l.jefe_sitio).filter(Boolean))];
 
-  const captureGPS = () => {
-    setGpsLoading(true);
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => {
-        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setGpsLoading(false);
-        toast.success('Ubicación capturada');
-      },
-      () => {
-        setGpsLoading(false);
-        toast.error('No se pudo obtener la ubicación');
-      },
-      { timeout: 10000 }
-    );
+  // Sugerencias por establecimiento
+  const estSuggestions = estSearch.length >= 1
+    ? locations.filter(l => l.establecimiento?.toLowerCase().includes(estSearch.toLowerCase())).slice(0, 8)
+    : [];
+
+  // Sugerencias por dirección (ubic_tecnica o jefe_sitio)
+  const dirSuggestions = dirSearch.length >= 1
+    ? locations.filter(l =>
+        l.ubic_tecnica?.toLowerCase().includes(dirSearch.toLowerCase()) ||
+        l.jefe_sitio?.toLowerCase().includes(dirSearch.toLowerCase())
+      ).slice(0, 8)
+    : [];
+
+  const selectByEstablecimiento = (loc) => {
+    setEstSearch(loc.establecimiento);
+    setDirSearch(loc.ubic_tecnica || '');
+    setForm(f => ({
+      ...f,
+      establecimiento: loc.establecimiento,
+      direccion: loc.ubic_tecnica || f.direccion,
+      comuna: loc.comuna || f.comuna,
+      jefe_sitio_asignado: loc.jefe_sitio || f.jefe_sitio_asignado,
+    }));
+  };
+
+  const selectByDireccion = (loc) => {
+    setDirSearch(loc.ubic_tecnica || '');
+    setEstSearch(loc.establecimiento || '');
+    setForm(f => ({
+      ...f,
+      establecimiento: loc.establecimiento || f.establecimiento,
+      direccion: loc.ubic_tecnica || f.direccion,
+      comuna: loc.comuna || f.comuna,
+      jefe_sitio_asignado: loc.jefe_sitio || f.jefe_sitio_asignado,
+    }));
   };
 
   const handlePhoto = async (e) => {
@@ -79,24 +117,6 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
     setUploadingPhoto(false);
   };
 
-  const handleEstablecimientoSelect = (loc) => {
-    setEstSearch(loc.establecimiento);
-    setShowSuggestions(false);
-    setForm(f => ({
-      ...f,
-      establecimiento: loc.establecimiento,
-      direccion: loc.ubic_tecnica || f.direccion,
-      comuna: loc.comuna || f.comuna,
-      jefe_sitio_asignado: loc.jefe_sitio || f.jefe_sitio_asignado,
-    }));
-  };
-
-  const estSuggestions = estSearch.length >= 1
-    ? locations.filter(l =>
-        l.establecimiento?.toLowerCase().includes(estSearch.toLowerCase())
-      ).slice(0, 8)
-    : [];
-
   const handleSubmit = async () => {
     if (!form.titulo || !form.tipo || !form.establecimiento) {
       toast.error('Completá los campos obligatorios');
@@ -104,35 +124,20 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
     }
     setSaving(true);
     const codigo = `EMG-${Date.now().toString().slice(-6)}`;
-
-    // Crear la emergencia
     const emergencia = await base44.entities.Emergencia.create({
-      ...form,
-      codigo,
-      estado: 'activa',
-      gps_latitude: gps?.lat || null,
-      gps_longitude: gps?.lng || null,
+      ...form, codigo, estado: 'activa',
     });
-
-    // Crear OT vinculada automáticamente
     const ot = await base44.entities.WorkOrder.create({
       title: `[EMERGENCIA] ${form.titulo}`,
-      type: 'emergencia',
-      status: 'pendiente',
-      priority: 'urgente',
+      type: 'emergencia', status: 'pendiente', priority: 'urgente',
       description: form.descripcion,
       location: `${form.establecimiento} - ${form.direccion}`,
       assigned_name: form.jefe_sitio_asignado,
-      gps_latitude: gps?.lat || null,
-      gps_longitude: gps?.lng || null,
-      gps_status: gps ? 'capturado' : 'no_disponible',
+      gps_status: 'no_disponible',
       photos: form.fotos,
       notes: `Emergencia: ${codigo}`,
     });
-
-    // Vincular OT a la emergencia
     await base44.entities.Emergencia.update(emergencia.id, { work_order_id: ot.id });
-
     setSaving(false);
     toast.success('Emergencia registrada y OT creada');
     onSuccess?.();
@@ -140,7 +145,7 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
 
   return (
     <div className="space-y-6">
-      {/* Tipo de emergencia */}
+      {/* Tipo */}
       <div>
         <label className="text-sm font-semibold text-slate-300 mb-3 block">Tipo de emergencia *</label>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -181,87 +186,77 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
         />
       </div>
 
-      {/* Establecimiento */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="relative" ref={estRef}>
-          <label className="text-sm font-semibold text-slate-300 mb-2 block flex items-center gap-2">
-            <Building2 className="h-4 w-4" /> Establecimiento *
-          </label>
-          <Input
+      {/* Establecimiento + Dirección — autocomplete bidireccional */}
+      <div>
+        <p className="text-xs text-slate-500 mb-3">Podés buscar por nombre del establecimiento o por dirección — los campos se completan automáticamente.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <AutocompleteField
+            label="Establecimiento *"
+            icon={Building2}
             placeholder="Escribí para buscar escuela..."
             value={estSearch}
-            onChange={e => {
-              setEstSearch(e.target.value);
-              setShowSuggestions(true);
-              if (!e.target.value) setForm(f => ({ ...f, establecimiento: '', direccion: '', comuna: '', jefe_sitio_asignado: '' }));
+            confirmed={!!form.establecimiento}
+            onChange={v => {
+              setEstSearch(v);
+              if (!v) { setForm(f => ({ ...f, establecimiento: '', direccion: '', comuna: '', jefe_sitio_asignado: '' })); setDirSearch(''); }
             }}
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-            className={`bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 ${form.establecimiento ? 'border-emerald-500/50' : ''}`}
+            suggestions={estSuggestions}
+            onSelect={selectByEstablecimiento}
+            renderSuggestion={loc => (
+              <>
+                <p className="text-sm text-white font-medium">{loc.establecimiento}</p>
+                <p className="text-xs text-slate-400">{loc.ubic_tecnica || ''}{loc.jefe_sitio ? ` · ${loc.jefe_sitio}` : ''}</p>
+              </>
+            )}
           />
-          {showSuggestions && estSuggestions.length > 0 && (
-            <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-              {estSuggestions.map(loc => (
-                <button
-                  key={loc.id}
-                  type="button"
-                  onMouseDown={() => handleEstablecimientoSelect(loc)}
-                  className="w-full text-left px-3 py-2.5 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
-                >
-                  <p className="text-sm text-white font-medium">{loc.establecimiento}</p>
-                  <p className="text-xs text-slate-400">{loc.jefe_sitio ? `Jefe: ${loc.jefe_sitio}` : ''} {loc.comuna ? `· ${loc.comuna}` : ''}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div>
-          <label className="text-sm font-semibold text-slate-300 mb-2 block">Dirección</label>
-          <Input
-            placeholder="Se completa automáticamente"
-            value={form.direccion}
-            onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))}
-            className="bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+          <AutocompleteField
+            label="Dirección / Ubicación técnica"
+            icon={MapPin}
+            placeholder="Escribí dirección para buscar..."
+            value={dirSearch}
+            confirmed={!!form.direccion}
+            onChange={v => {
+              setDirSearch(v);
+              setForm(f => ({ ...f, direccion: v }));
+              if (!v) { setForm(f => ({ ...f, establecimiento: '', direccion: '', comuna: '', jefe_sitio_asignado: '' })); setEstSearch(''); }
+            }}
+            suggestions={dirSuggestions}
+            onSelect={selectByDireccion}
+            renderSuggestion={loc => (
+              <>
+                <p className="text-sm text-white font-medium">{loc.ubic_tecnica}</p>
+                <p className="text-xs text-slate-400">{loc.establecimiento}{loc.jefe_sitio ? ` · ${loc.jefe_sitio}` : ''}</p>
+              </>
+            )}
           />
         </div>
+        {form.establecimiento && (
+          <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-400">
+            {form.comuna && <span>🏘️ {form.comuna}</span>}
+            {form.jefe_sitio_asignado && <span>👤 Jefe: {form.jefe_sitio_asignado}</span>}
+          </div>
+        )}
       </div>
 
-      {/* Jefe de Sitio + GPS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-semibold text-slate-300 mb-2 block flex items-center gap-2">
-            <User className="h-4 w-4" /> Jefe de Sitio asignado
-          </label>
-          <select
-            value={form.jefe_sitio_asignado}
-            onChange={e => setForm(f => ({ ...f, jefe_sitio_asignado: e.target.value }))}
-            className="w-full h-9 rounded-md border border-slate-700 bg-slate-800/50 px-3 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500"
-          >
-            <option value="">Sin asignar</option>
-            {jefes.map(j => <option key={j} value={j}>{j}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="text-sm font-semibold text-slate-300 mb-2 block flex items-center gap-2">
-            <MapPin className="h-4 w-4" /> Ubicación GPS
-          </label>
-          <Button
-            type="button"
-            onClick={captureGPS}
-            disabled={gpsLoading}
-            variant="outline"
-            className={`w-full border-slate-700 ${gps ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10' : 'text-slate-400 bg-slate-800/50'}`}
-          >
-            {gpsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-            {gps ? `GPS capturado (${gps.lat.toFixed(4)}, ${gps.lng.toFixed(4)})` : 'Capturar ubicación'}
-          </Button>
-        </div>
+      {/* Jefe de Sitio */}
+      <div>
+        <label className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+          <User className="h-4 w-4" /> Jefe de Sitio asignado
+        </label>
+        <select
+          value={form.jefe_sitio_asignado}
+          onChange={e => setForm(f => ({ ...f, jefe_sitio_asignado: e.target.value }))}
+          className="w-full h-9 rounded-md border border-slate-700 bg-slate-800/50 px-3 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500"
+        >
+          <option value="">Sin asignar</option>
+          {jefes.map(j => <option key={j} value={j}>{j}</option>)}
+        </select>
       </div>
 
       {/* Contacto */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="text-sm font-semibold text-slate-300 mb-2 block flex items-center gap-2">
+          <label className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
             <User className="h-4 w-4" /> Reportado por
           </label>
           <Input
@@ -272,7 +267,7 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
           />
         </div>
         <div>
-          <label className="text-sm font-semibold text-slate-300 mb-2 block flex items-center gap-2">
+          <label className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
             <Phone className="h-4 w-4" /> Teléfono de contacto
           </label>
           <Input
@@ -286,7 +281,7 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
 
       {/* Fotos */}
       <div>
-        <label className="text-sm font-semibold text-slate-300 mb-2 block flex items-center gap-2">
+        <label className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
           <Camera className="h-4 w-4" /> Fotos de la situación
         </label>
         <div className="flex flex-wrap gap-2 mb-2">
