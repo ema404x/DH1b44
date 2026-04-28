@@ -2,12 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Activity, List, Users, Globe } from 'lucide-react';
+import { MapPin, Activity, List, Users, Globe, School } from 'lucide-react';
 import { toast } from 'sonner';
 import MapaFichajes from '@/components/mapa/MapaFichajes';
 import LocationsManager from '@/components/mapa/LocationsManager';
 import AsignacionesUbicacion from '@/components/mapa/AsignacionesUbicacion';
 import MapaProyectosOTs from '@/components/mapa/MapaProyectosOTs';
+import MapaColegios from '@/components/mapa/MapaColegios';
 
 export default function Mapa() {
   const [tab, setTab] = useState('mapa');
@@ -81,6 +82,9 @@ export default function Mapa() {
           <TabsTrigger value="gestion" className="gap-2">
             <List className="h-4 w-4" /> Gestión de Ubicaciones
           </TabsTrigger>
+          <TabsTrigger value="colegios" className="gap-2">
+            <School className="h-4 w-4" /> Colegios
+          </TabsTrigger>
           <TabsTrigger value="asignaciones" className="gap-2">
             <Users className="h-4 w-4" /> Asignaciones
           </TabsTrigger>
@@ -111,6 +115,10 @@ export default function Mapa() {
             highlightedLocId={highlightedLoc?.id}
             onClearHighlight={() => setHighlightedLoc(null)}
           />
+        </TabsContent>
+
+        <TabsContent value="colegios" className="mt-5">
+          <MapaColegios />
         </TabsContent>
 
         <TabsContent value="asignaciones" className="mt-5">

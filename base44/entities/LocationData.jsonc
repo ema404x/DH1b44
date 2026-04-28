@@ -46,6 +46,14 @@
         "inactivo"
       ],
       "default": "activo"
+    },
+    "gps_latitude": {
+      "type": "number",
+      "description": "Latitud GPS del establecimiento"
+    },
+    "gps_longitude": {
+      "type": "number",
+      "description": "Longitud GPS del establecimiento"
     }
   },
   "required": [
