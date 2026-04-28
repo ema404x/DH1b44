@@ -1,11 +1,11 @@
-import React, { useRef, useState, useMemo, useEffect } from 'react';
+import React, { useRef, useState, useMemo, useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
-import { Search, School, Loader2 } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 
 const COMUNA_COLORS = {
   '8A': '#3b82f6',
@@ -17,24 +17,9 @@ const createSchoolIcon = (comuna, isSelected = false) => {
   const color = COMUNA_COLORS[comuna] || '#64748b';
   const size = isSelected ? 40 : 32;
   return L.divIcon({
-    html: `
-      <div style="
-        background: ${color};
-        width: ${size}px;
-        height: ${size}px;
-        border-radius: 50% 50% 50% 0;
-        transform: rotate(-45deg);
-        border: 3px solid white;
-        box-shadow: 0 3px 10px rgba(0,0,0,0.35);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s;
-      ">
-        <div style="transform: rotate(45deg); font-size: ${isSelected ? 16 : 13}px;">🏫</div>
-      </div>
-    `,
+    html: `<div style="background:${color};width:${size}px;height:${size}px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+        <div style="transform:rotate(45deg);font-size:${isSelected ? 16 : 13}px;">🏫</div>
+      </div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size],
     popupAnchor: [0, -(size + 2)],
@@ -42,7 +27,6 @@ const createSchoolIcon = (comuna, isSelected = false) => {
   });
 };
 
-// Geocodifica una dirección usando Nominatim (OpenStreetMap)
 const geocodeAddress = async (address) => {
   const query = encodeURIComponent(`${address}, Buenos Aires, Argentina`);
   const res = await fetch(
@@ -50,9 +34,7 @@ const geocodeAddress = async (address) => {
     { headers: { 'Accept-Language': 'es' } }
   );
   const data = await res.json();
-  if (data.length > 0) {
-    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-  }
+  if (data.length > 0) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
   return null;
 };
 
@@ -61,8 +43,8 @@ export default function MapaColegios() {
   const [search, setSearch] = useState('');
   const [selectedComuna, setSelectedComuna] = useState('all');
   const [selected, setSelected] = useState(null);
-  const [coords, setCoords] = useState({}); // { locationId: { lat, lon } }
-  const [geocoding, setGeocoding] = useState(false);
+  const [geocodingProgress, setGeocodingProgress] = useState(null); // null = idle, number = progreso
+  const queryClient = useQueryClient();
 
   const { data: locations = [], isLoading } = useQuery({
     queryKey: ['locationData'],
@@ -80,67 +62,68 @@ export default function MapaColegios() {
     return map;
   }, [direcciones]);
 
-  // Geocodificar todas las direcciones que no tengan coords aún
-  useEffect(() => {
-    if (locations.length === 0 || direcciones.length === 0) return;
+  // Colegios que ya tienen coords guardadas
+  const locationsWithCoords = useMemo(
+    () => locations.filter(l => l.gps_latitude && l.gps_longitude),
+    [locations]
+  );
 
-    const toGeocode = locations.filter(loc => {
-      if (coords[loc.id]) return false; // ya tiene coords
-      const dir = loc.direccion_id ? direccionesMap[loc.direccion_id] : null;
-      return !!dir?.direccion;
-    });
+  // Colegios sin coords que tienen dirección → hay que geocodificar y guardar
+  const pending = useMemo(
+    () => locations.filter(l => !l.gps_latitude && l.direccion_id && direccionesMap[l.direccion_id]?.direccion),
+    [locations, direccionesMap]
+  );
 
-    if (toGeocode.length === 0) return;
-
-    setGeocoding(true);
-
-    // Geocodificar de a uno para no saturar Nominatim
-    const runSequential = async () => {
-      const newCoords = { ...coords };
-      for (const loc of toGeocode) {
-        const dir = direccionesMap[loc.direccion_id];
-        if (!dir?.direccion) continue;
-        const result = await geocodeAddress(dir.direccion);
-        if (result) {
-          newCoords[loc.id] = result;
-        }
-        // Esperar 300ms entre requests para respetar rate limit de Nominatim
-        await new Promise(r => setTimeout(r, 300));
+  // Geocodificar los pendientes UNA SOLA VEZ y guardar en la entidad
+  const runGeocoding = useCallback(async () => {
+    if (pending.length === 0 || geocodingProgress !== null) return;
+    setGeocodingProgress(0);
+    let done = 0;
+    for (const loc of pending) {
+      const dir = direccionesMap[loc.direccion_id];
+      const result = await geocodeAddress(dir.direccion);
+      if (result) {
+        await base44.entities.LocationData.update(loc.id, {
+          gps_latitude: result.lat,
+          gps_longitude: result.lon,
+        });
       }
-      setCoords(newCoords);
-      setGeocoding(false);
-    };
+      done++;
+      setGeocodingProgress(done);
+      await new Promise(r => setTimeout(r, 350)); // respetar rate limit Nominatim
+    }
+    setGeocodingProgress(null);
+    queryClient.invalidateQueries({ queryKey: ['locationData'] });
+  }, [pending, direccionesMap, geocodingProgress, queryClient]);
 
-    runSequential();
-  }, [locations, direcciones]);
+  useEffect(() => {
+    if (pending.length > 0 && geocodingProgress === null && direcciones.length > 0) {
+      runGeocoding();
+    }
+  }, [pending.length, direcciones.length]);
 
   const filtered = useMemo(() => {
-    return locations.filter(l => {
+    return locationsWithCoords.filter(l => {
       const matchSearch = !search || l.establecimiento?.toLowerCase().includes(search.toLowerCase());
       const matchComuna = selectedComuna === 'all' || l.comuna === selectedComuna;
       return matchSearch && matchComuna;
     });
-  }, [locations, search, selectedComuna]);
-
-  const filteredWithCoords = useMemo(() => {
-    return filtered.filter(l => coords[l.id]);
-  }, [filtered, coords]);
+  }, [locationsWithCoords, search, selectedComuna]);
 
   const center = useMemo(() => {
-    if (filteredWithCoords.length > 0) {
+    if (filtered.length > 0) {
       return [
-        filteredWithCoords.reduce((s, l) => s + coords[l.id].lat, 0) / filteredWithCoords.length,
-        filteredWithCoords.reduce((s, l) => s + coords[l.id].lon, 0) / filteredWithCoords.length,
+        filtered.reduce((s, l) => s + l.gps_latitude, 0) / filtered.length,
+        filtered.reduce((s, l) => s + l.gps_longitude, 0) / filtered.length,
       ];
     }
     return [-34.6037, -58.3816];
-  }, [filteredWithCoords]);
+  }, [filtered]);
 
   const handleSelect = (loc) => {
     setSelected(loc);
-    const c = coords[loc.id];
-    if (c && mapRef.current) {
-      mapRef.current.setView([c.lat, c.lon], 16, { animate: true });
+    if (mapRef.current) {
+      mapRef.current.setView([loc.gps_latitude, loc.gps_longitude], 16, { animate: true });
     }
   };
 
@@ -160,8 +143,8 @@ export default function MapaColegios() {
       <div className="grid grid-cols-3 gap-3">
         {[
           { label: 'Total Colegios', value: locations.length, color: 'text-primary' },
-          { label: 'En el mapa', value: Object.keys(coords).length, color: 'text-emerald-600' },
-          { label: 'Geocodificando', value: geocoding ? '...' : `${locations.length - Object.keys(coords).length} pendientes`, color: 'text-amber-600' },
+          { label: 'En el mapa', value: locationsWithCoords.length, color: 'text-emerald-600' },
+          { label: 'Sin ubicar', value: pending.length, color: 'text-amber-600' },
         ].map((s, i) => (
           <div key={i} className="rounded-lg border bg-card p-3 text-center">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -170,15 +153,17 @@ export default function MapaColegios() {
         ))}
       </div>
 
-      {/* Geocoding indicator */}
-      {geocoding && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 px-4 py-2 rounded-lg border">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          Geocodificando direcciones... ({Object.keys(coords).length}/{locations.length})
+      {/* Barra de progreso geocodificación */}
+      {geocodingProgress !== null && (
+        <div className="flex items-center gap-3 text-sm bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2.5 rounded-lg">
+          <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+          <span>
+            Guardando ubicaciones en la base de datos... ({geocodingProgress}/{pending.length}) — la próxima vez cargará al instante.
+          </span>
         </div>
       )}
 
-      {/* Filtros */}
+      {/* Filtros por comuna */}
       <div className="flex gap-2 flex-wrap items-center">
         <span className="text-xs text-muted-foreground font-medium">Comunas:</span>
         {comunas.map(c => (
@@ -204,30 +189,28 @@ export default function MapaColegios() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Mapa */}
         <div className="lg:col-span-2 rounded-xl overflow-hidden border shadow-sm" style={{ height: '520px' }}>
-          <MapContainer ref={mapRef} center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution="© OpenStreetMap contributors"
-              maxZoom={19}
-            />
-            {filteredWithCoords.map(loc => {
-              const c = coords[loc.id];
-              const dir = loc.direccion_id ? direccionesMap[loc.direccion_id] : null;
-              return (
+          {filtered.length > 0 ? (
+            <MapContainer ref={mapRef} center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution="© OpenStreetMap contributors"
+                maxZoom={19}
+              />
+              {filtered.map(loc => (
                 <Marker
                   key={loc.id}
-                  position={[c.lat, c.lon]}
+                  position={[loc.gps_latitude, loc.gps_longitude]}
                   icon={createSchoolIcon(loc.comuna, selected?.id === loc.id)}
                   eventHandlers={{ click: () => setSelected(loc) }}
                 >
                   <Popup>
-                    <div className="min-w-48">
+                    <div className="min-w-44">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-base">🏫</span>
                         <h3 className="font-bold text-sm">{loc.establecimiento}</h3>
                       </div>
-                      {dir?.direccion && (
-                        <p className="text-xs text-gray-500 mb-1">📍 {dir.direccion}</p>
+                      {loc.direccion_id && direccionesMap[loc.direccion_id]?.direccion && (
+                        <p className="text-xs text-gray-500 mb-1">📍 {direccionesMap[loc.direccion_id].direccion}</p>
                       )}
                       <div className="flex gap-2 flex-wrap text-xs mt-2">
                         {loc.comuna && (
@@ -242,9 +225,13 @@ export default function MapaColegios() {
                     </div>
                   </Popup>
                 </Marker>
-              );
-            })}
-          </MapContainer>
+              ))}
+            </MapContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+              {geocodingProgress !== null ? 'Cargando ubicaciones...' : 'Sin colegios con coordenadas disponibles'}
+            </div>
+          )}
         </div>
 
         {/* Lista lateral */}
@@ -261,19 +248,19 @@ export default function MapaColegios() {
           <p className="text-xs text-muted-foreground">{filtered.length} colegios</p>
           <div className="overflow-y-auto rounded-lg border bg-card divide-y" style={{ maxHeight: '460px' }}>
             {filtered.length === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">Sin resultados</div>
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                {geocodingProgress !== null ? 'Geocodificando...' : 'Sin resultados'}
+              </div>
             ) : (
               filtered.map(loc => {
                 const dir = loc.direccion_id ? direccionesMap[loc.direccion_id] : null;
-                const hasCoords = !!coords[loc.id];
                 return (
                   <button
                     key={loc.id}
                     onClick={() => handleSelect(loc)}
-                    disabled={!hasCoords}
                     className={`w-full text-left px-3 py-2.5 transition-colors ${
                       selected?.id === loc.id ? 'bg-accent' : 'hover:bg-accent/50'
-                    } ${!hasCoords ? 'opacity-50' : ''}`}
+                    }`}
                   >
                     <div className="flex items-start gap-2">
                       <span className="text-base mt-0.5">🏫</span>
@@ -282,19 +269,12 @@ export default function MapaColegios() {
                         {dir?.direccion && (
                           <p className="text-xs text-muted-foreground truncate">{dir.direccion}</p>
                         )}
-                        <div className="flex gap-1.5 mt-1 flex-wrap">
-                          {loc.comuna && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full text-white font-semibold"
-                              style={{ background: COMUNA_COLORS[loc.comuna] || '#64748b' }}>
-                              {loc.comuna}
-                            </span>
-                          )}
-                          {!hasCoords && geocoding && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold flex items-center gap-1">
-                              <Loader2 className="h-2.5 w-2.5 animate-spin" /> geocodificando
-                            </span>
-                          )}
-                        </div>
+                        {loc.comuna && (
+                          <span className="mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded-full text-white font-semibold"
+                            style={{ background: COMUNA_COLORS[loc.comuna] || '#64748b' }}>
+                            {loc.comuna}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </button>
