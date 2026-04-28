@@ -39,9 +39,11 @@ export default function EmergenciaCard({ emergencia, onUpdate }) {
     setSaving(true);
     const updates = { estado: nuevoEstado };
     if (nuevoEstado === 'resuelta') {
-      updates.fecha_resolucion = new Date().toISOString();
+      const ahora = new Date();
+      updates.fecha_resolucion = ahora.toISOString();
       const created = new Date(emergencia.created_date);
-      updates.tiempo_respuesta_min = Math.round((Date.now() - created.getTime()) / 60000);
+      const diffMin = Math.round((ahora.getTime() - created.getTime()) / 60000);
+      updates.tiempo_respuesta_min = Math.max(0, diffMin);
     }
     await base44.entities.Emergencia.update(emergencia.id, updates);
     if (emergencia.work_order_id && nuevoEstado === 'resuelta') {

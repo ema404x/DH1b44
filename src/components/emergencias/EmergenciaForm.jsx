@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,9 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [estSearch, setEstSearch] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const estRef = useRef(null);
 
   const { data: locations = [] } = useQuery({
     queryKey: ['locations'],
@@ -76,15 +79,23 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
     setUploadingPhoto(false);
   };
 
-  const handleEstablecimientoChange = (val) => {
-    const loc = locations.find(l => l.establecimiento === val);
+  const handleEstablecimientoSelect = (loc) => {
+    setEstSearch(loc.establecimiento);
+    setShowSuggestions(false);
     setForm(f => ({
       ...f,
-      establecimiento: val,
-      comuna: loc?.comuna || f.comuna,
-      jefe_sitio_asignado: loc?.jefe_sitio || f.jefe_sitio_asignado,
+      establecimiento: loc.establecimiento,
+      direccion: loc.ubic_tecnica || f.direccion,
+      comuna: loc.comuna || f.comuna,
+      jefe_sitio_asignado: loc.jefe_sitio || f.jefe_sitio_asignado,
     }));
   };
+
+  const estSuggestions = estSearch.length >= 1
+    ? locations.filter(l =>
+        l.establecimiento?.toLowerCase().includes(estSearch.toLowerCase())
+      ).slice(0, 8)
+    : [];
 
   const handleSubmit = async () => {
     if (!form.titulo || !form.tipo || !form.establecimiento) {
@@ -172,25 +183,42 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
 
       {/* Establecimiento */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
+        <div className="relative" ref={estRef}>
           <label className="text-sm font-semibold text-slate-300 mb-2 block flex items-center gap-2">
             <Building2 className="h-4 w-4" /> Establecimiento *
           </label>
-          <select
-            value={form.establecimiento}
-            onChange={e => handleEstablecimientoChange(e.target.value)}
-            className="w-full h-9 rounded-md border border-slate-700 bg-slate-800/50 px-3 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500"
-          >
-            <option value="">Seleccionar escuela...</option>
-            {locations.map(l => (
-              <option key={l.id} value={l.establecimiento}>{l.establecimiento}</option>
-            ))}
-          </select>
+          <Input
+            placeholder="Escribí para buscar escuela..."
+            value={estSearch}
+            onChange={e => {
+              setEstSearch(e.target.value);
+              setShowSuggestions(true);
+              if (!e.target.value) setForm(f => ({ ...f, establecimiento: '', direccion: '', comuna: '', jefe_sitio_asignado: '' }));
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            className={`bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 ${form.establecimiento ? 'border-emerald-500/50' : ''}`}
+          />
+          {showSuggestions && estSuggestions.length > 0 && (
+            <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+              {estSuggestions.map(loc => (
+                <button
+                  key={loc.id}
+                  type="button"
+                  onMouseDown={() => handleEstablecimientoSelect(loc)}
+                  className="w-full text-left px-3 py-2.5 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
+                >
+                  <p className="text-sm text-white font-medium">{loc.establecimiento}</p>
+                  <p className="text-xs text-slate-400">{loc.jefe_sitio ? `Jefe: ${loc.jefe_sitio}` : ''} {loc.comuna ? `· ${loc.comuna}` : ''}</p>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <label className="text-sm font-semibold text-slate-300 mb-2 block">Dirección</label>
           <Input
-            placeholder="Dirección del lugar"
+            placeholder="Se completa automáticamente"
             value={form.direccion}
             onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))}
             className="bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
