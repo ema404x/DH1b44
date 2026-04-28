@@ -89,8 +89,8 @@ export default function Fichar() {
   );
 
   if (error) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
-      <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-6">
+      <div className="bg-white rounded-2xl p-8 w-full max-w-sm mx-auto text-center shadow-2xl">
         <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-3" />
         <h2 className="font-bold text-lg mb-2">Error</h2>
         <p className="text-muted-foreground text-sm">{error}</p>
@@ -99,8 +99,8 @@ export default function Fichar() {
   );
 
   if (done) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1628] to-[#0f2a4a] p-4">
-      <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1628] to-[#0f2a4a] p-6">
+      <div className="bg-white rounded-2xl p-8 w-full max-w-sm mx-auto text-center shadow-2xl">
         <div className={`h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4 ${done.type === 'entrada' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
           {done.type === 'entrada'
             ? <LogIn className="h-8 w-8 text-emerald-600" />
@@ -132,8 +132,8 @@ export default function Fichar() {
   const isEntrada = nextType === 'entrada';
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1628] to-[#0f2a4a] p-4">
-      <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1628] to-[#0f2a4a] p-6">
+      <div className="bg-white rounded-2xl p-8 w-full max-w-sm mx-auto shadow-2xl">
         {/* Header */}
         <div className="text-center mb-6">
           <img
