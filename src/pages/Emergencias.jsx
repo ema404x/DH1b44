@@ -4,11 +4,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  AlertTriangle, Plus, X, Zap, CheckCircle2, Clock, Shield
+  AlertTriangle, Plus, X, Zap, CheckCircle2, Clock, Shield, BarChart2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import EmergenciaForm from '@/components/emergencias/EmergenciaForm';
 import EmergenciaCard from '@/components/emergencias/EmergenciaCard';
+import EmergenciasDashboard from '@/components/emergencias/EmergenciasDashboard';
 
 const FILTROS = [
   { id: 'all', label: 'Todas' },
@@ -20,6 +21,7 @@ const FILTROS = [
 export default function Emergencias() {
   const [showForm, setShowForm] = useState(false);
   const [filtro, setFiltro] = useState('all');
+  const [tab, setTab] = useState('lista'); // 'lista' | 'dashboard'
   const queryClient = useQueryClient();
 
   const { data: emergencias = [], isLoading, refetch } = useQuery({
@@ -127,8 +129,35 @@ export default function Emergencias() {
           )}
         </AnimatePresence>
 
-        {/* Filtros */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex gap-2 flex-wrap mb-5">
+        {/* Tabs */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="flex gap-2 mb-5 border-b border-slate-700/50 pb-4">
+          {[
+            { id: 'lista', label: 'Lista', icon: Shield },
+            { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all border ${
+                tab === t.id
+                  ? 'bg-red-600/20 border-red-500/50 text-red-300'
+                  : 'border-slate-700/50 text-slate-400 hover:border-slate-600 bg-slate-800/30'
+              }`}
+            >
+              <t.icon className="h-4 w-4" /> {t.label}
+            </button>
+          ))}
+        </motion.div>
+
+        {/* Dashboard */}
+        {tab === 'dashboard' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <EmergenciasDashboard emergencias={emergencias} />
+          </motion.div>
+        )}
+
+        {/* Filtros (solo en lista) */}
+        {tab === 'lista' && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex gap-2 flex-wrap mb-5">
           {FILTROS.map(f => (
             <button
               key={f.id}
@@ -150,7 +179,7 @@ export default function Emergencias() {
         </motion.div>
 
         {/* Lista */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="space-y-3">
+        {tab === 'lista' && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="space-y-3">
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
               <div className="h-10 w-10 rounded-full border-2 border-slate-700 border-t-red-500 animate-spin" />
@@ -177,7 +206,7 @@ export default function Emergencias() {
               ))}
             </AnimatePresence>
           )}
-        </motion.div>
+        </motion.div>}
       </div>
     </div>
   );
