@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FolderKanban, ClipboardList, Users, UserCog,
+  LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  Wrench, TrendingUp, ClipboardCheck, Calculator, CalendarDays, Cpu, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -21,7 +21,7 @@ const navGroups = [
     items: [
       { label: 'Proyectos', icon: FolderKanban, path: '/proyectos' },
       { label: 'Órdenes de Trabajo', icon: ClipboardList, path: '/ordenes' },
-      { label: 'Pendientes', icon: ClipboardList, path: '/activos' },
+      { label: 'Pendientes', icon: ClipboardCheck, path: '/activos' },
       { label: 'Informes', icon: ClipboardCheck, path: '/informes' },
       { label: 'Reportes & KPIs', icon: BarChart2, path: '/reportes' },
       { label: 'Automatizaciones', icon: Zap, path: '/automatizaciones' },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { CheckCircle2, Clock, MapPin, Loader2, AlertTriangle, LogIn, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,8 +15,7 @@ export default function Fichar() {
   const [locationLoading, setLocationLoading] = useState(true);
   const [lastLog, setLastLog] = useState(null);
 
-  const params = new URLSearchParams(window.location.search);
-  const employeeId = params.get('id');
+  const employeeId = useMemo(() => new URLSearchParams(window.location.search).get('id'), []);
 
   useEffect(() => {
     if (!employeeId) { setError('QR inválido. No se encontró el empleado.'); setLoading(false); return; }

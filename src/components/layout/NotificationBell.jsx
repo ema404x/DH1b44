@@ -36,10 +36,10 @@ export default function NotificationBell() {
     queryFn: () => base44.entities.Notification.list('-created_date', 30),
   });
 
-  const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list() });
-  const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list() });
-  const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list() });
+  const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list(), staleTime: 60000 });
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list(), staleTime: 60000 });
+  const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list(), staleTime: 60000 });
+  const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list(), staleTime: 60000 });
 
   const markReadMutation = useMutation({
     mutationFn: (id) => base44.entities.Notification.update(id, { read: true }),
@@ -106,7 +106,7 @@ export default function NotificationBell() {
               )}
               {allNotifs.map((n) => {
                 const Icon = typeIcons[n.type] || Info;
-                const isSystem = typeof n.id === 'string' && n.id.includes('-overdue') || n.id === 'stock-low';
+                const isSystem = typeof n.id === 'string' && (n.id.includes('-overdue') || n.id === 'stock-low');
                 const handleClick = () => {
                   if (isSystem) {
                     const path = systemAlertPaths[n.id];

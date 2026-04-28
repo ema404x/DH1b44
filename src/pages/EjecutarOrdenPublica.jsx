@@ -340,8 +340,11 @@ export default function EjecutarOrdenPublica() {
     setSaving(true);
     setGpsLoading(true);
 
-    // Capturar GPS antes de guardar
-    const gps = await captureGPS();
+    // Capturar GPS antes de guardar (con timeout de seguridad)
+    const gps = await Promise.race([
+      captureGPS(),
+      new Promise(resolve => setTimeout(() => resolve({ status: 'no_disponible' }), 10000))
+    ]);
     setGpsData(gps);
     setGpsLoading(false);
 
