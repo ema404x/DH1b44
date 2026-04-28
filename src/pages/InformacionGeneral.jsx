@@ -72,37 +72,37 @@ export default function InformacionGeneral() {
       <div className="relative z-10">
         {/* Header Premium */}
         <div className="border-b border-slate-700/50 backdrop-blur-xl bg-slate-900/50 sticky top-0 z-20 shadow-2xl">
-          <div className="max-w-7xl mx-auto px-6 py-8">
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between gap-3 mb-5">
+              <div className="flex items-center gap-3 min-w-0">
                 <motion.div
-                  className="h-16 w-16 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-2xl shadow-primary/40"
+                  className="h-11 w-11 sm:h-16 sm:w-16 flex-shrink-0 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-2xl shadow-primary/40"
                   animate={{ rotate: [0, 5, -5, 0] }}
                   transition={{ duration: 4, repeat: Infinity }}
                 >
-                  <Building2 className="h-8 w-8 text-white" />
+                  <Building2 className="h-5 w-5 sm:h-8 sm:w-8 text-white" />
                 </motion.div>
-                <div>
-                  <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-                    Información General
-                    <Badge className="bg-primary/20 text-primary border-primary/30 ml-2">Hub Central</Badge>
-                  </h1>
-                  <p className="text-sm text-slate-400 mt-2">Gestión integral de escuelas, direcciones y asignaciones</p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-2xl sm:text-4xl font-bold text-white leading-tight">Información General</h1>
+                    <Badge className="bg-primary/20 text-primary border-primary/30 text-xs shrink-0">Hub Central</Badge>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-400 mt-1">Gestión integral de escuelas, direcciones y asignaciones</p>
                 </div>
               </div>
               <motion.button
                 onClick={() => setActiveTab('importar')}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-primary to-purple-600 text-white font-semibold shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all"
+                className="flex-shrink-0 flex items-center gap-2 px-3 sm:px-6 py-2 sm:py-3 rounded-lg bg-gradient-to-r from-primary to-purple-600 text-white font-semibold shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 transition-all text-sm"
               >
-                <Upload className="h-5 w-5" />
-                <span className="hidden sm:inline">Importar Datos</span>
+                <Upload className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="hidden xs:inline sm:inline">Importar</span>
               </motion.button>
             </motion.div>
 
             {/* Stats Grid Premium */}
-            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
               {[
                 { label: 'Escuelas', value: stats.total, icon: Building2, color: 'from-blue-500', highlight: stats.total > 0 },
                 { label: 'Activas', value: stats.activos, icon: Zap, color: 'from-emerald-500', highlight: stats.activos === stats.total },
@@ -116,14 +116,14 @@ export default function InformacionGeneral() {
                       ? 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border-emerald-500/50 shadow-lg shadow-emerald-500/20'
                       : 'bg-gradient-to-br from-slate-700/50 to-slate-800/50 border-slate-600/50 hover:border-slate-500/50'
                   }`}>
-                    <div className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{stat.label}</p>
-                        <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${stat.color} to-transparent flex items-center justify-center`}>
-                          <stat.icon className="h-4 w-4 text-white" />
+                    <div className="p-3 sm:p-4">
+                      <div className="flex items-center justify-between mb-1 sm:mb-2">
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide leading-tight">{stat.label}</p>
+                        <div className={`h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-br ${stat.color} to-transparent flex items-center justify-center flex-shrink-0`}>
+                          <stat.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" />
                         </div>
                       </div>
-                      <p className="text-2xl font-bold text-white">{stat.value}</p>
+                      <p className="text-xl sm:text-2xl font-bold text-white">{stat.value}</p>
                     </div>
                     <motion.div
                       className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 pointer-events-none"
@@ -138,8 +138,8 @@ export default function InformacionGeneral() {
         </div>
 
         {/* Tabs Modernas */}
-        <div className="max-w-7xl mx-auto px-6 pt-8">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex gap-3 mb-8 border-b border-slate-700/50 pb-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 sm:pt-8">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex gap-2 sm:gap-3 mb-6 sm:mb-8 border-b border-slate-700/50 pb-4">
             {[
               { id: 'directorio', label: 'Directorio Jerárquico', icon: MapPin },
               { id: 'importar', label: 'Importar Datos', icon: Brain },
@@ -148,14 +148,14 @@ export default function InformacionGeneral() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 whileHover={{ x: 5 }}
-                className={`flex items-center gap-2 px-5 py-3 rounded-lg font-semibold transition-all duration-300 ${
+                className={`flex items-center gap-2 px-3 sm:px-5 py-2 sm:py-3 rounded-lg font-semibold transition-all duration-300 text-sm sm:text-base ${
                   activeTab === tab.id
                     ? 'bg-gradient-to-r from-primary/20 to-purple-600/20 text-primary border border-primary/50 shadow-lg shadow-primary/20'
                     : 'text-slate-400 hover:text-slate-300 border border-transparent hover:border-slate-700/50'
                 }`}
               >
-                <tab.icon className="h-5 w-5" />
-                <span className="hidden sm:inline">{tab.label}</span>
+                <tab.icon className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                <span>{tab.label}</span>
               </motion.button>
             ))}
           </motion.div>
