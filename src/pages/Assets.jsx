@@ -6,18 +6,20 @@ import ActivosTab from '@/components/assets/ActivosTab';
 
 export default function Assets() {
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <ClipboardList className="h-6 w-6 text-primary" />
+        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+            <ClipboardList className="h-5 w-5 text-white" />
+          </div>
           Pendientes
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Activos y Equipos — Gestión de trabajos pendientes SAP asignados a jefes de sitio</p>
+        <p className="text-slate-400 mt-1">Activos y Equipos — Gestión de trabajos pendientes SAP asignados a jefes de sitio</p>
       </div>
 
       <Tabs defaultValue="pendientes">
-        <TabsList>
+        <TabsList className="bg-slate-800/50 border border-slate-700/50">
           <TabsTrigger value="pendientes" className="gap-1.5">
             <ClipboardList className="h-4 w-4" /> Pendientes SAP
           </TabsTrigger>

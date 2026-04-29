@@ -6,8 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, Truck, Pencil, Trash2, Phone, Mail, Star } from 'lucide-react';
-import PageHeader from '@/components/shared/PageHeader';
+import { Search, Truck, Pencil, Trash2, Phone, Mail, Star, Plus } from 'lucide-react';
 import EmptyState from '@/components/shared/EmptyState';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -86,24 +85,57 @@ export default function Clients() {
 
   const rubrosEnUso = [...new Set(providers.map(p => p.rubro).filter(Boolean))];
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Proveedores"
-        subtitle="Directorio de proveedores y subcontratistas"
-        actionLabel="Nuevo Proveedor"
-        onAction={() => { setEditing(null); setDialogOpen(true); }}
-      />
+  const stats = {
+    total: providers.length,
+    activos: providers.filter(p => p.status === 'activo').length,
+    rubros: [...new Set(providers.map(p => p.rubro).filter(Boolean))].length,
+  };
 
+  return (
+    <div className="min-h-screen space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
+              <Truck className="h-5 w-5 text-white" />
+            </div>
+            Proveedores
+          </h1>
+          <p className="text-slate-400 mt-1">Directorio de proveedores y subcontratistas</p>
+        </div>
+        <Button
+          onClick={() => { setEditing(null); setDialogOpen(true); }}
+          className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-lg shadow-cyan-500/30 transition-all"
+        >
+          <Plus className="h-4 w-4" /> Nuevo Proveedor
+        </Button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Total', value: stats.total, color: 'from-blue-500' },
+          { label: 'Activos', value: stats.activos, color: 'from-emerald-500' },
+          { label: 'Rubros', value: stats.rubros, color: 'from-purple-500' },
+        ].map((s, i) => (
+          <div key={i} className="bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-lg p-4">
+            <p className="text-xs text-slate-400 uppercase tracking-wide">{s.label}</p>
+            <p className="text-2xl font-bold text-white mt-1">{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtros */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar proveedores..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+          <Input placeholder="Buscar proveedores..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500" />
         </div>
         <select
           value={filterRubro}
           onChange={e => setFilterRubro(e.target.value)}
-          className="text-sm border border-border rounded-md px-3 py-2 bg-background"
+          className="text-sm border border-slate-700/50 rounded-md px-3 py-2 bg-slate-800/50 text-white"
         >
           <option value="">Todos los rubros</option>
           {rubrosEnUso.map(r => (
@@ -121,47 +153,51 @@ export default function Clients() {
           onAction={() => { setEditing(null); setDialogOpen(true); }}
         />
       ) : (
-        <Card>
+        <div className="bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Proveedor</TableHead>
-                  <TableHead className="hidden md:table-cell">Rubro</TableHead>
-                  <TableHead className="hidden md:table-cell">Contacto</TableHead>
-                  <TableHead className="hidden lg:table-cell">Teléfono</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="hidden lg:table-cell">Valoración</TableHead>
+                <TableRow className="border-slate-700/50">
+                  <TableHead className="text-slate-300">Proveedor</TableHead>
+                  <TableHead className="hidden md:table-cell text-slate-300">Rubro</TableHead>
+                  <TableHead className="hidden md:table-cell text-slate-300">Contacto</TableHead>
+                  <TableHead className="hidden lg:table-cell text-slate-300">Teléfono</TableHead>
+                  <TableHead className="text-slate-300">Estado</TableHead>
+                  <TableHead className="hidden lg:table-cell text-slate-300">Valoración</TableHead>
                   <TableHead className="w-20"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map(p => (
-                  <TableRow key={p.id} className="group">
+                  <TableRow key={p.id} className="group border-slate-700/50 hover:bg-slate-700/30 transition-colors">
                     <TableCell>
                       <div>
-                        <p className="font-medium">{p.name}</p>
-                        {p.cuit && <p className="text-xs text-muted-foreground">CUIT: {p.cuit}</p>}
+                        <p className="font-medium text-white">{p.name}</p>
+                        {p.cuit && <p className="text-xs text-slate-500">CUIT: {p.cuit}</p>}
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       {p.rubro ? (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
                           {RUBRO_LABELS[p.rubro] || p.rubro}
                         </span>
-                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                      ) : <span className="text-xs text-slate-500">—</span>}
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       <div className="text-sm">
-                        {p.contact_name && <p>{p.contact_name}</p>}
-                        {p.email && <p className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="h-2.5 w-2.5" />{p.email}</p>}
+                        {p.contact_name && <p className="text-slate-300">{p.contact_name}</p>}
+                        {p.email && <p className="text-xs text-slate-500 flex items-center gap-1"><Mail className="h-2.5 w-2.5" />{p.email}</p>}
                       </div>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
-                      {p.phone && <span className="flex items-center gap-1 text-sm"><Phone className="h-3 w-3" />{p.phone}</span>}
+                      {p.phone && <span className="flex items-center gap-1 text-sm text-slate-300"><Phone className="h-3 w-3" />{p.phone}</span>}
                     </TableCell>
                     <TableCell>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${STATUS_STYLES[p.status] || STATUS_STYLES.activo}`}>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${
+                        p.status === 'activo' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                        p.status === 'suspendido' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
+                        'bg-slate-500/20 text-slate-400 border border-slate-500/30'
+                      }`}>
                         {p.status || 'activo'}
                       </span>
                     </TableCell>
@@ -170,12 +206,12 @@ export default function Clients() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(p); setDialogOpen(true); }}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white" onClick={() => { setEditing(p); setDialogOpen(true); }}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-500/10"><Trash2 className="h-3.5 w-3.5" /></Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
@@ -195,7 +231,7 @@ export default function Clients() {
               </TableBody>
             </Table>
           </div>
-        </Card>
+        </div>
       )}
 
       <EntityFormDialog

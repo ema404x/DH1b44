@@ -17,13 +17,13 @@ export default function UserMenu() {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 h-9 px-2 rounded-lg hover:bg-accent transition-colors"
+        className="flex items-center gap-2 h-9 px-2 rounded-lg hover:bg-white/10 transition-colors"
       >
         <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
           {initials}
         </div>
-        <span className="hidden md:block text-sm font-medium max-w-[120px] truncate">{user?.full_name || 'Usuario'}</span>
-        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground hidden md:block" />
+        <span className="hidden md:block text-sm font-medium max-w-[120px] truncate text-slate-300">{user?.full_name || 'Usuario'}</span>
+        <ChevronDown className="h-3.5 w-3.5 text-slate-500 hidden md:block" />
       </button>
 
       {open && (

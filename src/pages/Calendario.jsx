@@ -148,17 +148,20 @@ export default function Calendario() {
   const handleClosePanel = () => setSelectedEvent(null);
 
   return (
-    <div className="space-y-5">
+    <div className="min-h-screen space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Calendario</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Órdenes de trabajo, informes y mantenimientos programados</p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+            <Calendar className="h-5 w-5 text-white" />
+          </div>
+          Calendario
+        </h1>
+        <p className="text-slate-400 mt-1">Órdenes de trabajo, informes y mantenimientos programados</p>
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+      <div className="flex flex-wrap gap-4 text-xs text-slate-400">
         {LEGEND.map(([c, l]) => (
           <div key={l} className="flex items-center gap-1.5">
             <div className={`h-2.5 w-2.5 rounded-full ${c}`} />
@@ -169,21 +172,21 @@ export default function Calendario() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
         {/* Calendar grid */}
-        <Card className="lg:col-span-3">
+        <Card className="lg:col-span-3 bg-slate-800/50 backdrop-blur border-slate-700/50">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <Button variant="ghost" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+              <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-slate-700/50" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <div className="flex items-center gap-3">
-                <h2 className="font-semibold text-base capitalize">
+                <h2 className="font-semibold text-base capitalize text-white">
                   {format(currentDate, 'MMMM yyyy', { locale: es })}
                 </h2>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCurrentDate(new Date())}>
+                <Button variant="outline" size="sm" className="h-7 text-xs border-slate-600 text-slate-300 hover:bg-slate-700" onClick={() => setCurrentDate(new Date())}>
                   Hoy
                 </Button>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+              <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-slate-700/50" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -192,11 +195,11 @@ export default function Calendario() {
             {/* Day names */}
             <div className="grid grid-cols-7 mb-1">
               {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => (
-                <div key={d} className="text-center text-xs font-semibold text-muted-foreground py-2">{d}</div>
+                <div key={d} className="text-center text-xs font-semibold text-slate-500 py-2">{d}</div>
               ))}
             </div>
             {/* Days grid */}
-            <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+            <div className="grid grid-cols-7 gap-px bg-slate-700/30 rounded-lg overflow-hidden">
               {days.map((d, i) => {
                 const dayEvents = getEventsForDay(d);
                 const isSelected = selectedDay && isSameDay(d, selectedDay);
@@ -207,16 +210,16 @@ export default function Calendario() {
                     key={i}
                     onClick={() => handleDayClick(d)}
                     className={cn(
-                      'bg-card min-h-[80px] p-1.5 cursor-pointer transition-colors select-none',
-                      !isCurrentMonth && 'opacity-40',
-                      isSelected && 'ring-1 ring-inset ring-primary/40 bg-primary/5',
-                      isT && !isSelected && 'bg-primary/5',
-                      'hover:bg-accent/60'
+                      'bg-slate-800/60 min-h-[80px] p-1.5 cursor-pointer transition-colors select-none',
+                      !isCurrentMonth && 'opacity-30',
+                      isSelected && 'ring-1 ring-inset ring-primary/60 bg-primary/10',
+                      isT && !isSelected && 'bg-primary/10',
+                      'hover:bg-slate-700/60'
                     )}
                   >
                     <div className={cn(
-                      'h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium mb-1',
-                      isT && 'bg-primary text-primary-foreground font-bold'
+                      'h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium mb-1 text-slate-300',
+                      isT && 'bg-primary text-white font-bold'
                     )}>
                       {format(d, 'd')}
                     </div>
@@ -255,16 +258,16 @@ export default function Calendario() {
 
           {/* Today */}
           {!selectedEvent && (
-            <Card>
+            <Card className="bg-slate-800/50 backdrop-blur border-slate-700/50">
               <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-sm flex items-center gap-2">
+                <CardTitle className="text-sm flex items-center gap-2 text-white">
                   <div className="h-2 w-2 rounded-full bg-primary" />
                   Hoy — {format(new Date(), 'd MMM', { locale: es })}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pb-3 px-4">
                 {todayEvents.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Sin eventos hoy</p>
+                  <p className="text-xs text-slate-500">Sin eventos hoy</p>
                 ) : (
                   <div className="space-y-1.5">
                     {todayEvents.map(ev => (
@@ -278,15 +281,15 @@ export default function Calendario() {
 
           {/* Selected day */}
           {!selectedEvent && selectedDay && (
-            <Card>
+            <Card className="bg-slate-800/50 backdrop-blur border-slate-700/50">
               <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-sm capitalize">
+                <CardTitle className="text-sm capitalize text-white">
                   {format(selectedDay, 'EEEE d MMM', { locale: es })}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pb-3 px-4">
                 {selectedDayEvents.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Sin eventos</p>
+                  <p className="text-xs text-slate-500">Sin eventos</p>
                 ) : (
                   <div className="space-y-1.5">
                     {selectedDayEvents.map(ev => (
@@ -300,21 +303,21 @@ export default function Calendario() {
 
           {/* Upcoming 7 days */}
           {!selectedEvent && (
-            <Card>
+            <Card className="bg-slate-800/50 backdrop-blur border-slate-700/50">
               <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-sm">Próximos 7 días</CardTitle>
+                <CardTitle className="text-sm text-white">Próximos 7 días</CardTitle>
               </CardHeader>
               <CardContent className="pb-3 px-4">
                 {upcoming.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Sin eventos próximos</p>
+                  <p className="text-xs text-slate-500">Sin eventos próximos</p>
                 ) : (
                   <div className="space-y-1.5">
                     {upcoming.map(ev => (
-                      <div key={ev.id} className="flex items-start gap-2 cursor-pointer hover:bg-muted/50 rounded p-1 transition-colors" onClick={() => setSelectedEvent(ev)}>
+                      <div key={ev.id} className="flex items-start gap-2 cursor-pointer hover:bg-slate-700/40 rounded p-1 transition-colors" onClick={() => setSelectedEvent(ev)}>
                         <div className={`h-2 w-2 rounded-full mt-1.5 flex-shrink-0 ${ev.color}`} />
                         <div className="min-w-0">
-                          <div className="text-xs font-medium leading-tight truncate">{ev.title}</div>
-                          <div className="text-[10px] text-muted-foreground">{format(parseISO(ev.date), 'd MMM', { locale: es })}</div>
+                          <div className="text-xs font-medium leading-tight truncate text-slate-300">{ev.title}</div>
+                          <div className="text-[10px] text-slate-500">{format(parseISO(ev.date), 'd MMM', { locale: es })}</div>
                         </div>
                       </div>
                     ))}
@@ -335,14 +338,14 @@ function MiniEventRow({ event, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted/60 cursor-pointer transition-colors"
+      className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-700/50 cursor-pointer transition-colors"
     >
       <div className={`h-6 w-6 rounded flex items-center justify-center flex-shrink-0 ${event.color}`}>
         <Icon className="h-3 w-3 text-white" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-xs font-medium truncate">{event.title}</div>
-        {event.assignee && <div className="text-[10px] text-muted-foreground truncate">{event.assignee}</div>}
+        <div className="text-xs font-medium truncate text-slate-300">{event.title}</div>
+        {event.assignee && <div className="text-[10px] text-slate-500 truncate">{event.assignee}</div>}
       </div>
     </div>
   );
