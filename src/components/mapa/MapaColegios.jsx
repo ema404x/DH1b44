@@ -1,11 +1,12 @@
-import React, { useRef, useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useMemo, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const COMUNA_COLORS = {
   '8A': '#3b82f6',
@@ -27,23 +28,14 @@ const createSchoolIcon = (comuna, isSelected = false) => {
   });
 };
 
-const geocodeAddress = async (address) => {
-  const query = encodeURIComponent(`${address}, Buenos Aires, Argentina`);
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
-    { headers: { 'Accept-Language': 'es' } }
-  );
-  const data = await res.json();
-  if (data.length > 0) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-  return null;
-};
 
 export default function MapaColegios() {
   const mapRef = useRef(null);
   const [search, setSearch] = useState('');
   const [selectedComuna, setSelectedComuna] = useState('all');
   const [selected, setSelected] = useState(null);
-  const [geocodingProgress, setGeocodingProgress] = useState(null); // null = idle, number = progreso
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodingDone, setGeocodingDone] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: locations = [], isLoading } = useQuery({
@@ -68,38 +60,27 @@ export default function MapaColegios() {
     [locations]
   );
 
-  // Colegios sin coords que tienen dirección → hay que geocodificar y guardar
+  // Colegios sin coords
   const pending = useMemo(
     () => locations.filter(l => !l.gps_latitude && l.direccion_id && direccionesMap[l.direccion_id]?.direccion),
     [locations, direccionesMap]
   );
 
-  const [geocodingStarted, setGeocodingStarted] = useState(false);
-
-  // Geocodificar los pendientes UNA SOLA VEZ y guardar en la entidad
-  // Se ejecuta SOLO si el usuario lo solicita manualmente (botón)
   const runGeocoding = useCallback(async () => {
-    if (pending.length === 0 || geocodingProgress !== null) return;
-    setGeocodingProgress(0);
-    setGeocodingStarted(true);
-    let done = 0;
-    // Procesar en lotes de 10 para no hacer demasiadas llamadas
-    for (const loc of pending) {
-      const dir = direccionesMap[loc.direccion_id];
-      const result = await geocodeAddress(dir.direccion);
-      if (result) {
-        await base44.entities.LocationData.update(loc.id, {
-          gps_latitude: result.lat,
-          gps_longitude: result.lon,
-        });
-      }
-      done++;
-      setGeocodingProgress(done);
-      await new Promise(r => setTimeout(r, 400)); // respetar rate limit Nominatim
+    if (geocoding) return;
+    setGeocoding(true);
+    try {
+      const res = await base44.functions.invoke('geocodificarColegios', {});
+      const { updated, total, message } = res.data;
+      toast.success(`${message}`);
+      setGeocodingDone(true);
+      await queryClient.invalidateQueries({ queryKey: ['locationData'] });
+    } catch (err) {
+      toast.error('Error al geocodificar: ' + err.message);
+    } finally {
+      setGeocoding(false);
     }
-    setGeocodingProgress(null);
-    queryClient.invalidateQueries({ queryKey: ['locationData'] });
-  }, [pending, direccionesMap, geocodingProgress, queryClient]);
+  }, [geocoding, queryClient]);
 
   const filtered = useMemo(() => {
     return locationsWithCoords.filter(l => {
@@ -152,29 +133,31 @@ export default function MapaColegios() {
         ))}
       </div>
 
-      {/* Geocodificación manual */}
-      {pending.length > 0 && geocodingProgress === null && !geocodingStarted && (
+      {/* Geocodificación */}
+      {pending.length > 0 && !geocodingDone && (
         <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg">
           <div className="flex items-center gap-2 text-sm">
-            <Loader2 className="h-4 w-4 flex-shrink-0" />
-            <span><strong>{pending.length}</strong> colegios sin coordenadas GPS. Podés geocodificarlos para verlos en el mapa.</span>
+            {geocoding ? <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" /> : <Loader2 className="h-4 w-4 flex-shrink-0 opacity-50" />}
+            <span>
+              {geocoding
+                ? 'Geocodificando colegios... esto puede tardar unos minutos.'
+                : <><strong>{pending.length}</strong> colegios sin coordenadas GPS. Geocodificá para verlos en el mapa.</>}
+            </span>
           </div>
-          <button
-            onClick={runGeocoding}
-            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors flex-shrink-0"
-          >
-            Geocodificar
-          </button>
+          {!geocoding && (
+            <button
+              onClick={runGeocoding}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors flex-shrink-0"
+            >
+              Geocodificar
+            </button>
+          )}
         </div>
       )}
-
-      {/* Barra de progreso geocodificación */}
-      {geocodingProgress !== null && (
-        <div className="flex items-center gap-3 text-sm bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2.5 rounded-lg">
-          <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
-          <span>
-            Guardando ubicaciones en la base de datos... ({geocodingProgress}/{pending.length}) — la próxima vez cargará al instante.
-          </span>
+      {geocodingDone && (
+        <div className="flex items-center gap-2 text-sm bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-2.5 rounded-lg">
+          <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+          <span>Geocodificación completada. Los colegios ya aparecen en el mapa.</span>
         </div>
       )}
 
@@ -244,7 +227,7 @@ export default function MapaColegios() {
             </MapContainer>
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-              {geocodingProgress !== null ? 'Cargando ubicaciones...' : 'Sin colegios con coordenadas disponibles'}
+              {geocoding ? 'Geocodificando...' : 'Sin colegios con coordenadas disponibles'}
             </div>
           )}
         </div>
@@ -264,7 +247,7 @@ export default function MapaColegios() {
           <div className="overflow-y-auto rounded-lg border bg-card divide-y" style={{ maxHeight: '460px' }}>
             {filtered.length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">
-                {geocodingProgress !== null ? 'Geocodificando...' : 'Sin resultados'}
+                {geocoding ? 'Geocodificando...' : 'Sin resultados'}
               </div>
             ) : (
               filtered.map(loc => {
