@@ -1,0 +1,75 @@
+{
+  "name": "InspeccionColegio",
+  "type": "object",
+  "properties": {
+    "titulo": {
+      "type": "string",
+      "description": "T\u00edtulo del informe"
+    },
+    "establecimiento": {
+      "type": "string",
+      "description": "Nombre del colegio"
+    },
+    "direccion": {
+      "type": "string",
+      "description": "Direcci\u00f3n del colegio"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Nombre del jefe de sitio"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "borrador",
+        "en_progreso",
+        "generando",
+        "completado"
+      ],
+      "default": "borrador"
+    },
+    "secciones": {
+      "type": "array",
+      "description": "Secciones del recorrido con notas y transcripciones",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "transcripcion": {
+            "type": "string"
+          },
+          "notas_libres": {
+            "type": "string"
+          },
+          "fotos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "completada": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    "informe_generado": {
+      "type": "string",
+      "description": "Informe final generado por IA"
+    },
+    "fecha_inspeccion": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "establecimiento",
+    "jefe_sitio"
+  ]
+}
