@@ -177,8 +177,8 @@ export default function MapaJefesVista({ direcciones, escuelas, modo }) {
           style={{ height: '100%', width: '100%', minHeight: '520px' }}
         >
           <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution="© OpenStreetMap contributors"
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            attribution='&copy; OpenStreetMap contributors, &copy; CARTO'
             maxZoom={19}
           />
           {filtradas.map(dir => (
