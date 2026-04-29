@@ -37,6 +37,7 @@ import EjecutarOrdenPublica from '@/pages/EjecutarOrdenPublica';
 import InformacionGeneral from '@/pages/InformacionGeneral';
 import Emergencias from '@/pages/Emergencias';
 import MapaJefes from '@/pages/MapaJefes';
+import InspeccionColegio from '@/pages/InspeccionColegio';
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
