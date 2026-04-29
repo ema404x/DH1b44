@@ -50,6 +50,7 @@ const navGroups = [
       { label: 'Información General', icon: Info, path: '/informacion-general' },
       { label: 'Empleados', icon: UserCog, path: '/empleados' },
       { label: 'Mapa de Ubicaciones', icon: MapPin, path: '/mapa' },
+      { label: 'Mapa Jefes de Sitio', icon: MapPin, path: '/mapa-jefes' },
       { label: 'Inventario', icon: Package, path: '/inventario' },
     ]
   },
