@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Search, Package, Pencil, Trash2, AlertTriangle, Sparkles,
-  ArrowDownCircle, ArrowUpCircle, History, Plus, Zap, TrendingUp, Layers
+  ArrowDownCircle, ArrowUpCircle, History, Plus, Zap, TrendingUp, Layers, ShoppingCart
 } from 'lucide-react';
 import EmptyState from '@/components/shared/EmptyState';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
@@ -19,6 +19,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import InventoryImporter from '@/components/inventory/InventoryImporter';
 import MovimientoDialog from '@/components/inventory/MovimientoDialog';
 import MovimientosLog from '@/components/inventory/MovimientosLog';
+import RequerimientosList from '@/components/inventory/RequerimientosList';
+import { useEffect, useRef } from 'react';
+import { base44 } from '@/api/base44Client';
 
 const categoryLabels = {
   electrico: 'Eléctrico', plomeria: 'Plomería', pintura: 'Pintura', construccion: 'Construcción',
@@ -48,7 +51,12 @@ export default function Inventory() {
   const [editing, setEditing] = useState(null);
   const [showImporter, setShowImporter] = useState(false);
   const [movimientoDialog, setMovimientoDialog] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    base44.auth.me().then(u => setCurrentUser(u)).catch(() => {});
+  }, []);
 
   const { data: materials = [], isLoading } = useQuery({
     queryKey: ['materials'],
@@ -146,9 +154,10 @@ export default function Inventory() {
       {/* Tabs */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
         <Tabs defaultValue="stock" className="w-full">
-          <TabsList className="grid w-full sm:w-auto grid-cols-2 bg-slate-800/50 border border-slate-700/50">
+          <TabsList className="grid w-full sm:w-auto grid-cols-3 bg-slate-800/50 border border-slate-700/50">
             <TabsTrigger value="stock" className="gap-1.5"><Package className="h-4 w-4" /> Stock</TabsTrigger>
             <TabsTrigger value="movimientos" className="gap-1.5"><History className="h-4 w-4" /> Movimientos</TabsTrigger>
+            <TabsTrigger value="requerimientos" className="gap-1.5"><ShoppingCart className="h-4 w-4" /> Requerimientos</TabsTrigger>
           </TabsList>
 
           {/* Stock Tab */}
@@ -263,6 +272,11 @@ export default function Inventory() {
           {/* Movimientos Tab */}
           <TabsContent value="movimientos" className="mt-4">
             <MovimientosLog />
+          </TabsContent>
+
+          {/* Requerimientos Tab */}
+          <TabsContent value="requerimientos" className="mt-4">
+            <RequerimientosList user={currentUser} />
           </TabsContent>
         </Tabs>
       </motion.div>

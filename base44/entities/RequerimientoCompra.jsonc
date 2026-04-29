@@ -1,0 +1,145 @@
+{
+  "name": "RequerimientoCompra",
+  "type": "object",
+  "properties": {
+    "numero": {
+      "type": "string",
+      "description": "N\u00famero correlativo del requerimiento (ej: REQ-001)"
+    },
+    "titulo": {
+      "type": "string",
+      "description": "T\u00edtulo breve del requerimiento"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Nombre del jefe de sitio que solicita"
+    },
+    "jefe_sitio_email": {
+      "type": "string"
+    },
+    "establecimiento": {
+      "type": "string",
+      "description": "Establecimiento o direcci\u00f3n donde se necesitan los materiales"
+    },
+    "proyecto_id": {
+      "type": "string"
+    },
+    "proyecto_nombre": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array",
+      "description": "Lista de materiales solicitados",
+      "items": {
+        "type": "object",
+        "properties": {
+          "material_id": {
+            "type": "string"
+          },
+          "material_nombre": {
+            "type": "string"
+          },
+          "material_codigo": {
+            "type": "string"
+          },
+          "unidad": {
+            "type": "string"
+          },
+          "cantidad_solicitada": {
+            "type": "number"
+          },
+          "cantidad_aprobada": {
+            "type": "number"
+          },
+          "costo_estimado": {
+            "type": "number"
+          },
+          "notas_item": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "borrador",
+        "enviado",
+        "en_revision",
+        "aprobado",
+        "en_compra",
+        "recibido",
+        "rechazado"
+      ],
+      "default": "borrador",
+      "description": "Estado del proceso de compra"
+    },
+    "prioridad": {
+      "type": "string",
+      "enum": [
+        "baja",
+        "normal",
+        "alta",
+        "urgente"
+      ],
+      "default": "normal"
+    },
+    "fecha_necesidad": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha en que se necesitan los materiales"
+    },
+    "total_estimado": {
+      "type": "number",
+      "default": 0
+    },
+    "observaciones": {
+      "type": "string",
+      "description": "Observaciones generales del requerimiento"
+    },
+    "historial": {
+      "type": "array",
+      "description": "Historial de cambios de estado y observaciones",
+      "items": {
+        "type": "object",
+        "properties": {
+          "fecha": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "usuario": {
+            "type": "string"
+          },
+          "observacion": {
+            "type": "string"
+          },
+          "tiene_alerta": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "responsable_compras": {
+      "type": "string",
+      "description": "Nombre del responsable de compras asignado"
+    },
+    "numero_orden_compra": {
+      "type": "string",
+      "description": "N\u00famero de OC generada"
+    },
+    "proveedor_seleccionado": {
+      "type": "string"
+    },
+    "fecha_entrega_estimada": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "titulo",
+    "jefe_sitio",
+    "estado"
+  ]
+}
