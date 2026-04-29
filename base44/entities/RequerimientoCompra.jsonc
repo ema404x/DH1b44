@@ -3,23 +3,19 @@
   "type": "object",
   "properties": {
     "numero": {
-      "type": "string",
-      "description": "N\u00famero correlativo del requerimiento (ej: REQ-001)"
+      "type": "string"
     },
     "titulo": {
-      "type": "string",
-      "description": "T\u00edtulo breve del requerimiento"
+      "type": "string"
     },
     "jefe_sitio": {
-      "type": "string",
-      "description": "Nombre del jefe de sitio que solicita"
+      "type": "string"
     },
     "jefe_sitio_email": {
       "type": "string"
     },
     "establecimiento": {
-      "type": "string",
-      "description": "Establecimiento o direcci\u00f3n donde se necesitan los materiales"
+      "type": "string"
     },
     "proyecto_id": {
       "type": "string"
@@ -29,7 +25,6 @@
     },
     "items": {
       "type": "array",
-      "description": "Lista de materiales solicitados",
       "items": {
         "type": "object",
         "properties": {
@@ -60,6 +55,24 @@
         }
       }
     },
+    "adjuntos": {
+      "type": "array",
+      "description": "Archivos adjuntos del requerimiento",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "size": {
+            "type": "number"
+          }
+        }
+      }
+    },
     "estado": {
       "type": "string",
       "enum": [
@@ -71,8 +84,7 @@
         "recibido",
         "rechazado"
       ],
-      "default": "borrador",
-      "description": "Estado del proceso de compra"
+      "default": "borrador"
     },
     "prioridad": {
       "type": "string",
@@ -86,20 +98,17 @@
     },
     "fecha_necesidad": {
       "type": "string",
-      "format": "date",
-      "description": "Fecha en que se necesitan los materiales"
+      "format": "date"
     },
     "total_estimado": {
       "type": "number",
       "default": 0
     },
     "observaciones": {
-      "type": "string",
-      "description": "Observaciones generales del requerimiento"
+      "type": "string"
     },
     "historial": {
       "type": "array",
-      "description": "Historial de cambios de estado y observaciones",
       "items": {
         "type": "object",
         "properties": {
@@ -122,12 +131,10 @@
       }
     },
     "responsable_compras": {
-      "type": "string",
-      "description": "Nombre del responsable de compras asignado"
+      "type": "string"
     },
     "numero_orden_compra": {
-      "type": "string",
-      "description": "N\u00famero de OC generada"
+      "type": "string"
     },
     "proveedor_seleccionado": {
       "type": "string"

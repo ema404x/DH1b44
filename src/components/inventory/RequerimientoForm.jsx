@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Trash2, Loader2, Package } from 'lucide-react';
+import { Plus, Trash2, Loader2, Package, Paperclip, X, FileText } from 'lucide-react';
 
 const unitLabels = {
   unidad: 'Unidad', metro: 'Metro', metro2: 'm²', metro3: 'm³',
@@ -28,6 +28,9 @@ export default function RequerimientoForm({ open, onOpenChange, onSave, saving, 
   });
   const [itemSearch, setItemSearch] = useState('');
   const [showMaterialPicker, setShowMaterialPicker] = useState(false);
+  const [adjuntos, setAdjuntos] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef();
 
   const { data: materials = [] } = useQuery({
     queryKey: ['materials'],
@@ -38,6 +41,7 @@ export default function RequerimientoForm({ open, onOpenChange, onSave, saving, 
     if (open) {
       if (initialData) {
         setForm({ ...initialData });
+        setAdjuntos(initialData.adjuntos || []);
       } else {
         setForm({
           titulo: '',
@@ -49,9 +53,24 @@ export default function RequerimientoForm({ open, onOpenChange, onSave, saving, 
           observaciones: '',
           items: [],
         });
+        setAdjuntos([]);
       }
     }
   }, [open, initialData, user]);
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    setUploading(true);
+    for (const file of files) {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setAdjuntos(prev => [...prev, { nombre: file.name, url: file_url, size: file.size }]);
+    }
+    setUploading(false);
+    e.target.value = '';
+  };
+
+  const removeAdjunto = (idx) => setAdjuntos(prev => prev.filter((_, i) => i !== idx));
 
   const addMaterial = (mat) => {
     const exists = form.items.find(i => i.material_id === mat.id);
@@ -88,7 +107,7 @@ export default function RequerimientoForm({ open, onOpenChange, onSave, saving, 
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave({ ...form, total_estimado: totalEstimado });
+    onSave({ ...form, total_estimado: totalEstimado, adjuntos });
   };
 
   const filteredMaterials = materials.filter(m =>
@@ -228,6 +247,37 @@ export default function RequerimientoForm({ open, onOpenChange, onSave, saving, 
             <Textarea value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))}
               placeholder="Notas adicionales para el sector de compras..."
               className="bg-slate-800 border-slate-600 text-white" rows={3} />
+          </div>
+
+          {/* Adjuntos */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-slate-300">Archivos adjuntos</Label>
+              <Button type="button" size="sm" variant="outline"
+                className="gap-1.5 border-slate-600 text-slate-300 hover:text-white"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}>
+                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+                {uploading ? 'Subiendo...' : 'Adjuntar archivo'}
+              </Button>
+              <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
+            </div>
+            {adjuntos.length === 0 && (
+              <p className="text-slate-500 text-xs text-center py-3 border border-dashed border-slate-700 rounded-lg">
+                Sin archivos adjuntos
+              </p>
+            )}
+            {adjuntos.map((adj, i) => (
+              <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                <FileText className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                <a href={adj.url} target="_blank" rel="noopener noreferrer"
+                  className="text-sm text-blue-400 hover:text-blue-300 truncate flex-1">{adj.nombre}</a>
+                <span className="text-xs text-slate-500 flex-shrink-0">{adj.size ? `${(adj.size / 1024).toFixed(0)} KB` : ''}</span>
+                <button type="button" onClick={() => removeAdjunto(i)} className="text-slate-500 hover:text-red-400 transition-colors flex-shrink-0">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
           </div>
 
           <DialogFooter>

@@ -10,7 +10,7 @@ import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertTriangle, CheckCircle2, Clock, ShoppingCart, Package, Send, MessageSquare, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, ShoppingCart, Package, Send, MessageSquare, Loader2, FileText, ExternalLink } from 'lucide-react';
 
 const ESTADOS = [
   { value: 'borrador', label: 'Borrador', color: 'bg-slate-500/20 text-slate-300 border-slate-500/30' },
@@ -124,6 +124,24 @@ export default function RequerimientoDetalle({ req, onClose, user }) {
               ))}
             </div>
           </div>
+
+          {/* Adjuntos */}
+          {(req.adjuntos || []).length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-white mb-3">Archivos adjuntos</p>
+              <div className="space-y-2">
+                {req.adjuntos.map((adj, i) => (
+                  <a key={i} href={adj.url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-slate-600 transition-colors group">
+                    <FileText className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                    <span className="text-sm text-blue-400 group-hover:text-blue-300 truncate flex-1">{adj.nombre}</span>
+                    {adj.size && <span className="text-xs text-slate-500">{(adj.size / 1024).toFixed(0)} KB</span>}
+                    <ExternalLink className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Historial */}
           {(req.historial || []).length > 0 && (
