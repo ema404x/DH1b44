@@ -18,6 +18,7 @@ import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import ProjectDetailPanel from '@/components/projects/ProjectDetailPanel';
 import ProjectImporter from '@/components/projects/ProjectImporter';
+import ProjectAlerts from '@/components/projects/ProjectAlerts';
 
 const typeLabels = {
   obra_nueva: 'Obra Nueva', remodelacion: 'Remodelación', mantenimiento_preventivo: 'Mant. Preventivo',
@@ -134,6 +135,13 @@ export default function Projects() {
           ))}
         </motion.div>
       </motion.div>
+
+      {/* Alertas de proyectos */}
+      {projects.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+          <ProjectAlerts projects={projects} />
+        </motion.div>
+      )}
 
       {/* Filtros */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex flex-col sm:flex-row gap-3">
