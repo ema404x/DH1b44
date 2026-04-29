@@ -61,9 +61,21 @@ export default function MapaProyectosOTs() {
     urgentes: ordersWithGPS.filter(o => o.priority === 'urgente').length,
   };
 
-  const center = filteredOrders.length > 0 
-    ? [filteredOrders[0].gps_latitude, filteredOrders[0].gps_longitude]
-    : [-34.6037, -58.3816];
+  const center = useMemo(() => {
+    if (filteredOrders.length > 0) {
+      return [
+        filteredOrders.reduce((s, o) => s + o.gps_latitude, 0) / filteredOrders.length,
+        filteredOrders.reduce((s, o) => s + o.gps_longitude, 0) / filteredOrders.length,
+      ];
+    }
+    if (ordersWithGPS.length > 0) {
+      return [
+        ordersWithGPS.reduce((s, o) => s + o.gps_latitude, 0) / ordersWithGPS.length,
+        ordersWithGPS.reduce((s, o) => s + o.gps_longitude, 0) / ordersWithGPS.length,
+      ];
+    }
+    return [-34.6037, -58.3816];
+  }, [filteredOrders, ordersWithGPS]);
 
   if (isLoading) {
     return (

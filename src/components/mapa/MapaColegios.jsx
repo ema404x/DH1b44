@@ -74,11 +74,16 @@ export default function MapaColegios() {
     [locations, direccionesMap]
   );
 
+  const [geocodingStarted, setGeocodingStarted] = useState(false);
+
   // Geocodificar los pendientes UNA SOLA VEZ y guardar en la entidad
+  // Se ejecuta SOLO si el usuario lo solicita manualmente (botón)
   const runGeocoding = useCallback(async () => {
     if (pending.length === 0 || geocodingProgress !== null) return;
     setGeocodingProgress(0);
+    setGeocodingStarted(true);
     let done = 0;
+    // Procesar en lotes de 10 para no hacer demasiadas llamadas
     for (const loc of pending) {
       const dir = direccionesMap[loc.direccion_id];
       const result = await geocodeAddress(dir.direccion);
@@ -90,17 +95,11 @@ export default function MapaColegios() {
       }
       done++;
       setGeocodingProgress(done);
-      await new Promise(r => setTimeout(r, 350)); // respetar rate limit Nominatim
+      await new Promise(r => setTimeout(r, 400)); // respetar rate limit Nominatim
     }
     setGeocodingProgress(null);
     queryClient.invalidateQueries({ queryKey: ['locationData'] });
   }, [pending, direccionesMap, geocodingProgress, queryClient]);
-
-  useEffect(() => {
-    if (pending.length > 0 && geocodingProgress === null && direcciones.length > 0) {
-      runGeocoding();
-    }
-  }, [pending.length, direcciones.length]);
 
   const filtered = useMemo(() => {
     return locationsWithCoords.filter(l => {
@@ -152,6 +151,22 @@ export default function MapaColegios() {
           </div>
         ))}
       </div>
+
+      {/* Geocodificación manual */}
+      {pending.length > 0 && geocodingProgress === null && !geocodingStarted && (
+        <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg">
+          <div className="flex items-center gap-2 text-sm">
+            <Loader2 className="h-4 w-4 flex-shrink-0" />
+            <span><strong>{pending.length}</strong> colegios sin coordenadas GPS. Podés geocodificarlos para verlos en el mapa.</span>
+          </div>
+          <button
+            onClick={runGeocoding}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors flex-shrink-0"
+          >
+            Geocodificar
+          </button>
+        </div>
+      )}
 
       {/* Barra de progreso geocodificación */}
       {geocodingProgress !== null && (

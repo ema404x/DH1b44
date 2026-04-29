@@ -171,10 +171,6 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
             center={mapCenter}
             zoom={13}
             style={{ height: '100%', width: '100%' }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              if (onClickToAdd) onClickToAdd({ latitude: e.latlng.lat, longitude: e.latlng.lng });
-            }}
           >
             <TileLayer
               url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
@@ -269,7 +265,7 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
         <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-blue-500 border-2 border-white shadow" />Ubicación QR</div>
         <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-emerald-500 border-2 border-white shadow" />Fichaje entrada</div>
         <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-blue-400 border-2 border-white shadow" />Fichaje salida</div>
-        <span className="text-muted-foreground/60">· Clic en marcador para acciones · Arrastrá para mover · Clic derecho para crear</span>
+        <span className="text-muted-foreground/60">· Clic en marcador para ver acciones · Arrastrá para mover</span>
       </div>
 
       {/* QR Modal */}
