@@ -1,36 +1,61 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { MapPin, Users, Map, Layers, Upload, Loader2, RefreshCw } from 'lucide-react';
+import { MapPin, Users, Map, Layers, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
 import MapaJefesVista from '@/components/mapa-jefes/MapaJefesVista';
-import ImportarMapaJefes from '@/components/mapa-jefes/ImportarMapaJefes';
 
 export default function MapaJefes() {
   const [modo, setModo] = useState('jefe'); // 'jefe' | 'comuna' | 'cluster'
-  const [showImport, setShowImport] = useState(false);
 
-  const { data: direcciones = [], isLoading: loadingDir, refetch: refetchDir } = useQuery({
-    queryKey: ['direccionesMapa'],
-    queryFn: () => base44.entities.DireccionMapa.list('jefe_sitio', 500),
+  const { data: rawDirecciones = [], isLoading: loadingDir, refetch: refetchDir } = useQuery({
+    queryKey: ['direcciones'],
+    queryFn: () => base44.entities.Direccion.list('jefe_sitio', 500),
   });
 
-  const { data: escuelas = [], isLoading: loadingEsc, refetch: refetchEsc } = useQuery({
-    queryKey: ['escuelasMapa'],
-    queryFn: () => base44.entities.EscuelaMapa.list('nombre', 1000),
+  const { data: rawLocations = [], isLoading: loadingLoc, refetch: refetchLoc } = useQuery({
+    queryKey: ['locationData'],
+    queryFn: () => base44.entities.LocationData.list('-created_date', 500),
   });
 
-  const isLoading = loadingDir || loadingEsc;
+  const isLoading = loadingDir || loadingLoc;
+
+  // Construir datos para el mapa: una entrada por dirección con coords promedio de sus escuelas
+  const { direcciones, escuelas } = useMemo(() => {
+    // Agrupar locations por direccion_id para obtener coords
+    const coordsByDir = {};
+    rawLocations.forEach(loc => {
+      if (loc.direccion_id && loc.gps_latitude && loc.gps_longitude) {
+        if (!coordsByDir[loc.direccion_id]) coordsByDir[loc.direccion_id] = [];
+        coordsByDir[loc.direccion_id].push({ lat: loc.gps_latitude, lng: loc.gps_longitude });
+      }
+    });
+
+    const dirs = rawDirecciones.map(d => {
+      const coords = coordsByDir[d.id];
+      let lat = null, lng = null;
+      if (coords && coords.length > 0) {
+        lat = coords.reduce((s, c) => s + c.lat, 0) / coords.length;
+        lng = coords.reduce((s, c) => s + c.lng, 0) / coords.length;
+      }
+      // Normalizar comuna al formato esperado
+      const comunaMap = { '8A': 'COMUNA 8A1', '8B': 'COMUNA 8B1', '10A': 'COMUNA 10A1' };
+      return { ...d, lat, lng, comuna: comunaMap[d.comuna] || d.comuna };
+    });
+
+    const escs = rawLocations.map(loc => ({
+      id: loc.id,
+      direccion_mapa_id: loc.direccion_id,
+      nombre: loc.establecimiento,
+      jefe_sitio: loc.jefe_sitio,
+      comuna: loc.comuna,
+    }));
+
+    return { direcciones: dirs, escuelas: escs };
+  }, [rawDirecciones, rawLocations]);
+
   const sinCoords = direcciones.filter(d => !d.lat || !d.lng).length;
   const conCoords = direcciones.filter(d => d.lat && d.lng).length;
-
-  const handleImportDone = () => {
-    setShowImport(false);
-    refetchDir();
-    refetchEsc();
-    toast.success('Datos importados correctamente');
-  };
 
   const MODOS = [
     { id: 'jefe', label: 'Por Jefe', icon: Users },
@@ -56,19 +81,11 @@ export default function MapaJefes() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => { refetchDir(); refetchEsc(); }}
+            onClick={() => { refetchDir(); refetchLoc(); }}
             className="gap-1.5"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Actualizar
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => setShowImport(true)}
-            className="gap-1.5"
-          >
-            <Upload className="h-3.5 w-3.5" />
-            Importar Excel
           </Button>
         </div>
       </div>
@@ -96,27 +113,8 @@ export default function MapaJefes() {
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : direcciones.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center py-20">
-          <MapPin className="h-16 w-16 text-muted-foreground/30" />
-          <div>
-            <p className="text-lg font-semibold">No hay datos importados</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Importá el archivo Excel para ver las direcciones en el mapa
-            </p>
-          </div>
-          <Button onClick={() => setShowImport(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            Importar Excel
-          </Button>
-        </div>
       ) : (
         <MapaJefesVista direcciones={direcciones} escuelas={escuelas} modo={modo} />
-      )}
-
-      {/* Modal importar */}
-      {showImport && (
-        <ImportarMapaJefes onDone={handleImportDone} onCancel={() => setShowImport(false)} />
       )}
     </div>
   );
