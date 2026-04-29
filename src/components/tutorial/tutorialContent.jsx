@@ -1,614 +1,707 @@
 export const TUTORIAL_MODULES = [
+  // ─── OPERACIONES ───────────────────────────────────────────────
   {
     id: 'dashboard',
     icon: '📊',
     title: 'Panel Principal (Dashboard)',
-    description: 'Visualiza el estado general de tu negocio en un solo lugar',
+    description: 'Visualizá el estado general de tu negocio en un solo lugar',
     color: '#3b82f6',
-    keywords: ['inicio', 'resumen', 'métricas', 'gráficos'],
+    category: 'operaciones',
+    keywords: ['inicio', 'resumen', 'métricas', 'gráficos', 'kpi'],
     steps: [
       {
         title: 'Acceder al Dashboard',
         duration: '2 min',
-        description: 'El Dashboard es tu centro de control. Al iniciar sesión, verás un resumen completo de tu negocio con métricas clave, gráficos y alertas importantes.',
+        difficulty: 'Básica',
+        description: 'El Dashboard es tu centro de control. Al iniciar sesión verás un resumen completo: KPIs, alertas, emergencias activas, pendientes SAP y mucho más.',
         instructions: [
-          'Haz clic en "Inicio" en el menú lateral',
-          'Observa los indicadores (KPIs) en la parte superior',
-          'Revisa los gráficos de ingresos y estado de proyectos'
+          'Hacé clic en "Inicio" en el menú lateral',
+          'Observá los indicadores (KPIs) en la parte superior',
+          'Revisá el widget de Emergencias activas',
+          'Chequeá los pendientes SAP y OTs próximas',
+          'Mirá los gráficos de ingresos en la sección financiera',
         ],
         tips: [
-          'El dashboard se actualiza automáticamente cada minuto',
-          'Puedes personalizar los datos según tus necesidades'
+          'El dashboard se actualiza automáticamente en tiempo real',
+          'Las tarjetas rojas requieren atención urgente',
         ],
-        example: 'Si tienes 5 proyectos activos, 12 órdenes pendientes y $50,000 en ingresos mensuales, estos datos aparecerán en las tarjetas superiores.'
+        example: 'Si hay 2 emergencias activas, el widget parpadeará en rojo. Hacé clic para ir directo al módulo de emergencias.',
       },
       {
-        title: 'Interpretar métricas',
+        title: 'Interpretar alertas y notificaciones',
         duration: '3 min',
         difficulty: 'Básica',
-        description: 'Aprende a leer e interpretar los indicadores clave del negocio.',
+        description: 'El sistema genera alertas automáticas sobre proyectos atrasados, stock bajo, facturas vencidas y mantenimientos programados.',
         instructions: [
-          'Identifica los KPIs en la sección superior',
-          'Lee los gráficos de tendencias mensuales',
-          'Revisa la sección de proyectos activos',
-          'Observa las órdenes de trabajo pendientes'
+          'Observá la campana de notificaciones en el header',
+          'Lee las alertas de stock bajo (materiales por debajo del mínimo)',
+          'Revisá las OTs vencidas destacadas en el dashboard',
+          'Hacé clic en una alerta para ir al módulo correspondiente',
         ],
         tips: [
-          'Los números en rojo indican alertas o problemas',
-          'Los gráficos te ayudan a ver tendencias rápidamente'
+          'Las alertas rojas son críticas, amarillas son advertencias',
+          'En Proyectos también aparecen alertas por avance vs tiempo',
         ],
-        important: 'Si un proyecto está atrasado, aparecerá destacado en rojo para que tomes acción inmediata.'
+        important: 'Los proyectos con fecha límite próxima y avance bajo generan alertas automáticas en verde, amarillo o rojo.',
       },
-      {
-        title: 'Usar alertas y notificaciones',
-        duration: '2 min',
-        difficulty: 'Básica',
-        description: 'Las alertas te notifican sobre eventos importantes que requieren tu atención.',
-        instructions: [
-          'Lee las alertas en la sección superior del dashboard',
-          'Haz clic en una alerta para ir directamente al módulo correspondiente',
-          'Revisa las notificaciones (icono de campana)',
-          'Marca notificaciones como leídas según sea necesario'
-        ],
-        tips: [
-          'Abre las alertas inmediatamente para resolver problemas rápido',
-          'Las notificaciones están ordenadas por importancia'
-        ]
-      }
-    ]
+    ],
   },
   {
     id: 'proyectos',
     icon: '🏗️',
     title: 'Gestión de Proyectos',
-    description: 'Crea, organiza y controla todos tus proyectos de construcción',
+    description: 'Creá, organizá y controlá todos tus proyectos de construcción',
     color: '#10b981',
-    keywords: ['proyectos', 'obras', 'timeline', 'presupuesto'],
+    category: 'operaciones',
+    keywords: ['proyectos', 'obras', 'timeline', 'presupuesto', 'avance'],
     steps: [
       {
         title: 'Crear un nuevo proyecto',
         duration: '5 min',
         difficulty: 'Básica',
-        description: 'Los proyectos son el núcleo de tu negocio. Cada proyecto contiene información sobre la obra, cliente, equipo y presupuesto.',
+        description: 'Los proyectos son el núcleo de tu negocio. Cada uno contiene información sobre la obra, cliente, equipo y presupuesto.',
         instructions: [
-          'Ve a Proyectos en el menú lateral',
-          'Haz clic en "Nuevo Proyecto"',
-          'Completa los datos básicos: nombre, cliente, dirección',
-          'Define el tipo de proyecto (obra nueva, remodelación, etc.)',
-          'Establece fechas de inicio y fin estimadas',
-          'Define el presupuesto estimado',
-          'Haz clic en "Guardar"'
+          'Andá a Proyectos en el menú lateral',
+          'Hacé clic en "Nuevo Proyecto"',
+          'Completá: nombre, código, cliente, dirección',
+          'Definí el tipo (obra nueva, remodelación, mantenimiento, etc.)',
+          'Establecé fechas de inicio y fin estimadas',
+          'Definí el presupuesto estimado',
+          'Establecé el % de avance inicial (generalmente 0)',
+          'Hacé clic en "Guardar"',
         ],
         tips: [
-          'Los nombres descriptivos facilitan identificar proyectos después',
-          'Las fechas realistas ayudan a cumplir plazos'
+          'Los nombres descriptivos facilitan identificar proyectos',
+          'Las fechas realistas permiten que el sistema genere alertas correctas',
         ],
-        example: 'Proyecto: "Remodelación Casa Rosada - San Isidro" con inicio 01/05/2024, fin 30/08/2024, presupuesto $75,000'
+        example: 'Proyecto: "Remodelación Escuela Nº 5 - San Telmo" | Inicio: 01/05/2025 | Fin: 30/08/2025 | Presupuesto: $2.500.000',
       },
       {
-        title: 'Asignar equipo al proyecto',
+        title: 'Sistema de alertas automáticas',
         duration: '3 min',
         difficulty: 'Básica',
-        description: 'Forma tu equipo de trabajo asignando empleados con roles específicos.',
+        description: 'El sistema analiza el % de avance real vs el esperado según el tiempo transcurrido y genera alertas de 3 niveles.',
         instructions: [
-          'Abre el proyecto creado',
-          'Ve a la pestaña "Equipo"',
-          'Haz clic en "Agregar miembro"',
-          'Selecciona empleados de la lista',
-          'Define su rol (supervisor, técnico, operario, etc.)',
-          'Guarda los cambios'
+          'Abrí la página de Proyectos',
+          'Observá los banners de alerta en la parte superior de la lista',
+          'Verde (Aviso): faltan 30-60 días y el avance está por debajo del esperado',
+          'Amarillo (Precaución): faltan 15-30 días con avance moderadamente bajo',
+          'Rojo (Crítico): faltan menos de 15 días o la fecha ya venció',
+          'Podés cerrar cada alerta con la X',
         ],
         tips: [
-          'Asigna un supervisor responsable a cada proyecto',
-          'Los roles determinan responsabilidades y acceso a funciones'
-        ]
+          'El avance "esperado" se calcula automáticamente en base al tiempo transcurrido',
+          'Actualizá el % de avance regularmente para que las alertas sean precisas',
+        ],
+        important: 'Si la fecha de fin ya pasó y el proyecto no está completado, aparece una alerta roja crítica automáticamente.',
       },
       {
-        title: 'Monitorear progreso',
+        title: 'Monitorear y actualizar progreso',
         duration: '3 min',
         difficulty: 'Básica',
-        description: 'Mantén el control del avance del proyecto en tiempo real.',
+        description: 'Mantené el control del avance del proyecto en tiempo real.',
         instructions: [
-          'Abre el proyecto',
-          'Ve a la sección "Progreso"',
-          'Actualiza el porcentaje de avance',
-          'Revisa hitos (milestones) completados',
-          'Lee comentarios del equipo',
-          'Descarga reportes si es necesario'
+          'Hacé clic en un proyecto para ver su detalle',
+          'Actualizá el porcentaje de avance en el formulario',
+          'Revisá los datos de equipo y documentos adjuntos',
+          'Chequeá las OTs asociadas al proyecto',
+          'Descargá reportes si es necesario',
         ],
         tips: [
-          'Actualiza el progreso semanalmente',
-          'Un proyecto con 0% de avance durante 2 semanas genera alerta'
+          'Actualizá el % de avance al menos una vez por semana',
+          'Un proyecto "en_progreso" con 0% de avance por mucho tiempo generará alertas',
         ],
-        important: 'Si el proyecto se atrasa más de 10%, recibirás una alerta automática.'
-      }
-    ]
+      },
+    ],
   },
   {
     id: 'ordenes',
     icon: '📋',
-    title: 'Órdenes de Trabajo',
-    description: 'Crea y sigue órdenes de trabajo para tareas específicas',
+    title: 'Órdenes de Trabajo (OT)',
+    description: 'Creá y seguí órdenes de trabajo para tareas específicas en campo',
     color: '#f59e0b',
-    keywords: ['órdenes', 'tareas', 'mantenimiento', 'urgencias'],
+    category: 'operaciones',
+    keywords: ['órdenes', 'ot', 'tareas', 'mantenimiento', 'urgencias', 'qr'],
     steps: [
       {
         title: 'Crear una orden de trabajo',
         duration: '4 min',
         difficulty: 'Básica',
-        description: 'Las órdenes de trabajo son tareas específicas que deben completarse en el proyecto.',
+        description: 'Las OTs son tareas concretas asignadas a técnicos. Pueden estar vinculadas a proyectos, ubicaciones QR o emergencias.',
         instructions: [
-          'Ve a Órdenes de Trabajo',
-          'Haz clic en "Nueva Orden"',
-          'Selecciona el proyecto asociado',
-          'Define el tipo (mantenimiento, instalación, reparación, etc.)',
-          'Asigna un empleado responsable',
-          'Establece una fecha de inicio y estimado de horas',
-          'Define la prioridad (baja, media, alta, urgente)',
-          'Haz clic en "Guardar"'
+          'Andá a Órdenes de Trabajo',
+          'Hacé clic en "Nueva Orden"',
+          'Seleccioná el proyecto asociado',
+          'Definí el tipo (mantenimiento, instalación, reparación, emergencia, etc.)',
+          'Asigná un técnico responsable',
+          'Establecé fecha y estimado de horas',
+          'Definí la prioridad (baja, media, alta, urgente)',
+          'Opcionalmente vinculá una ubicación QR',
+          'Hacé clic en "Guardar"',
         ],
         tips: [
-          'Las órdenes urgentes aparecen destacadas en el dashboard',
-          'Las horas estimadas ayudan a calcular costos'
+          'Las OTs urgentes aparecen destacadas en el dashboard',
+          'Si la OT surge de una emergencia, se crea automáticamente',
         ],
-        example: 'Orden: "Instalación de cableado eléctrico" - Prioridad Alta - 16 horas estimadas - Asignado a Juan García'
+        example: 'OT: "Reparación cañería rota - Escuela Nº12" | Prioridad: Urgente | Asignado: Juan García | 4 horas estimadas',
       },
       {
-        title: 'Actualizar estado de orden',
+        title: 'Ejecutar OT desde el campo (móvil)',
+        duration: '5 min',
+        difficulty: 'Media',
+        description: 'Los técnicos pueden ejecutar las OTs desde su celular: completar checklist, sacar fotos, ingresar materiales y firmar digitalmente.',
+        instructions: [
+          'El técnico escanea el QR de la OT desde su celular',
+          'Ve el detalle completo de la tarea asignada',
+          'Completa el checklist ítem por ítem',
+          'Sube fotos del trabajo realizado',
+          'Registra materiales utilizados con cantidad',
+          'Firma digitalmente al finalizar',
+          'Hace clic en "Guardar y Completar"',
+        ],
+        tips: [
+          'Funciona sin internet (modo offline), sincroniza cuando hay conexión',
+          'Las fotos quedan guardadas permanentemente en el sistema',
+        ],
+        important: 'La firma digital es obligatoria para marcar una OT como completada.',
+      },
+      {
+        title: 'Generar y usar QR de OT',
         duration: '2 min',
         difficulty: 'Básica',
-        description: 'Mantén el estado de las órdenes actualizado conforme avanza el trabajo.',
+        description: 'Cada OT tiene su propio código QR que permite acceso rápido desde campo sin necesidad de buscar en el sistema.',
         instructions: [
-          'Abre la orden de trabajo',
-          'Cambia el estado: Pendiente → Asignada → En Progreso → Completada',
-          'Si es necesario, cámbialo a "En espera" con motivo',
-          'Haz clic en "Guardar"'
+          'Abrí la OT',
+          'Hacé clic en el ícono QR',
+          'Descargá o imprimí el código',
+          'Pegalo en el lugar físico de trabajo',
+          'El técnico lo escanea para acceder directo a la OT',
         ],
         tips: [
-          'El sistema rastrea cuánto tiempo toma cada orden',
-          'Los cambios de estado son registrados automáticamente'
-        ]
+          'Imprimí los QR y pegados en tableros o equipos de obra',
+          'Al escanear, el técnico ve todo: checklist, fotos requeridas, firma',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'emergencias',
+    icon: '🚨',
+    title: 'Centro de Emergencias',
+    description: 'Registrá y gestioná emergencias en establecimientos en tiempo real',
+    color: '#ef4444',
+    category: 'operaciones',
+    keywords: ['emergencias', 'urgencias', 'incendio', 'inundacion', 'respuesta', 'alerta'],
+    steps: [
+      {
+        title: 'Registrar una emergencia',
+        duration: '3 min',
+        difficulty: 'Básica',
+        description: 'El módulo de emergencias permite reportar situaciones críticas y asignar cuadrillas de respuesta inmediata.',
+        instructions: [
+          'Andá a Emergencias en el menú lateral',
+          'Hacé clic en "Nueva Emergencia"',
+          'Seleccioná el tipo (incendio, inundación, corte eléctrico, derrumbe, rotura de gas, etc.)',
+          'Buscá y seleccioná el establecimiento afectado',
+          'Completá el título y la descripción de la situación',
+          'Ingresá datos de contacto del reportante',
+          'Subí fotos de la situación si las tenés',
+          'Hacé clic en "Registrar Emergencia"',
+        ],
+        tips: [
+          'El sistema crea automáticamente una OT de emergencia vinculada',
+          'Las emergencias activas aparecen en el dashboard en tiempo real',
+        ],
+        important: 'Al registrar una emergencia, se genera automáticamente una Orden de Trabajo con prioridad urgente.',
       },
       {
-        title: 'Agregar notas, fotos y firmas',
-        duration: '4 min',
-        difficulty: 'Media',
-        description: 'Documenta el trabajo con evidencia fotográfica, notas y firmas digitales.',
+        title: 'Gestionar estados y resolución',
+        duration: '3 min',
+        difficulty: 'Básica',
+        description: 'Seguí el ciclo de vida de cada emergencia desde que se reporta hasta su resolución.',
         instructions: [
-          'Abre la orden de trabajo',
-          'Ve a la pestaña "Documentación"',
-          'Carga fotos del antes y después del trabajo',
-          'Escribe notas sobre lo realizado',
-          'Solicita firma digital del cliente o responsable',
-          'Guarda todos los cambios'
+          'Desde la lista de emergencias, abrí la que querés gestionar',
+          'Cambiá el estado a "En Atención" cuando se despacha cuadrilla',
+          'Registrá el jefe de sitio asignado',
+          'Cuando se resuelve, cambiá a "Resuelta"',
+          'Agregá notas de resolución y tiempo de respuesta',
         ],
         tips: [
-          'Las fotos en alta calidad son importantes para auditorías',
-          'Las notas detalladas evitan confusiones después'
+          'El sistema calcula automáticamente el tiempo de respuesta',
+          'Usá el Dashboard de Emergencias para ver estadísticas históricas',
         ],
-        important: 'Solicita firma del cliente para órdenes completadas; sin firma no se cierra.'
-      }
-    ]
+      },
+    ],
   },
+  {
+    id: 'pendientes',
+    icon: '📌',
+    title: 'Pendientes SAP',
+    description: 'Gestioná y hacé seguimiento de órdenes SAP y trabajos pendientes',
+    color: '#8b5cf6',
+    category: 'operaciones',
+    keywords: ['sap', 'pendientes', 'órdenes', 'seguimiento', 'establecimiento'],
+    steps: [
+      {
+        title: 'Ver y filtrar pendientes',
+        duration: '3 min',
+        difficulty: 'Básica',
+        description: 'Los pendientes SAP son tareas que vienen del sistema SAP del ministerio y que deben ser ejecutadas por los equipos.',
+        instructions: [
+          'Andá a Activos > pestaña "Pendientes SAP"',
+          'Usá los filtros por estado, jefe de sitio, comunidad, prioridad',
+          'Buscá por número SAP, descripción o establecimiento',
+          'Hacé clic en un pendiente para ver su detalle completo',
+          'Podés ver el historial de cambios de estado de cada pendiente',
+        ],
+        tips: [
+          'Los pendientes vencidos se marcan automáticamente en rojo',
+          'El filtro por jefe de sitio es muy útil para ver la carga de trabajo',
+        ],
+      },
+      {
+        title: 'Asignar y actualizar pendientes',
+        duration: '4 min',
+        difficulty: 'Media',
+        description: 'Asigná jefes de sitio, cuadrillas y seguí el progreso de cada pendiente.',
+        instructions: [
+          'Abrí el pendiente que querés gestionar',
+          'Asigná el jefe de sitio responsable',
+          'Agregá la cuadrilla de trabajo',
+          'Cambiá el estado: Pendiente → Asignado → En Progreso → Resuelto',
+          'Registrá notas de resolución y fotos al finalizar',
+          'Cada cambio de estado queda registrado en el historial',
+        ],
+        tips: [
+          'Agregá comentarios en cada cambio de estado para tener trazabilidad',
+          'Podés importar pendientes masivamente desde un archivo SAP',
+        ],
+        important: 'Todo cambio de estado queda registrado en el Historial de Pendientes para auditoría.',
+      },
+    ],
+  },
+
+  // ─── ADMINISTRACIÓN ────────────────────────────────────────────
   {
     id: 'clientes',
     icon: '👥',
-    title: 'Gestión de Clientes',
-    description: 'Administra información y relaciones con clientes',
-    color: '#8b5cf6',
-    keywords: ['clientes', 'contactos', 'empresas', 'particulares'],
+    title: 'Proveedores y Clientes',
+    description: 'Administrá información y relaciones con proveedores y clientes',
+    color: '#ec4899',
+    category: 'administracion',
+    keywords: ['clientes', 'proveedores', 'contactos', 'valoración', 'rubro'],
     steps: [
       {
-        title: 'Agregar un nuevo cliente',
+        title: 'Agregar un proveedor/cliente',
         duration: '3 min',
         difficulty: 'Básica',
-        description: 'Los clientes son la base de tus proyectos. Registra toda su información importante.',
+        description: 'El módulo de Clientes gestiona tanto proveedores de materiales y servicios como clientes de la empresa.',
         instructions: [
-          'Ve a Clientes',
-          'Haz clic en "Nuevo Cliente"',
-          'Completa datos: nombre/razón social, CUIT, tipo',
-          'Agrega contacto responsable con email y teléfono',
-          'Escribe la dirección de domicilio',
-          'Selecciona estado (activo/inactivo)',
-          'Haz clic en "Guardar"'
+          'Andá a Proveedores',
+          'Hacé clic en "Nuevo"',
+          'Completá: nombre/razón social, CUIT',
+          'Seleccioná el rubro principal',
+          'Agregá contacto con email y teléfono',
+          'Asigná una valoración del 1 al 5',
+          'Hacé clic en "Guardar"',
         ],
         tips: [
-          'El CUIT es obligatorio para facturación',
-          'Mantén actualizado el contacto principal'
+          'La valoración te ayuda a priorizar proveedores de confianza',
+          'Usá las notas para registrar condiciones de pago o acuerdos especiales',
         ],
-        example: 'Cliente: "Empresa Construcciones S.A." - Contacto: "María Pérez" - Email: maria@construcciones.com'
+        example: 'Proveedor: "Ferreterías del Sur" | Rubro: Materiales | Valoración: ★★★★☆',
       },
-      {
-        title: 'Ver historial de proyectos',
-        duration: '2 min',
-        difficulty: 'Básica',
-        description: 'Accede rápidamente a todos los proyectos de un cliente.',
-        instructions: [
-          'Abre un cliente',
-          'Ve a la pestaña "Proyectos"',
-          'Observa todos los proyectos pasados y actuales',
-          'Haz clic en cualquier proyecto para ver detalles'
-        ],
-        tips: [
-          'Esto te ayuda a ver el valor total que le has generado',
-          'Facilita cotizar nuevos trabajos basándote en lo anterior'
-        ]
-      }
-    ]
+    ],
   },
   {
     id: 'facturacion',
     icon: '💰',
-    title: 'Facturación e Invoices',
-    description: 'Crea y gestiona facturas, presupuestos y cobranza',
-    color: '#ec4899',
+    title: 'Facturación',
+    description: 'Creá y gestioná facturas, presupuestos y registros de cobranza',
+    color: '#f59e0b',
+    category: 'administracion',
     keywords: ['facturas', 'dinero', 'pagos', 'cobranza', 'invoices'],
     steps: [
       {
         title: 'Crear una factura',
         duration: '5 min',
         difficulty: 'Media',
-        description: 'Las facturas formalizar los cobros a tus clientes.',
+        description: 'Las facturas formalizan los cobros a tus clientes y quedan registradas para el seguimiento financiero.',
         instructions: [
-          'Ve a Facturación > Facturas',
-          'Haz clic en "Nueva Factura"',
-          'Selecciona el cliente',
-          'Elige si es por proyecto específico o servicios generales',
-          'Agrega items con descripción, cantidad y precio unitario',
-          'El total se calcula automáticamente (+ IVA 21%)',
-          'Establece fecha de vencimiento',
-          'Haz clic en "Guardar" y luego "Emitir"'
+          'Andá a Facturación',
+          'Hacé clic en "Nueva Factura"',
+          'Seleccioná el cliente',
+          'Agregá ítems con descripción, cantidad y precio unitario',
+          'El total se calcula automáticamente',
+          'Establecé fecha de vencimiento',
+          'Hacé clic en "Guardar" y luego "Emitir"',
         ],
         tips: [
-          'Verifica que el cliente sea correcto antes de emitir',
-          'Las facturas emitidas no se pueden editar, solo anular'
+          'Verificá que el cliente sea correcto antes de emitir',
+          'Exportá a PDF para enviar al cliente',
         ],
-        important: 'Una vez emitida, la factura tiene validez legal. Guarda un PDF para tus archivos.'
+        important: 'Una vez emitida, la factura no se puede editar. Guardá siempre el PDF.',
       },
       {
         title: 'Registrar pagos',
         duration: '2 min',
         difficulty: 'Básica',
-        description: 'Marca los pagos recibidos de clientes.',
+        description: 'Marcá los pagos recibidos de clientes para mantener las cuentas al día.',
         instructions: [
-          'Abre la factura pendiente',
-          'Haz clic en "Registrar Pago"',
-          'Escribe el monto pagado',
-          'Selecciona método de pago (efectivo, banco, tarjeta)',
-          'Agrega número de comprobante si existe',
-          'Haz clic en "Guardar"'
+          'Abrí la factura pendiente',
+          'Hacé clic en "Registrar Pago"',
+          'Ingresá el monto pagado',
+          'Seleccioná método (efectivo, transferencia, cheque)',
+          'Agregá número de comprobante si existe',
+          'Hacé clic en "Guardar"',
         ],
         tips: [
-          'Si es pago parcial, el sistema calcula el saldo restante',
-          'Completa el monto exacto para marcar como pagada'
-        ]
+          'Si el pago es parcial, el sistema calcula el saldo automáticamente',
+          'Las facturas vencidas aparecen como alerta en el dashboard',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'presupuestos',
+    icon: '📐',
+    title: 'Presupuestos de Obra',
+    description: 'Creá presupuestos detallados usando el preciario ministerial',
+    color: '#06b6d4',
+    category: 'administracion',
+    keywords: ['presupuesto', 'preciario', 'PCP', 'rubro', 'obra', 'coeficiente'],
+    steps: [
+      {
+        title: 'Crear un presupuesto de obra',
+        duration: '6 min',
+        difficulty: 'Media',
+        description: 'Los presupuestos de obra se arman en base al preciario ministerial, con ítems agrupados por rubro y cálculo automático de coeficientes.',
+        instructions: [
+          'Andá a Presupuestos de Obra',
+          'Hacé clic en "Nuevo Presupuesto"',
+          'Completá los datos de la obra: código, título, cliente, licitación',
+          'Configurá los coeficientes de pase y oferta',
+          'Seleccioná la commune del preciario',
+          'En la grilla PCP, buscá ítems del preciario y agregálos',
+          'Ingresá la cantidad para cada ítem',
+          'El sistema calcula automáticamente los totales',
+          'Exportá a Excel o genera el Plan de Trabajos',
+        ],
+        tips: [
+          'Los ítems del preciario tienen código, descripción, unidad y precio base',
+          'El coeficiente de pase por defecto es 1.6504 y el de oferta 1.38',
+        ],
+        important: 'Seleccioná la comuna correcta del preciario para que los precios sean los correspondientes.',
       },
       {
-        title: 'Crear un presupuesto',
-        duration: '4 min',
+        title: 'Exportar y Plan de Trabajos',
+        duration: '3 min',
         difficulty: 'Media',
-        description: 'Los presupuestos son cotizaciones que envías a clientes antes de la factura.',
+        description: 'Una vez listo el presupuesto, podés exportar el PCP y generar automáticamente el Plan de Trabajos.',
         instructions: [
-          'Ve a Facturación > Presupuestos',
-          'Haz clic en "Nuevo Presupuesto"',
-          'Selecciona cliente y proyecto (opcional)',
-          'Agrega items con descripción y precio',
-          'Establece fecha de validez (ej: 30 días)',
-          'Añade términos y condiciones si es necesario',
-          'Haz clic en "Guardar"',
-          'Envía al cliente por email'
+          'Desde el presupuesto, hacé clic en "Plan de Trabajos"',
+          'El sistema distribuye automáticamente los ítems en semanas',
+          'Ajustá la distribución si es necesario',
+          'Hacé clic en "Exportar Excel" para el PCP completo',
+          'El archivo Excel incluye todas las hojas reglamentarias',
         ],
         tips: [
-          'Los presupuestos pueden convertirse en facturas después',
-          'Incluye márgenes razonables para ganancias'
-        ]
-      }
-    ]
+          'El Plan de Trabajos puede editarse manualmente antes de exportar',
+          'Los colores en el plan indican el % de distribución por período',
+        ],
+      },
+    ],
   },
   {
     id: 'inventario',
     icon: '📦',
-    title: 'Inventario y Materiales',
-    description: 'Controla stock de materiales y herramientas',
-    color: '#06b6d4',
-    keywords: ['stock', 'materiales', 'inventario', 'herramientas'],
+    title: 'Inventario y Pañol',
+    description: 'Controlá stock de materiales, herramientas y movimientos del pañol',
+    color: '#10b981',
+    category: 'administracion',
+    keywords: ['stock', 'materiales', 'inventario', 'pañol', 'herramientas', 'movimientos'],
     steps: [
       {
-        title: 'Registrar un material nuevo',
+        title: 'Registrar materiales',
         duration: '3 min',
         difficulty: 'Básica',
-        description: 'Crea un registro para cada material que usas en tus proyectos.',
+        description: 'Creá un registro para cada material o herramienta que manejás en el pañol.',
         instructions: [
-          'Ve a Inventario',
-          'Haz clic en "Nuevo Material"',
-          'Completa: nombre, código, categoría',
-          'Define unidad de medida (metros, kilos, litros, etc.)',
-          'Establece stock inicial',
-          'Define stock mínimo (alerta cuando llega a este punto)',
-          'Escribe costo unitario',
-          'Haz clic en "Guardar"'
+          'Andá a Inventario',
+          'Hacé clic en "Nuevo Material"',
+          'Completá: nombre, código, categoría',
+          'Definí unidad de medida (metros, kilos, litros, unidades)',
+          'Establecé stock inicial y stock mínimo',
+          'Escribí el costo unitario',
+          'Hacé clic en "Guardar"',
         ],
         tips: [
-          'Códigos únicos facilitan búsquedas rápidas',
-          'El stock mínimo genera alertas automáticas'
+          'El stock mínimo genera alertas automáticas cuando se alcanza',
+          'Los códigos únicos facilitan búsquedas y movimientos',
         ],
-        example: 'Material: "Hormigón preparado" - Código: HORM001 - Unidad: m³ - Stock inicial: 50 - Costo: $180/m³'
+        example: 'Material: "Cable eléctrico 2.5mm" | Código: ELEC001 | Unidad: metros | Stock mín: 100m | Costo: $450/m',
       },
       {
-        title: 'Actualizar stock',
+        title: 'Registrar movimientos (entradas/salidas)',
         duration: '2 min',
         difficulty: 'Básica',
-        description: 'Mantén el inventario actualizado conforme usas o compras materiales.',
+        description: 'Todo movimiento de stock queda registrado con fecha, responsable y motivo.',
         instructions: [
-          'Abre el material',
-          'Ve a la sección "Movimientos"',
-          'Haz clic en "Nuevo Movimiento"',
-          'Selecciona tipo: entrada (compra) o salida (uso)',
-          'Escribe cantidad',
-          'Agrega documento de referencia si existe',
-          'Haz clic en "Guardar"'
+          'Abrí el material',
+          'Hacé clic en "Nuevo Movimiento"',
+          'Seleccioná tipo: entrada (compra/devolución) o salida (uso/asignación)',
+          'Ingresá la cantidad',
+          'Seleccioná el motivo',
+          'Agregá el nombre del responsable',
+          'Hacé clic en "Guardar"',
         ],
         tips: [
-          'El sistema rastrea todos los movimientos automáticamente',
-          'Puedes ver el historial completo de cada material'
-        ]
+          'Los movimientos de salida reducen el stock automáticamente',
+          'El historial completo de movimientos está disponible en la pestaña "Historial"',
+        ],
       },
-      {
-        title: 'Asignar materiales a un proyecto',
-        duration: '3 min',
-        difficulty: 'Media',
-        description: 'Vincula materiales específicos a un proyecto para rastrear costos.',
-        instructions: [
-          'Abre el proyecto',
-          'Ve a la pestaña "Materiales"',
-          'Haz clic en "Asignar Material"',
-          'Selecciona el material del inventario',
-          'Escribe cantidad a utilizar',
-          'El costo se calcula automáticamente',
-          'Haz clic en "Guardar"'
-        ],
-        tips: [
-          'Esto te ayuda a calcular el costo real del proyecto',
-          'Puedes ver qué proyectos consumen más recursos'
-        ]
-      }
-    ]
+    ],
   },
+
+  // ─── CAMPO ─────────────────────────────────────────────────────
   {
     id: 'empleados',
-    icon: '👨‍💼',
+    icon: '👷',
     title: 'Gestión de Empleados',
-    description: 'Administra datos, roles y desempeño de tu equipo',
+    description: 'Administrá datos, roles, especialidades y asistencia de tu equipo',
     color: '#14b8a6',
-    keywords: ['empleados', 'equipo', 'roles', 'especialidades'],
+    category: 'campo',
+    keywords: ['empleados', 'equipo', 'roles', 'especialidades', 'cuadrilla', 'qr'],
     steps: [
       {
         title: 'Agregar un empleado',
         duration: '3 min',
         difficulty: 'Básica',
-        description: 'Registra los datos principales de cada integrante de tu equipo.',
+        description: 'Registrá los datos principales de cada integrante del equipo operativo.',
         instructions: [
-          'Ve a Empleados',
-          'Haz clic en "Nuevo Empleado"',
-          'Completa: nombre completo, DNI, teléfono',
-          'Selecciona rol: operario, técnico, supervisor, etc.',
-          'Elige especialidad: electricidad, plomería, albañilería, etc.',
-          'Define estado (activo, licencia, vacaciones, inactivo)',
-          'Establece tarifa horaria',
-          'Haz clic en "Guardar"'
+          'Andá a Empleados',
+          'Hacé clic en "Nuevo Empleado"',
+          'Completá: nombre, DNI, teléfono',
+          'Seleccioná rol: operario, técnico, capataz, supervisor, etc.',
+          'Elegí especialidad: electricidad, plomería, albañilería, etc.',
+          'Definí estado (activo, licencia, vacaciones, inactivo)',
+          'Establecé tarifa horaria',
+          'Hacé clic en "Guardar"',
         ],
         tips: [
-          'Almacena datos de contacto de emergencia',
-          'Los roles determinan qué funciones pueden hacer'
+          'Guardá el contacto de emergencia de cada empleado',
+          'La asignación automática propone empleados por especialidad y disponibilidad',
         ],
-        example: 'Empleado: "Juan Carlos García" - DNI: 28456789 - Rol: Técnico - Especialidad: Electricidad - Tarifa: $450/hora'
+        example: 'Empleado: "Carlos Rodríguez" | DNI: 28456789 | Rol: Técnico | Especialidad: Electricidad | $2.800/hora',
       },
       {
-        title: 'Generar código QR para asistencia',
+        title: 'Generar QR de empleado',
         duration: '2 min',
         difficulty: 'Básica',
-        description: 'Crea códigos QR individuales para que empleados registren asistencia rápidamente.',
+        description: 'Cada empleado tiene un código QR único para registrar su asistencia desde campo.',
         instructions: [
-          'Abre el empleado',
-          'Haz clic en "Generar Código QR"',
-          'Se abrirá una ventana con el código',
-          'Descarga la imagen o imprímela',
-          'Comparte con el empleado para que lo guarde'
+          'Abrí el perfil del empleado',
+          'Hacé clic en el ícono QR',
+          'Descargá o imprimí el código',
+          'Entregáselo al empleado para que lo tenga en su celular',
+          'El empleado lo usa para fichar entrada/salida',
         ],
         tips: [
-          'El código QR es personal y único',
-          'Facilita el registro rápido en la obra'
-        ]
-      }
-    ]
+          'El código QR es personal e intransferible',
+          'Guardalo como imagen de pantalla en el celular del empleado',
+        ],
+      },
+    ],
   },
   {
     id: 'asistencia',
     icon: '⏰',
     title: 'Control de Asistencia (Fichar)',
-    description: 'Registra entrada y salida de empleados con GPS',
+    description: 'Registrá entrada y salida de empleados con GPS y firma digital',
     color: '#f43f5e',
-    keywords: ['asistencia', 'fichar', 'qr', 'gps', 'entrada', 'salida'],
+    category: 'campo',
+    keywords: ['asistencia', 'fichar', 'qr', 'gps', 'entrada', 'salida', 'firma'],
     steps: [
       {
         title: 'Fichar desde el móvil',
         duration: '3 min',
         difficulty: 'Básica',
-        description: 'Los empleados registran entrada y salida usando la app móvil con código QR y GPS.',
+        description: 'Los empleados registran entrada y salida usando su código QR personal, GPS y firma digital.',
         instructions: [
-          'El empleado abre la app en su móvil',
+          'El empleado abre la URL de fichaje en su celular',
           'Va a la sección "Fichar"',
-          'Escanea el código QR de la ubicación con su cámara',
+          'Muestra su código QR (o escanea el de la ubicación)',
           'Captura su firma digital en la pantalla',
-          'Haz clic en "Confirmar Entrada" o "Confirmar Salida"',
-          'El sistema registra automáticamente GPS y hora'
+          'Hacé clic en "Confirmar Entrada" o "Confirmar Salida"',
+          'El sistema registra automáticamente GPS y hora',
         ],
         tips: [
           'La firma es obligatoria para validar el fichaje',
-          'El GPS verifica que el empleado esté en el lugar correcto'
+          'El GPS verifica que el empleado esté en la ubicación correcta',
         ],
-        important: 'Sin firma válida, el fichaje no se registra en el sistema.'
+        important: 'Sin firma válida, el fichaje no se registra. El empleado debe dibujar su firma en la pantalla.',
       },
       {
-        title: 'Ver historial de asistencia',
-        duration: '2 min',
-        difficulty: 'Básica',
-        description: 'Supervisa la asistencia del equipo desde el panel administrativo.',
+        title: 'Crear ubicaciones QR para fichaje',
+        duration: '3 min',
+        difficulty: 'Media',
+        description: 'Configurá puntos de fichaje físicos con sus propios QR, ideal para obras con varios accesos.',
         instructions: [
-          'Ve a Asistencia',
-          'Selecciona el rango de fechas',
-          'Observa la lista de fichajes por fecha',
-          'Haz clic en un fichaje para ver detalles (hora, GPS, firma)',
-          'Filtra por empleado o ubicación si es necesario'
+          'Andá a Mapa > Gestión de Ubicaciones',
+          'Hacé clic en "Nueva Ubicación"',
+          'Completá: nombre, dirección, descripción',
+          'Seleccioná tipo de evento: entrada, salida o ambos',
+          'Elegí un color identificador',
+          'Guardá y descargá el QR de esa ubicación',
+          'Imprimilo y pegalo en el acceso de la obra',
         ],
         tips: [
-          'Los fichajes incompletos aparecen destacados',
-          'Descarga reportes en PDF o Excel para análisis'
-        ]
-      }
-    ]
+          'Una obra grande puede tener múltiples puntos de fichaje',
+          'Los empleados asignados a cada ubicación pueden verse en el panel de asignaciones',
+        ],
+      },
+    ],
   },
   {
     id: 'mapa',
     icon: '🗺️',
-    title: 'Mapa Interactivo (GPS)',
-    description: 'Visualiza ubicaciones de proyectos y empleados en tiempo real',
+    title: 'Mapa Interactivo',
+    description: 'Visualizá ubicaciones de obras, fichajes y jefes de sitio en tiempo real',
     color: '#06b6d4',
-    keywords: ['mapa', 'gps', 'ubicaciones', 'tiempo real', 'seguimiento'],
+    category: 'campo',
+    keywords: ['mapa', 'gps', 'ubicaciones', 'jefes de sitio', 'seguimiento', 'escuelas'],
     steps: [
       {
-        title: 'Crear ubicaciones en el mapa',
+        title: 'Mapa de Fichajes y Ubicaciones',
         duration: '4 min',
         difficulty: 'Básica',
-        description: 'Define puntos de referencia para tus obras y proyectos en el mapa.',
+        description: 'El mapa interactivo muestra en tiempo real dónde están las obras y los fichajes de asistencia.',
         instructions: [
-          'Ve a Mapa Interactivo',
-          'Haz clic derecho en el lugar donde quieres crear una ubicación',
-          'Se abrirá un formulario con las coordenadas GPS automáticas',
-          'Completa: nombre, dirección, descripción',
-          'Selecciona tipo de evento: entrada, salida o ambos',
-          'Elige un color distintivo',
-          'Haz clic en "Crear Ubicación"'
+          'Andá a Mapa en el menú lateral',
+          'Observá los marcadores de ubicaciones activas',
+          'Hacé clic en un marcador para ver los detalles',
+          'Cambiá a la pestaña "Fichajes" para ver los últimos registros de asistencia con GPS',
+          'Usá la pestaña "Administración" para gestionar ubicaciones',
         ],
         tips: [
-          'Las coordenadas se rellenan automáticamente según donde hagas clic',
-          'Los colores ayudan a identificar ubicaciones rápidamente'
+          'Los marcadores verdes son ubicaciones activas, los grises inactivos',
+          'Hacé clic derecho en el mapa para crear una nueva ubicación en ese punto',
         ],
-        example: 'Ubicación: "Obra Centro - Av. 9 de Julio" - Tipo: Ambos - Color: Azul'
       },
       {
-        title: 'Visualizar información de ubicaciones',
-        duration: '2 min',
+        title: 'Mapa de Jefes de Sitio',
+        duration: '3 min',
         difficulty: 'Básica',
-        description: 'Observa estadísticas y detalles de cada ubicación.',
+        description: 'Visualizá la distribución geográfica de establecimientos agrupados por jefe de sitio o comuna.',
         instructions: [
-          'Haz clic en un marcador en el mapa',
-          'Se abrirá un popup con información de la ubicación',
-          'Lee: nombre, dirección, total de escaneos, estado',
-          'Haz clic en la ubicación para ver panel detallado'
+          'Andá a Mapa de Jefes en el menú lateral',
+          'Seleccioná el modo de visualización: Por Jefe, Por Comuna o Clusters',
+          'Cada color representa un jefe de sitio diferente',
+          'Hacé clic en un marcador para ver las escuelas de esa dirección',
+          'Usá el buscador para filtrar por nombre de jefe o dirección',
         ],
         tips: [
-          'El número de escaneos te muestra qué ubicaciones se usan más',
-          'Los marcadores azules indican ubicaciones activas'
-        ]
-      }
-    ]
+          'El modo "Clusters" agrupa ubicaciones cercanas para mejor visibilidad',
+          'Podés importar datos de jefes y escuelas desde un Excel',
+        ],
+      },
+    ],
   },
+
+  // ─── REPORTES ─────────────────────────────────────────────────
   {
     id: 'reportes',
     icon: '📈',
     title: 'Reportes y Análisis',
-    description: 'Genera reportes detallados de operaciones y finanzas',
+    description: 'Generá reportes detallados de operaciones, finanzas y rendimiento',
     color: '#8b5cf6',
-    keywords: ['reportes', 'análisis', 'datos', 'gráficos', 'export'],
+    category: 'reportes',
+    keywords: ['reportes', 'análisis', 'datos', 'gráficos', 'export', 'pdf', 'excel'],
     steps: [
       {
-        title: 'Generar un reporte de proyectos',
+        title: 'Reportes de proyectos y OTs',
         duration: '4 min',
         difficulty: 'Media',
-        description: 'Crea reportes sobre el estado y rentabilidad de tus proyectos.',
+        description: 'Generá reportes sobre el estado, rentabilidad y cumplimiento de proyectos y órdenes.',
         instructions: [
-          'Ve a Reportes',
-          'Selecciona "Proyectos"',
-          'Define rango de fechas',
-          'Selecciona qué datos incluir: presupuesto, gasto, ganancia, etc.',
-          'Haz clic en "Generar Reporte"',
-          'Observa gráficos y tablas interactivas',
-          'Descarga en PDF o Excel si lo necesitas'
+          'Andá a Reportes',
+          'Seleccioná la categoría: Proyectos, OTs, Empleados o Finanzas',
+          'Definí el rango de fechas',
+          'Aplicá filtros adicionales si es necesario',
+          'Hacé clic en "Generar"',
+          'Descargá en PDF o Excel',
         ],
         tips: [
-          'Los gráficos muestran tendencias visuales claramente',
-          'Puedes comparar múltiples períodos en paralelo'
-        ]
+          'Los gráficos muestran tendencias de forma visual',
+          'Los reportes de OTs incluyen tiempo real vs estimado',
+        ],
       },
       {
-        title: 'Crear reporte de rentabilidad',
-        duration: '3 min',
+        title: 'Certificados de obra',
+        duration: '5 min',
         difficulty: 'Media',
-        description: 'Analiza la ganancia real de cada proyecto.',
+        description: 'Generá certificados de avance de obra a partir de los presupuestos aprobados.',
         instructions: [
-          'Ve a Reportes > Rentabilidad',
-          'Selecciona un período (mes, trimestre, año)',
-          'Selecciona proyectos específicos o todos',
-          'El sistema calcula automáticamente:',
-          '  - Ingresos totales',
-          '  - Costos (materiales, mano de obra)',
-          '  - Gastos operativos',
-          '  - Ganancia neta y margen',
-          'Descarga el análisis'
+          'Andá a Certificados',
+          'Seleccioná el presupuesto de obra base',
+          'Ingresá el % de avance del período',
+          'El sistema calcula el monto a certificar automáticamente',
+          'Revisá los ítems certificados',
+          'Exportá el certificado en PDF con firma',
         ],
         tips: [
-          'Un margen sano está entre 20-30%',
-          'Identifica proyectos menos rentables para optimizar'
-        ]
-      }
-    ]
+          'Los certificados se generan sobre el presupuesto PCP aprobado',
+          'Podés subir el ADA (acta de aprobación) desde el módulo de certificados',
+        ],
+      },
+    ],
   },
   {
-    id: 'soporte',
-    icon: '🆘',
-    title: 'Soporte y Ayuda',
-    description: 'Contacta con nosotros y resuelve problemas rápidamente',
-    color: '#f59e0b',
-    keywords: ['soporte', 'ayuda', 'contacto', 'problemas', 'asistencia'],
+    id: 'informacion',
+    icon: '🏫',
+    title: 'Información General',
+    description: 'Administrá establecimientos, direcciones y jefes de sitio',
+    color: '#f97316',
+    category: 'reportes',
+    keywords: ['establecimientos', 'escuelas', 'direcciones', 'jefes', 'sitio', 'comunas'],
     steps: [
       {
-        title: 'Acceder al centro de ayuda',
-        duration: '2 min',
+        title: 'Directorio de establecimientos',
+        duration: '3 min',
         difficulty: 'Básica',
-        description: 'Encuentra respuestas rápidas y contacta con nuestro equipo de soporte.',
+        description: 'El módulo de Información General centraliza todos los establecimientos (escuelas) y su estructura jerárquica de responsables.',
         instructions: [
-          'Haz clic en el icono de ayuda (?) en la esquina inferior derecha',
-          'Busca tu pregunta en la barra de búsqueda',
-          'Navega por las categorías de temas',
-          'Lee artículos detallados y tutoriales',
-          'Si no encuentras la respuesta, crea un ticket'
+          'Andá a Información General',
+          'Seleccioná la pestaña "Directorio"',
+          'Buscá por nombre de establecimiento, dirección o jefe de sitio',
+          'Filtrá por comuna (8A, 8B, 10A)',
+          'Hacé clic en una dirección para ver sus establecimientos asociados',
+          'Hacé clic en "Expandir" para ver el detalle completo',
         ],
         tips: [
-          'La mayoría de problemas tienen solución en la base de conocimiento',
-          'Los tickets son respondidos en máximo 24 horas'
-        ]
+          'La estructura es: Dirección → Jefe de Sitio → Inspector → Establecimientos',
+          'Usá el campo de búsqueda para encontrar cualquier escuela rápidamente',
+        ],
       },
       {
-        title: 'Crear un ticket de soporte',
-        duration: '2 min',
-        difficulty: 'Básica',
-        description: 'Si tienes un problema, abre un ticket para que nuestro equipo te ayude.',
+        title: 'Importar establecimientos',
+        duration: '4 min',
+        difficulty: 'Media',
+        description: 'Cargá datos masivos de establecimientos y jefes de sitio desde archivos Excel.',
         instructions: [
-          'Ve a Soporte',
-          'Haz clic en "Nuevo Ticket"',
-          'Escribe un título claro del problema',
-          'Describe detalladamente qué sucede',
-          'Selecciona prioridad (baja, media, alta, urgente)',
-          'Adjunta capturas de pantalla si es necesario',
-          'Haz clic en "Enviar"',
-          'Recibirás respuesta por email'
+          'Andá a Información General > pestaña "Importar"',
+          'Seleccioná el tipo de importación (Ubicaciones, Jefes, Escuelas, etc.)',
+          'Descargá la plantilla de ejemplo',
+          'Completá la plantilla con los datos',
+          'Subí el archivo Excel',
+          'Revisá el resumen de importación',
+          'Confirmá la carga',
         ],
         tips: [
-          'Detalles específicos ayudan a resolver más rápido',
-          'Las capturas de pantalla aceleran la solución'
-        ]
-      }
-    ]
-  }
+          'Siempre descargá y usá la plantilla de ejemplo para el formato correcto',
+          'La importación no duplica registros existentes',
+        ],
+      },
+    ],
+  },
 ];
