@@ -20,8 +20,7 @@ import InventoryImporter from '@/components/inventory/InventoryImporter';
 import MovimientoDialog from '@/components/inventory/MovimientoDialog';
 import MovimientosLog from '@/components/inventory/MovimientosLog';
 import RequerimientosList from '@/components/inventory/RequerimientosList';
-import { useEffect, useRef } from 'react';
-import { base44 } from '@/api/base44Client';
+import { useEffect } from 'react';
 
 const categoryLabels = {
   electrico: 'Eléctrico', plomeria: 'Plomería', pintura: 'Pintura', construccion: 'Construcción',
