@@ -1,48 +1,57 @@
-import React, { useState, useRef } from 'react';
-import { Mic, MicOff, Square, Upload, Trash2, ChevronDown, ChevronUp, CheckCircle2, Loader2, Camera } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Mic, Square, Trash2, ChevronDown, ChevronUp, CheckCircle2, Camera, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { base44 } from '@/api/base44Client';
 import { cn } from '@/lib/utils';
 
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
 export default function SeccionInspeccion({ seccion, onChange }) {
   const [expanded, setExpanded] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const mediaRecorderRef = useRef(null);
-  const chunksRef = useRef([]);
+  const [noSupport, setNoSupport] = useState(false);
+  const recognitionRef = useRef(null);
   const fileInputRef = useRef(null);
+  const transcripcionAcumuladaRef = useRef(seccion.transcripcion || '');
 
-  const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mr = new MediaRecorder(stream);
-    chunksRef.current = [];
-    mr.ondataavailable = e => chunksRef.current.push(e.data);
-    mr.onstop = async () => {
-      stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      await transcribeBlob(blob);
+  // Mantener ref sincronizada con la prop
+  useEffect(() => {
+    transcripcionAcumuladaRef.current = seccion.transcripcion || '';
+  }, [seccion.transcripcion]);
+
+  const startRecording = () => {
+    if (!SpeechRecognition) {
+      setNoSupport(true);
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'es-AR';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    recognition.onresult = (e) => {
+      const nuevasPalabras = Array.from(e.results)
+        .slice(e.resultIndex)
+        .map(r => r[0].transcript)
+        .join(' ');
+      const base = transcripcionAcumuladaRef.current;
+      const updated = base ? base + ' ' + nuevasPalabras : nuevasPalabras;
+      transcripcionAcumuladaRef.current = updated;
+      onChange({ transcripcion: updated });
     };
-    mr.start();
-    mediaRecorderRef.current = mr;
+
+    recognition.onerror = () => setRecording(false);
+    recognition.onend = () => setRecording(false);
+
+    recognition.start();
+    recognitionRef.current = recognition;
     setRecording(true);
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    recognitionRef.current?.stop();
     setRecording(false);
-  };
-
-  const transcribeBlob = async (blob) => {
-    setTranscribing(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: blob });
-      const res = await base44.functions.invoke('transcribirAudio', { audio_url: file_url });
-      const texto = res.data.transcripcion || '';
-      onChange({ transcripcion: (seccion.transcripcion ? seccion.transcripcion + ' ' : '') + texto });
-    } finally {
-      setTranscribing(false);
-    }
   };
 
   const handlePhotos = async (e) => {
@@ -101,7 +110,7 @@ export default function SeccionInspeccion({ seccion, onChange }) {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Grabación de voz</p>
             <div className="flex items-center gap-2">
               {!recording ? (
-                <Button size="sm" variant="outline" onClick={startRecording} disabled={transcribing} className="gap-2">
+                <Button size="sm" variant="outline" onClick={startRecording} className="gap-2">
                   <Mic className="h-4 w-4 text-red-500" /> Grabar
                 </Button>
               ) : (
@@ -109,7 +118,7 @@ export default function SeccionInspeccion({ seccion, onChange }) {
                   <Square className="h-4 w-4" /> Detener
                 </Button>
               )}
-              {transcribing && <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Transcribiendo...</span>}
+              {noSupport && <span className="flex items-center gap-1.5 text-xs text-destructive"><AlertCircle className="h-3 w-3" /> Tu navegador no soporta reconocimiento de voz. Usá Chrome.</span>}
             </div>
           </div>
 
