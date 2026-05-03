@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Search, Plus, ClipboardList, AlertCircle, Upload,
-  LayoutGrid, Table2, X, ChevronUp, ChevronDown, Trash2
+  LayoutGrid, Table2, X, ChevronUp, ChevronDown, Trash2, CheckSquare
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { isPast, format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -52,6 +53,9 @@ export default function PendientesTab() {
   const [sortCol, setSortCol] = useState('fecha_limite');
   const [sortDir, setSortDir] = useState('asc');
   const [canDelete, setCanDelete] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -87,6 +91,38 @@ export default function PendientesTab() {
 
   const openNew = () => { setSelected(null); setDialogOpen(true); };
   const openEdit = (p) => { setSelected(p); setDialogOpen(true); };
+
+  const toggleSelectId = (id, e) => {
+    e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(p => p.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      await Promise.all([...selectedIds].map(id => base44.entities.Pendiente.delete(id)));
+      qc.invalidateQueries({ queryKey: ['pendientes'] });
+      toast.success(`${selectedIds.size} pendientes eliminados`);
+      setSelectedIds(new Set());
+      setBulkDeleteOpen(false);
+    } catch {
+      toast.error('Error al eliminar algunos pendientes');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   // Unique inspectors & comunas
   const inspectors = useMemo(() => [...new Set(pendientes.map(p => p.inspector).filter(Boolean))].sort(), [pendientes]);
@@ -213,8 +249,37 @@ export default function PendientesTab() {
         </div>
 
         <div className="flex gap-2 justify-between">
-          <div className="text-sm text-muted-foreground self-center">
-            {filtered.length.toLocaleString()} de {pendientes.length.toLocaleString()} órdenes
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-muted-foreground">
+              {filtered.length.toLocaleString()} de {pendientes.length.toLocaleString()} órdenes
+            </div>
+            {canDelete && selectedIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-primary">{selectedIds.size} seleccionados</span>
+                <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="gap-1.5 h-7">
+                      <Trash2 className="h-3.5 w-3.5" /> Eliminar seleccionados
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar {selectedIds.size} pendientes?</AlertDialogTitle>
+                      <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminarán permanentemente los {selectedIds.size} pendientes seleccionados.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleBulkDelete} disabled={bulkDeleting}>
+                        {bulkDeleting ? 'Eliminando...' : 'Eliminar'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <button onClick={() => setSelectedIds(new Set())} className="text-xs text-muted-foreground hover:text-foreground">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             {/* View toggle */}
@@ -258,6 +323,14 @@ export default function PendientesTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted border-b">
+                  {canDelete && (
+                    <th className="px-3 py-2.5 w-8" onClick={e => e.stopPropagation()}>
+                      <Checkbox
+                        checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </th>
+                  )}
                   {[
                     { key: 'inspector', label: 'INSPECTOR' },
                     { key: 'sitio', label: 'UBICACIÓN' },
@@ -298,8 +371,13 @@ export default function PendientesTab() {
                     <tr
                       key={p.id}
                       onClick={() => openEdit(p)}
-                      className={`border-b cursor-pointer hover:bg-muted/70 transition-colors ${isVencido ? 'bg-red-950/40' : idx % 2 === 0 ? 'bg-card' : 'bg-muted/20'}`}
+                      className={`border-b cursor-pointer hover:bg-muted/70 transition-colors ${selectedIds.has(p.id) ? 'bg-primary/10' : isVencido ? 'bg-red-950/40' : idx % 2 === 0 ? 'bg-card' : 'bg-muted/20'}`}
                     >
+                      {canDelete && (
+                        <td className="px-3 py-2 w-8" onClick={e => toggleSelectId(p.id, e)}>
+                          <Checkbox checked={selectedIds.has(p.id)} />
+                        </td>
+                      )}
                       <td className="px-3 py-2 text-xs font-medium whitespace-nowrap">{p.inspector || '—'}</td>
                       <td className="px-3 py-2 text-xs max-w-36 truncate" title={p.sitio}>{p.sitio || '—'}</td>
                       <td className="px-3 py-2 text-xs max-w-36 truncate" title={p.establecimiento}>{p.establecimiento || '—'}</td>
