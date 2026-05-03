@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import {
   BarChart2, TrendingUp, Clock, Package, Wrench, CheckCircle2, AlertTriangle, Download,
-  Filter, FileText, Target, Users, Activity, Zap
+  Filter, FileText, Target, Users, Activity, Zap, RefreshCw, CalendarDays
 } from 'lucide-react';
 import { exportKPIsPDF } from '@/utils/exportPDF';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, isWithinInterval } from 'date-fns';
@@ -61,6 +61,21 @@ function KpiMetric({ title, value, subtitle, icon: IconComponent, color = 'blue'
 }
 
 export default function Reportes() {
+  const [resumenSemanal, setResumenSemanal] = useState(null);
+  const [loadingResumen, setLoadingResumen] = useState(false);
+  const [resumenFecha, setResumenFecha] = useState(null);
+
+  const fetchResumenSemanal = async () => {
+    setLoadingResumen(true);
+    try {
+      const res = await base44.functions.invoke('resumenSemanal', {});
+      setResumenSemanal(res.data);
+      setResumenFecha(new Date());
+    } finally {
+      setLoadingResumen(false);
+    }
+  };
+
   const [dateFrom, setDateFrom] = useState(format(subMonths(new Date(), 5), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [comunaFilter, setComunaFilter] = useState('all');
@@ -278,11 +293,12 @@ export default function Reportes() {
       {/* Tabs */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
         <Tabs defaultValue="operaciones" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-slate-800/50 border border-slate-700/50">
+          <TabsList className="grid w-full grid-cols-5 bg-slate-800/50 border border-slate-700/50">
             <TabsTrigger value="operaciones" className="gap-1.5 text-xs"><Activity className="h-3.5 w-3.5" /> Operaciones</TabsTrigger>
             <TabsTrigger value="personal" className="gap-1.5 text-xs"><Users className="h-3.5 w-3.5" /> Personal</TabsTrigger>
             <TabsTrigger value="financiero" className="gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" /> Financiero</TabsTrigger>
             <TabsTrigger value="inventario" className="gap-1.5 text-xs"><Package className="h-3.5 w-3.5" /> Inventario</TabsTrigger>
+            <TabsTrigger value="semanal" className="gap-1.5 text-xs"><CalendarDays className="h-3.5 w-3.5" /> Semanal</TabsTrigger>
           </TabsList>
 
           {/* Operaciones */}
@@ -433,6 +449,75 @@ export default function Reportes() {
               </motion.div>
             </motion.div>
           </TabsContent>
+          {/* Resumen Semanal */}
+          <TabsContent value="semanal" className="mt-4 space-y-4">
+            <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+              <CardContent className="pt-6 pb-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-white font-semibold text-base">Resumen Semanal Operativo</h3>
+                    <p className="text-slate-400 text-xs mt-1">
+                      {resumenFecha ? `Última actualización: ${resumenFecha.toLocaleString('es-AR')}` : 'Generá el resumen para ver el estado actual'}
+                    </p>
+                  </div>
+                  <Button onClick={fetchResumenSemanal} disabled={loadingResumen} className="gap-2">
+                    {loadingResumen ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    {loadingResumen ? 'Generando...' : 'Generar Resumen'}
+                  </Button>
+                </div>
+
+                {!resumenSemanal && !loadingResumen && (
+                  <div className="text-center py-16 text-slate-500">
+                    <CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">Hacé clic en "Generar Resumen" para ver el estado operativo semanal</p>
+                  </div>
+                )}
+
+                {loadingResumen && (
+                  <div className="text-center py-16 text-slate-400">
+                    <RefreshCw className="h-10 w-10 mx-auto mb-3 animate-spin opacity-50" />
+                    <p className="text-sm">Analizando datos...</p>
+                  </div>
+                )}
+
+                {resumenSemanal?.resumenGlobal && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[
+                        { label: 'Pendientes Vencidos', value: resumenSemanal.resumenGlobal.vencidos, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+                        { label: 'Resueltos esta semana', value: resumenSemanal.resumenGlobal.resueltosSemana, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+                        { label: 'OTs completadas', value: resumenSemanal.resumenGlobal.otsCompletadasSemana, color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' },
+                        { label: 'Emergencias activas', value: resumenSemanal.resumenGlobal.emergenciasActivas, color: resumenSemanal.resumenGlobal.emergenciasActivas > 0 ? 'text-red-400' : 'text-slate-400', bg: resumenSemanal.resumenGlobal.emergenciasActivas > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-700/30 border-slate-600/30' },
+                      ].map((stat, i) => (
+                        <div key={i} className={`rounded-xl border p-4 text-center ${stat.bg}`}>
+                          <div className={`text-3xl font-bold ${stat.color}`}>{stat.value}</div>
+                          <div className="text-xs text-slate-400 mt-1">{stat.label}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4 flex items-center gap-4">
+                        <AlertTriangle className="h-8 w-8 text-amber-400 flex-shrink-0" />
+                        <div>
+                          <div className="text-xl font-bold text-white">{resumenSemanal.resumenGlobal.totalPendientes}</div>
+                          <div className="text-xs text-slate-400">Pendientes SAP sin resolver</div>
+                        </div>
+                      </div>
+                      <div className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4 flex items-center gap-4">
+                        <Wrench className="h-8 w-8 text-blue-400 flex-shrink-0" />
+                        <div>
+                          <div className="text-xl font-bold text-white">{resumenSemanal.resumenGlobal.otsNuevasSemana}</div>
+                          <div className="text-xs text-slate-400">OTs nuevas esta semana</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
         </Tabs>
       </motion.div>
     </div>
