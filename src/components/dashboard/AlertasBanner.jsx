@@ -88,7 +88,7 @@ export default function AlertasBanner() {
           const TipoIcon = tipo.icon;
 
           return (
-            <div key={alerta.id} className="flex items-start gap-3 px-4 py-2.5 bg-white/60 hover:bg-white/80 transition-colors group">
+            <div key={alerta.id} className="flex items-start gap-3 px-4 py-2.5 bg-white hover:bg-slate-50 transition-colors group">
               <div className={`h-7 w-7 rounded-lg ${tipo.bg} ${tipo.border} border flex items-center justify-center flex-shrink-0 mt-0.5`}>
                 <TipoIcon className={`h-3.5 w-3.5 ${tipo.color}`} />
               </div>

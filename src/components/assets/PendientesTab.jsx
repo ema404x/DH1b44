@@ -257,7 +257,7 @@ export default function PendientesTab() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-muted/60 border-b">
+                <tr className="bg-muted border-b">
                   {[
                     { key: 'inspector', label: 'INSPECTOR' },
                     { key: 'sitio', label: 'UBICACIÓN' },
@@ -298,7 +298,7 @@ export default function PendientesTab() {
                     <tr
                       key={p.id}
                       onClick={() => openEdit(p)}
-                      className={`border-b cursor-pointer hover:bg-muted/40 transition-colors ${isVencido ? 'bg-red-50/50' : idx % 2 === 0 ? 'bg-white' : 'bg-muted/10'}`}
+                      className={`border-b cursor-pointer hover:bg-muted/70 transition-colors ${isVencido ? 'bg-red-50' : idx % 2 === 0 ? 'bg-white' : 'bg-muted/30'}`}
                     >
                       <td className="px-3 py-2 text-xs font-medium whitespace-nowrap">{p.inspector || '—'}</td>
                       <td className="px-3 py-2 text-xs max-w-36 truncate" title={p.sitio}>{p.sitio || '—'}</td>

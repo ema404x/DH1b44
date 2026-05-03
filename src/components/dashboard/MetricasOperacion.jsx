@@ -76,7 +76,7 @@ export default function MetricasOperacion({ orders, projects, materials, assets,
         {/* KPI Pills */}
         <div className="flex flex-wrap gap-2">
           {kpis.map((k, i) => (
-            <div key={i} className="flex items-center gap-1.5 rounded-full px-3 py-1 bg-muted/60 text-[11px]">
+            <div key={i} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 bg-muted text-[12px] border border-border">
               <span className="font-semibold" style={{ color: k.color }}>{k.value}</span>
               <span className="text-muted-foreground">{k.label}</span>
             </div>
