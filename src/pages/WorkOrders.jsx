@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Search, Plus, ClipboardList, User, Calendar, MapPin,
-  AlertTriangle, CheckCircle2, Clock, Zap, Wrench, Eye, Trash2, FileText, QrCode, Sparkles, TrendingUp
+  AlertTriangle, CheckCircle2, Clock, Zap, Wrench, Eye, Trash2, FileText, QrCode, Sparkles, TrendingUp,
+  Layers, History, Smartphone
 } from 'lucide-react';
 import WorkOrderQRButton from '@/components/workorders/WorkOrderQRButton';
 import QRCodeModal from '@/components/shared/QRCodeModal';
@@ -20,6 +21,9 @@ import { format, isPast, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import EmptyState from '@/components/shared/EmptyState';
 import WorkOrderDetailPanel from '@/components/workorders/WorkOrderDetailPanel';
+import OTTemplateSelector from '@/components/workorders/OTTemplateSelector';
+import HistorialEstablecimiento from '@/components/workorders/HistorialEstablecimiento';
+import ModoCampo from '@/components/workorders/ModosCampo';
 
 const typeLabels = {
   mantenimiento_preventivo: 'Preventivo', mantenimiento_correctivo: 'Correctivo',
@@ -169,7 +173,13 @@ export default function WorkOrders() {
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [qrOrder, setQrOrder] = useState(null);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [historialOpen, setHistorialOpen] = useState(false);
+  const [modoCampo, setModoCampo] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const queryClient = useQueryClient();
+
+  useEffect(() => { base44.auth.me().then(u => setCurrentUser(u)).catch(() => {}); }, []);
 
   const { isOnline, pendingCount } = useOfflineQueue((count) => {
     toast.success(`${count} OT${count !== 1 ? 's' : ''} sincronizada${count !== 1 ? 's' : ''}`);
@@ -185,9 +195,15 @@ export default function WorkOrders() {
     mutationFn: async (data) => base44.entities.WorkOrder.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-campo'] });
       setNewDialogOpen(false);
     },
   });
+
+  const handleUseTemplate = (template) => {
+    // Abrir el diálogo con datos pre-cargados de la plantilla
+    setNewDialogOpen(true);
+  };
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.WorkOrder.delete(id),
@@ -232,9 +248,20 @@ export default function WorkOrders() {
             </h1>
             <p className="text-slate-400 mt-1">{stats.total} órdenes en total {!isOnline && '• Offline'}</p>
           </div>
-          <Button onClick={() => setNewDialogOpen(true)} className="gap-2 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/50 transition-all">
-            <Plus className="h-4 w-4" /> Nueva OT
-          </Button>
+          <div className="flex gap-2 flex-wrap justify-end">
+            <Button variant="outline" onClick={() => setModoCampo(v => !v)} className={`gap-2 border-slate-700 text-slate-300 hover:text-white ${modoCampo ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300' : ''}`}>
+              <Smartphone className="h-4 w-4" /> {modoCampo ? 'Modo Escritorio' : 'Modo Campo'}
+            </Button>
+            <Button variant="outline" onClick={() => setHistorialOpen(true)} className="gap-2 border-slate-700 text-slate-300 hover:text-white">
+              <History className="h-4 w-4" /> Historial
+            </Button>
+            <Button variant="outline" onClick={() => setTemplateOpen(true)} className="gap-2 border-slate-700 text-slate-300 hover:text-white">
+              <Layers className="h-4 w-4" /> Plantillas
+            </Button>
+            <Button onClick={() => setNewDialogOpen(true)} className="gap-2 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/50 transition-all">
+              <Plus className="h-4 w-4" /> Nueva OT
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -259,32 +286,41 @@ export default function WorkOrders() {
         </motion.div>
       </motion.div>
 
+      {/* Modo Campo */}
+      {modoCampo && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border border-slate-700/50 rounded-xl p-5">
+          <ModoCampo currentUser={currentUser} onOpenOrder={setSelectedOrder} />
+        </motion.div>
+      )}
+
       {/* Filters */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-          <Input
-            placeholder="Buscar OT..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-10 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500"
-          />
-        </div>
-        <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
-          {['all', 'pendiente', 'en_progreso', 'completada'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setStatusTab(tab)}
-              className={`text-xs px-3 py-1.5 rounded font-medium transition-all ${statusTab === tab ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
-            >
-              {tab === 'all' ? 'Todas' : tab.replace('_', ' ')}
-            </button>
-          ))}
-        </div>
-      </motion.div>
+      {!modoCampo && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <Input
+              placeholder="Buscar OT..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-10 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500"
+            />
+          </div>
+          <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
+            {['all', 'pendiente', 'en_progreso', 'completada'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setStatusTab(tab)}
+                className={`text-xs px-3 py-1.5 rounded font-medium transition-all ${statusTab === tab ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
+              >
+                {tab === 'all' ? 'Todas' : tab.replace('_', ' ')}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* Grid */}
-      {filtered.length === 0 && !isLoading ? (
+      {!modoCampo && (filtered.length === 0 && !isLoading ? (
         <EmptyState icon={ClipboardList} title="No hay órdenes" description="Creá una nueva orden de trabajo" actionLabel="Nueva OT" onAction={() => setNewDialogOpen(true)} />
       ) : (
         <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -292,7 +328,7 @@ export default function WorkOrders() {
             <WorkOrderCard key={order.id} order={order} onOpen={setSelectedOrder} onShowQR={setQrOrder} />
           ))}
         </motion.div>
-      )}
+      ))}
 
       <NewOrderDialog
         open={newDialogOpen}
@@ -300,6 +336,25 @@ export default function WorkOrders() {
         onSave={createMutation.mutate}
         saving={createMutation.isPending}
       />
+
+      <OTTemplateSelector
+        open={templateOpen}
+        onOpenChange={setTemplateOpen}
+        onSelect={(template) => {
+          createMutation.mutate({
+            title: template.title,
+            type: template.type,
+            priority: template.priority,
+            description: template.description,
+            estimated_hours: template.estimated_hours,
+            checklist: (template.checklist || []).map(t => ({ ...t, completed: false })),
+            status: 'pendiente',
+          });
+          setTemplateOpen(false);
+        }}
+      />
+
+      <HistorialEstablecimiento open={historialOpen} onOpenChange={setHistorialOpen} />
 
       {selectedOrder && (
         <WorkOrderDetailPanel

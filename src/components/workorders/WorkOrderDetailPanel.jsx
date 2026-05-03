@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode, Navigation } from 'lucide-react';
+import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode, Navigation, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import WorkOrderQRButton from './WorkOrderQRButton';
 import QRCodeModal from '@/components/shared/QRCodeModal';
@@ -33,7 +33,30 @@ const typeLabels = {
 export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [data, setData] = useState({ ...order });
   const [qrOpen, setQrOpen] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const queryClient = useQueryClient();
+
+  const handleSaveAsTemplate = async () => {
+    const nombre = prompt('Nombre de la plantilla:', data.title);
+    if (!nombre) return;
+    setSavingTemplate(true);
+    try {
+      await base44.entities.OTTemplate.create({
+        nombre,
+        title: data.title,
+        type: data.type,
+        priority: data.priority,
+        description: data.description,
+        estimated_hours: data.estimated_hours,
+        checklist: (data.checklist || []).map(t => ({ ...t, completed: false })),
+        require_photos: (data.photos || []).length > 0,
+      });
+      queryClient.invalidateQueries({ queryKey: ['ot-templates'] });
+      toast.success('Plantilla guardada');
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
 
   const { data: timeLogs = [] } = useQuery({
     queryKey: ['timelogs', order.id],
@@ -73,14 +96,22 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const pendingTasks = checklist.filter(t => !t.completed);
   const checklistBlocked = checklist.length > 0 && pendingTasks.length > 0;
 
+  // Fotos obligatorias: si require_photos está en true, necesita al menos 1 foto para completar
+  const photosBlocked = data.require_photos && (data.photos || []).length === 0;
+  const canComplete = !checklistBlocked && !photosBlocked;
+
   const handleStatusChange = (v) => {
-    if (v === 'completada' && checklistBlocked) return; // blocked by checklist
+    if (v === 'completada' && !canComplete) return;
     set('status', v);
   };
 
   const save = () => {
     if (checklistBlocked) {
       toast.warning(`Faltan ${pendingTasks.length} tarea(s) del checklist por completar`);
+      return;
+    }
+    if (photosBlocked) {
+      toast.warning('Esta OT requiere al menos una foto para completarse');
       return;
     }
     saveMutation.mutate(data);
@@ -128,6 +159,11 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
               {checklistBlocked && (
                 <p className="text-[9px] text-orange-500 flex items-center gap-0.5 mt-0.5">
                   <AlertTriangle className="h-2.5 w-2.5" />{pendingTasks.length} tarea(s) pendiente(s)
+                </p>
+              )}
+              {photosBlocked && (
+                <p className="text-[9px] text-amber-500 flex items-center gap-0.5 mt-0.5">
+                  <AlertTriangle className="h-2.5 w-2.5" />Se requiere foto
                 </p>
               )}
             </div>
@@ -273,6 +309,16 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
              >
                <Download className="h-4 w-4" />
              </Button>
+             <Button
+               variant="outline"
+               size="icon"
+               className="flex-shrink-0"
+               title="Guardar como plantilla"
+               onClick={handleSaveAsTemplate}
+               disabled={savingTemplate}
+             >
+               {savingTemplate ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}
+             </Button>
              <WorkOrderQRButton order={data} variant="outline" size="icon" onShowQR={() => setQrOpen(true)} />
            </div>
            <div className="flex gap-2 flex-1 justify-end">
@@ -282,11 +328,11 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
              <Button
                className="gap-2"
                onClick={save}
-               disabled={saveMutation.isPending || checklistBlocked}
-               title={checklistBlocked ? `${pendingTasks.length} tarea(s) del checklist sin completar` : ''}
+               disabled={saveMutation.isPending || (data.status === 'completada' && !canComplete)}
+               title={checklistBlocked ? `${pendingTasks.length} tarea(s) del checklist sin completar` : photosBlocked ? 'Falta foto obligatoria' : ''}
              >
                {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-               {checklistBlocked ? `Faltan ${pendingTasks.length} tarea(s)` : 'Guardar'}
+               {data.status === 'completada' && checklistBlocked ? `Faltan ${pendingTasks.length} tarea(s)` : data.status === 'completada' && photosBlocked ? 'Falta foto 📷' : 'Guardar'}
              </Button>
              <Button variant="outline" onClick={onClose}>Cerrar</Button>
            </div>

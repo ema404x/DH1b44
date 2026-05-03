@@ -18,6 +18,7 @@ import CertificadosPanel from '@/components/dashboard/CertificadosPanel';
 import MetricasOperacion from '@/components/dashboard/MetricasOperacion';
 import AlertasBanner from '@/components/dashboard/AlertasBanner';
 import EmergenciasWidget from '@/components/dashboard/EmergenciasWidget';
+import KpisJefeSitio from '@/components/dashboard/KpisJefeSitio';
 import { format, differenceInDays, isPast, parseISO, startOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -227,6 +228,11 @@ export default function Dashboard() {
           <CertificadosPanel />
         </motion.div>
       </div>
+
+      {/* KPIs Jefe de Sitio */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}>
+        <KpisJefeSitio />
+      </motion.div>
 
       {/* Métricas */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>

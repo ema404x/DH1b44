@@ -1,0 +1,69 @@
+{
+  "name": "OTTemplate",
+  "type": "object",
+  "properties": {
+    "nombre": {
+      "type": "string",
+      "description": "Nombre de la plantilla"
+    },
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo de la OT"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "mantenimiento_preventivo",
+        "mantenimiento_correctivo",
+        "instalacion",
+        "inspeccion",
+        "reparacion",
+        "emergencia"
+      ],
+      "default": "mantenimiento_correctivo"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "baja",
+        "media",
+        "alta",
+        "urgente"
+      ],
+      "default": "media"
+    },
+    "description": {
+      "type": "string"
+    },
+    "estimated_hours": {
+      "type": "number"
+    },
+    "checklist": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "completed": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    "require_photos": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la OT requiere fotos antes y despu\u00e9s para completarse"
+    }
+  },
+  "required": [
+    "nombre",
+    "title"
+  ]
+}
