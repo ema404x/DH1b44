@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
@@ -57,12 +58,11 @@ export default function PendientesTab() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const qc = useQueryClient();
+  const { isAdmin, filterByUser } = useCurrentUser();
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setCanDelete(u?.role === 'admin' || u?.can_delete_pendientes === true);
-    }).catch(() => {});
-  }, []);
+    setCanDelete(isAdmin);
+  }, [isAdmin]);
 
   const { data: pendientes = [], isLoading } = useQuery({
     queryKey: ['pendientes'],
@@ -128,8 +128,12 @@ export default function PendientesTab() {
   const inspectors = useMemo(() => [...new Set(pendientes.map(p => p.inspector).filter(Boolean))].sort(), [pendientes]);
   const comunas = useMemo(() => [...new Set(pendientes.map(p => p.comuna).filter(Boolean))].sort(), [pendientes]);
 
+  const visiblePendientes = useMemo(() =>
+    filterByUser(pendientes, ['jefe_sitio', 'jefe_sitio_email', 'inspector', 'created_by'])
+  , [pendientes, isAdmin]);
+
   const filtered = useMemo(() => {
-    let result = pendientes.filter(p => {
+    let result = visiblePendientes.filter(p => {
       const matchSearch = !search ||
         p.descripcion?.toLowerCase().includes(search.toLowerCase()) ||
         p.numero_sap?.toLowerCase().includes(search.toLowerCase()) ||
@@ -157,14 +161,14 @@ export default function PendientesTab() {
     });
 
     return result;
-  }, [pendientes, search, filterEstado, filterInspector, filterComuna, sortCol, sortDir]);
+  }, [visiblePendientes, search, filterEstado, filterInspector, filterComuna, sortCol, sortDir]);
 
   const stats = {
-    total: pendientes.length,
-    pendiente: pendientes.filter(p => p.estado === 'pendiente').length,
-    asignado: pendientes.filter(p => p.estado === 'asignado' || p.estado === 'en_progreso').length,
-    resuelto: pendientes.filter(p => p.estado === 'resuelto').length,
-    vencidos: pendientes.filter(p => p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado').length,
+    total: visiblePendientes.length,
+    pendiente: visiblePendientes.filter(p => p.estado === 'pendiente').length,
+    asignado: visiblePendientes.filter(p => p.estado === 'asignado' || p.estado === 'en_progreso').length,
+    resuelto: visiblePendientes.filter(p => p.estado === 'resuelto').length,
+    vencidos: visiblePendientes.filter(p => p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado').length,
   };
 
   function toggleSort(col) {
@@ -250,7 +254,7 @@ export default function PendientesTab() {
 
         <div className="flex gap-2 justify-between">
           <div className="text-sm text-muted-foreground self-center">
-            {filtered.length.toLocaleString()} de {pendientes.length.toLocaleString()} órdenes
+            {filtered.length.toLocaleString()} de {visiblePendientes.length.toLocaleString()} órdenes
           </div>
           <div className="flex gap-2">
             {/* View toggle */}

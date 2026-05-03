@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -20,6 +20,7 @@ import AlertasBanner from '@/components/dashboard/AlertasBanner';
 import EmergenciasWidget from '@/components/dashboard/EmergenciasWidget';
 import KpisJefeSitio from '@/components/dashboard/KpisJefeSitio';
 import { format, differenceInDays, isPast, parseISO, startOfMonth, subMonths } from 'date-fns';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { es } from 'date-fns/locale';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
@@ -74,13 +75,20 @@ function KpiCard({ title, value, subtitle, icon: Icon, trend, color = 'primary',
 }
 
 export default function Dashboard() {
+  const { isAdmin, filterByUser } = useCurrentUser();
+
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: () => base44.entities.Project.list() });
-  const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
+  const { data: allOrders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
   const { data: clients = [] } = useQuery({ queryKey: ['clients'], queryFn: () => base44.entities.Client.list() });
   const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list() });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list() });
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list() });
   const { data: employees = [] } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list() });
+
+  // No-admins solo ven sus OTs
+  const orders = useMemo(() =>
+    filterByUser(allOrders, ['assigned_name', 'assigned_to', 'created_by'])
+  , [allOrders, isAdmin]);
 
   const metrics = useMemo(() => {
     const thisMonth = startOfMonth(new Date());

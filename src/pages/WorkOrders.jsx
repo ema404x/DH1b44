@@ -24,6 +24,7 @@ import WorkOrderDetailPanel from '@/components/workorders/WorkOrderDetailPanel';
 import OTTemplateSelector from '@/components/workorders/OTTemplateSelector';
 import HistorialEstablecimiento from '@/components/workorders/HistorialEstablecimiento';
 import ModoCampo from '@/components/workorders/ModosCampo';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 const typeLabels = {
   mantenimiento_preventivo: 'Preventivo', mantenimiento_correctivo: 'Correctivo',
@@ -176,10 +177,8 @@ export default function WorkOrders() {
   const [templateOpen, setTemplateOpen] = useState(false);
   const [historialOpen, setHistorialOpen] = useState(false);
   const [modoCampo, setModoCampo] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
   const queryClient = useQueryClient();
-
-  useEffect(() => { base44.auth.me().then(u => setCurrentUser(u)).catch(() => {}); }, []);
+  const { currentUser, isAdmin, filterByUser } = useCurrentUser();
 
   const { isOnline, pendingCount } = useOfflineQueue((count) => {
     toast.success(`${count} OT${count !== 1 ? 's' : ''} sincronizada${count !== 1 ? 's' : ''}`);
@@ -210,18 +209,22 @@ export default function WorkOrders() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['workorders'] }); setSelectedOrder(null); }
   });
 
-  const filtered = useMemo(() => orders.filter(o => {
+  const visibleOrders = useMemo(() =>
+    filterByUser(orders, ['assigned_name', 'assigned_to', 'created_by'])
+  , [orders, currentUser]);
+
+  const filtered = useMemo(() => visibleOrders.filter(o => {
     const matchSearch = !search || o.title?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusTab === 'all' || o.status === statusTab;
     return matchSearch && matchStatus;
-  }), [orders, search, statusTab]);
+  }), [visibleOrders, search, statusTab]);
 
   const stats = useMemo(() => ({
-    total: orders.length,
-    pendientes: orders.filter(o => o.status === 'pendiente').length,
-    en_progreso: orders.filter(o => o.status === 'en_progreso').length,
-    completadas: orders.filter(o => o.status === 'completada').length,
-  }), [orders]);
+    total: visibleOrders.length,
+    pendientes: visibleOrders.filter(o => o.status === 'pendiente').length,
+    en_progreso: visibleOrders.filter(o => o.status === 'en_progreso').length,
+    completadas: visibleOrders.filter(o => o.status === 'completada').length,
+  }), [visibleOrders]);
 
   const container = {
     hidden: { opacity: 0 },
