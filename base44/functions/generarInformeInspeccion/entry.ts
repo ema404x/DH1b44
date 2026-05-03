@@ -11,6 +11,15 @@ Deno.serve(async (req) => {
   const inspeccion = await base44.entities.InspeccionColegio.get(inspeccion_id);
   if (!inspeccion) return Response.json({ error: 'No encontrado' }, { status: 404 });
 
+  // Obtener preciario relevante (hasta 300 ítems para no saturar el prompt)
+  const preciarioItems = await base44.entities.PrecarioMinisterio.filter({ activo: true }, 'categoria', 300);
+
+  const preciarioTexto = preciarioItems.length > 0
+    ? preciarioItems.map(p =>
+        `[${p.codigo}] ${p.descripcion} | Unidad: ${p.unidad} | Cat: ${p.categoria}${p.subcategoria ? ' / ' + p.subcategoria : ''}`
+      ).join('\n')
+    : 'No hay preciario cargado.';
+
   const seccionesTexto = (inspeccion.secciones || [])
     .map(s => {
       const partes = [];
@@ -21,7 +30,7 @@ Deno.serve(async (req) => {
       return `## ${s.nombre}\n${partes.join('\n') || 'Sin observaciones'}`;
     }).join('\n\n');
 
-  const prompt = `Sos un profesional en inspección de establecimientos educativos. 
+  const prompt = `Sos un profesional en inspección de establecimientos educativos con amplio conocimiento en construcción y mantenimiento edilicio.
 Generá un informe técnico formal de inspección en base a las observaciones del jefe de sitio.
 
 Establecimiento: ${inspeccion.establecimiento}
@@ -32,12 +41,36 @@ Fecha: ${inspeccion.fecha_inspeccion || new Date().toLocaleDateString('es-AR')}
 OBSERVACIONES POR SECCIÓN:
 ${seccionesTexto}
 
-Generá un informe técnico estructurado con:
-1. Resumen ejecutivo
-2. Detalle por sección con estado y observaciones
-3. Problemas detectados (si los hay)
-4. Recomendaciones y acciones sugeridas
-5. Conclusión
+PRECIARIO MINISTERIAL DISPONIBLE (para armar el listado de materiales):
+${preciarioTexto}
+
+Generá un informe técnico estructurado con los siguientes apartados exactos:
+
+# INFORME TÉCNICO DE INSPECCIÓN
+
+## 1. Resumen Ejecutivo
+Síntesis general del estado del establecimiento.
+
+## 2. Detalle por Sección
+Para cada sección inspeccionada: estado observado, problemas detectados y nivel de urgencia (Urgente / Importante / Leve / Sin novedad).
+
+## 3. Problemas Detectados
+Lista de los problemas encontrados ordenados por urgencia.
+
+## 4. Recomendaciones y Acciones Sugeridas
+Acciones concretas recomendadas.
+
+## 5. Listado de Materiales y Trabajos (según Preciario Ministerial)
+Basándote en los problemas detectados y el preciario disponible, armá una tabla con los ítems del preciario que se necesitarían para resolver los trabajos. Usá EXACTAMENTE este formato de tabla Markdown:
+
+| Código | Descripción | Unidad | Cantidad estimada | Observación |
+|--------|-------------|--------|-------------------|-------------|
+| ... | ... | ... | ... | ... |
+
+Solo incluí ítems que realmente apliquen a las observaciones. Si no encontrás el ítem exacto en el preciario, indicá el más cercano. Si no hay problemas que requieran materiales, indicalo.
+
+## 6. Conclusión
+Evaluación final del estado general y próximos pasos.
 
 Usá un tono profesional y formal. El informe debe ser claro y accionable.`;
 

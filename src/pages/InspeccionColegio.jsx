@@ -18,9 +18,11 @@ const SECCIONES_DEFAULT = [
   'Patio / Espacios exteriores',
   'Instalaciones eléctricas',
   'Instalaciones de agua / Plomería',
+  'Instalaciones de gas',
   'Techo / Cubierta',
   'Sala de dirección / Administración',
   'Observaciones generales',
+  'Otro',
 ];
 
 const STATUS_LABELS = {
@@ -71,6 +73,19 @@ export default function InspeccionColegioPage() {
     [...new Set(locations.map(l => l.establecimiento).filter(Boolean))].sort(),
     [locations]
   );
+
+  const direcciones = useMemo(() =>
+    [...new Set(locations.map(l => l.ubic_tecnica).filter(Boolean))].sort(),
+    [locations]
+  );
+
+  // Auto-completar dirección al seleccionar establecimiento
+  const handleEstablecimientoChange = (val) => {
+    setFormNueva(p => {
+      const match = locations.find(l => l.establecimiento === val);
+      return { ...p, establecimiento: val, direccion: match?.ubic_tecnica || p.direccion };
+    });
+  };
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.InspeccionColegio.create(data),
@@ -229,7 +244,7 @@ export default function InspeccionColegioPage() {
             list="establecimientos-list"
             placeholder="Nombre del colegio"
             value={formNueva.establecimiento}
-            onChange={e => setFormNueva(p => ({ ...p, establecimiento: e.target.value }))}
+            onChange={e => handleEstablecimientoChange(e.target.value)}
           />
           <datalist id="establecimientos-list">
             {establecimientos.map(e => <option key={e} value={e} />)}
@@ -238,10 +253,20 @@ export default function InspeccionColegioPage() {
         <div>
           <label className="text-sm font-medium mb-1.5 block">Dirección</label>
           <Input
+            list="direcciones-list"
             placeholder="Dirección del establecimiento"
             value={formNueva.direccion}
-            onChange={e => setFormNueva(p => ({ ...p, direccion: e.target.value }))}
+            onChange={e => {
+              const val = e.target.value;
+              setFormNueva(p => {
+                const match = locations.find(l => l.ubic_tecnica === val);
+                return { ...p, direccion: val, establecimiento: match?.establecimiento || p.establecimiento };
+              });
+            }}
           />
+          <datalist id="direcciones-list">
+            {direcciones.map(d => <option key={d} value={d} />)}
+          </datalist>
         </div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">Título del informe</label>
