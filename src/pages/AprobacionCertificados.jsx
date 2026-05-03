@@ -113,8 +113,8 @@ export default function AprobacionCertificados() {
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {isAdmin ? [
+      {(() => {
+        const kpis = isAdmin ? [
           { label: 'Enviadas', value: counts.enviada, icon: SendHorizonal, color: 'text-blue-500', bg: 'bg-blue-500/10' },
           { label: 'En revisión', value: counts.en_revision, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
           { label: 'Aprobadas', value: counts.aprobada, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
@@ -124,18 +124,23 @@ export default function AprobacionCertificados() {
           { label: 'Enviadas', value: counts.enviada, icon: SendHorizonal, color: 'text-blue-500', bg: 'bg-blue-500/10' },
           { label: 'Aprobadas', value: counts.aprobada, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
           { label: 'Rechazadas', value: counts.rechazada, icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
-        ].map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className="flex items-center gap-3 bg-card border border-border rounded-xl p-4">
-            <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${bg}`}>
-              <Icon className={`h-4 w-4 ${color}`} />
-            </div>
-            <div>
-              <div className="text-xl font-bold">{value}</div>
-              <div className="text-xs text-muted-foreground">{label}</div>
-            </div>
+        ];
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {kpis.map(({ label, value, icon: Icon, color, bg }) => (
+              <div key={label} className="flex items-center gap-3 bg-card border border-border rounded-xl p-4">
+                <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${bg}`}>
+                  <Icon className={`h-4 w-4 ${color}`} />
+                </div>
+                <div>
+                  <div className="text-xl font-bold">{value}</div>
+                  <div className="text-xs text-muted-foreground">{label}</div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        );
+      })()}
 
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
