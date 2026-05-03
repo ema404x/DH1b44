@@ -69,21 +69,41 @@ export default function InspeccionColegioPage() {
     queryFn: () => base44.entities.LocationData.list('-created_date', 500),
   });
 
+  const { data: direccionesData = [] } = useQuery({
+    queryKey: ['direcciones'],
+    queryFn: () => base44.entities.Direccion.list('-created_date', 500),
+  });
+
+  // Mapa de id -> direccion de calle
+  const direccionMap = useMemo(() => {
+    const map = {};
+    direccionesData.forEach(d => { map[d.id] = d.direccion; });
+    return map;
+  }, [direccionesData]);
+
   const establecimientos = useMemo(() =>
     [...new Set(locations.map(l => l.establecimiento).filter(Boolean))].sort(),
     [locations]
   );
 
-  const direcciones = useMemo(() =>
-    [...new Set(locations.map(l => l.ubic_tecnica).filter(Boolean))].sort(),
-    [locations]
+  // Lista de direcciones de calle únicas para el datalist
+  const direccionesList = useMemo(() =>
+    [...new Set(direccionesData.map(d => d.direccion).filter(Boolean))].sort(),
+    [direccionesData]
   );
+
+  // Obtener dirección de calle a partir de un LocationData
+  const getDireccionCalle = (loc) => {
+    if (loc?.direccion_id && direccionMap[loc.direccion_id]) return direccionMap[loc.direccion_id];
+    return '';
+  };
 
   // Auto-completar dirección al seleccionar establecimiento
   const handleEstablecimientoChange = (val) => {
     setFormNueva(p => {
       const match = locations.find(l => l.establecimiento === val);
-      return { ...p, establecimiento: val, direccion: match?.ubic_tecnica || p.direccion };
+      const calle = match ? getDireccionCalle(match) : p.direccion;
+      return { ...p, establecimiento: val, direccion: calle || p.direccion };
     });
   };
 
@@ -259,13 +279,18 @@ export default function InspeccionColegioPage() {
             onChange={e => {
               const val = e.target.value;
               setFormNueva(p => {
-                const match = locations.find(l => l.ubic_tecnica === val);
-                return { ...p, direccion: val, establecimiento: match?.establecimiento || p.establecimiento };
+                // si eligen una dirección conocida, buscar si hay un establecimiento asociado
+                const dirObj = direccionesData.find(d => d.direccion === val);
+                if (dirObj) {
+                  const locMatch = locations.find(l => l.direccion_id === dirObj.id);
+                  return { ...p, direccion: val, establecimiento: locMatch?.establecimiento || p.establecimiento };
+                }
+                return { ...p, direccion: val };
               });
             }}
           />
           <datalist id="direcciones-list">
-            {direcciones.map(d => <option key={d} value={d} />)}
+            {direccionesList.map(d => <option key={d} value={d} />)}
           </datalist>
         </div>
         <div>
