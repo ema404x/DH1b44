@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   if (!inspeccion) return Response.json({ error: 'No encontrado' }, { status: 404 });
 
   // Obtener preciario relevante (hasta 300 ítems para no saturar el prompt)
-  const preciarioItems = await base44.entities.PrecarioMinisterio.filter({ activo: true }, 'categoria', 300);
+  const preciarioItems = await base44.entities.PrecarioMinisterio.filter({ activo: true, comuna: '8A' }, 'categoria', 300);
 
   const preciarioTexto = preciarioItems.length > 0
     ? preciarioItems.map(p =>
