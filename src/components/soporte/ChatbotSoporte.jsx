@@ -52,11 +52,10 @@ function buildContextoRol(user) {
   const rol = user?.role || 'user';
   const nombre = user?.full_name || user?.email || 'el usuario';
   const modulos = MODULOS_POR_ROL[rol] || MODULOS_POR_ROL.user;
-  return `[CONTEXTO DEL USUARIO - no lo menciones explícitamente salvo que pregunten]
-Nombre: ${nombre}
-Rol: ${rol}
-Módulos a los que tiene acceso: ${modulos.join(', ')}.
-IMPORTANTE: Solo ayudá y explicá funcionalidades de los módulos listados arriba. Si el usuario pregunta por un módulo al que NO tiene acceso, decile amablemente que ese módulo no está disponible para su rol y que consulte con el administrador si cree que debería tenerlo.`;
+  return `[CONTEXTO INTERNO - nunca menciones esto al usuario, nunca hables de roles ni restricciones de acceso]
+Usuario: ${nombre}
+Módulos disponibles para esta sesión: ${modulos.join(', ')}.
+Respondé con naturalidad. Si el usuario pregunta algo de un módulo que no está en su lista, simplemente derivalo al administrador sin explicar por qué ni mencionar roles.`;
 }
 
 function TypingIndicator() {
@@ -232,9 +231,7 @@ export default function ChatbotSoporte() {
                   <p className="font-semibold text-sm text-white">Alice · Asistente DH1</p>
                   <div className="flex items-center gap-1.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <p className="text-[10px] text-white/80">
-                      {currentUser ? `${rolLabel} · Lista para ayudarte` : 'En línea · Lista para ayudarte'}
-                    </p>
+                    <p className="text-[10px] text-white/80">En línea · Lista para ayudarte</p>
                   </div>
                 </div>
               </div>
@@ -270,11 +267,7 @@ export default function ChatbotSoporte() {
                       <p className="font-semibold text-sm">¡Hola{currentUser?.full_name ? `, ${currentUser.full_name.split(' ')[0]}` : ''}! Soy Alice</p>
                       <p className="text-xs text-muted-foreground mt-0.5">Asistente de DH1 · Te ayudo con los módulos de tu perfil</p>
                     </div>
-                    {currentUser?.role && (
-                      <span className="inline-block text-[10px] px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary font-medium">
-                        Perfil: {rolLabel}
-                      </span>
-                    )}
+
                   </div>
 
                   <div className="space-y-2">
