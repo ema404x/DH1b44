@@ -65,10 +65,11 @@ async function buildContextoReflexivo(user) {
   let inspeccionesInfo = '';
 
   try {
-    const [pendientes, ots, inspecciones] = await Promise.all([
+    const [pendientes, ots, inspecciones, emergencias] = await Promise.all([
       base44.entities.Pendiente.list('-created_date', 50),
       base44.entities.WorkOrder.list('-created_date', 50),
       base44.entities.InspeccionColegio.list('-created_date', 20),
+      base44.entities.Emergencia.list('-created_date', 20),
     ]);
 
     // Pendientes relevantes
@@ -84,12 +85,22 @@ async function buildContextoReflexivo(user) {
     const pendPendientes = misPendientes.filter(p => p.estado === 'pendiente' || p.estado === 'asignado');
     const pendResueltos = misPendientes.filter(p => p.estado === 'resuelto');
 
+    // Pendientes próximos a vencer (en los próximos 7 días)
+    const hoy = new Date();
+    const en7dias = new Date(); en7dias.setDate(hoy.getDate() + 7);
+    const pendProximos = misPendientes.filter(p => {
+      if (!p.fecha_limite || p.estado === 'resuelto' || p.estado === 'cancelado') return false;
+      const fl = new Date(p.fecha_limite);
+      return fl >= hoy && fl <= en7dias;
+    });
+
     if (misPendientes.length > 0) {
       pendientesInfo = `Pendientes SAP relacionados a ${primerNombre}: ${misPendientes.length} en total. 
 - Sin resolver: ${pendPendientes.length}
 - Vencidos: ${pendVencidos.length}
 - Resueltos: ${pendResueltos.length}
-${pendVencidos.length > 0 ? `- Algunos vencidos: ${pendVencidos.slice(0, 3).map(p => `"${p.descripcion?.slice(0, 60)}" (límite: ${p.fecha_limite})`).join('; ')}` : ''}`;
+${pendVencidos.length > 0 ? `- Vencidos: ${pendVencidos.slice(0, 3).map(p => `"${p.descripcion?.slice(0, 60)}" (límite: ${p.fecha_limite})`).join('; ')}` : ''}
+${pendProximos.length > 0 ? `- Próximos a vencer (7 días): ${pendProximos.slice(0, 3).map(p => `"${p.descripcion?.slice(0, 60)}" (vence: ${p.fecha_limite})`).join('; ')}` : ''}`;
     }
 
     // OTs relevantes
@@ -101,12 +112,23 @@ ${pendVencidos.length > 0 ? `- Algunos vencidos: ${pendVencidos.slice(0, 3).map(
     const otsPendientes = misOTs.filter(o => o.status === 'pendiente');
     const otsCompletadas = misOTs.filter(o => o.status === 'completada');
 
+    // OTs programadas para los próximos 7 días
+    const otsProximas = misOTs.filter(o => {
+      if (!o.scheduled_date || o.status === 'completada' || o.status === 'cancelada') return false;
+      const sd = new Date(o.scheduled_date);
+      return sd >= hoy && sd <= en7dias;
+    });
+    // OTs urgentes
+    const otsUrgentes = misOTs.filter(o => o.priority === 'urgente' && o.status !== 'completada' && o.status !== 'cancelada');
+
     if (misOTs.length > 0) {
       otsInfo = `Órdenes de trabajo relacionadas a ${primerNombre}: ${misOTs.length} en total.
 - En progreso: ${otsEnProgreso.length}
 - Pendientes: ${otsPendientes.length}
 - Completadas: ${otsCompletadas.length}
-${otsEnProgreso.length > 0 ? `- En curso: ${otsEnProgreso.slice(0, 3).map(o => `"${o.title}" (${o.priority})`).join('; ')}` : ''}`;
+${otsUrgentes.length > 0 ? `- Urgentes sin completar: ${otsUrgentes.slice(0, 3).map(o => `"${o.title}"`).join('; ')}` : ''}
+${otsProximas.length > 0 ? `- Programadas para los próximos 7 días: ${otsProximas.slice(0, 3).map(o => `"${o.title}" (${o.scheduled_date})`).join('; ')}` : ''}
+${otsEnProgreso.length > 0 ? `- En curso ahora: ${otsEnProgreso.slice(0, 3).map(o => `"${o.title}" (${o.priority})`).join('; ')}` : ''}`;
     }
 
     // Inspecciones
@@ -117,6 +139,13 @@ ${otsEnProgreso.length > 0 ? `- En curso: ${otsEnProgreso.slice(0, 3).map(o => `
     if (misInsp.length > 0) {
       const completas = misInsp.filter(i => i.estado === 'completado').length;
       inspeccionesInfo = `Inspecciones de colegios de ${primerNombre}: ${misInsp.length} total, ${completas} con informe generado.`;
+    }
+
+    // Emergencias activas
+    const emergenciasActivas = emergencias.filter(e => e.estado === 'activa' || e.estado === 'en_atencion');
+    if (emergenciasActivas.length > 0) {
+      const emgInfo = emergenciasActivas.slice(0, 3).map(e => `"${e.titulo}" en ${e.establecimiento} (${e.tipo})`).join('; ');
+      inspeccionesInfo += `\n\nEmergencias activas en el sistema: ${emergenciasActivas.length}. Detalle: ${emgInfo}.`;
     }
   } catch (e) {
     // Si falla la carga de datos, continúa sin ellos
@@ -129,7 +158,11 @@ Nombre del usuario: ${nombre}
 ${resumen ? `\nDatos actuales del sistema para ${primerNombre}:\n${resumen}` : ''}
 
 INSTRUCCIÓN ESPECIAL PARA ESTE MENSAJE:
-Iniciá la conversación en modo reflexivo y empático. Preguntale a ${primerNombre} cómo se siente hoy con su trabajo y si hay algo que le esté pesando o que quiera mejorar. Luego, usando los datos del sistema que tenés arriba, ofrecele un análisis personalizado de su situación actual: qué tiene pendiente, qué logró, y qué podría hacer hoy para mejorar su flujo de trabajo. Sé cálido, cercano y constructivo. No seas genérico. Usá los datos reales si los tenés.`;
+Iniciá la conversación en modo reflexivo y empático. Preguntale a ${primerNombre} cómo se siente hoy con su trabajo. Luego, usando los datos del sistema que tenés arriba, ofrecele un análisis personalizado con tres secciones claras:
+1. **Su situación actual**: qué tiene pendiente, en progreso, vencido.
+2. **Lo que se viene**: alertá sobre pendientes próximos a vencer, OTs programadas y emergencias activas que debería tener en el radar.
+3. **Recomendación concreta**: qué haría hoy si fuera él/ella para mejorar su flujo de trabajo y no quedar expuesto.
+Sé cálido, cercano y directo. No seas genérico. Usá los datos reales. Si no hay datos disponibles, igual preguntale cómo está y ofrecete a ayudarle a organizarse.`;
 }
 
 function TypingIndicator() {
