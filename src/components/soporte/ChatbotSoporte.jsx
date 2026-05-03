@@ -1,8 +1,66 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { MessageCircle, X, Send, Loader2, Bot } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Bot, RotateCcw, ChevronDown, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ReactMarkdown from 'react-markdown';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const SUGERENCIAS = [
+  { categoria: '📋 Pendientes', preguntas: ['¿Cómo importo pendientes desde SAP?', '¿Cómo asigno un jefe de sitio a un pendiente?'] },
+  { categoria: '🔧 Órdenes de trabajo', preguntas: ['¿Cómo creo una orden de trabajo?', '¿Cómo registro materiales en una OT?'] },
+  { categoria: '🏫 Inspecciones', preguntas: ['¿Cómo hago una inspección de colegio?', '¿Cómo genero el informe con IA?'] },
+  { categoria: '📦 Inventario', preguntas: ['¿Cómo registro entrada de materiales?', '¿Cómo configuro alertas de stock bajo?'] },
+  { categoria: '📄 Presupuestos', preguntas: ['¿Cómo creo un presupuesto de obra?', '¿Qué es el preciario ministerial?'] },
+  { categoria: '🗺️ Mapa y fichaje', preguntas: ['¿Cómo ficha el personal con QR?', '¿Cómo veo la ubicación de los equipos?'] },
+];
+
+function TypingIndicator() {
+  return (
+    <div className="flex justify-start">
+      <div className="bg-muted rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1">
+        {[0, 1, 2].map(i => (
+          <motion.div
+            key={i}
+            className="h-2 w-2 rounded-full bg-muted-foreground/50"
+            animate={{ y: [0, -4, 0] }}
+            transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({ msg }) {
+  const isUser = msg.role === 'user';
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'} items-end gap-2`}
+    >
+      {!isUser && (
+        <div className="h-6 w-6 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0 mb-0.5">
+          <Bot className="h-3 w-3 text-primary" />
+        </div>
+      )}
+      <div className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+        isUser
+          ? 'bg-primary text-primary-foreground rounded-br-sm'
+          : 'bg-muted text-foreground rounded-bl-sm'
+      }`}>
+        {isUser ? (
+          <p>{msg.content}</p>
+        ) : (
+          <ReactMarkdown className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:font-semibold">
+            {msg.content}
+          </ReactMarkdown>
+        )}
+      </div>
+    </motion.div>
+  );
+}
 
 export default function ChatbotSoporte() {
   const [open, setOpen] = useState(false);
@@ -10,9 +68,15 @@ export default function ChatbotSoporte() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [showSugerencias, setShowSugerencias] = useState(false);
+  const [categoriaActiva, setCategoriaActiva] = useState(0);
+  const [unread, setUnread] = useState(0);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
-  // Crear conversación al abrir por primera vez
+  const isThinking = messages.length > 0 &&
+    messages[messages.length - 1]?.role === 'user';
+
   useEffect(() => {
     if (open && !conversation) {
       base44.agents.createConversation({
@@ -23,89 +87,179 @@ export default function ChatbotSoporte() {
         setMessages(conv.messages || []);
       });
     }
+    if (open) {
+      setUnread(0);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
   }, [open, conversation]);
 
-  // Suscribirse a updates en tiempo real
   useEffect(() => {
     if (!conversation?.id) return;
     const unsub = base44.agents.subscribeToConversation(conversation.id, (data) => {
       setMessages(data.messages || []);
+      if (!open) setUnread(u => u + 1);
     });
     return unsub;
-  }, [conversation?.id]);
+  }, [conversation?.id, open]);
 
-  // Scroll al último mensaje
   useEffect(() => {
-    if (open) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, open]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isThinking]);
 
-  const handleSend = async () => {
-    if (!input.trim() || sending || !conversation) return;
-    const text = input.trim();
+  const handleSend = async (text) => {
+    const msg = (text || input).trim();
+    if (!msg || sending || !conversation) return;
     setInput('');
+    setShowSugerencias(false);
     setSending(true);
     try {
-      await base44.agents.addMessage(conversation, { role: 'user', content: text });
+      await base44.agents.addMessage(conversation, { role: 'user', content: msg });
     } finally {
       setSending(false);
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  const handleReset = async () => {
+    setConversation(null);
+    setMessages([]);
+    setShowSugerencias(false);
   };
-
-  const isThinking = messages.length > 0 &&
-    messages[messages.length - 1]?.role === 'user' && sending === false &&
-    messages.filter(m => m.role === 'assistant').length < messages.filter(m => m.role === 'user').length;
 
   return (
     <>
       {/* Botón flotante */}
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all hover:scale-105 flex items-center justify-center"
-        >
-          <MessageCircle className="h-6 w-6" />
-        </button>
-      )}
+      <AnimatePresence>
+        {!open && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setOpen(true)}
+            className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center"
+            style={{ boxShadow: '0 4px 24px rgba(59,130,246,0.45)' }}
+          >
+            <MessageCircle className="h-6 w-6" />
+            {unread > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {unread}
+              </span>
+            )}
+          </motion.button>
+        )}
+      </AnimatePresence>
 
-      {/* Panel de chat */}
-      {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-80 sm:w-96 flex flex-col rounded-2xl border border-border shadow-2xl overflow-hidden"
-          style={{ height: '500px', background: 'hsl(var(--card))' }}>
-
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-primary text-primary-foreground">
-            <div className="flex items-center gap-2">
-              <Bot className="h-5 w-5" />
-              <div>
-                <p className="font-semibold text-sm">Asistente</p>
-                <p className="text-[10px] opacity-80">¿En qué te puedo ayudar?</p>
+      {/* Panel */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-6 right-6 z-50 w-[340px] sm:w-[400px] flex flex-col rounded-2xl border border-border overflow-hidden"
+            style={{ height: '560px', background: 'hsl(var(--card))', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(213,90%,42%) 100%)' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
+                  <Sparkles className="h-4.5 w-4.5 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-white">Asistente IA</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <p className="text-[10px] text-white/80">En línea · Listo para ayudarte</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                {messages.length > 0 && (
+                  <button
+                    onClick={handleReset}
+                    title="Nueva conversación"
+                    className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors text-white/80 hover:text-white"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button onClick={() => setOpen(false)}
+                  className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors text-white/80 hover:text-white">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             </div>
-            <button onClick={() => setOpen(false)} className="hover:opacity-80 transition-opacity">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
 
-          {/* Mensajes */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3">
-            {!conversation && (
-              <div className="flex justify-center items-center h-full">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            )}
+            {/* Mensajes */}
+            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
+              {!conversation && (
+                <div className="flex justify-center items-center h-full">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
 
-            {conversation && messages.length === 0 && (
-              <div className="text-center py-8 space-y-3">
-                <Bot className="h-10 w-10 mx-auto text-primary opacity-60" />
-                <p className="text-sm text-muted-foreground">¡Hola! Soy el asistente del sistema.<br />Preguntame lo que necesites.</p>
-                <div className="space-y-1.5">
-                  {['¿Cómo creo una orden de trabajo?', '¿Cómo importo pendientes SAP?', '¿Cómo genero un informe de inspección?'].map(q => (
-                    <button key={q} onClick={() => { setInput(q); }}
-                      className="block w-full text-left text-xs px-3 py-2 rounded-lg border border-border hover:bg-muted transition-colors">
+              {conversation && messages.length === 0 && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4 py-2">
+                  <div className="text-center space-y-2">
+                    <div className="h-12 w-12 mx-auto rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                      <Bot className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">¡Hola! Soy tu asistente</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Puedo ayudarte con cualquier duda sobre el sistema</p>
+                    </div>
+                  </div>
+
+                  {/* Categorías de sugerencias */}
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide px-1">¿Sobre qué querés preguntar?</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {SUGERENCIAS.map((cat, i) => (
+                        <button key={i}
+                          onClick={() => { setCategoriaActiva(i); setShowSugerencias(true); }}
+                          className="text-left text-xs px-3 py-2 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-all">
+                          <span>{cat.categoria}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Preguntas de categoría seleccionada */}
+                  <AnimatePresence>
+                    {showSugerencias && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                        <div className="space-y-1.5">
+                          {SUGERENCIAS[categoriaActiva].preguntas.map((q, i) => (
+                            <button key={i} onClick={() => handleSend(q)}
+                              className="w-full text-left text-xs px-3 py-2.5 rounded-xl bg-primary/8 border border-primary/20 hover:bg-primary/15 transition-colors text-foreground">
+                              {q}
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+
+              {messages.map((msg, i) => (
+                <MessageBubble key={i} msg={msg} />
+              ))}
+
+              {isThinking && <TypingIndicator />}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Sugerencias rápidas mientras chateas */}
+            {messages.length > 0 && messages.length < 6 && !isThinking && (
+              <div className="px-3 pb-1 flex-shrink-0">
+                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                  {SUGERENCIAS.flatMap(c => c.preguntas).slice(0, 4).map((q, i) => (
+                    <button key={i} onClick={() => handleSend(q)}
+                      className="flex-shrink-0 text-[10px] px-2.5 py-1 rounded-full border border-border hover:border-primary/40 hover:bg-primary/5 transition-all whitespace-nowrap text-muted-foreground">
                       {q}
                     </button>
                   ))}
@@ -113,51 +267,34 @@ export default function ChatbotSoporte() {
               </div>
             )}
 
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
-                  msg.role === 'user'
-                    ? 'bg-primary text-primary-foreground rounded-br-sm'
-                    : 'bg-muted text-foreground rounded-bl-sm'
-                }`}>
-                  {msg.role === 'assistant' ? (
-                    <ReactMarkdown className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-                      {msg.content}
-                    </ReactMarkdown>
-                  ) : (
-                    <p>{msg.content}</p>
-                  )}
-                </div>
+            {/* Input */}
+            <div className="px-3 pb-3 pt-1 border-t border-border flex-shrink-0">
+              <div className="flex gap-2 items-end">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                  placeholder="Escribí tu pregunta..."
+                  disabled={!conversation || sending}
+                  rows={1}
+                  className="flex-1 text-sm bg-muted rounded-xl px-3 py-2.5 outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring disabled:opacity-50 resize-none leading-snug max-h-24 overflow-y-auto"
+                  style={{ scrollbarWidth: 'none' }}
+                />
+                <Button
+                  size="icon"
+                  className="h-9 w-9 rounded-xl flex-shrink-0"
+                  onClick={() => handleSend()}
+                  disabled={!input.trim() || !conversation || sending}
+                >
+                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
               </div>
-            ))}
-
-            {isThinking && (
-              <div className="flex justify-start">
-                <div className="bg-muted rounded-2xl rounded-bl-sm px-3 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          <div className="p-3 border-t border-border flex gap-2">
-            <input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Escribí tu pregunta..."
-              disabled={!conversation || sending}
-              className="flex-1 text-sm bg-muted rounded-xl px-3 py-2 outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring disabled:opacity-50"
-            />
-            <Button size="icon" className="h-9 w-9 rounded-xl flex-shrink-0" onClick={handleSend} disabled={!input.trim() || !conversation || sending}>
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
-          </div>
-        </div>
-      )}
+              <p className="text-[10px] text-muted-foreground/50 text-center mt-1.5">Enter para enviar · Shift+Enter para nueva línea</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
