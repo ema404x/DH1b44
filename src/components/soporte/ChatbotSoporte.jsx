@@ -169,10 +169,10 @@ export default function ChatbotSoporte() {
                   <Sparkles className="h-4.5 w-4.5 text-white" />
                 </div>
                 <div>
-                  <p className="font-semibold text-sm text-white">Asistente IA</p>
+                  <p className="font-semibold text-sm text-white">Alice · Asistente DH1</p>
                   <div className="flex items-center gap-1.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <p className="text-[10px] text-white/80">En línea · Listo para ayudarte</p>
+                    <p className="text-[10px] text-white/80">En línea · Lista para ayudarte</p>
                   </div>
                 </div>
               </div>
@@ -208,8 +208,8 @@ export default function ChatbotSoporte() {
                       <Bot className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">¡Hola! Soy tu asistente</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Puedo ayudarte con cualquier duda sobre el sistema</p>
+                      <p className="font-semibold text-sm">¡Hola! Soy Alice</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Asistente de DH1 · Puedo ayudarte con cualquier duda sobre el sistema</p>
                     </div>
                   </div>
 
