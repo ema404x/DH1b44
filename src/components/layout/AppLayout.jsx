@@ -7,6 +7,7 @@ import UserMenu from './UserMenu';
 import OfflineBar from '@/components/pwa/OfflineBar';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { toast } from 'sonner';
+import ChatbotSoporte from '@/components/soporte/ChatbotSoporte';
 
 export default function AppLayout() {
   const { isOnline, pendingCount, isSyncing, syncPending } = useOfflineQueue((count) => {
@@ -33,6 +34,7 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <ChatbotSoporte />
     </div>
   );
 }
