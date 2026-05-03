@@ -1,0 +1,135 @@
+{
+  "name": "SolicitudCertificado",
+  "type": "object",
+  "properties": {
+    "numero": {
+      "type": "string",
+      "description": "N\u00famero de la solicitud (ej: SOL-001)"
+    },
+    "titulo": {
+      "type": "string",
+      "description": "T\u00edtulo descriptivo de la solicitud"
+    },
+    "establecimiento": {
+      "type": "string",
+      "description": "Nombre del establecimiento / obra"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Nombre del jefe de sitio que env\u00eda la solicitud"
+    },
+    "jefe_sitio_email": {
+      "type": "string",
+      "description": "Email del jefe de sitio"
+    },
+    "descripcion_trabajo": {
+      "type": "string",
+      "description": "Descripci\u00f3n del trabajo realizado"
+    },
+    "monto_solicitado": {
+      "type": "number",
+      "default": 0,
+      "description": "Monto del certificado solicitado"
+    },
+    "porcentaje_avance": {
+      "type": "number",
+      "default": 0,
+      "description": "Porcentaje de avance de obra (0-100)"
+    },
+    "periodo": {
+      "type": "string",
+      "description": "Per\u00edodo del certificado (ej: Abril 2025)"
+    },
+    "adjuntos": {
+      "type": "array",
+      "description": "Fotos y documentos adjuntos",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "borrador",
+        "enviada",
+        "en_revision",
+        "aprobada",
+        "rechazada"
+      ],
+      "default": "borrador"
+    },
+    "prioridad": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "alta",
+        "urgente"
+      ],
+      "default": "normal"
+    },
+    "comentarios_admin": {
+      "type": "string",
+      "description": "Comentarios del administrador al revisar"
+    },
+    "motivo_rechazo": {
+      "type": "string",
+      "description": "Motivo del rechazo (si aplica)"
+    },
+    "aprobado_por": {
+      "type": "string",
+      "description": "Nombre del gerente que aprob\u00f3"
+    },
+    "aprobado_por_email": {
+      "type": "string"
+    },
+    "fecha_aprobacion": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "firma_gerente_url": {
+      "type": "string",
+      "description": "URL de la firma digital del gerente"
+    },
+    "certificado_id": {
+      "type": "string",
+      "description": "ID del certificado generado tras la aprobaci\u00f3n"
+    },
+    "historial": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "fecha": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "usuario": {
+            "type": "string"
+          },
+          "comentario": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "titulo",
+    "establecimiento",
+    "jefe_sitio",
+    "estado"
+  ]
+}

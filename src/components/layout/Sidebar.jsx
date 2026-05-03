@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -41,6 +41,7 @@ const navGroups = [
       { label: 'Presupuestos', icon: FileText, path: '/presupuestos' },
       { label: 'Presupuestos Obra', icon: Calculator, path: '/presupuestos-obra' },
       { label: 'Certificados', icon: Award, path: '/certificados' },
+      { label: 'Aprobación Certificados', icon: FileCheck2, path: '/aprobacion-certificados' },
       { label: 'Facturación', icon: Receipt, path: '/facturacion' },
       { label: 'Finanzas', icon: TrendingUp, path: '/finanzas' },
     ]
@@ -131,7 +132,7 @@ export default function Sidebar() {
     items: group.items.filter(item => {
       if (!isJefeSitio) return true;
       // Para jefe_sitio: solo mostrar Dashboard, Órdenes, Pendientes, Informes, Mapa
-      const jefeSitioRoutes = ['/', '/ordenes', '/activos', '/informes', '/mapa'];
+      const jefeSitioRoutes = ['/', '/ordenes', '/activos', '/informes', '/mapa', '/aprobacion-certificados'];
       return jefeSitioRoutes.includes(item.path);
     })
   })).filter(group => group.items.length > 0);
