@@ -59,6 +59,13 @@ export default function Mapa() {
     },
   });
 
+  const handleActivateAll = async () => {
+    const inactivas = locations.filter(l => !l.is_active);
+    await Promise.all(inactivas.map(l => base44.entities.LocationQR.update(l.id, { is_active: true })));
+    queryClient.invalidateQueries({ queryKey: ['locations'] });
+    toast.success(`${inactivas.length} ubicación${inactivas.length !== 1 ? 'es' : ''} activada${inactivas.length !== 1 ? 's' : ''}`);
+  };
+
   return (
     <div className="space-y-5">
       <div>
@@ -112,6 +119,7 @@ export default function Mapa() {
             onUpdate={(id, data) => updateLocation.mutate({ id, data })}
             onDelete={(id) => deleteLocation.mutate(id)}
             onCreate={(data) => createLocation.mutate(data)}
+            onActivateAll={handleActivateAll}
             highlightedLocId={highlightedLoc?.id}
             onClearHighlight={() => setHighlightedLoc(null)}
           />

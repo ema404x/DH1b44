@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, QrCode, MapPin, Pencil, Trash2, Building2, Search } from 'lucide-react';
+import { Plus, QrCode, MapPin, Pencil, Trash2, Building2, Search, CheckCheck } from 'lucide-react';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { toast } from 'sonner';
 
@@ -30,7 +30,7 @@ const emptyForm = {
   latitude: '', longitude: '',
 };
 
-export default function LocationsManager({ locations, isLoading, onUpdate, onDelete, onCreate, highlightedLocId, onClearHighlight }) {
+export default function LocationsManager({ locations, isLoading, onUpdate, onDelete, onCreate, onActivateAll, highlightedLocId, onClearHighlight }) {
   const [search, setSearch] = useState('');
   const [filterActive, setFilterActive] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -121,9 +121,16 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
             <option value="inactive">Inactivos</option>
           </select>
         </div>
-        <Button onClick={openNew} className="gap-2 h-9">
-          <Plus className="h-4 w-4" /> Nueva Ubicación
-        </Button>
+        <div className="flex gap-2">
+          {onActivateAll && locations.some(l => !l.is_active) && (
+            <Button variant="outline" size="sm" className="gap-1.5 h-9 text-emerald-700 border-emerald-300 hover:bg-emerald-50" onClick={onActivateAll}>
+              <CheckCheck className="h-4 w-4" /> Activar todas
+            </Button>
+          )}
+          <Button onClick={openNew} className="gap-2 h-9">
+            <Plus className="h-4 w-4" /> Nueva Ubicación
+          </Button>
+        </div>
       </div>
 
       {/* Stats bar */}
@@ -156,7 +163,7 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
               <Card
                 key={loc.id}
                 ref={el => { cardRefs.current[loc.id] = el; }}
-                className={`overflow-hidden transition-all hover:shadow-md ${!loc.is_active ? 'opacity-60' : ''} ${isHighlighted ? 'ring-2 ring-primary ring-offset-2 shadow-lg' : ''}`}
+                className={`overflow-hidden transition-all hover:shadow-md ${!loc.is_active ? 'opacity-70 border-dashed' : ''} ${isHighlighted ? 'ring-2 ring-primary ring-offset-2 shadow-lg' : ''}`}
               >
                 <div className="h-1.5 w-full" style={{ background: colorCfg.hex }} />
                 <CardContent className="pt-4 pb-4 px-4">
