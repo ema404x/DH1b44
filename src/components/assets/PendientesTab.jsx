@@ -249,37 +249,8 @@ export default function PendientesTab() {
         </div>
 
         <div className="flex gap-2 justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-sm text-muted-foreground">
-              {filtered.length.toLocaleString()} de {pendientes.length.toLocaleString()} órdenes
-            </div>
-            {canDelete && selectedIds.size > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-primary">{selectedIds.size} seleccionados</span>
-                <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" className="gap-1.5 h-7">
-                      <Trash2 className="h-3.5 w-3.5" /> Eliminar seleccionados
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Eliminar {selectedIds.size} pendientes?</AlertDialogTitle>
-                      <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminarán permanentemente los {selectedIds.size} pendientes seleccionados.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleBulkDelete} disabled={bulkDeleting}>
-                        {bulkDeleting ? 'Eliminando...' : 'Eliminar'}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                <button onClick={() => setSelectedIds(new Set())} className="text-xs text-muted-foreground hover:text-foreground">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
+          <div className="text-sm text-muted-foreground self-center">
+            {filtered.length.toLocaleString()} de {pendientes.length.toLocaleString()} órdenes
           </div>
           <div className="flex gap-2">
             {/* View toggle */}
@@ -309,6 +280,33 @@ export default function PendientesTab() {
             <Button variant="outline" className="gap-1.5" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" /> Importar SAP
             </Button>
+            {canDelete && selectedIds.size > 0 && (
+              <>
+                <span className="text-sm font-medium text-primary self-center">{selectedIds.size} sel.</span>
+                <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="gap-1.5">
+                      <Trash2 className="h-4 w-4" /> Eliminar seleccionados
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar {selectedIds.size} pendientes?</AlertDialogTitle>
+                      <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminarán permanentemente los {selectedIds.size} pendientes seleccionados.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleBulkDelete} disabled={bulkDeleting}>
+                        {bulkDeleting ? 'Eliminando...' : 'Eliminar'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <button onClick={() => setSelectedIds(new Set())} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              </>
+            )}
             <Button onClick={openNew} className="gap-1.5">
               <Plus className="h-4 w-4" /> Nuevo
             </Button>
