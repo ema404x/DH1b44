@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import SeccionInspeccion from '@/components/inspeccion/SeccionInspeccion';
 import InformeViewer from '@/components/inspeccion/InformeViewer';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { useAuth } from '@/lib/AuthContext';
 
 const SECCIONES_DEFAULT = [
@@ -110,8 +109,11 @@ export default function InspeccionColegioPage() {
     const updated = { ...inspeccionActiva, secciones };
     setInspeccionActiva(updated);
     setGuardando(true);
-    await updateMutation.mutateAsync({ id: updated.id, data: { secciones } });
-    setGuardando(false);
+    try {
+      await updateMutation.mutateAsync({ id: updated.id, data: { secciones } });
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const handleGenerarInforme = async () => {

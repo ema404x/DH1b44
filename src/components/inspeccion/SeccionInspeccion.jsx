@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { base44 } from '@/api/base44Client';
 import { cn } from '@/lib/utils';
 
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const getSpeechRecognition = () => window.SpeechRecognition || window.webkitSpeechRecognition || null;
 
 export default function SeccionInspeccion({ seccion, onChange }) {
   const [expanded, setExpanded] = useState(false);
@@ -20,7 +20,13 @@ export default function SeccionInspeccion({ seccion, onChange }) {
     transcripcionAcumuladaRef.current = seccion.transcripcion || '';
   }, [seccion.transcripcion]);
 
+  // Detener reconocimiento al desmontar
+  useEffect(() => {
+    return () => { recognitionRef.current?.stop(); };
+  }, []);
+
   const startRecording = () => {
+    const SpeechRecognition = getSpeechRecognition();
     if (!SpeechRecognition) {
       setNoSupport(true);
       return;
@@ -56,10 +62,9 @@ export default function SeccionInspeccion({ seccion, onChange }) {
 
   const handlePhotos = async (e) => {
     const files = Array.from(e.target.files);
-    for (const file of files) {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      onChange({ fotos: [...(seccion.fotos || []), file_url] });
-    }
+    const urls = await Promise.all(files.map(file => base44.integrations.Core.UploadFile({ file }).then(r => r.file_url)));
+    onChange({ fotos: [...(seccion.fotos || []), ...urls] });
+    e.target.value = '';
   };
 
   const removePhoto = (idx) => {
