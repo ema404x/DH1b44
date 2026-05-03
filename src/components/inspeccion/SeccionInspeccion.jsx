@@ -62,6 +62,7 @@ export default function SeccionInspeccion({ seccion, onChange }) {
 
   const handlePhotos = async (e) => {
     const files = Array.from(e.target.files);
+    if (!files.length) return;
     const urls = await Promise.all(files.map(file => base44.integrations.Core.UploadFile({ file }).then(r => r.file_url)));
     onChange({ fotos: [...(seccion.fotos || []), ...urls] });
     e.target.value = '';
