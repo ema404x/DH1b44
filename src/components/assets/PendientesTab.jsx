@@ -321,14 +321,7 @@ export default function PendientesTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted border-b">
-                  {canDelete && (
-                    <th className="px-3 py-2.5 w-8" onClick={e => e.stopPropagation()}>
-                      <Checkbox
-                        checked={filtered.length > 0 && selectedIds.size === filtered.length}
-                        onCheckedChange={toggleSelectAll}
-                      />
-                    </th>
-                  )}
+                  {canDelete && <th className="px-3 py-2.5 w-8" />}
                   {[
                     { key: 'inspector', label: 'INSPECTOR' },
                     { key: 'sitio', label: 'UBICACIÓN' },
@@ -345,7 +338,7 @@ export default function PendientesTab() {
                   ].map(col => (
                     <th
                       key={col.key}
-                      onClick={() => toggleSort(col.key)}
+                      onClick={col.key === '_delete' ? undefined : () => toggleSort(col.key)}
                       className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:text-foreground select-none whitespace-nowrap"
                     >
                       <span className="flex items-center gap-1">
