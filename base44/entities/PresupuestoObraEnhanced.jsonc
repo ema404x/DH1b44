@@ -38,6 +38,10 @@
     "supervisor": {
       "type": "string"
     },
+    "responsable": {
+      "type": "string",
+      "description": "Responsable t\u00e9cnico / supervisor"
+    },
     "inspector": {
       "type": "string"
     },
@@ -77,7 +81,36 @@
             "type": "string"
           },
           "items": {
-            "type": "array"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "codigo": {
+                  "type": "string"
+                },
+                "descripcion": {
+                  "type": "string"
+                },
+                "unidad": {
+                  "type": "string"
+                },
+                "cantidad": {
+                  "type": "number"
+                },
+                "pu_mat": {
+                  "type": "number"
+                },
+                "pu_mo": {
+                  "type": "number"
+                },
+                "avance_anterior_pct": {
+                  "type": "number"
+                },
+                "avance_actual_pct": {
+                  "type": "number"
+                }
+              }
+            }
           }
         }
       }
@@ -100,6 +133,14 @@
     "total_presupuesto": {
       "type": "number",
       "default": 0
+    },
+    "archivo_url": {
+      "type": "string",
+      "description": "URL del Excel de referencia"
+    },
+    "archivo_nombre": {
+      "type": "string",
+      "description": "Nombre del archivo Excel"
     },
     "notas": {
       "type": "string"

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import * as XLSX from 'npm:xlsx@0.18.5';
 
 Deno.serve(async (req) => {
   try {
@@ -9,45 +10,46 @@ Deno.serve(async (req) => {
     const { file_url, archivo_nombre } = await req.json();
     if (!file_url) return Response.json({ error: 'file_url required' }, { status: 400 });
 
-    // 1. Usar parseExcelPresupuesto para obtener el contenido del Excel
-    const parseRes = await base44.asServiceRole.functions.invoke('parseExcelPresupuesto', { file_url });
-    const parsed = parseRes;
+    // 1. Descargar el archivo Excel
+    const fileRes = await fetch(file_url);
+    if (!fileRes.ok) return Response.json({ error: 'No se pudo descargar el archivo' }, { status: 400 });
+    const arrayBuffer = await fileRes.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
 
-    // 2. Convertir a texto plano para la IA
+    // 2. Parsear con xlsx (SheetJS)
+    const workbook = XLSX.read(uint8Array, { type: 'array' });
+
+    // 3. Convertir todas las hojas a texto plano
     let textoHojas = '';
-    if (parsed && parsed.sheets) {
-      for (const [sheetName, sheetData] of Object.entries(parsed.sheets)) {
-        const rows = (sheetData.rows || []).slice(0, 200);
-        const lines = rows.map(row =>
-          (row || []).map(cell => {
-            let v = cell?.value;
-            if (v && typeof v === 'object' && v.result !== undefined) v = v.result;
-            if (v && typeof v === 'object' && v.text !== undefined) v = v.text;
-            return v !== null && v !== undefined ? String(v).trim() : '';
-          }).filter(Boolean).join(' | ')
-        ).filter(Boolean);
-        textoHojas += `=== HOJA: ${sheetName} ===\n${lines.join('\n')}\n\n`;
+    for (const sheetName of workbook.SheetNames) {
+      const ws = workbook.Sheets[sheetName];
+      const csv = XLSX.utils.sheet_to_csv(ws, { blankrows: false });
+      const lines = csv.split('\n')
+        .map(l => l.trim())
+        .filter(l => l && l.replace(/,/g, '').trim());
+      if (lines.length > 0) {
+        textoHojas += `=== HOJA: ${sheetName} ===\n${lines.slice(0, 200).join('\n')}\n\n`;
       }
     }
 
-    const textoTotal = textoHojas.slice(0, 25000);
+    const textoTotal = textoHojas.slice(0, 28000);
 
     if (!textoTotal.trim()) {
-      return Response.json({ error: 'No se pudo leer el contenido del Excel' }, { status: 400 });
+      return Response.json({ error: 'El Excel está vacío o no se pudo leer su contenido' }, { status: 400 });
     }
 
-    // 3. IA extrae la estructura del presupuesto
+    // 4. IA extrae la estructura del presupuesto
     const datos = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: `Sos un experto en presupuestos de obras de construcción argentina (GCBA, Ministerio Educación, formato PCP/PAPORC/PAMON).
 
 Analizá este contenido extraído de un Excel de presupuesto de obra y extraé toda la información estructurada.
 
-CONTENIDO DEL EXCEL:
+CONTENIDO DEL EXCEL (formato CSV por hoja):
 ${textoTotal}
 
 INSTRUCCIONES:
 - titulo: descripción o nombre de la obra
-- codigo: número o código del presupuesto (ej: PPTO-001, 8A-001)
+- codigo: número o código del presupuesto
 - licitacion: número de licitación si aparece
 - cliente_nombre: comitente u organismo contratante
 - escuela: nombre del establecimiento educativo si aplica
@@ -55,21 +57,20 @@ INSTRUCCIONES:
 - inspector: nombre del inspector
 - responsable: supervisor o responsable técnico
 - mtom: número MTOM si aparece
-- coef_pase: coeficiente de pase (número decimal, buscar en el Excel, default 1.6504)
-- coef_oferta: coeficiente de oferta (número decimal, buscar en el Excel, default 1.38)
+- coef_pase: coeficiente de pase (número decimal, default 1.6504)
+- coef_oferta: coeficiente de oferta (número decimal, default 1.38)
 - plazo: plazo de obra en texto
 - rubros: array de capítulos/secciones con sus ítems
 
-Para cada ítem:
-- codigo: código alfanumérico del ítem
-- descripcion: descripción completa del ítem
+Para cada ÍTEM:
+- codigo: código alfanumérico
+- descripcion: descripción completa
 - unidad: unidad de medida (m2, ml, gl, kg, etc)
-- cantidad: número (puede ser decimal)
-- pu_mat: precio unitario de materiales (número)
-- pu_mo: precio unitario de mano de obra (número). Si hay un solo precio unitario, ponerlo en pu_mat y 0 en pu_mo
-- Si hay columnas de Anterior % y Actual %, extraerlas también
+- cantidad: número
+- pu_mat: precio unitario materiales (si hay un solo PU, usarlo aquí)
+- pu_mo: precio unitario mano de obra (0 si no se distingue)
 
-IMPORTANTE: Ignorar filas de totales, subtotales, encabezados. Los rubros agrupan ítems. Si no hay rubros claros, usar un rubro "GENERAL".`,
+IMPORTANTE: Ignorar filas de TOTALES, SUBTOTALES y ENCABEZADOS. Si no hay rubros claros usar un rubro "GENERAL".`,
       response_json_schema: {
         type: 'object',
         properties: {
@@ -102,8 +103,6 @@ IMPORTANTE: Ignorar filas de totales, subtotales, encabezados. Los rubros agrupa
                       cantidad: { type: 'number' },
                       pu_mat: { type: 'number' },
                       pu_mo: { type: 'number' },
-                      avance_anterior_pct: { type: 'number' },
-                      avance_actual_pct: { type: 'number' },
                     }
                   }
                 }
@@ -114,27 +113,34 @@ IMPORTANTE: Ignorar filas de totales, subtotales, encabezados. Los rubros agrupa
       }
     });
 
-    // 4. Normalizar valores
+    // 5. Normalizar
     if (!datos.titulo) datos.titulo = archivo_nombre?.replace(/\.(xlsx|xls)$/i, '') || 'Presupuesto importado';
     if (!datos.codigo) datos.codigo = `PPTO-${Date.now()}`;
     if (!datos.coef_pase || isNaN(datos.coef_pase)) datos.coef_pase = 1.6504;
     if (!datos.coef_oferta || isNaN(datos.coef_oferta)) datos.coef_oferta = 1.38;
     if (!Array.isArray(datos.rubros)) datos.rubros = [];
 
-    datos.rubros = datos.rubros.map(r => ({
-      ...r,
-      nombre: r.nombre || 'GENERAL',
-      items: (r.items || []).map(i => ({
-        ...i,
-        cantidad: Number(i.cantidad) || 0,
-        pu_mat: Number(i.pu_mat) || 0,
-        pu_mo: Number(i.pu_mo) || 0,
-        avance_anterior_pct: Number(i.avance_anterior_pct) || 0,
-        avance_actual_pct: Number(i.avance_actual_pct) || 0,
+    datos.rubros = datos.rubros
+      .map(r => ({
+        nombre: r.nombre || 'GENERAL',
+        items: (r.items || []).map(i => ({
+          codigo: i.codigo || '',
+          descripcion: i.descripcion || '',
+          unidad: i.unidad || '',
+          cantidad: Number(i.cantidad) || 0,
+          pu_mat: Number(i.pu_mat) || 0,
+          pu_mo: Number(i.pu_mo) || 0,
+          avance_anterior_pct: 0,
+          avance_actual_pct: 0,
+        }))
       }))
-    })).filter(r => r.items.length > 0);
+      .filter(r => r.items.length > 0);
 
-    // 5. Guardar en base de datos
+    if (datos.rubros.length === 0) {
+      datos.rubros = [{ nombre: 'GENERAL', items: [] }];
+    }
+
+    // 6. Guardar en BD
     const nuevo = await base44.asServiceRole.entities.PresupuestoObraEnhanced.create({
       titulo: datos.titulo,
       codigo: datos.codigo,
