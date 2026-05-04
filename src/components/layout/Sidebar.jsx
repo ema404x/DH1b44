@@ -40,7 +40,6 @@ const navGroups = [
       { label: 'Proveedores', icon: Truck, path: '/clientes' },
       { label: 'Presupuestos', icon: FileText, path: '/presupuestos' },
       { label: 'Presupuestos Obra', icon: Calculator, path: '/presupuestos-obra' },
-      { label: 'Avance de Obra', icon: BarChart2, path: '/avance-obra' },
       { label: 'Control de Riesgos', icon: ShieldAlert, path: '/control-riesgo' },
       { label: 'Certificados', icon: Award, path: '/certificados' },
       { label: 'Aprobación Certificados', icon: FileCheck2, path: '/aprobacion-certificados' },

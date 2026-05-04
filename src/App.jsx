@@ -39,7 +39,6 @@ import Emergencias from '@/pages/Emergencias';
 import MapaJefes from '@/pages/MapaJefes';
 import InspeccionColegio from '@/pages/InspeccionColegio';
 import AprobacionCertificados from '@/pages/AprobacionCertificados';
-import AvanceObra from '@/pages/AvanceObra';
 import ControlRiesgo from '@/pages/ControlRiesgo';
 
 class ErrorBoundary extends React.Component {
@@ -115,7 +114,6 @@ const AuthenticatedApp = () => {
         <Route path="/mapa-jefes" element={<MapaJefes />} />
         <Route path="/inspeccion-colegio" element={<InspeccionColegio />} />
         <Route path="/aprobacion-certificados" element={<AprobacionCertificados />} />
-        <Route path="/avance-obra" element={<AvanceObra />} />
         <Route path="/control-riesgo" element={<ControlRiesgo />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
