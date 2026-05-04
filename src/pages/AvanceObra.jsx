@@ -359,11 +359,11 @@ export default function AvanceObra() {
     setSelected(s => ({
       ...s,
       rubros: (s.rubros || []).map(r => ({
-        ...r, items: (r.items || []).map(item => {
-          const anterior = Number(item.avance_anterior_pct) || 0;
-          const disponible = Math.max(0, pct - anterior);
-          return { ...item, avance_actual_pct: disponible };
-        })
+        ...r, items: (r.items || []).map(item => ({
+          ...item,
+          avance_anterior_pct: 0,
+          avance_actual_pct: pct,
+        }))
       }))
     }));
   };
@@ -430,21 +430,41 @@ export default function AvanceObra() {
           </div>
         </div>
 
-        {/* Botones masivos */}
+        {/* Botones masivos — escenarios de certificación */}
         <div className="flex items-center gap-2 px-1 flex-wrap">
           <Zap className="h-4 w-4 shrink-0" style={{ color: RED_MAIN }} />
-          <span className="text-xs font-semibold text-gray-600">Aplicar a TODA la obra:</span>
-          <button onClick={() => applyToAll(0)}
-            className="px-3 py-1.5 text-xs font-bold rounded-lg border transition-all bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100">
-            0%
-          </button>
+          <span className="text-xs font-semibold text-gray-600">Aplicar a toda la obra:</span>
+
+          {/* PAPORC / PAMON — 1° Certificación 50% */}
           <button onClick={() => applyToAll(50)}
             className="px-3 py-1.5 text-xs font-bold rounded-lg border transition-all bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100">
-            50% a todo
+            1° Cert. — 50%
+            <span className="block text-[9px] font-normal opacity-70">ant: 0% · act: 50% · acum: 50%</span>
           </button>
-          <button onClick={() => applyToAll(100)}
+
+          {/* PAMON — 2° Certificación (50% anterior + 50% actual = 100%) */}
+          <button onClick={() => {
+            setSelected(s => ({
+              ...s,
+              rubros: (s.rubros || []).map(r => ({
+                ...r, items: (r.items || []).map(item => ({
+                  ...item,
+                  avance_anterior_pct: 50,
+                  avance_actual_pct: 50,
+                }))
+              }))
+            }));
+          }}
             className="px-3 py-1.5 text-xs font-bold rounded-lg border transition-all bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100">
-            100% a todo
+            2° Cert. — 100%
+            <span className="block text-[9px] font-normal opacity-70">ant: 50% · act: 50% · acum: 100%</span>
+          </button>
+
+          {/* Reset */}
+          <button onClick={() => applyToAll(0)}
+            className="px-3 py-1.5 text-xs font-bold rounded-lg border transition-all bg-gray-50 border-gray-300 text-gray-500 hover:bg-gray-100">
+            Limpiar
+            <span className="block text-[9px] font-normal opacity-70">0% todo</span>
           </button>
         </div>
 
