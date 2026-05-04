@@ -113,6 +113,22 @@ export default function Certificados() {
     saveMutation.mutate(formData);
   };
 
+  const detectarComuna = (cert) => {
+    const texto = `${cert.emprendimiento || ''} ${cert.obra_servicio || ''}`.toUpperCase();
+    if (texto.includes('8A') || texto.includes('8 A')) return '8A';
+    if (texto.includes('8B') || texto.includes('8 B')) return '8B';
+    if (texto.includes('10A') || texto.includes('10 A')) return '10A';
+    return null;
+  };
+
+  const filtrarPorComuna = (certs) => {
+    return certs.filter(c => {
+      if (comunaFiltro === 'Todas') return true;
+      const comunaDetectada = detectarComuna(c);
+      return comunaDetectada === comunaFiltro;
+    });
+  };
+
   if (view === 'upload') {
     return (
       <div>
@@ -189,7 +205,7 @@ export default function Certificados() {
             </Button>
           </div>
           <CertificadosLista
-            certificados={certificados.filter(c => c.tipo === 'abono_mensual' && (comunaFiltro === 'Todas' || !c.comuna || c.comuna === comunaFiltro))}
+            certificados={filtrarPorComuna(certificados.filter(c => c.tipo === 'abono_mensual'))}
             isLoading={isLoading}
             onNew={() => setView('upload')}
             onEdit={handleEdit}
@@ -206,7 +222,7 @@ export default function Certificados() {
 
         <TabsContent value="obra" className="mt-6">
           <CertificadosLista
-            certificados={certificados.filter(c => c.tipo === 'obra' && (comunaFiltro === 'Todas' || !c.comuna || c.comuna === comunaFiltro))}
+            certificados={filtrarPorComuna(certificados.filter(c => c.tipo === 'obra'))}
             isLoading={isLoading}
             onNew={() => setView('upload')}
             onEdit={handleEdit}
@@ -218,7 +234,7 @@ export default function Certificados() {
 
         <TabsContent value="informe" className="mt-6">
           <CertificadosLista
-            certificados={certificados.filter(c => c.tipo === 'informe' && (comunaFiltro === 'Todas' || !c.comuna || c.comuna === comunaFiltro))}
+            certificados={filtrarPorComuna(certificados.filter(c => c.tipo === 'informe'))}
             isLoading={isLoading}
             onNew={() => setView('upload')}
             onEdit={handleEdit}
