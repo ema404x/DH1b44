@@ -155,15 +155,14 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                 <Button 
                   size="icon" 
                   variant="ghost" 
-                  className={`h-8 w-8 ${c.estado !== 'aprobado' ? 'opacity-30 cursor-not-allowed' : 'text-emerald-600 hover:text-emerald-700'}`}
+                  className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
                   onClick={async () => {
-                    if (c.estado !== 'aprobado') return;
                     setExportingPDF(c.id);
                     await exportCertificadoPDF(c);
                     setExportingPDF(null);
                   }}
-                  disabled={c.estado !== 'aprobado' || exportingPDF === c.id}
-                  title={c.estado !== 'aprobado' ? 'PDF disponible solo tras aprobación gerencial' : 'Descargar PDF con firma'}
+                  disabled={exportingPDF === c.id}
+                  title="Descargar PDF"
                 >
                   {exportingPDF === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                 </Button>
