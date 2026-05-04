@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Bot, Sparkles, ChevronDown, ChevronUp, Loader2, Send } from 'lucide-react';
+import { Bot, Sparkles, ChevronDown, ChevronUp, Loader2, Send, Paperclip, X, File } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 
@@ -102,6 +102,9 @@ export default function AliceImportAssistant({ step, mappingResult, importResult
   const [sending, setSending] = useState(false);
   const [conversation, setConversation] = useState(null);
   const [initDone, setInitDone] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   // Inicializar conversación con contexto del módulo de importación
@@ -168,14 +171,50 @@ Sé concisa, práctica y amigable.`;
     return unsub;
   }, [conversation?.id]);
 
+  const handleFileSelect = async (files) => {
+    if (!files.length || !conversation) return;
+    setUploadingFile(true);
+    try {
+      const fileUrls = [];
+      for (const file of files) {
+        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        fileUrls.push(file_url);
+      }
+      setSelectedFiles(prev => [...prev, ...files.map((f, i) => ({ name: f.name, url: fileUrls[i], type: f.type }))]);
+    } catch (err) {
+      console.error('Error uploading file:', err);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const removeFile = (idx) => setSelectedFiles(prev => prev.filter((_, i) => i !== idx));
+
   const handleSend = async (text) => {
     const msg = (text || input).trim();
-    if (!msg || sending || !conversation) return;
+    if ((!msg && !selectedFiles.length) || sending || !conversation) return;
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: msg }]);
-    setMessages(prev => [...prev, { role: 'assistant', content: '...', _typing: true }]);
+    
+    // Enviar mensaje con archivos adjuntos
+    const userMsg = { role: 'user', content: msg || '📎 Archivos adjuntos para analizar' };
+    if (selectedFiles.length > 0) {
+      userMsg.file_urls = selectedFiles.map(f => f.url);
+    }
+    
+    setMessages(prev => [...prev, userMsg]);
+    if (selectedFiles.length > 0) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `📂 Recibí ${selectedFiles.length} archivo${selectedFiles.length !== 1 ? 's' : ''}: ${selectedFiles.map(f => f.name).join(', ')}. Analizando...`,
+        _typing: true
+      }]);
+    } else {
+      setMessages(prev => [...prev, { role: 'assistant', content: '...', _typing: true }]);
+    }
     setSending(true);
-    await base44.agents.addMessage(conversation, { role: 'user', content: msg });
+    setSelectedFiles([]);
+    
+    await base44.agents.addMessage(conversation, userMsg);
   };
 
   const currentSuggestions = STEP_MESSAGES[step]?.suggestions || [];
@@ -259,6 +298,23 @@ Sé concisa, práctica y amigable.`;
                 </div>
               )}
 
+              {/* File attachments preview */}
+              {selectedFiles.length > 0 && (
+                <div className="px-4 py-2 border-t border-border/50 space-y-2">
+                  {selectedFiles.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs bg-muted/30 rounded-lg px-2.5 py-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <File className="h-3 w-3 text-muted-foreground" />
+                        <span className="truncate text-muted-foreground">{file.name}</span>
+                      </div>
+                      <button onClick={() => removeFile(idx)} className="text-muted-foreground hover:text-destructive">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Input */}
               <div className="px-4 pb-3 flex gap-2">
                 <input
@@ -270,9 +326,25 @@ Sé concisa, práctica y amigable.`;
                   disabled={sending || !conversation}
                   className="flex-1 text-sm bg-background border border-input rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground disabled:opacity-50"
                 />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept=".xlsx,.xls,.csv,.json,.pdf"
+                  onChange={e => handleFileSelect(Array.from(e.target.files || []))}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={sending || !conversation || uploadingFile}
+                  className="h-9 w-9 rounded-xl border border-input hover:bg-muted flex items-center justify-center disabled:opacity-40 transition-colors flex-shrink-0"
+                  title="Adjuntar archivos para que Alice analice"
+                >
+                  {uploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                </button>
                 <button
                   onClick={() => handleSend()}
-                  disabled={!input.trim() || sending || !conversation}
+                  disabled={(!input.trim() && !selectedFiles.length) || sending || !conversation}
                   className="h-9 w-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0"
                 >
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
