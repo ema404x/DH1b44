@@ -19,6 +19,7 @@ export default function Certificados() {
   const [view, setView] = useState('list');
   const [tab, setTab] = useState('abono_mensual');
   const [comunaFiltro, setComunaFiltro] = useState('Todas');
+  const [mesFiltro, setMesFiltro] = useState('Todos');
   const [showMasiva, setShowMasiva] = useState(false);
   const [extracted, setExtracted] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -129,6 +130,19 @@ export default function Certificados() {
     });
   };
 
+  const getMeses = () => {
+    const meses = new Set();
+    certificados.forEach(c => {
+      if (c.mes_periodo) meses.add(c.mes_periodo);
+    });
+    return Array.from(meses).sort().reverse();
+  };
+
+  const filtrarPorMes = (certs) => {
+    if (mesFiltro === 'Todos') return certs;
+    return certs.filter(c => c.mes_periodo === mesFiltro);
+  };
+
   if (view === 'upload') {
     return (
       <div>
@@ -173,22 +187,34 @@ export default function Certificados() {
         onAction={() => setView('upload')}
       />
 
-      {/* Filtro por comuna */}
-      <div className="flex gap-2 flex-wrap">
-        {['Todas', '8A', '8B', '10A'].map(c => (
-          <button
-            key={c}
-            onClick={() => setComunaFiltro(c)}
-            className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
-              comunaFiltro === c
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'border-border text-muted-foreground hover:border-primary/50'
-            }`}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
+      {/* Filtros por comuna y mes */}
+       <div className="flex gap-4 flex-wrap items-center">
+         <div className="flex gap-2 flex-wrap">
+           {['Todas', '8A', '8B', '10A'].map(c => (
+             <button
+               key={c}
+               onClick={() => setComunaFiltro(c)}
+               className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                 comunaFiltro === c
+                   ? 'bg-primary text-primary-foreground border-primary'
+                   : 'border-border text-muted-foreground hover:border-primary/50'
+               }`}
+             >
+               {c}
+             </button>
+           ))}
+         </div>
+         <select
+           value={mesFiltro}
+           onChange={(e) => setMesFiltro(e.target.value)}
+           className="px-3 py-1.5 rounded-md border border-input bg-background text-xs font-medium"
+         >
+           <option value="Todos">Todos los meses</option>
+           {getMeses().map(mes => (
+             <option key={mes} value={mes}>{mes}</option>
+           ))}
+         </select>
+       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
@@ -205,7 +231,7 @@ export default function Certificados() {
             </Button>
           </div>
           <CertificadosLista
-            certificados={filtrarPorComuna(certificados.filter(c => c.tipo === 'abono_mensual'))}
+            certificados={filtrarPorMes(filtrarPorComuna(certificados.filter(c => c.tipo === 'abono_mensual')))}
             isLoading={isLoading}
             onNew={() => setView('upload')}
             onEdit={handleEdit}
@@ -222,7 +248,7 @@ export default function Certificados() {
 
         <TabsContent value="obra" className="mt-6">
           <CertificadosLista
-            certificados={filtrarPorComuna(certificados.filter(c => c.tipo === 'obra'))}
+            certificados={filtrarPorMes(filtrarPorComuna(certificados.filter(c => c.tipo === 'obra')))}
             isLoading={isLoading}
             onNew={() => setView('upload')}
             onEdit={handleEdit}
@@ -234,7 +260,7 @@ export default function Certificados() {
 
         <TabsContent value="informe" className="mt-6">
           <CertificadosLista
-            certificados={filtrarPorComuna(certificados.filter(c => c.tipo === 'informe'))}
+            certificados={filtrarPorMes(filtrarPorComuna(certificados.filter(c => c.tipo === 'informe')))}
             isLoading={isLoading}
             onNew={() => setView('upload')}
             onEdit={handleEdit}
