@@ -402,20 +402,25 @@ Responde con JSON. Para cada hoja:
       
       let actualRowCount = rawRows ? Math.max(0, rawRows.length - 1) : (sheet.row_count || 0);
       
-      // Para 8B pivotado: contar filas con datos válidos (que tengan N° DE ORDEN)
+      // Para 8B pivotado: contar celdas con datos (no filas)
       if (model === '8B' && rawRows && rawRows.length > 1) {
-        // Encontrar la columna de N° DE ORDEN (generalmente tiene números 6+ dígitos)
+        let cellCount = 0;
         const headers = (rawRows[0] || []).map(h => String(h || '').trim());
-        const ordenColIndex = headers.findIndex(h => /^(\d{6,}|n.*orden|numero.*orden)$/i.test(h));
         
-        if (ordenColIndex >= 0) {
-          // Contar filas donde N° DE ORDEN tiene valor
-          const validPendientes = rawRows.slice(1).filter(row => {
-            const val = row[ordenColIndex];
-            return val !== null && val !== undefined && val !== '' && val !== '#N/A';
-          }).length;
-          actualRowCount = validPendientes > 0 ? validPendientes : actualRowCount;
-        }
+        // Iterar filas y contar celdas que contengan datos válidos
+        rawRows.slice(1).forEach(row => {
+          headers.forEach((header, colIdx) => {
+            const cellValue = row[colIdx];
+            // Contar celdas que tengan contenido (excluir vacíos, #N/A, null)
+            if (cellValue !== null && cellValue !== undefined && cellValue !== '' && cellValue !== '#N/A') {
+              // Si la celda contiene múltiples pendientes delimitados (comas, saltos), contar cada uno
+              const items = String(cellValue).split(/[\n,;]/).filter(v => v.trim());
+              cellCount += items.length;
+            }
+          });
+        });
+        
+        actualRowCount = cellCount > 0 ? cellCount : actualRowCount;
       }
       
       return {
