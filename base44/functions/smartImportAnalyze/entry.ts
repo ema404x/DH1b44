@@ -101,6 +101,21 @@ const ENTITY_SCHEMAS = {
       unidad: ['unidad', 'um', 'u.m.', 'unit'],
     }
   },
+  LocationData: {
+    fields: ['ubic_tecnica', 'establecimiento', 'elem_pep', 'm2', 'comuna', 'jefe_sitio', 'inspector'],
+    key_fields: ['ubic_tecnica'],
+    description: 'Ubicaciones técnicas, escuelas o establecimientos con su ubicación y responsables',
+    aliases: ['ubicacion', 'ubicaciones', 'establecimiento', 'escuela', 'escuelas', 'colegio', 'colegios', 'location', 'sitio', 'sitios'],
+    key_patterns: {
+      ubic_tecnica: ['ubic tecnica', 'ubicacion tecnica', 'ubic_tecnica', 'codigo ubicacion', 'cod ubic', 'ubicacion', 'codigo sitio'],
+      establecimiento: ['establecimiento', 'escuela', 'nombre escuela', 'nombre establecimiento', 'colegio', 'nombre colegio'],
+      jefe_sitio: ['jefe sitio', 'jefe_sitio', 'jefe', 'responsable sitio', 'encargado'],
+      inspector: ['inspector', 'insp', 'inspector asignado'],
+      m2: ['m2', 'metros', 'superficie', 'area', 'superficie m2'],
+      comuna: ['comuna', 'zona', 'district'],
+      elem_pep: ['elem pep', 'pep', 'elemento pep', 'elem_pep'],
+    }
+  },
   Quote: {
     fields: ['title', 'client_name', 'description', 'status', 'subtotal', 'tax_rate', 'total', 'valid_until', 'notes'],
     key_fields: ['title', 'client_name'],

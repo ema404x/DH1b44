@@ -17,6 +17,7 @@ import ImportStepConfirm from '@/components/importar/ImportStepConfirm';
 import ImportStepResult from '@/components/importar/ImportStepResult';
 import AsignadorJefesEscuelas from '@/components/informacion-general/AsignadorJefesEscuelas';
 import ImportadorJefesSitio from '@/components/informacion-general/ImportadorJefesSitio';
+import AliceImportAssistant from '@/components/importar/AliceImportAssistant';
 
 const STEPS = [
   { id: 0, name: 'Subir Archivo', icon: Upload, description: 'Selecciona tu archivo Excel' },
@@ -186,6 +187,14 @@ export default function ImportarDatos() {
           {/* Content */}
           {activeTab === 'general' && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+
+              {/* Alice Import Assistant */}
+              <AliceImportAssistant
+                step={step}
+                mappingResult={mappingResult}
+                importResult={importResult}
+              />
+
               {/* Steps Indicator */}
               {step > 0 && (
                 <div className="flex gap-2 mb-8">

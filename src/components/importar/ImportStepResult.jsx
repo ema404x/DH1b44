@@ -9,6 +9,7 @@ const ENTITY_ROUTES = {
   Client: '/clientes', Employee: '/empleados', Material: '/inventario',
   Project: '/proyectos', WorkOrder: '/ordenes', Asset: '/activos',
   PrecarioMinisterio: '/presupuestos-obra', Quote: '/presupuestos', Invoice: '/facturacion',
+  LocationData: '/informacion-general',
 };
 
 export default function ImportStepResult({ result, onReset }) {

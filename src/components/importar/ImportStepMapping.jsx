@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 const ENTITY_OPTIONS = [
-  { value: 'Client', label: 'Clientes' },
+  { value: 'Client', label: 'Clientes/Proveedores' },
   { value: 'Employee', label: 'Empleados' },
   { value: 'Material', label: 'Materiales' },
   { value: 'Project', label: 'Proyectos' },
@@ -14,6 +14,7 @@ const ENTITY_OPTIONS = [
   { value: 'PrecarioMinisterio', label: 'Preciario Ministerial' },
   { value: 'Quote', label: 'Presupuestos' },
   { value: 'Invoice', label: 'Facturas' },
+  { value: 'LocationData', label: 'Ubicaciones Técnicas' },
   { value: 'skip', label: '— Ignorar esta hoja —' },
 ];
 
@@ -27,6 +28,7 @@ const ENTITY_FIELDS = {
   PrecarioMinisterio: ['codigo', 'descripcion', 'unidad', 'categoria', 'subcategoria', 'comuna', 'pu_mat', 'pu_mo', 'coef_pase', 'coef_oferta'],
   Quote: ['title', 'client_name', 'description', 'status', 'subtotal', 'tax_rate', 'total', 'valid_until', 'notes'],
   Invoice: ['client_name', 'project_name', 'status', 'subtotal', 'tax_rate', 'total', 'issue_date', 'due_date', 'notes'],
+  LocationData: ['ubic_tecnica', 'establecimiento', 'elem_pep', 'm2', 'comuna', 'jefe_sitio', 'inspector', 'estado'],
 };
 
 const KEY_FIELDS = {
@@ -39,6 +41,7 @@ const KEY_FIELDS = {
   PrecarioMinisterio: ['codigo'],
   Quote: ['title', 'client_name'],
   Invoice: ['client_name', 'issue_date'],
+  LocationData: ['ubic_tecnica'],
 };
 
 function ConfidenceBadge({ confidence }) {
