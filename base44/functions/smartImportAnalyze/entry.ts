@@ -146,31 +146,36 @@ const ENTITY_SCHEMAS = {
 // Detectar el modelo de planilla por comuna
 function detectPlanillaModel(sheetName, headers) {
   const sheetLower = sheetName.toLowerCase();
+  // Normalizar headers igual que en preScoreSheet
+  const headersNorm = headers.map(h => h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
   
-  // Modelo 8A: Hojas por inspector con columnas estándar (INSPECTOR, UBICACIÓN, ESTABLECIMIENTO, TAREAS, N° DE ORDEN, etc.)
-  if (headers.includes('INSPECTOR') && headers.includes('N° DE ORDEN') && headers.includes('TAREAS A REALIZAR')) {
-    return { model: '8A', pattern: 'inspector_sheets' };
+  // Contar matches de palabras clave
+  const hasInspector = headersNorm.some(h => h.includes('inspector'));
+  const hasOrdenNumber = headersNorm.some(h => h.includes('n°') && h.includes('orden') || h.includes('numero') && h.includes('orden'));
+  const hasTareas = headersNorm.some(h => h.includes('tarea'));
+  const hasUbicacion = headersNorm.some(h => h.includes('ubicacion'));
+  const hasEstablecimiento = headersNorm.some(h => h.includes('establecimiento'));
+  const hasStatus = headersNorm.some(h => h.includes('status') || h.includes('estado'));
+  
+  // Modelo 8A: Tiene INSPECTOR + estructura SAP completa
+  if (hasInspector && hasOrdenNumber && hasTareas) {
+    return { model: '8A', pattern: 'inspector_sheets', confidence: 0.95 };
   }
   
-  // Modelo 10A: Sin INSPECTOR, pero tiene UBICACIÓN, ESTABLECIMIENTO, TAREAS, N° DE ORDEN
-  if (!headers.includes('INSPECTOR') && headers.includes('N° DE ORDEN') && 
-      headers.includes('TAREAS A REALIZAR') && headers.includes('ESTABLECIMIENTO')) {
-    return { model: '10A', pattern: 'no_inspector' };
+  // Modelo 10A: SIN INSPECTOR pero TIENE estructura SAP (N° DE ORDEN, TAREAS, ESTABLECIMIENTO)
+  if (!hasInspector && hasOrdenNumber && hasTareas && hasEstablecimiento) {
+    return { model: '10A', pattern: 'no_inspector', confidence: 0.95 };
   }
   
-  // Modelo 8B: Formato pivotado (columnas dinámicas = direcciones/jefes, datos anidados)
-  // Detectar por: nombres de direcciones en headers, sin INSPECTOR, sin estructura SAP clara
-  const hasAddressLikeHeaders = headers.some(h => 
-    h.match(/^[A-Z].*\d{3,}/) || // Direcciones (ej: MONTIEL 3826)
-    h.match(/calle|avenida|avda|pasaje|pje/i)
-  );
+  // Modelo 8B: Direcciones como nombres de columnas, sin estructura SAP clara
+  const hasAddressLikeHeaders = headers.some(h => {
+    const clean = h.trim().toUpperCase();
+    // Direcciones: patrón típico es "PALABRA PALABRA NUMERO" (ej: MONTIEL 3826)
+    return /^[A-Z\s]+\s+\d{4}/.test(clean) && !hasOrdenNumber;
+  });
   
-  const hasSAPStructure = headers.some(h => 
-    h.match(/n° de orden|n° orden|numero orden|inspector|ubicacion|establecimiento/i)
-  );
-  
-  if (hasAddressLikeHeaders && !hasSAPStructure) {
-    return { model: '8B', pattern: 'pivoted_addresses' };
+  if (hasAddressLikeHeaders && !hasInspector && !hasOrdenNumber) {
+    return { model: '8B', pattern: 'pivoted_addresses', confidence: 0.90 };
   }
   
   return null;
@@ -325,12 +330,17 @@ Responde con la lista de hojas ordenada por confidence DESCENDENTE (mayor confia
   });
 
   // Ensure row_count is always set from real data (not LLM guess)
+  // También asegurarse de que detected_planilla_model esté poblado
   if (result && result.sheets) {
     result.sheets = result.sheets.map(sheet => {
       const rawRows = raw_data[sheet.sheet_name];
+      const sheetInfo = sheetsInfo.find(s => s.sheetName === sheet.sheet_name);
+      
       return {
         ...sheet,
         row_count: rawRows ? Math.max(0, rawRows.length - 1) : (sheet.row_count || 0),
+        // Si la IA no detectó, usar nuestro análisis local
+        detected_planilla_model: sheet.detected_planilla_model || sheetInfo?.planilla_model || null,
       };
     });
   }
