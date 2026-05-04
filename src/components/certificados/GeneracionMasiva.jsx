@@ -1,204 +1,229 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Zap, CheckCircle2, AlertCircle, Users } from 'lucide-react';
+import {
+  Loader2, Zap, CheckCircle2, AlertCircle, FileText, Upload, X, UploadCloud
+} from 'lucide-react';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+const ESTADOS = {
+  pendiente: { label: 'Pendiente', color: 'text-muted-foreground', icon: FileText },
+  subiendo:  { label: 'Subiendo...', color: 'text-blue-500',    icon: Loader2, spin: true },
+  extrayendo:{ label: 'Extrayendo con IA...', color: 'text-violet-500', icon: Loader2, spin: true },
+  guardando: { label: 'Guardando...', color: 'text-blue-500',   icon: Loader2, spin: true },
+  ok:        { label: 'Certificado generado', color: 'text-emerald-600', icon: CheckCircle2 },
+  error:     { label: 'Error', color: 'text-destructive',       icon: AlertCircle },
+};
 
 export default function GeneracionMasiva({ open, onClose, onSuccess }) {
   const queryClient = useQueryClient();
-  const [seleccionados, setSeleccionados] = useState([]);
-  const [mesPeriodo, setMesPeriodo] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const inputRef = useRef(null);
+  const [archivos, setArchivos] = useState([]); // [{file, estado, certNumero, error}]
   const [running, setRunning] = useState(false);
-  const [resultado, setResultado] = useState(null);
+  const [drag, setDrag] = useState(false);
 
-  const { data: clientes = [], isLoading } = useQuery({
-    queryKey: ['clientes-activos'],
-    queryFn: () => base44.entities.Client.filter({ status: 'activo' }),
-    enabled: open,
-  });
-
-  const { data: certExistentes = [] } = useQuery({
-    queryKey: ['certs-mes', mesPeriodo],
-    queryFn: () => base44.entities.Certificado.filter({ mes_periodo: mesPeriodo, tipo: 'abono_mensual' }),
-    enabled: open && !!mesPeriodo,
-  });
-
-  const yaGenerados = new Set(certExistentes.map(c => c.contratista_id).filter(Boolean));
-
-  const toggleSeleccion = (id) => {
-    setSeleccionados(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+  const addFiles = (files) => {
+    const nuevos = Array.from(files)
+      .filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'))
+      .map(file => ({ file, estado: 'pendiente', certNumero: null, error: null }));
+    setArchivos(prev => [...prev, ...nuevos]);
   };
 
-  const toggleTodos = () => {
-    const disponibles = clientes.filter(c => !yaGenerados.has(c.id)).map(c => c.id);
-    if (seleccionados.length === disponibles.length) {
-      setSeleccionados([]);
-    } else {
-      setSeleccionados(disponibles);
-    }
+  const removeFile = (idx) => {
+    setArchivos(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const procesarArchivo = async (idx, lastNum) => {
+    const setEstado = (estado, extra = {}) =>
+      setArchivos(prev => prev.map((a, i) => i === idx ? { ...a, estado, ...extra } : a));
+
+    const archivo = archivos[idx];
+
+    // 1. Subir el archivo
+    setEstado('subiendo');
+    const { file_url } = await base44.integrations.Core.UploadFile({ file: archivo.file });
+
+    // 2. Extraer datos con IA
+    setEstado('extrayendo');
+    const res = await base44.functions.invoke('extractADA', { file_url });
+    const data = res.data?.data || res.data;
+
+    // 3. Guardar certificado
+    setEstado('guardando');
+    const certNum = lastNum + idx + 1;
+    const newCert = {
+      numero: certNum,
+      tipo: data.tipo || 'abono_mensual',
+      estado: 'emitido',
+      generado_automaticamente: false,
+      emprendimiento: data.emprendimiento || '',
+      obra_servicio: data.obra_servicio || '',
+      contratista: data.contratista || '',
+      ada_numero: data.ada_numero || '',
+      oc_numero: data.oc_numero || '',
+      mes_periodo: data.mes_periodo || '',
+      fecha_inicio: data.fecha_inicio || '',
+      plazo_obra: data.plazo_obra || '',
+      plazo_entrega: data.plazo_entrega || '',
+      monto_contratado: data.monto_contratado || data.subtotal || 0,
+      monto_obra_contratada: data.monto_obra_contratada || 0,
+      porcentaje_avance: data.porcentaje_avance || 0,
+      condiciones_pago: data.condiciones_pago || '',
+      fecha_certificado: new Date().toISOString().split('T')[0],
+      items: data.items || [],
+      subtotal: data.subtotal || 0,
+      anticipo_pct: 0,
+      fondo_reparo_pct: 5,
+      ada_pdf_url: file_url,
+    };
+
+    await base44.entities.Certificado.create(newCert);
+    setEstado('ok', { certNumero: certNum });
   };
 
   const handleGenerar = async () => {
-    if (!seleccionados.length || !mesPeriodo) return;
+    if (!archivos.length || running) return;
     setRunning(true);
-    setResultado(null);
 
-    try {
-      const clientesSeleccionados = clientes.filter(c => seleccionados.includes(c.id));
-      const generados = [];
-      const errores = [];
+    // Obtener último número de certificado base
+    const allCerts = await base44.entities.Certificado.list('-numero', 1);
+    const lastNum = allCerts.length > 0 ? (allCerts[0].numero || 0) : 0;
 
-      // Obtener el último número de certificado
-      const allCerts = await base44.entities.Certificado.list('-numero', 1);
-      let lastNum = allCerts.length > 0 ? (allCerts[0].numero || 0) : 0;
+    // Procesar todos en paralelo
+    const promises = archivos.map((_, idx) =>
+      procesarArchivo(idx, lastNum).catch(err => {
+        setArchivos(prev => prev.map((a, i) =>
+          i === idx ? { ...a, estado: 'error', error: err.message || 'Error desconocido' } : a
+        ));
+      })
+    );
 
-      const fechaCert = new Date().toISOString().split('T')[0];
+    await Promise.all(promises);
 
-      for (const cliente of clientesSeleccionados) {
-        try {
-          lastNum += 1;
-          const newCert = {
-            numero: lastNum,
-            tipo: 'abono_mensual',
-            estado: 'emitido',
-            generado_automaticamente: true,
-            contratista: cliente.name,
-            contratista_id: cliente.id,
-            emprendimiento: cliente.notes || '',
-            mes_periodo: mesPeriodo,
-            fecha_certificado: fechaCert,
-            items: [],
-            subtotal: 0,
-            monto_contratado: 0,
-            anticipo_pct: 0,
-            fondo_reparo_pct: 5,
-          };
-          await base44.entities.Certificado.create(newCert);
-          generados.push(cliente.name);
-        } catch (e) {
-          errores.push(cliente.name);
-        }
-      }
-
-      setResultado({ generados, errores });
-      queryClient.invalidateQueries({ queryKey: ['certificados'] });
-      queryClient.invalidateQueries({ queryKey: ['certs-mes', mesPeriodo] });
-      if (onSuccess) onSuccess();
-    } finally {
-      setRunning(false);
-    }
+    queryClient.invalidateQueries({ queryKey: ['certificados'] });
+    setRunning(false);
+    if (onSuccess) onSuccess();
   };
 
-  const disponibles = clientes.filter(c => !yaGenerados.has(c.id));
-  const todosSeleccionados = disponibles.length > 0 && seleccionados.length === disponibles.length;
+  const limpiar = () => {
+    setArchivos([]);
+    setRunning(false);
+  };
+
+  const terminados = archivos.filter(a => a.estado === 'ok').length;
+  const conError = archivos.filter(a => a.estado === 'error').length;
+  const todosTerminados = archivos.length > 0 && archivos.every(a => a.estado === 'ok' || a.estado === 'error');
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl">
+    <Dialog open={open} onOpenChange={() => { if (!running) { limpiar(); onClose(); } }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-violet-500" />
-            Generación Masiva — Abono Mensual
+            Generación Masiva desde PDFs
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Selector de mes */}
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">Mes / Período</label>
-            <input
-              type="month"
-              value={mesPeriodo}
-              onChange={e => { setMesPeriodo(e.target.value); setSeleccionados([]); setResultado(null); }}
-              className="px-3 py-2 border border-input rounded-lg text-sm bg-background w-full"
-            />
-          </div>
-
-          {/* Resultado */}
-          {resultado && (
-            <div className={`rounded-lg p-4 border text-sm space-y-1 ${resultado.errores.length === 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
-              {resultado.generados.length > 0 && (
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>{resultado.generados.length} certificados generados correctamente</span>
-                </div>
-              )}
-              {resultado.errores.length > 0 && (
-                <div className="flex items-center gap-2 text-amber-700">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Errores en: {resultado.errores.join(', ')}</span>
-                </div>
-              )}
+        <div className="flex flex-col gap-4 flex-1 min-h-0">
+          {/* Drop zone */}
+          {!running && (
+            <div
+              onClick={() => inputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setDrag(true); }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={e => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                drag ? 'border-violet-500 bg-violet-50/10' : 'border-border hover:border-violet-400 hover:bg-muted/20'
+              }`}
+            >
+              <UploadCloud className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+              <p className="font-semibold text-sm">Arrastrá los PDFs acá o hacé click</p>
+              <p className="text-xs text-muted-foreground mt-1">Podés subir hasta 20 archivos PDF a la vez</p>
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                multiple
+                className="hidden"
+                onChange={e => addFiles(e.target.files)}
+              />
             </div>
           )}
 
-          {/* Lista de contratistas */}
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground text-sm">Cargando contratistas...</div>
-          ) : clientes.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground text-sm">
-              <Users className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              No hay proveedores/contratistas activos
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{disponibles.length} disponibles para {mesPeriodo}</span>
-                {disponibles.length > 0 && (
-                  <button onClick={toggleTodos} className="text-xs text-primary hover:underline">
-                    {todosSeleccionados ? 'Deseleccionar todos' : 'Seleccionar todos'}
-                  </button>
-                )}
-              </div>
-
-              <div className="max-h-64 overflow-y-auto space-y-1 border rounded-lg p-2">
-                {clientes.map(cliente => {
-                  const yaExiste = yaGenerados.has(cliente.id);
-                  const checked = seleccionados.includes(cliente.id);
-                  return (
-                    <div
-                      key={cliente.id}
-                      onClick={() => !yaExiste && toggleSeleccion(cliente.id)}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                        yaExiste ? 'opacity-50 cursor-not-allowed bg-muted/30' :
-                        checked ? 'bg-violet-50 border border-violet-200 cursor-pointer' :
-                        'hover:bg-muted/40 cursor-pointer'
-                      }`}
-                    >
-                      <Checkbox checked={checked} disabled={yaExiste} onCheckedChange={() => !yaExiste && toggleSeleccion(cliente.id)} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{cliente.name}</p>
-                        {cliente.rubro && <p className="text-xs text-muted-foreground">{cliente.rubro}</p>}
-                      </div>
-                      {yaExiste && <Badge variant="secondary" className="text-xs shrink-0">Ya generado</Badge>}
+          {/* Lista de archivos */}
+          {archivos.length > 0 && (
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 border rounded-xl p-3">
+              {archivos.map((a, idx) => {
+                const cfg = ESTADOS[a.estado] || ESTADOS.pendiente;
+                const Icon = cfg.icon;
+                return (
+                  <div key={idx} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/20 border border-border/40">
+                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{a.file.name}</p>
+                      {a.estado === 'error' && a.error && (
+                        <p className="text-xs text-destructive truncate">{a.error}</p>
+                      )}
+                      {a.estado === 'ok' && a.certNumero && (
+                        <p className="text-xs text-emerald-600">Certificado N° {a.certNumero}</p>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
+                    <div className={`flex items-center gap-1.5 text-xs font-medium ${cfg.color} shrink-0`}>
+                      <Icon className={`h-3.5 w-3.5 ${cfg.spin ? 'animate-spin' : ''}`} />
+                      <span>{cfg.label}</span>
+                    </div>
+                    {!running && a.estado === 'pendiente' && (
+                      <button onClick={() => removeFile(idx)} className="text-muted-foreground hover:text-destructive transition-colors">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Resumen post-proceso */}
+          {todosTerminados && (
+            <div className={`rounded-lg p-3 border text-sm flex items-center gap-3 ${
+              conError === 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'
+            }`}>
+              {conError === 0 ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
+              <span>
+                {terminados} certificado{terminados !== 1 ? 's' : ''} generado{terminados !== 1 ? 's' : ''}
+                {conError > 0 && ` · ${conError} con error`}
+              </span>
             </div>
           )}
 
           {/* Acciones */}
-          <div className="flex gap-2 pt-2 border-t">
-            <Button variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>
+          <div className="flex gap-2 pt-1 border-t">
             <Button
-              onClick={handleGenerar}
-              disabled={seleccionados.length === 0 || running}
-              className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700"
+              variant="outline"
+              onClick={() => { limpiar(); onClose(); }}
+              disabled={running}
+              className="flex-1"
             >
-              {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-              {running ? 'Generando...' : `Generar ${seleccionados.length > 0 ? `(${seleccionados.length})` : ''}`}
+              {todosTerminados ? 'Cerrar' : 'Cancelar'}
             </Button>
+            {!todosTerminados && (
+              <Button
+                onClick={handleGenerar}
+                disabled={archivos.length === 0 || running}
+                className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700"
+              >
+                {running
+                  ? <><Loader2 className="h-4 w-4 animate-spin" />Procesando {terminados}/{archivos.length}...</>
+                  : <><Zap className="h-4 w-4" />Generar {archivos.length > 0 ? `${archivos.length} certificado${archivos.length !== 1 ? 's' : ''}` : ''}</>
+                }
+              </Button>
+            )}
+            {todosTerminados && archivos.some(a => a.estado === 'error') && (
+              <Button onClick={limpiar} variant="outline" className="flex-1">
+                Intentar de nuevo
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
