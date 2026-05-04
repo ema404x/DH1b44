@@ -47,48 +47,67 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
       </div>
 
       {/* Preview Card */}
-      <div className="bg-card border rounded-xl p-6 space-y-6">
+      <div className="bg-card border rounded-xl p-8 space-y-6 max-w-4xl mx-auto">
         {/* Header del certificado */}
-        <div className="flex items-start justify-between border-b pb-4">
-          <div>
-            <h2 className="text-xl font-bold">Certificado N° {form.numero}</h2>
-            <p className="text-sm text-muted-foreground capitalize">{form.tipo?.replace(/_/g, ' ')} · {fmtDate(form.fecha_certificado)}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">ADA N°</p>
-            <p className="font-bold">{form.ada_numero}</p>
-          </div>
+        <div className="border-b pb-6">
+          <h1 className="text-3xl font-bold mb-2">Certificado N° {form.numero}</h1>
+          <p className="text-sm text-muted-foreground capitalize">{form.tipo?.replace(/_/g, ' ')} · {fmtDate(form.fecha_certificado)}</p>
         </div>
 
-        {/* Info general */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div className="space-y-2">
-            {[
-              ['Emprendimiento', form.emprendimiento],
-              ['Obra / Servicio', form.obra_servicio],
-              ['Contratista', form.contratista],
-              ['Base', form.base],
-            ].map(([k, v]) => (
-              <div key={k} className="flex gap-2">
-                <span className="text-muted-foreground w-32 shrink-0">{k}:</span>
-                <span className="font-medium">{v || '—'}</span>
+        {/* Info general - Una columna para mejor legibilidad */}
+        <div className="space-y-4 text-sm">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground font-medium">Emprendimiento:</span>
+              <span className="font-semibold">{form.emprendimiento || '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground font-medium">ADA N°:</span>
+              <span className="font-semibold">{form.ada_numero || '—'}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-muted-foreground font-medium">Obra / Servicio:</span>
+              <span className="font-semibold">{form.obra_servicio || '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground font-medium">OC N°:</span>
+              <span className="font-semibold">{form.oc_numero || '—'}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-muted-foreground font-medium">Contratista:</span>
+              <span className="font-semibold">{form.contratista || '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground font-medium">Mes / Período:</span>
+              <span className="font-semibold">{form.mes_periodo || '—'}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-muted-foreground font-medium">Fecha inicio:</span>
+              <span className="font-semibold">{fmtDate(form.fecha_inicio)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground font-medium">Fecha finalización:</span>
+              <span className="font-semibold">{fmtDate(form.fecha_finalizacion)}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-muted-foreground font-medium">Plazo:</span>
+              <span className="font-semibold">{form.plazo_obra || '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground font-medium">Monto contratado:</span>
+              <span className="font-semibold text-primary">{fmt(form.monto_contratado)}</span>
+            </div>
+
+            {form.base && (
+              <div className="flex justify-between col-span-2">
+                <span className="text-muted-foreground font-medium">Base:</span>
+                <span className="font-semibold">{form.base}</span>
               </div>
-            ))}
-          </div>
-          <div className="space-y-2">
-            {[
-              ['OC N°', form.oc_numero],
-              ['Mes / Período', form.mes_periodo],
-              ['Fecha inicio', fmtDate(form.fecha_inicio)],
-              ['Plazo', form.plazo_obra],
-              ['Finalización', fmtDate(form.fecha_finalizacion)],
-              ['Monto contratado', fmt(form.monto_contratado)],
-            ].map(([k, v]) => (
-              <div key={k} className="flex gap-2">
-                <span className="text-muted-foreground w-32 shrink-0">{k}:</span>
-                <span className="font-medium">{v || '—'}</span>
-              </div>
-            ))}
+            )}
           </div>
         </div>
 
