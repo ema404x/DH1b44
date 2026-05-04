@@ -393,16 +393,35 @@ Responde con JSON. Para cada hoja:
 
   // Ensure row_count is always set from real data (not LLM guess)
   // También asegurarse de que detected_planilla_model esté poblado
+  // Para 8B pivotado, contar pendientes únicos (no filas crudas)
   if (result && result.sheets) {
     result.sheets = result.sheets.map(sheet => {
       const rawRows = raw_data[sheet.sheet_name];
       const sheetInfo = sheetsInfo.find(s => s.sheetName === sheet.sheet_name);
+      const model = sheet.detected_planilla_model || sheetInfo?.planilla_model;
+      
+      let actualRowCount = rawRows ? Math.max(0, rawRows.length - 1) : (sheet.row_count || 0);
+      
+      // Para 8B pivotado: contar filas con datos válidos (que tengan N° DE ORDEN)
+      if (model === '8B' && rawRows && rawRows.length > 1) {
+        // Encontrar la columna de N° DE ORDEN (generalmente tiene números 6+ dígitos)
+        const headers = (rawRows[0] || []).map(h => String(h || '').trim());
+        const ordenColIndex = headers.findIndex(h => /^(\d{6,}|n.*orden|numero.*orden)$/i.test(h));
+        
+        if (ordenColIndex >= 0) {
+          // Contar filas donde N° DE ORDEN tiene valor
+          const validPendientes = rawRows.slice(1).filter(row => {
+            const val = row[ordenColIndex];
+            return val !== null && val !== undefined && val !== '' && val !== '#N/A';
+          }).length;
+          actualRowCount = validPendientes > 0 ? validPendientes : actualRowCount;
+        }
+      }
       
       return {
         ...sheet,
-        row_count: rawRows ? Math.max(0, rawRows.length - 1) : (sheet.row_count || 0),
-        // Si la IA no detectó, usar nuestro análisis local
-        detected_planilla_model: sheet.detected_planilla_model || sheetInfo?.planilla_model || null,
+        row_count: actualRowCount,
+        detected_planilla_model: model || null,
       };
     });
   }
