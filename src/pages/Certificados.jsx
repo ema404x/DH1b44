@@ -16,7 +16,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 // view: 'list' | 'upload' | 'edit' | 'preview'
 export default function Certificados() {
   const [view, setView] = useState('list');
-  const [tab, setTab] = useState('manuales');
+  const [tab, setTab] = useState('abono_mensual');
   const [extracted, setExtracted] = useState(null);
   const [editing, setEditing] = useState(null);
   const [previewing, setPreviewing] = useState(null);
@@ -156,18 +156,45 @@ export default function Certificados() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="manuales">Certificados Manuales</TabsTrigger>
-          <TabsTrigger value="automaticos">Certificados Automáticos</TabsTrigger>
+          <TabsTrigger value="abono_mensual">🟣 Abono Mensual</TabsTrigger>
+          <TabsTrigger value="obra">🟠 Obra</TabsTrigger>
+          <TabsTrigger value="informe">🔵 Informe</TabsTrigger>
+          <TabsTrigger value="automaticos">⚡ Automáticos</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="manuales" className="mt-6">
+        <TabsContent value="abono_mensual" className="mt-6">
           <CertificadosLista
-            certificados={certificados.filter(c => !c.generado_automaticamente)}
+            certificados={certificados.filter(c => c.tipo === 'abono_mensual')}
             isLoading={isLoading}
             onNew={() => setView('upload')}
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
             onPreviewPDF={handlePreviewPDF}
+            emptyLabel="No hay certificados de Abono Mensual"
+          />
+        </TabsContent>
+
+        <TabsContent value="obra" className="mt-6">
+          <CertificadosLista
+            certificados={certificados.filter(c => c.tipo === 'obra')}
+            isLoading={isLoading}
+            onNew={() => setView('upload')}
+            onEdit={handleEdit}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            onPreviewPDF={handlePreviewPDF}
+            emptyLabel="No hay certificados de Obra"
+          />
+        </TabsContent>
+
+        <TabsContent value="informe" className="mt-6">
+          <CertificadosLista
+            certificados={certificados.filter(c => c.tipo === 'informe')}
+            isLoading={isLoading}
+            onNew={() => setView('upload')}
+            onEdit={handleEdit}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            onPreviewPDF={handlePreviewPDF}
+            emptyLabel="No hay certificados de Informe"
           />
         </TabsContent>
 

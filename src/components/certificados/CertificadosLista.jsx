@@ -15,7 +15,13 @@ const estadoStyle = {
   aprobado: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
-export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete }) {
+const tipoStyle = {
+  abono_mensual: { label: 'Abono Mensual', color: 'bg-violet-100 text-violet-700 border-violet-200' },
+  obra:          { label: 'Obra',           color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  informe:       { label: 'Informe',        color: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
+};
+
+export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete, emptyLabel }) {
   const [exporting, setExporting] = useState(null);
   const [exportingPDF, setExportingPDF] = useState(null);
   const [search, setSearch] = useState('');
@@ -58,7 +64,7 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
   if (certificados.length === 0) return (
     <div className="text-center py-20">
       <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-      <h3 className="font-semibold text-lg mb-1">No hay certificados aún</h3>
+      <h3 className="font-semibold text-lg mb-1">{emptyLabel || 'No hay certificados aún'}</h3>
       <p className="text-muted-foreground text-sm mb-6">Subí un ADA y la IA generará el certificado automáticamente</p>
       <Button onClick={onNew} className="gap-2"><Plus className="h-4 w-4" />Nuevo Certificado</Button>
     </div>
@@ -91,8 +97,13 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                     <Badge className={`text-xs border ${estadoStyle[c.estado] || estadoStyle.borrador}`}>
                       {c.estado}
                     </Badge>
+                    {c.tipo && tipoStyle[c.tipo] && (
+                      <Badge className={`text-xs border ${tipoStyle[c.tipo].color}`}>
+                        {tipoStyle[c.tipo].label}
+                      </Badge>
+                    )}
                     {c.generado_automaticamente && (
-                      <Badge variant="secondary" className="text-xs">Automático</Badge>
+                      <Badge variant="secondary" className="text-xs">⚡ Auto</Badge>
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground">{c.contratista}</p>
