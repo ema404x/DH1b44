@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, BarChart2, ChevronRight, ArrowLeft, CheckCircle2, Clock, AlertCircle, Save, Zap, Plus, Upload, FileSpreadsheet, Download, Trash2, X } from 'lucide-react';
+import { Search, Loader2, BarChart2, ChevronRight, ArrowLeft, CheckCircle2, Clock, AlertCircle, Save, Zap, Plus, Upload, FileSpreadsheet, Download, Trash2, X, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
@@ -133,94 +133,146 @@ function PresupuestoCard({ p, onOpen, onDelete }) {
   );
 }
 
-// ── Formulario nuevo presupuesto ─────────────────────────────────────────────
-function NuevoPresupuestoForm({ onClose, onCreated }) {
-  const [form, setForm] = useState({ codigo: '', titulo: '', escuela: '', coef_pase: 1.6504, coef_oferta: 1.38 });
-  const [file, setFile] = useState(null);
-  const [saving, setSaving] = useState(false);
+// ── Zona de importación inteligente con IA ───────────────────────────────────
+function ImportarExcelIA({ onClose, onCreated }) {
+  const [step, setStep] = useState('idle'); // idle | uploading | analyzing | done | error
+  const [fileName, setFileName] = useState('');
+  const [stats, setStats] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [dragging, setDragging] = useState(false);
   const fileRef = useRef();
 
-  const handleFile = (e) => {
-    const f = e.target.files?.[0];
-    if (f) setFile(f);
+  const processFile = async (file) => {
+    if (!file?.name.match(/\.(xlsx|xls)$/i)) {
+      toast.error('Solo se aceptan archivos Excel (.xlsx, .xls)');
+      return;
+    }
+    setFileName(file.name);
+    setStep('uploading');
+    setErrorMsg('');
+
+    // 1. Subir el archivo
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+
+    // 2. IA analiza y crea el presupuesto
+    setStep('analyzing');
+    const res = await base44.functions.invoke('importarExcelPresupuesto', {
+      file_url,
+      archivo_nombre: file.name,
+    });
+
+    if (res.data?.success) {
+      setStats(res.data.stats);
+      setStep('done');
+      onCreated();
+    } else {
+      setErrorMsg(res.data?.error || 'Error al procesar el Excel');
+      setStep('error');
+    }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.titulo) { toast.error('El título es requerido'); return; }
-    setSaving(true);
-    let archivo_url = null, archivo_nombre = null;
-    if (file) {
-      const res = await base44.integrations.Core.UploadFile({ file });
-      archivo_url = res.file_url;
-      archivo_nombre = file.name;
-    }
-    const codigo = form.codigo || `PPTO-${Date.now()}`;
-    await base44.entities.PresupuestoObraEnhanced.create({
-      ...form, codigo, rubros: [], archivo_url, archivo_nombre,
-    });
-    toast.success('Presupuesto creado');
-    onCreated();
-    onClose();
-    setSaving(false);
+  const handleFileInput = (e) => {
+    const f = e.target.files?.[0];
+    if (f) processFile(f);
   };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) processFile(f);
+  };
+
+  const isProcessing = step === 'uploading' || step === 'analyzing';
 
   return (
-    <div className="rounded-xl border-2 bg-white p-5 space-y-4" style={{ borderColor: RED_DARK }}>
-      <div className="flex items-center justify-between">
-        <h3 className="font-bold text-sm" style={{ color: RED_DARK }}>Nuevo Presupuesto de Obra</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
+    <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: RED_DARK }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3" style={{ background: RED_DARK }}>
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-yellow-300" />
+          <span className="font-bold text-sm text-white">Importar Excel con IA</span>
+          <span className="text-[10px] text-white/60 bg-white/10 px-2 py-0.5 rounded-full">Automático</span>
+        </div>
+        {!isProcessing && <button onClick={onClose} className="text-white/60 hover:text-white"><X className="h-4 w-4" /></button>}
       </div>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Código</label>
-            <Input placeholder="PPTO-001" value={form.codigo} onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))} className="h-8 text-sm" />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Título *</label>
-            <Input placeholder="Desc. de la obra..." value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} className="h-8 text-sm" required />
-          </div>
-        </div>
-        <div>
-          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Escuela / Proyecto</label>
-          <Input placeholder="Nombre del establecimiento" value={form.escuela} onChange={e => setForm(f => ({ ...f, escuela: e.target.value }))} className="h-8 text-sm" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Coef. Pase</label>
-            <Input type="number" step="0.0001" value={form.coef_pase} onChange={e => setForm(f => ({ ...f, coef_pase: parseFloat(e.target.value) || 1.6504 }))} className="h-8 text-sm font-mono" />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Coef. Oferta</label>
-            <Input type="number" step="0.01" value={form.coef_oferta} onChange={e => setForm(f => ({ ...f, coef_oferta: parseFloat(e.target.value) || 1.38 }))} className="h-8 text-sm font-mono" />
-          </div>
-        </div>
-        {/* Excel adjunto */}
-        <div>
-          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Excel de referencia (opcional)</label>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} className="hidden" />
-          {file ? (
-            <div className="flex items-center gap-2 p-2 rounded-lg border border-emerald-300 bg-emerald-50 text-xs">
-              <FileSpreadsheet className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span className="truncate text-emerald-800 font-medium flex-1">{file.name}</span>
-              <button type="button" onClick={() => { setFile(null); fileRef.current.value = ''; }} className="text-gray-400 hover:text-red-500"><X className="h-3.5 w-3.5" /></button>
+
+      <div className="bg-white p-5">
+        {/* Estado: idle — zona de drop */}
+        {step === 'idle' && (
+          <div
+            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileRef.current?.click()}
+            className={`cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-all
+              ${dragging ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-red-300 hover:bg-red-50/30'}`}
+          >
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFileInput} className="hidden" />
+            <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+            <p className="font-bold text-sm text-gray-700">Arrastrá tu Excel aquí o hacé click para seleccionar</p>
+            <p className="text-xs text-gray-400 mt-1">La IA detectará automáticamente rubros, ítems, precios y datos del presupuesto</p>
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">PCP</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">PAPORC</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">PAMON</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200">Otros formatos</span>
             </div>
-          ) : (
-            <button type="button" onClick={() => fileRef.current?.click()}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-gray-300 text-xs text-gray-500 hover:border-red-300 hover:text-red-600 transition-all w-full justify-center">
-              <Upload className="h-3.5 w-3.5" /> Subir Excel de presupuesto
-            </button>
-          )}
-        </div>
-        <div className="flex gap-2 pt-1">
-          <Button type="submit" disabled={saving} size="sm" className="gap-1.5" style={{ background: RED_DARK, color: 'white' }}>
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-            Crear Presupuesto
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancelar</Button>
-        </div>
-      </form>
+          </div>
+        )}
+
+        {/* Estado: procesando */}
+        {isProcessing && (
+          <div className="text-center py-8 space-y-4">
+            <div className="relative mx-auto h-14 w-14">
+              <Loader2 className="h-14 w-14 animate-spin" style={{ color: RED_MAIN }} />
+              <Sparkles className="h-5 w-5 absolute inset-0 m-auto text-yellow-400" />
+            </div>
+            <div>
+              <p className="font-bold text-sm" style={{ color: RED_DARK }}>
+                {step === 'uploading' ? 'Subiendo archivo...' : 'IA analizando el presupuesto...'}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {step === 'uploading'
+                  ? `Cargando ${fileName}`
+                  : 'Detectando rubros, ítems, precios y datos del presupuesto'}
+              </p>
+            </div>
+            {step === 'analyzing' && (
+              <div className="flex justify-center gap-4 text-[10px] text-gray-400">
+                <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-emerald-500" /> Excel leído</span>
+                <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin text-blue-500" /> Procesando con IA...</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Estado: done */}
+        {step === 'done' && (
+          <div className="text-center py-6 space-y-3">
+            <CheckCircle2 className="h-12 w-12 mx-auto text-emerald-500" />
+            <p className="font-bold text-sm text-emerald-700">¡Presupuesto importado correctamente!</p>
+            {stats && (
+              <p className="text-xs text-gray-500">
+                Se detectaron <strong>{stats.rubros} rubros</strong> y <strong>{stats.items} ítems</strong>
+              </p>
+            )}
+            <Button size="sm" onClick={onClose} style={{ background: RED_DARK, color: 'white' }}>
+              Ver presupuesto
+            </Button>
+          </div>
+        )}
+
+        {/* Estado: error */}
+        {step === 'error' && (
+          <div className="text-center py-6 space-y-3">
+            <AlertCircle className="h-10 w-10 mx-auto text-red-500" />
+            <p className="font-bold text-sm text-red-700">No se pudo procesar el Excel</p>
+            <p className="text-xs text-gray-500">{errorMsg}</p>
+            <Button size="sm" variant="outline" onClick={() => setStep('idle')}>Intentar de nuevo</Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -567,9 +619,9 @@ export default function AvanceObra() {
         </Button>
       </div>
 
-      {/* Formulario nuevo */}
+      {/* Importador IA */}
       {showNuevo && (
-        <NuevoPresupuestoForm
+        <ImportarExcelIA
           onClose={() => setShowNuevo(false)}
           onCreated={() => qc.invalidateQueries({ queryKey: ['presupuestos-obra'] })}
         />
