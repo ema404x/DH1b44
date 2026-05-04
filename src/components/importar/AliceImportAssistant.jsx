@@ -51,8 +51,10 @@ function buildAnalysisMessage(mappingResult) {
   if (!mappingResult?.sheets) return null;
   const sheets = mappingResult.sheets.filter(s => s.target_entity !== 'skip');
   const total = sheets.reduce((acc, s) => acc + (s.row_count || 0), 0);
+  const workOrders = sheets.filter(s => s.target_entity === 'WorkOrder');
   const highConf = sheets.filter(s => s.confidence >= 0.85);
   const lowConf = sheets.filter(s => s.confidence < 0.6);
+  const needsUnpivot = sheets.filter(s => s.needs_unpivot);
 
   // Detectar comunas
   const comunasDetectadas = new Set();
@@ -61,49 +63,49 @@ function buildAnalysisMessage(mappingResult) {
   });
   const comunasList = Array.from(comunasDetectadas).sort();
 
-  let msg = `Analicé tu archivo y encontré **${sheets.length} hoja${sheets.length !== 1 ? 's' : ''}** con **${total.toLocaleString()} registros** listos para importar.\n\n`;
-
-  if (comunasList.length > 0) {
-    msg += `🏘️ **Comuna${comunasList.length > 1 ? 's' : ''} detectada${comunasList.length > 1 ? 's' : ''}:** ${comunasList.map(c => `**${c}**`).join(', ')}\n`;
-  }
-
   // Detectar modelos de planilla
   const modelosDetectados = new Set();
   sheets.forEach(s => {
     if (s.detected_planilla_model) modelosDetectados.add(s.detected_planilla_model);
   });
   const modelosList = Array.from(modelosDetectados).sort();
+
+  let msg = `**Análisis de ingeniero senior completado** ✓\n\n`;
+  msg += `Detecté **${total.toLocaleString()} pendientes/órdenes** en **${sheets.length} hoja${sheets.length !== 1 ? 's' : ''}**.\n\n`;
+
+  if (comunasList.length > 0) {
+    msg += `🏘️ **Comuna${comunasList.length > 1 ? 's' : ''} detectada${comunasList.length > 1 ? 's' : ''}:** ${comunasList.map(c => `**${c}**`).join(', ')}\n`;
+  }
   
   if (modelosList.length > 0) {
     const modelDescs = {
-      '8A': 'Hojas por inspector (estándar SAP)',
-      '8B': 'Formato pivotado (direcciones como columnas)',
+      '8A': 'Inspector + estructura SAP completa',
+      '8B': 'Formato pivotado (dirección/jefe como columnas)',
       '10A': 'Sin inspector (simplificado)'
     };
-    msg += `📋 **Modelo${modelosList.length > 1 ? 's' : ''} de planilla:** ${modelosList.map(m => `**${m}** (${modelDescs[m] || ''})`).join(', ')}\n\n`;
+    msg += `📋 **Modelo${modelosList.length > 1 ? 's' : ''} de planilla:** ${modelosList.map(m => `**${m}** - ${modelDescs[m] || ''}`).join(', ')}\n\n`;
+  }
+
+  if (needsUnpivot.length > 0) {
+    msg += `⚠️ **Requiere desagregación (8B):** ${needsUnpivot.map(s => `"${s.sheet_name}"`).join(', ')}\n`;
+    msg += `   Las direcciones están como columnas. Se desagregará automáticamente al importar.\n\n`;
   }
 
   if (highConf.length > 0) {
-    msg += `✅ **Alta confianza:** ${highConf.map(s => {
+    msg += `✅ **Detectadas (${highConf.length} hojas):**\n`;
+    highConf.forEach(s => {
       const modelTag = s.detected_planilla_model ? ` [${s.detected_planilla_model}]` : '';
-      return `"${s.sheet_name}" → ${s.target_entity}${modelTag}`;
-    }).join(', ')}\n`;
+      const pendientesTag = s.target_entity === 'WorkOrder' ? ` — ${s.row_count} pendientes` : '';
+      msg += `   • "${s.sheet_name}" → ${s.target_entity}${modelTag}${pendientesTag}\n`;
+    });
+    msg += '\n';
   }
+
   if (lowConf.length > 0) {
-    msg += `⚠️ **Necesitan revisión:** ${lowConf.map(s => `"${s.sheet_name}"`).join(', ')} — te recomiendo expandirlas y revisar el mapeo de columnas.\n`;
+    msg += `⚠️ **Auxiliares (será omitido en importación):** ${lowConf.map(s => `"${s.sheet_name}"`).join(', ')}\n\n`;
   }
 
-  const unmappedSheets = sheets.filter(s => {
-    const mapped = Object.values(s.field_mapping || {}).filter(v => v).length;
-    const total = Object.keys(s.field_mapping || {}).length;
-    return mapped < total * 0.5;
-  });
-
-  if (unmappedSheets.length > 0) {
-    msg += `\n💡 Algunas columnas quedaron sin mapear en **${unmappedSheets.map(s => s.sheet_name).join(', ')}**. Expandilas para ajustar manualmente.`;
-  } else {
-    msg += `\n🎯 El mapeo se ve bien. Revisá los detalles si querés ajustar algo antes de importar.`;
-  }
+  msg += `🚀 Listo para importar. ${workOrders.length > 0 ? `Se crearán ${workOrders.reduce((a, s) => a + (s.row_count || 0), 0)} órdenes de trabajo.` : 'Sin pendientes detectadas.'}`;
 
   return msg;
 }

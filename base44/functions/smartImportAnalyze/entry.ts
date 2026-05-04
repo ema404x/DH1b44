@@ -265,42 +265,79 @@ Deno.serve(async (req) => {
     name_aliases: schema.aliases,
   }));
 
-  const prompt = `Eres un experto en importación de datos para un sistema de gestión de construcción y mantenimiento en Argentina/Latinoamérica.
+  const prompt = `Sos un INGENIERO SENIOR ANALISTA especializado en gestión de órdenes de trabajo y mantenimiento edilicio.
 
-TAREA: Analiza las hojas de un archivo Excel/CSV y:
-1. Identifica qué entidad del sistema representa cada hoja
-2. Mapea cada columna al campo correcto del sistema con máxima precisión
-3. DETECTA LA COMUNA (8A, 8B o 10A) — las planillas varían según la comuna
+TAREA: Analiza las hojas de Excel y:
+1. Detecta CADA PENDIENTE/ORDEN como un registro independiente
+2. Identifica qué entidad representa cada hoja
+3. Mapea cada columna al campo correcto del sistema
+4. Reconoce los MODELOS DE PLANILLA por comuna (8A, 8B, 10A)
 
 ENTIDADES DEL SISTEMA (con patrones de columnas clave):
 ${JSON.stringify(schemaSummary, null, 2)}
 
-HOJAS A ANALIZAR (con sugerencia previa basada en keywords):
+HOJAS A ANALIZAR (pre-análisis automático):
 ${JSON.stringify(sheetsInfo, null, 2)}
 
-REGLAS DE MAPEO (por orden de importancia):
-1. CAMPOS CLAVE PRIMERO: Detecta siempre primero los campos que identifican un registro (key_fields). Ej: CUIT→Client.cuit, DNI→Employee.dni, N°Serie→Asset.serial_number, Código→Material.code
-2. COINCIDENCIA SEMÁNTICA: Usa sinónimos y variantes regionales. Ej: "Razón Social"→name, "Fecha de Alta"→hire_date, "Jornal"→hourly_rate, "P.U."→unit_cost
-3. DATOS DE MUESTRA: Usa los valores de sample para confirmar el tipo. Ej: si parece CUIT (11 dígitos con guiones) → campo cuit. Si es DNI (7-8 dígitos) → campo dni
-4. NOMBRE DE HOJA: Considéralo como señal fuerte. "Empleados", "Personal", "RRHH" → Employee
-5. DETECTA LA COMUNA Y MODELO:
-   - Comuna: Si encuentras "8A", "8B", "10A" EN EL NOMBRE DEL ARCHIVO O DATOS, indicalo en detected_comuna
-   - Modelo de planilla:
-     * 8A: Hojas por inspector (columnas INSPECTOR, UBICACIÓN, ESTABLECIMIENTO, TAREAS A REALIZAR, N° DE ORDEN, etc.)
-     * 8B: Formato pivotado (columnas = direcciones/jefes, sin INSPECTOR, datos anidados)
-     * 10A: Sin INSPECTOR, columnas simplificadas (UBICACIÓN, ESTABLECIMIENTO, TAREAS, N° DE ORDEN, pero sin INSPECTOR)
-   - Indicalo en detected_planilla_model
-6. pre_suggested_entity es una pista automática, valídala con headers y datos
-7. Si una columna no encaja en ningún campo del sistema, déjala vacía (no mapear)
-8. Si la hoja es claramente auxiliar o sin datos útiles, usa target_entity: "skip"
+REGLAS DE DETECCIÓN POR MODELO:
+- **8A**: Hojas POR INSPECTOR. Estructura: INSPECTOR | UBICACIÓN | ESTABLECIMIENTO | TAREAS A REALIZAR | N° DE ORDEN | FECHA INICIO | FECHA LIMITE | CLASE DE ORDEN | STATUS
+  → CADA ROW = 1 pendiente/orden de trabajo
+  
+- **8B**: Formato PIVOTADO. Estructura: Columnas = nombres de direcciones/jefes. Datos anidados.
+  → Requiere PIVOT/desagregación: cada dirección dentro de una celda = múltiples pendientes
+  
+- **10A**: SIN INSPECTOR. Estructura: UBICACIÓN | ESTABLECIMIENTO | TAREAS A REALIZAR | N° DE ORDEN | FECHA INICIO | FECHA LIMITE | STATUS
+  → Similar a 8A pero sin columna INSPECTOR
+  
+DETECTA EL MODELO: Analiza headers y estructura. Si ves "INSPECTOR" en headers → 8A. Si ves direcciones dinámicas como headers y NO ves "INSPECTOR" → 8B. Si ves N° DE ORDEN pero NO INSPECTOR → 10A.
+
+ANÁLISIS DETALLADO PARA CADA HOJA:
+1. **Identifica el modelo** (8A, 8B o 10A) analizando:
+   - Headers presentes (INSPECTOR? N° DE ORDEN? TAREAS?)
+   - Estructura de datos (¿cada row es 1 pendiente o hay datos anidados?)
+   - Nombres de columnas (¿son direcciones/ubicaciones dinámicas?)
+
+2. **Para WorkOrder (Pendientes/Órdenes)**:
+   - code → "N° DE ORDEN" o equivalente
+   - title → "TAREAS A REALIZAR" o "descripcion"
+   - location → "UBICACIÓN" o "ESTABLECIMIENTO"
+   - assigned_name → "INSPECTOR" (si existe, para 8A)
+   - status → "STATUS" (mapear AEJE→pendiente, DESAPROBADO→cancelada, etc.)
+   - scheduled_date → "FECHA INICIO"
+   - description → concatenar TAREAS + detalles
+
+3. **CRÍTICO PARA 8B**: Si es formato pivotado, INDICA en output:
+   - planilla_model: "8B"
+   - needs_unpivot: true
+   - pivot_columns: [lista de columnas que contienen direcciones]
+   - Explicación: "Esta hoja requiere desagregación. Las direcciones son columnas, cada una contiene múltiples pendientes anidadas"
+
+4. **COMUNAS**: Detecta de:
+   - Nombre archivo (PENDIENTESCOMUNA8A, PENDIENTESCOMUNA8B, etc.)
+   - Datos en hojas (si ves "8A", "COMUNA 8A" en los datos)
+
+MAPEO ESPECÍFICO PARA PENDIENTES (WorkOrder):
+- N° DE ORDEN / N° ORDEN / NUMERO ORDEN → code
+- TAREAS A REALIZAR / TAREA / DESCRIPCION → title
+- UBICACIÓN / ESTABLECIMIENTO / DIRECCION → location
+- INSPECTOR / RESPONSABLE (solo 8A) → assigned_name
+- FECHA INICIO / FECHA LIMITE / FECHA PROGRAMADA → scheduled_date
+- STATUS / ESTADO / CLASE DE ORDEN → status
+- FECHA LIMITE SAP → (info adicional, no mapear)
 
 CALIBRACIÓN DE CONFIANZA:
-- 0.95+: Nombre de hoja + campos clave coinciden perfectamente
-- 0.80-0.94: Campos clave detectados con buena coincidencia semántica  
-- 0.60-0.79: Coincidencia parcial, algunos campos reconocibles
-- <0.60: Dudoso, pocos campos reconocibles
+- 0.98+: WorkOrder con modelo 8A/10A completo (tiene N° ORDEN + TAREAS + UBICACIÓN)
+- 0.90-0.97: WorkOrder con estructura clara pero algunos campos faltantes
+- 0.70-0.89: Hojas auxiliares (ESC, Formato Condicional) → target_entity: "skip"
+- <0.70: Dudoso
 
-Responde con la lista de hojas ordenada por confidence DESCENDENTE (mayor confianza primero). INCLUYE detected_comuna en cada hoja si la detectas.`;
+Responde con JSON. Para cada hoja:
+- sheet_name, target_entity, confidence
+- detected_planilla_model (8A/8B/10A)
+- detected_comuna (8A/8B/10A si aplica)
+- field_mapping (mapeo de columnas)
+- sample_data
+- Si es 8B, agregar: needs_unpivot, pivot_columns`;
 
   const result = await base44.integrations.Core.InvokeLLM({
     prompt,
@@ -319,6 +356,8 @@ Responde con la lista de hojas ordenada por confidence DESCENDENTE (mayor confia
               row_count: { type: 'number' },
               detected_comuna: { type: 'string' },
               detected_planilla_model: { type: 'string' },
+              needs_unpivot: { type: 'boolean' },
+              pivot_columns: { type: 'array', items: { type: 'string' } },
               field_mapping: { type: 'object', additionalProperties: { type: 'string' } },
               sample_data: { type: 'object', additionalProperties: { type: 'string' } },
             },
