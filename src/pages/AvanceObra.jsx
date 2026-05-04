@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, BarChart2, ChevronRight, ArrowLeft, CheckCircle2, Clock, AlertCircle, Save, Zap } from 'lucide-react';
+import { Search, Loader2, BarChart2, ChevronRight, ArrowLeft, CheckCircle2, Clock, AlertCircle, Save, Zap, Plus, Upload, FileSpreadsheet, Download, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
@@ -34,55 +34,193 @@ function calcAvanceTotal(rubros, cp, co) {
 }
 
 // ── Card de presupuesto en la lista ─────────────────────────────────────────
-function PresupuestoCard({ p, onOpen }) {
+function PresupuestoCard({ p, onOpen, onDelete }) {
   const cp = p.coef_pase   ?? 1.6504;
   const co = p.coef_oferta ?? 1.38;
   const { total, acum, pct } = calcAvanceTotal(p.rubros, cp, co);
   const totalItems = (p.rubros || []).reduce((a, r) => a + (r.items || []).length, 0);
+  const [uploadingExcel, setUploadingExcel] = useState(false);
+  const excelRef = useRef();
 
   const pctColor = pct >= 100 ? 'text-emerald-600' : pct > 0 ? 'text-blue-600' : 'text-gray-400';
   const barColor = pct >= 100 ? '#22c55e' : pct > 0 ? '#3b82f6' : '#e5e7eb';
 
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingExcel(true);
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    await base44.entities.PresupuestoObraEnhanced.update(p.id, { archivo_url: file_url, archivo_nombre: file.name });
+    toast.success('Excel actualizado');
+    setUploadingExcel(false);
+    e.target.value = '';
+  };
+
   return (
-    <div
-      onClick={() => onOpen(p)}
-      className="group cursor-pointer border rounded-xl p-4 hover:shadow-md transition-all bg-white hover:border-red-300"
-      style={{ borderColor: '#E2E8F0' }}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-sm truncate group-hover:text-red-700 transition-colors" style={{ color: RED_DARK }}>{p.titulo || '(Sin título)'}</p>
-          <p className="text-[10px] font-mono text-gray-400 mt-0.5">{p.codigo}</p>
-          {p.escuela && <p className="text-xs text-gray-500 mt-0.5 truncate">{p.escuela}</p>}
-          <p className="text-[10px] text-gray-400 mt-1">{totalItems} ítems · {(p.rubros || []).length} rubros</p>
+    <div className="border rounded-xl bg-white hover:shadow-md transition-all" style={{ borderColor: '#E2E8F0' }}>
+      {/* Área clickeable */}
+      <div onClick={() => onOpen(p)} className="group cursor-pointer p-4 hover:border-red-300 rounded-t-xl">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-sm truncate group-hover:text-red-700 transition-colors" style={{ color: RED_DARK }}>{p.titulo || '(Sin título)'}</p>
+            <p className="text-[10px] font-mono text-gray-400 mt-0.5">{p.codigo}</p>
+            {p.escuela && <p className="text-xs text-gray-500 mt-0.5 truncate">{p.escuela}</p>}
+            <p className="text-[10px] text-gray-400 mt-1">{totalItems} ítems · {(p.rubros || []).length} rubros</p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className={`text-xl font-bold tabular-nums ${pctColor}`}>{pct.toFixed(0)}%</p>
+            <p className="text-[10px] text-gray-400">acumulado</p>
+          </div>
         </div>
-        <div className="text-right shrink-0">
-          <p className={`text-xl font-bold tabular-nums ${pctColor}`}>{pct.toFixed(0)}%</p>
-          <p className="text-[10px] text-gray-400">acumulado</p>
+
+        <div className="mt-3 h-2 rounded-full bg-gray-100 overflow-hidden">
+          <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: barColor }} />
+        </div>
+
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-[10px] text-gray-400">{fmt(total)}</span>
+          <span className="text-[10px] font-semibold" style={{ color: pct > 0 ? '#3b82f6' : '#9CA3AF' }}>{fmt(acum)} certificado</span>
+        </div>
+
+        <div className="mt-3 pt-2">
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border
+            ${pct >= 100 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+              pct > 0 ? 'bg-blue-50 text-blue-700 border-blue-200' :
+              'bg-gray-50 text-gray-500 border-gray-200'}`}>
+            {pct >= 100 ? '✓ Obra completa' : pct > 0 ? 'En progreso' : 'Sin avance'}
+          </span>
         </div>
       </div>
 
-      {/* Barra progreso */}
-      <div className="mt-3 h-2 rounded-full bg-gray-100 overflow-hidden">
-        <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, background: barColor }} />
-      </div>
-
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-[10px] text-gray-400">{fmt(total)}</span>
-        <span className="text-[10px] font-semibold" style={{ color: pct > 0 ? '#3b82f6' : '#9CA3AF' }}>{fmt(acum)} certificado</span>
-      </div>
-
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border
-          ${pct >= 100 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-            pct > 0 ? 'bg-blue-50 text-blue-700 border-blue-200' :
-            'bg-gray-50 text-gray-500 border-gray-200'}`}>
-          {pct >= 100 ? '✓ Obra completa' : pct > 0 ? 'En progreso' : 'Sin avance'}
+      {/* Barra de acciones */}
+      <div className="flex items-center gap-1 px-3 py-2 border-t border-gray-100 bg-gray-50/50 rounded-b-xl">
+        <span className="text-[10px] text-gray-400 flex-1">
+          {p.archivo_nombre
+            ? <span className="flex items-center gap-1 text-emerald-700"><FileSpreadsheet className="h-3 w-3" />{p.archivo_nombre}</span>
+            : <span className="text-gray-400 italic">Sin Excel adjunto</span>}
         </span>
-        <span className="text-xs font-medium flex items-center gap-1" style={{ color: RED_MAIN }}>
-          Cargar avance <ChevronRight className="h-3 w-3" />
-        </span>
+        {/* Subir / reemplazar Excel */}
+        <input ref={excelRef} type="file" accept=".xlsx,.xls" onChange={handleExcelUpload} className="hidden" />
+        <button
+          onClick={e => { e.stopPropagation(); excelRef.current?.click(); }}
+          className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold rounded border border-gray-200 text-gray-600 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all"
+          title="Subir Excel">
+          {uploadingExcel ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+          {p.archivo_url ? 'Reemplazar' : 'Subir Excel'}
+        </button>
+        {/* Descargar Excel */}
+        {p.archivo_url && (
+          <a href={p.archivo_url} target="_blank" rel="noopener noreferrer" download onClick={e => e.stopPropagation()}>
+            <button className="p-1 rounded border border-gray-200 text-gray-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition-all" title="Descargar Excel">
+              <Download className="h-3.5 w-3.5" />
+            </button>
+          </a>
+        )}
+        {/* Cargar avance */}
+        <button onClick={() => onOpen(p)}
+          className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded transition-all"
+          style={{ background: RED_DARK, color: 'white' }}>
+          Avance <ChevronRight className="h-3 w-3" />
+        </button>
+        {/* Eliminar */}
+        <button
+          onClick={e => { e.stopPropagation(); if (confirm('¿Eliminar este presupuesto?')) onDelete(p.id); }}
+          className="p-1 rounded border border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-all" title="Eliminar">
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       </div>
+    </div>
+  );
+}
+
+// ── Formulario nuevo presupuesto ─────────────────────────────────────────────
+function NuevoPresupuestoForm({ onClose, onCreated }) {
+  const [form, setForm] = useState({ codigo: '', titulo: '', escuela: '', coef_pase: 1.6504, coef_oferta: 1.38 });
+  const [file, setFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const fileRef = useRef();
+
+  const handleFile = (e) => {
+    const f = e.target.files?.[0];
+    if (f) setFile(f);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.titulo) { toast.error('El título es requerido'); return; }
+    setSaving(true);
+    let archivo_url = null, archivo_nombre = null;
+    if (file) {
+      const res = await base44.integrations.Core.UploadFile({ file });
+      archivo_url = res.file_url;
+      archivo_nombre = file.name;
+    }
+    const codigo = form.codigo || `PPTO-${Date.now()}`;
+    await base44.entities.PresupuestoObraEnhanced.create({
+      ...form, codigo, rubros: [], archivo_url, archivo_nombre,
+    });
+    toast.success('Presupuesto creado');
+    onCreated();
+    onClose();
+    setSaving(false);
+  };
+
+  return (
+    <div className="rounded-xl border-2 bg-white p-5 space-y-4" style={{ borderColor: RED_DARK }}>
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-sm" style={{ color: RED_DARK }}>Nuevo Presupuesto de Obra</h3>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Código</label>
+            <Input placeholder="PPTO-001" value={form.codigo} onChange={e => setForm(f => ({ ...f, codigo: e.target.value }))} className="h-8 text-sm" />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Título *</label>
+            <Input placeholder="Desc. de la obra..." value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} className="h-8 text-sm" required />
+          </div>
+        </div>
+        <div>
+          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Escuela / Proyecto</label>
+          <Input placeholder="Nombre del establecimiento" value={form.escuela} onChange={e => setForm(f => ({ ...f, escuela: e.target.value }))} className="h-8 text-sm" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Coef. Pase</label>
+            <Input type="number" step="0.0001" value={form.coef_pase} onChange={e => setForm(f => ({ ...f, coef_pase: parseFloat(e.target.value) || 1.6504 }))} className="h-8 text-sm font-mono" />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Coef. Oferta</label>
+            <Input type="number" step="0.01" value={form.coef_oferta} onChange={e => setForm(f => ({ ...f, coef_oferta: parseFloat(e.target.value) || 1.38 }))} className="h-8 text-sm font-mono" />
+          </div>
+        </div>
+        {/* Excel adjunto */}
+        <div>
+          <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide block mb-1">Excel de referencia (opcional)</label>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} className="hidden" />
+          {file ? (
+            <div className="flex items-center gap-2 p-2 rounded-lg border border-emerald-300 bg-emerald-50 text-xs">
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span className="truncate text-emerald-800 font-medium flex-1">{file.name}</span>
+              <button type="button" onClick={() => { setFile(null); fileRef.current.value = ''; }} className="text-gray-400 hover:text-red-500"><X className="h-3.5 w-3.5" /></button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-gray-300 text-xs text-gray-500 hover:border-red-300 hover:text-red-600 transition-all w-full justify-center">
+              <Upload className="h-3.5 w-3.5" /> Subir Excel de presupuesto
+            </button>
+          )}
+        </div>
+        <div className="flex gap-2 pt-1">
+          <Button type="submit" disabled={saving} size="sm" className="gap-1.5" style={{ background: RED_DARK, color: 'white' }}>
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+            Crear Presupuesto
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancelar</Button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -92,6 +230,7 @@ export default function AvanceObra() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null); // presupuesto abierto
+  const [showNuevo, setShowNuevo] = useState(false);
 
   const { data: presupuestos = [], isLoading } = useQuery({
     queryKey: ['presupuestos-obra'],
@@ -103,6 +242,14 @@ export default function AvanceObra() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['presupuestos-obra'] });
       toast.success('Avance guardado correctamente');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.PresupuestoObraEnhanced.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['presupuestos-obra'] });
+      toast.success('Presupuesto eliminado');
     },
   });
 
@@ -414,7 +561,19 @@ export default function AvanceObra() {
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">Seguimiento físico de avance por obra y certificación mensual</p>
         </div>
+        <Button size="sm" className="gap-1.5" style={{ background: RED_DARK, color: 'white' }}
+          onClick={() => setShowNuevo(v => !v)}>
+          <Plus className="h-4 w-4" /> Nuevo Presupuesto
+        </Button>
       </div>
+
+      {/* Formulario nuevo */}
+      {showNuevo && (
+        <NuevoPresupuestoForm
+          onClose={() => setShowNuevo(false)}
+          onCreated={() => qc.invalidateQueries({ queryKey: ['presupuestos-obra'] })}
+        />
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-0 rounded-xl overflow-hidden border shadow-sm" style={{ borderColor: RED_DARK }}>
@@ -455,7 +614,7 @@ export default function AvanceObra() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(p => (
-            <PresupuestoCard key={p.id} p={p} onOpen={setSelected} />
+            <PresupuestoCard key={p.id} p={p} onOpen={setSelected} onDelete={id => deleteMutation.mutate(id)} />
           ))}
         </div>
       )}
