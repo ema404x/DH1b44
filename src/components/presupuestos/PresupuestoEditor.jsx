@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import PCPGrid from '@/components/presupuestos/PCPGrid';
 import PlanTrabajos from '@/components/presupuestos/PlanTrabajos';
+import PAPORCGrid from '@/components/presupuestos/PAPORCGrid';
 import { generatePresupuestoPDF } from '@/components/presupuestos/presupuestoPDF';
 import { exportPresupuestoExcel } from '@/utils/exportExcel';
 import { toast } from 'sonner';
@@ -155,7 +156,7 @@ function ResumenPanel({ form, onCoefChange }) {
 
 // ── MAIN ──────────────────────────────────────────────────────────────────────
 export default function PresupuestoEditor({ presupuesto, onSave, onCancel, saving }) {
-  const [view, setView] = useState('editor');
+  const [view, setView] = useState('editor'); // 'editor' | 'paporc' | 'plan'
   const [form, setForm] = useState(() => presupuesto ? { ...presupuesto } : {
     codigo: generateCode(),
     titulo: '',
@@ -210,6 +211,40 @@ export default function PresupuestoEditor({ presupuesto, onSave, onCancel, savin
   const isNew = !presupuesto;
 
   if (view === 'plan') return <PlanTrabajos form={form} onBack={() => setView('editor')} />;
+  if (view === 'paporc') return (
+    <div className="flex flex-col min-h-full">
+      {/* Top bar igual al editor */}
+      <div className="sticky top-0 z-20 -mx-6 px-6 py-0 mb-6"
+        style={{ background: RED_DARK, borderBottom: `2px solid ${RED_MAIN}` }}>
+        <div className="flex items-center gap-3 flex-wrap h-12">
+          <button onClick={() => setView('editor')} className="flex items-center gap-1.5 text-sm text-white/80 hover:opacity-80">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div className="flex items-center gap-1.5 text-sm min-w-0">
+            <span className="cursor-pointer text-xs text-white/80 hover:opacity-80" onClick={onCancel}>Presupuestos</span>
+            <ChevronRight className="h-3 w-3 text-white/50" />
+            <span className="text-xs text-white/80 cursor-pointer hover:opacity-80" onClick={() => setView('editor')}>{form.titulo || form.codigo}</span>
+            <ChevronRight className="h-3 w-3 text-white/50" />
+            <span className="font-bold text-sm text-white">PAPORC / PAMON</span>
+          </div>
+          <div className="ml-auto">
+            <button onClick={() => onSave(form)} disabled={saving || !form.titulo}
+              className="flex items-center gap-1.5 px-4 h-7 text-xs font-bold rounded transition-all disabled:opacity-50"
+              style={{ background: YELLOW_ACC, color: RED_DARK }}>
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+      <PAPORCGrid
+        rubros={form.rubros || []}
+        onChange={handleRubrosChange}
+        coefPase={form.coef_pase}
+        coefOferta={form.coef_oferta}
+      />
+    </div>
+  );
 
   return (
     <div className="flex flex-col min-h-full">
@@ -245,6 +280,11 @@ export default function PresupuestoEditor({ presupuesto, onSave, onCancel, savin
               </SelectContent>
             </Select>
 
+            <button onClick={() => setView('paporc')}
+              className="flex items-center gap-1.5 px-3 h-7 text-xs font-semibold rounded transition-all hover:bg-white/20 text-white/90"
+              style={{ border: `1px solid rgba(255,255,255,0.3)` }}>
+              <Layers className="h-3.5 w-3.5" /> PAPORC / PAMON
+            </button>
             <button onClick={() => setView('plan')}
               className="flex items-center gap-1.5 px-3 h-7 text-xs font-semibold rounded transition-all hover:bg-white/20 text-white/90"
               style={{ border: `1px solid rgba(255,255,255,0.3)` }}>
