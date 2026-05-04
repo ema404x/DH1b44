@@ -6,11 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CheckCircle2, XCircle, MessageSquare, Paperclip, TrendingUp, DollarSign, Calendar, User, Building2, PenTool, ArrowLeft, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, MessageSquare, Paperclip, TrendingUp, DollarSign, Calendar, User, Building2, CheckSquare, ArrowLeft, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import FirmaGerenteModal from './FirmaGerenteModal';
+
+const FIRMA_RAUL_GARCIA_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/317004861_FirmaRaulGArcia.jpg';
 
 const estadoConfig = {
   borrador:    { label: 'Borrador',     color: 'bg-slate-100 text-slate-600 border-slate-300' },
@@ -24,8 +25,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
   const qc = useQueryClient();
   const [comentario, setComentario] = useState(solicitud.comentarios_admin || '');
   const [motivo, setMotivo] = useState('');
-  const [firmaOpen, setFirmaOpen] = useState(false);
-  const [accionPendiente, setAccionPendiente] = useState(null); // 'aprobar' | 'rechazar'
+  const [aprobando, setAprobando] = useState(false);
 
   const updateMutation = useMutation({
     mutationFn: (data) => base44.entities.SolicitudCertificado.update(solicitud.id, data),
@@ -47,64 +47,51 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
     });
   };
 
-  const handleIniciarAprobacion = () => {
-    setAccionPendiente('aprobar');
-    setFirmaOpen(true);
-  };
-
-  const handleIniciarRechazo = () => {
-    if (!motivo.trim()) { toast.error('Ingresá el motivo de rechazo'); return; }
-    setAccionPendiente('rechazar');
-    setFirmaOpen(true);
-  };
-
-  const handleFirmada = async (firmaUrl, nombreGerente) => {
-    setFirmaOpen(false);
-    const basePayload = {
+  const handleAprobar = async () => {
+    setAprobando(true);
+    const nombreGerente = 'Arq. Raúl García';
+    const payload = {
       aprobado_por: nombreGerente,
       aprobado_por_email: user?.email,
       fecha_aprobacion: new Date().toISOString(),
-      firma_gerente_url: firmaUrl,
+      firma_gerente_url: FIRMA_RAUL_GARCIA_URL,
       comentarios_admin: comentario,
+      estado: 'aprobada',
+      historial: [
+        ...(solicitud.historial || []),
+        { fecha: new Date().toISOString(), estado: 'aprobada', usuario: nombreGerente, comentario: comentario || 'Aprobado' }
+      ]
     };
-
-    if (accionPendiente === 'aprobar') {
-      // Actualizar la solicitud
-      updateMutation.mutate({
-        ...basePayload,
-        estado: 'aprobada',
-        historial: [
-          ...(solicitud.historial || []),
-          { fecha: new Date().toISOString(), estado: 'aprobada', usuario: nombreGerente, comentario: comentario || 'Aprobado' }
-        ]
+    updateMutation.mutate(payload);
+    if (solicitud.certificado_id) {
+      await base44.entities.Certificado.update(solicitud.certificado_id, {
+        estado: 'aprobado',
+        firma_gerente_url: FIRMA_RAUL_GARCIA_URL,
+        aprobado_por: nombreGerente,
+        fecha_aprobacion: new Date().toISOString(),
       });
-      // Actualizar el Certificado vinculado con firma y estado aprobado
-      if (solicitud.certificado_id) {
-        base44.entities.Certificado.update(solicitud.certificado_id, {
-          estado: 'aprobado',
-          firma_gerente_url: firmaUrl,
-          aprobado_por: nombreGerente,
-          fecha_aprobacion: new Date().toISOString(),
-        });
-      }
-    } else if (accionPendiente === 'rechazar') {
-      updateMutation.mutate({
-        ...basePayload,
-        estado: 'rechazada',
-        motivo_rechazo: motivo,
-        historial: [
-          ...(solicitud.historial || []),
-          { fecha: new Date().toISOString(), estado: 'rechazada', usuario: nombreGerente, comentario: motivo }
-        ]
-      });
-      // Revertir el certificado a borrador
-      if (solicitud.certificado_id) {
-        base44.entities.Certificado.update(solicitud.certificado_id, {
-          estado: 'borrador',
-        });
-      }
     }
-    setAccionPendiente(null);
+    setAprobando(false);
+  };
+
+  const handleRechazar = () => {
+    if (!motivo.trim()) { toast.error('Ingresá el motivo de rechazo'); return; }
+    const nombreGerente = 'Arq. Raúl García';
+    updateMutation.mutate({
+      aprobado_por: nombreGerente,
+      aprobado_por_email: user?.email,
+      fecha_aprobacion: new Date().toISOString(),
+      firma_gerente_url: FIRMA_RAUL_GARCIA_URL,
+      estado: 'rechazada',
+      motivo_rechazo: motivo,
+      historial: [
+        ...(solicitud.historial || []),
+        { fecha: new Date().toISOString(), estado: 'rechazada', usuario: nombreGerente, comentario: motivo }
+      ]
+    });
+    if (solicitud.certificado_id) {
+      base44.entities.Certificado.update(solicitud.certificado_id, { estado: 'borrador' });
+    }
   };
 
   const estado = estadoConfig[solicitud.estado] || estadoConfig.borrador;
@@ -192,13 +179,20 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
       )}
 
       {/* Firma aprobada */}
-      {solicitud.estado === 'aprobada' && solicitud.firma_gerente_url && (
+      {solicitud.estado === 'aprobada' && (
         <Card className="border-emerald-200 bg-emerald-50/30">
           <CardContent className="p-4 space-y-2">
             <p className="text-xs font-semibold uppercase text-emerald-700 mb-2 flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Aprobado por {solicitud.aprobado_por}
+              <CheckCircle2 className="h-3.5 w-3.5" /> Aprobado por {solicitud.aprobado_por || 'Arq. Raúl García'}
             </p>
-            <img src={solicitud.firma_gerente_url} alt="Firma gerente" className="h-16 object-contain border rounded bg-white p-1" />
+            <div className="flex items-center gap-4">
+              <img src={FIRMA_RAUL_GARCIA_URL} alt="Firma Arq. Raúl García" className="h-16 object-contain border rounded bg-white p-1" />
+              <div className="text-xs text-muted-foreground">
+                <p className="font-bold text-foreground">Arq. Raúl García</p>
+                <p>Gerente de Contratos</p>
+                <p>Mejores Hospitales S.A.</p>
+              </div>
+            </div>
             {solicitud.fecha_aprobacion && (
               <p className="text-xs text-muted-foreground">{format(new Date(solicitud.fecha_aprobacion), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}</p>
             )}
@@ -266,18 +260,18 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
                 variant="destructive"
                 size="sm"
                 className="flex-1 gap-2"
-                onClick={handleIniciarRechazo}
+                onClick={handleRechazar}
                 disabled={updateMutation.isPending}
               >
-                <XCircle className="h-4 w-4" /> Rechazar con firma
+                <XCircle className="h-4 w-4" /> Rechazar
               </Button>
               <Button
                 size="sm"
                 className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                onClick={handleIniciarAprobacion}
-                disabled={updateMutation.isPending}
+                onClick={handleAprobar}
+                disabled={updateMutation.isPending || aprobando}
               >
-                <PenTool className="h-4 w-4" /> Aprobar con firma
+                <CheckSquare className="h-4 w-4" /> Aprobar
               </Button>
             </div>
           </CardContent>
@@ -307,12 +301,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
         </Card>
       )}
 
-      <FirmaGerenteModal
-        open={firmaOpen}
-        onClose={() => { setFirmaOpen(false); setAccionPendiente(null); }}
-        onFirmada={handleFirmada}
-        user={user}
-      />
+
     </div>
   );
 }
