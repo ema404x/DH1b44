@@ -221,7 +221,30 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { raw_data } = await req.json();
+  let raw_data = null;
+  const body = await req.json();
+  
+  // Si viene raw_data desde frontend (caso manual), usar eso
+  if (body.raw_data && Object.keys(body.raw_data).length > 0) {
+    raw_data = body.raw_data;
+  } 
+  // Si viene file_urls, descargar y parsear
+  else if (body.file_urls && Array.isArray(body.file_urls)) {
+    const { default: XLSX } = await import('npm:xlsx@0.18.5');
+    raw_data = {};
+    
+    for (const url of body.file_urls) {
+      const res = await fetch(url);
+      const buffer = await res.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      
+      wb.SheetNames.forEach(sheetName => {
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        raw_data[sheetName] = rows;
+      });
+    }
+  }
 
   if (!raw_data || Object.keys(raw_data).length === 0) {
     return Response.json({ error: 'No se encontraron datos en el archivo' }, { status: 400 });
