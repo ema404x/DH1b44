@@ -133,14 +133,23 @@ export default function Certificados() {
   const getMeses = () => {
     const meses = new Set();
     certificados.forEach(c => {
-      if (c.mes_periodo) meses.add(c.mes_periodo);
+      if (c.created_date) {
+        const date = new Date(c.created_date);
+        const mes = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        meses.add(mes);
+      }
     });
     return Array.from(meses).sort().reverse();
   };
 
   const filtrarPorMes = (certs) => {
     if (mesFiltro === 'Todos') return certs;
-    return certs.filter(c => c.mes_periodo === mesFiltro);
+    return certs.filter(c => {
+      if (!c.created_date) return false;
+      const date = new Date(c.created_date);
+      const mes = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      return mes === mesFiltro;
+    });
   };
 
   if (view === 'upload') {
