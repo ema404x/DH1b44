@@ -32,9 +32,8 @@ export async function exportCertificadoPDF(form) {
   const pdfFondoReparo = pdfSubtotal * (fondo_reparo_pct / 100);
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
-  const [logoBase64, firmaBase64] = await Promise.all([
+  const [logoBase64] = await Promise.all([
     loadImageAsBase64(MEJORES_LOGO_URL),
-    loadImageAsBase64(FIRMA_RAUL_GARCIA_URL),
   ]);
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -230,20 +229,7 @@ export async function exportCertificadoPDF(form) {
   doc.text(fmt(pdfTotalNeto), W - M - 1, y + 7, { align: 'right' });
   y += 14;
 
-  // Firma Raúl García
-  if (firmaBase64 && y + 35 < SAFE_BOTTOM) {
-    y += 4;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(90, 90, 90);
-    doc.text('Firma y aprobación gerencial:', M, y + 5);
-    doc.addImage(firmaBase64, 'JPEG', M, y + 7, 55, 22);
-    doc.setDrawColor(100, 100, 100); doc.setLineWidth(0.3);
-    doc.line(M, y + 31, M + 55, y + 31);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(40, 40, 40);
-    doc.text('Arq. Raúl García', M, y + 35);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(90, 90, 90);
-    doc.text('Gerente de Contratos', M, y + 39);
-    doc.text('Mejores Hospitales S.A.', M, y + 43);
-  }
+
 
   // Footers finales
   const totalPages = doc.getNumberOfPages();
