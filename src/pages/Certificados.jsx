@@ -189,7 +189,7 @@ export default function Certificados() {
             </Button>
           </div>
           <CertificadosLista
-            certificados={certificados.filter(c => c.tipo === 'abono_mensual' && (comunaFiltro === 'Todas' || c.comuna === comunaFiltro))}
+            certificados={certificados.filter(c => c.tipo === 'abono_mensual' && (comunaFiltro === 'Todas' || !c.comuna || c.comuna === comunaFiltro))}
             isLoading={isLoading}
             onNew={() => setView('upload')}
             onEdit={handleEdit}
@@ -206,7 +206,7 @@ export default function Certificados() {
 
         <TabsContent value="obra" className="mt-6">
           <CertificadosLista
-            certificados={certificados.filter(c => c.tipo === 'obra' && (comunaFiltro === 'Todas' || c.comuna === comunaFiltro))}
+            certificados={certificados.filter(c => c.tipo === 'obra' && (comunaFiltro === 'Todas' || !c.comuna || c.comuna === comunaFiltro))}
             isLoading={isLoading}
             onNew={() => setView('upload')}
             onEdit={handleEdit}
@@ -218,7 +218,7 @@ export default function Certificados() {
 
         <TabsContent value="informe" className="mt-6">
           <CertificadosLista
-            certificados={certificados.filter(c => c.tipo === 'informe' && (comunaFiltro === 'Todas' || c.comuna === comunaFiltro))}
+            certificados={certificados.filter(c => c.tipo === 'informe' && (comunaFiltro === 'Todas' || !c.comuna || c.comuna === comunaFiltro))}
             isLoading={isLoading}
             onNew={() => setView('upload')}
             onEdit={handleEdit}
