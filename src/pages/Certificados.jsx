@@ -100,6 +100,11 @@ export default function Certificados() {
     setView('preview');
   };
 
+  const handlePreviewPDF = (cert) => {
+    setPreviewing(cert);
+    setView('preview');
+  };
+
   const handleSave = (formData) => {
     // Siempre crea nuevo (nunca pasa ID al mutationFn para que no haga update)
     saveMutation.mutate(formData);
@@ -129,10 +134,11 @@ export default function Certificados() {
   }
 
   if (view === 'preview') {
+    const fromList = previewing?.estado === 'aprobado' && !editing;
     return (
       <CertificadoPreview
         form={previewing}
-        onBack={() => setView('edit')}
+        onBack={() => fromList ? setView('list') : setView('edit')}
         onSave={handleSave}
         saving={saveMutation.isPending}
       />
@@ -161,6 +167,7 @@ export default function Certificados() {
             onNew={() => setView('upload')}
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
+            onPreviewPDF={handlePreviewPDF}
           />
         </TabsContent>
 

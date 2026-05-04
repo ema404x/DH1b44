@@ -14,7 +14,7 @@ const estadoStyle = {
   aprobado: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
-export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete }) {
+export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete, onPreviewPDF }) {
   const [exporting, setExporting] = useState(null);
   const [search, setSearch] = useState('');
 
@@ -153,12 +153,12 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                 <Button 
                   size="icon" 
                   variant="ghost" 
-                  className={`h-8 w-8 ${c.estado !== 'aprobado' ? 'opacity-30 cursor-not-allowed' : ''}`}
-                  onClick={() => c.estado === 'aprobado' && handleExport(c, 'pdf')} 
-                  disabled={exporting === `${c.id}-pdf` || c.estado !== 'aprobado'}
-                  title={c.estado !== 'aprobado' ? 'PDF disponible solo tras aprobación gerencial' : 'Descargar PDF'}
+                  className={`h-8 w-8 ${c.estado !== 'aprobado' ? 'opacity-30 cursor-not-allowed' : 'text-emerald-600 hover:text-emerald-700'}`}
+                  onClick={() => c.estado === 'aprobado' && onPreviewPDF && onPreviewPDF(c)} 
+                  disabled={c.estado !== 'aprobado'}
+                  title={c.estado !== 'aprobado' ? 'PDF disponible solo tras aprobación gerencial' : 'Descargar PDF con firma'}
                 >
-                  {exporting === `${c.id}-pdf` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  <FileText className="h-4 w-4" />
                 </Button>
                 <Button 
                   size="icon" 
