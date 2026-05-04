@@ -1,0 +1,80 @@
+{
+  "name": "RiesgoControl",
+  "type": "object",
+  "properties": {
+    "sector": {
+      "type": "string",
+      "enum": [
+        "EDUCACION",
+        "SALUD",
+        "BAPRO"
+      ],
+      "description": "Sector / contrato al que pertenece el riesgo"
+    },
+    "numero": {
+      "type": "number",
+      "description": "N\u00famero de \u00edtem"
+    },
+    "evento_riesgo": {
+      "type": "string",
+      "description": "Descripci\u00f3n del evento o riesgo"
+    },
+    "probabilidad": {
+      "type": "string",
+      "enum": [
+        "Muy Alta",
+        "Alta",
+        "Media",
+        "Baja",
+        "Muy baja"
+      ],
+      "description": "Probabilidad de ocurrencia"
+    },
+    "consecuencia": {
+      "type": "string",
+      "enum": [
+        "Maxima",
+        "Mayor",
+        "Moderada",
+        "Menor",
+        "Minima"
+      ],
+      "description": "Nivel de consecuencia"
+    },
+    "nivel_riesgo": {
+      "type": "number",
+      "description": "Nivel num\u00e9rico de riesgo (probabilidad \u00d7 consecuencia)"
+    },
+    "metodo_control": {
+      "type": "string",
+      "description": "M\u00e9todo de control aplicado (MP/MC/MT)"
+    },
+    "frecuencia": {
+      "type": "string",
+      "description": "Frecuencia establecida de control"
+    },
+    "en_alcance": {
+      "type": "string",
+      "description": "Si se encuentra dentro del alcance del contrato"
+    },
+    "comentarios": {
+      "type": "string",
+      "description": "Comentarios adicionales"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "activo",
+        "en_control",
+        "resuelto"
+      ],
+      "default": "activo"
+    }
+  },
+  "required": [
+    "sector",
+    "evento_riesgo",
+    "probabilidad",
+    "consecuencia"
+  ]
+}

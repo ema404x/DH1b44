@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -41,6 +41,7 @@ const navGroups = [
       { label: 'Presupuestos', icon: FileText, path: '/presupuestos' },
       { label: 'Presupuestos Obra', icon: Calculator, path: '/presupuestos-obra' },
       { label: 'Avance de Obra', icon: BarChart2, path: '/avance-obra' },
+      { label: 'Control de Riesgos', icon: ShieldAlert, path: '/control-riesgo' },
       { label: 'Certificados', icon: Award, path: '/certificados' },
       { label: 'Aprobación Certificados', icon: FileCheck2, path: '/aprobacion-certificados' },
       { label: 'Facturación', icon: Receipt, path: '/facturacion' },
