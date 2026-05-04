@@ -20,19 +20,24 @@ Deno.serve(async (req) => {
     const workbook = XLSX.read(uint8Array, { type: 'array' });
 
     // 3. Convertir todas las hojas a texto plano
+    // Priorizar hoja PCP que contiene los datos del presupuesto real
     let textoHojas = '';
-    for (const sheetName of workbook.SheetNames) {
+    const sheetOrder = ['PCP', ...workbook.SheetNames.filter(n => n !== 'PCP')];
+    for (const sheetName of sheetOrder) {
+      if (!workbook.SheetNames.includes(sheetName)) continue;
       const ws = workbook.Sheets[sheetName];
       const csv = XLSX.utils.sheet_to_csv(ws, { blankrows: false });
       const lines = csv.split('\n')
         .map(l => l.trim())
         .filter(l => l && l.replace(/,/g, '').trim());
       if (lines.length > 0) {
-        textoHojas += `=== HOJA: ${sheetName} ===\n${lines.slice(0, 200).join('\n')}\n\n`;
+        // Para PCP damos más líneas ya que es la hoja principal
+        const maxLines = sheetName === 'PCP' ? 300 : 50;
+        textoHojas += `=== HOJA: ${sheetName} ===\n${lines.slice(0, maxLines).join('\n')}\n\n`;
       }
     }
 
-    const textoTotal = textoHojas.slice(0, 28000);
+    const textoTotal = textoHojas.slice(0, 32000);
 
     if (!textoTotal.trim()) {
       return Response.json({ error: 'El Excel está vacío o no se pudo leer su contenido' }, { status: 400 });
@@ -40,37 +45,48 @@ Deno.serve(async (req) => {
 
     // 4. IA extrae la estructura del presupuesto
     const datos = await base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt: `Sos un experto en presupuestos de obras de construcción argentina (GCBA, Ministerio Educación, formato PCP/PAPORC/PAMON).
+      model: 'claude_sonnet_4_6',
+      prompt: `Sos un experto en presupuestos de obras de construcción del GCBA (Gobierno de la Ciudad de Buenos Aires), formato PCP (Planilla de Cómputo y Presupuesto) / PAPORC / PAMON del Ministerio de Educación.
 
-Analizá este contenido extraído de un Excel de presupuesto de obra y extraé toda la información estructurada.
+FORMATO REAL DEL EXCEL (hoja PCP):
+- Las primeras filas son metadatos: COMITENTE, LICITACIÓN, zona (ej: "8 B"), empresa, Nº PRESUPUESTO, FECHA ingreso sap, DIRECCIÓN, ESCUELA, OBRA, MTOM Nº, SUPERVISOR, INSPECTOR, Coef. Pase, Coef. Oferta, PLAZO, Preciario Utilizado
+- Luego viene la tabla de ítems con columnas: código preciario | descripción | UNID | CANT | P.U.MAT | P.U.M.O | TOTAL | precio actual sin IVA | coef deflador | precio deflacionado | coef total | coef oferta | PRECIO RESULTANTE | SUBTOTAL
+- Los RUBROS son filas con solo texto en mayúsculas sin valores numéricos (ej: "DEMOLICIONES", "ALBAÑILERÍA", "ESTRUCTURAS DE HIERRO", "GENERALES - VOLQUETES - ANDAMIOS")
+- Los ítems tienen un número (1.1, 1.2, 2.1, etc.) o código alfanumérico, descripción detallada, unidad, cantidad y precios
 
-CONTENIDO DEL EXCEL (formato CSV por hoja):
+CONTENIDO DEL EXCEL (formato CSV):
 ${textoTotal}
 
-INSTRUCCIONES:
-- titulo: descripción o nombre de la obra
-- codigo: número o código del presupuesto
-- licitacion: número de licitación si aparece
-- cliente_nombre: comitente u organismo contratante
-- escuela: nombre del establecimiento educativo si aplica
-- direccion_obra: dirección de la obra
-- inspector: nombre del inspector
-- responsable: supervisor o responsable técnico
-- mtom: número MTOM si aparece
-- coef_pase: coeficiente de pase (número decimal, default 1.6504)
-- coef_oferta: coeficiente de oferta (número decimal, default 1.38)
-- plazo: plazo de obra en texto
-- rubros: array de capítulos/secciones con sus ítems
+EXTRAÉ:
+- titulo: nombre/descripción de la OBRA (buscar campo "OBRA:" o similar, o armar desde la dirección/escuela)
+- codigo: Nº PRESUPUESTO (ej: "14-26")
+- licitacion: número de licitación (ej: "LICIT. PÚBLICA Nº 558-0002-LPU23")
+- cliente_nombre: COMITENTE (ej: "GCBA - MINISTERIO DE EDUCACIÓN...")
+- escuela: nombre del establecimiento (campo ESCUELA o DIRECCIÓN)
+- direccion_obra: dirección completa
+- inspector: INSPECTOR
+- responsable: SUPERVISOR
+- mtom: número MTOM (ej: "421172950")
+- coef_pase: Coef. Pase (número decimal, default 1.6504)
+- coef_oferta: Coef. Oferta (número decimal, default 1.38)
+- plazo: plazo en días (ej: "60")
+- rubros: array de rubros, cada uno con su nombre y sus ítems
 
-Para cada ÍTEM:
-- codigo: código alfanumérico
-- descripcion: descripción completa
-- unidad: unidad de medida (m2, ml, gl, kg, etc)
-- cantidad: número
-- pu_mat: precio unitario materiales (si hay un solo PU, usarlo aquí)
-- pu_mo: precio unitario mano de obra (0 si no se distingue)
+Para cada ÍTEM extraé:
+- codigo: código del preciario (ej: "DMDE004", "MS0628", "s/n")
+- descripcion: descripción completa del trabajo
+- unidad: unidad de medida (M2, M3, UN, HR, HH, ML, KG, GL, etc.)
+- cantidad: cantidad numérica
+- pu_mat: P.U.MAT (precio unitario materiales, número)
+- pu_mo: P.U.M.O (precio unitario mano de obra, número)
 
-IMPORTANTE: Ignorar filas de TOTALES, SUBTOTALES y ENCABEZADOS. Si no hay rubros claros usar un rubro "GENERAL".`,
+REGLAS CRÍTICAS:
+1. Los rubros son encabezados en MAYÚSCULAS sin números de ítem ni precios
+2. Ignorar filas de TOTAL, SUBTOTAL, TOTAL PRESUPUESTO
+3. Ignorar filas de encabezado de tabla (UNID, CANT, P.U.MAT, etc.)
+4. Los ítems con "s/n" en código son válidos (sin número de preciario)
+5. Si P.U.MAT y P.U.M.O están ambos en 0 pero hay un precio fuera de preciario (columna separada), usarlo en pu_mat
+6. Mantener el orden real de rubros e ítems del Excel`,
       response_json_schema: {
         type: 'object',
         properties: {
