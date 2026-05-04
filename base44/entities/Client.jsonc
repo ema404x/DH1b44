@@ -28,6 +28,16 @@
         "otro"
       ]
     },
+    "comuna": {
+      "type": "string",
+      "description": "Comuna a la que pertenece",
+      "enum": [
+        "8A",
+        "8B",
+        "10A",
+        "Sin asignar"
+      ]
+    },
     "cuit": {
       "type": "string"
     },

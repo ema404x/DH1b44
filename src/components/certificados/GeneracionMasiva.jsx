@@ -22,11 +22,26 @@ export default function GeneracionMasiva({ open, onClose, onSuccess }) {
   const [archivos, setArchivos] = useState([]); // [{file, estado, certNumero, error}]
   const [running, setRunning] = useState(false);
   const [drag, setDrag] = useState(false);
+  const [comunaFiltro, setComunaFiltro] = useState('Todas');
+
+  const detectarComuna = (nombre) => {
+    const n = nombre.toUpperCase();
+    if (n.includes('8A') || n.includes('8 A') || n.includes('COMUNA8A')) return '8A';
+    if (n.includes('8B') || n.includes('8 B') || n.includes('COMUNA8B')) return '8B';
+    if (n.includes('10A') || n.includes('10 A') || n.includes('COMUNA10A')) return '10A';
+    return 'Sin asignar';
+  };
 
   const addFiles = (files) => {
     const nuevos = Array.from(files)
       .filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'))
-      .map(file => ({ file, estado: 'pendiente', certNumero: null, error: null }));
+      .map(file => ({
+        file,
+        estado: 'pendiente',
+        certNumero: null,
+        error: null,
+        comuna: detectarComuna(file.name),
+      }));
     setArchivos(prev => [...prev, ...nuevos]);
   };
 
@@ -111,6 +126,12 @@ export default function GeneracionMasiva({ open, onClose, onSuccess }) {
     setRunning(false);
   };
 
+  const archivosFiltrados = comunaFiltro === 'Todas'
+    ? archivos
+    : archivos.filter(a => (a.comuna || 'Sin asignar') === comunaFiltro);
+
+  const comunas = ['Todas', ...Array.from(new Set(archivos.map(a => a.comuna || 'Sin asignar')))];
+
   const terminados = archivos.filter(a => a.estado === 'ok').length;
   const conError = archivos.filter(a => a.estado === 'error').length;
   const todosTerminados = archivos.length > 0 && archivos.every(a => a.estado === 'ok' || a.estado === 'error');
@@ -151,10 +172,30 @@ export default function GeneracionMasiva({ open, onClose, onSuccess }) {
             </div>
           )}
 
+          {/* Filtro por comuna */}
+          {archivos.length > 0 && comunas.length > 2 && (
+            <div className="flex gap-1.5 flex-wrap">
+              {comunas.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setComunaFiltro(c)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                    comunaFiltro === c
+                      ? 'bg-violet-600 text-white border-violet-600'
+                      : 'border-border text-muted-foreground hover:border-violet-400'
+                  }`}
+                >
+                  {c} {c !== 'Todas' ? `(${archivos.filter(a => (a.comuna || 'Sin asignar') === c).length})` : `(${archivos.length})`}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Lista de archivos */}
           {archivos.length > 0 && (
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2 border rounded-xl p-3">
-              {archivos.map((a, idx) => {
+              {archivosFiltrados.map((a, _) => {
+                const idx = archivos.indexOf(a);
                 const cfg = ESTADOS[a.estado] || ESTADOS.pendiente;
                 const Icon = cfg.icon;
                 return (
@@ -169,6 +210,14 @@ export default function GeneracionMasiva({ open, onClose, onSuccess }) {
                         <p className="text-xs text-emerald-600">Certificado N° {a.certNumero}</p>
                       )}
                     </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                      a.comuna === '8A' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                      a.comuna === '8B' ? 'bg-violet-50 text-violet-700 border-violet-200' :
+                      a.comuna === '10A' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      'bg-muted text-muted-foreground border-border'
+                    }`}>
+                      {a.comuna || 'Sin asignar'}
+                    </span>
                     <div className={`flex items-center gap-1.5 text-xs font-medium ${cfg.color} shrink-0`}>
                       <Icon className={`h-3.5 w-3.5 ${cfg.spin ? 'animate-spin' : ''}`} />
                       <span>{cfg.label}</span>
