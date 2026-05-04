@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Bell, BellOff, Plus, Trash2, Save, ShieldAlert, Package, Clock,
-  AlertTriangle, CheckCircle2, Loader2, Play
+  AlertTriangle, CheckCircle2, Loader2, Play, ClipboardList
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -40,12 +40,21 @@ const TIPO_CONFIG = {
     border: 'border-amber-200',
     desc: 'Alerta cuando un pendiente SAP lleva más días vencidos del límite configurado.',
   },
+  ot_vencida: {
+    label: 'OTs Vencidas sin Completar',
+    icon: AlertTriangle,
+    color: 'text-orange-600',
+    bg: 'bg-orange-50',
+    border: 'border-orange-200',
+    desc: 'Alerta cuando una orden de trabajo supera su fecha programada sin ser completada.',
+  },
 };
 
 const DEFAULT_CONFIGS = {
   garantia_activo:   { tipo: 'garantia_activo',   nombre: 'Alerta de Garantías', dias_anticipacion: 30, notificar_email: true, notificar_banner: true, email_destinatarios: [], activo: true },
   stock_material:    { tipo: 'stock_material',    nombre: 'Alerta de Stock',     umbral_stock_pct: 0,   notificar_email: true, notificar_banner: true, email_destinatarios: [], activo: true },
   pendiente_vencido: { tipo: 'pendiente_vencido', nombre: 'Pendientes Vencidos', dias_vencimiento_pendiente: 7, notificar_email: true, notificar_banner: true, email_destinatarios: [], activo: true },
+  ot_vencida: { tipo: 'ot_vencida', nombre: 'OTs Vencidas', dias_vencimiento_ot: 1, notificar_email: true, notificar_banner: true, email_destinatarios: [], activo: true },
 };
 
 
@@ -151,6 +160,20 @@ function ConfigCard({ config, onSave, onDelete, onTest }) {
             </div>
           )}
 
+          {form.tipo === 'ot_vencida' && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Días vencidos para alertar</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number" min={1} max={30}
+                  value={form.dias_vencimiento_ot ?? 1}
+                  onChange={e => setForm(f => ({ ...f, dias_vencimiento_ot: Number(e.target.value) }))}
+                  className="h-8 text-sm"
+                />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">días sin completar</span>
+              </div>
+            </div>
+          )}
 
         </div>
 

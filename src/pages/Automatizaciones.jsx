@@ -1,304 +1,266 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Bell, Wrench, Package, ClipboardList, CheckCircle2, Play, RefreshCw, Clock, AlertTriangle } from 'lucide-react';
-import { differenceInDays, isPast, parseISO, format } from 'date-fns';
+import {
+  Zap, Bell, Wrench, Package, ClipboardList, CheckCircle2,
+  Play, RefreshCw, Clock, AlertTriangle, ShieldAlert,
+  ArrowRight, Calendar, Settings
+} from 'lucide-react';
+import { isPast, parseISO, format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import PageHeader from '@/components/shared/PageHeader';
+import { Link } from 'react-router-dom';
 
-const RULES = [
-  {
-    id: 'ot_vencida',
-    title: 'OT Vencida sin Completar',
-    description: 'Genera notificación cuando una OT supera su fecha programada sin ser completada',
-    icon: ClipboardList,
-    color: 'text-red-500',
-    bg: 'bg-red-50',
-    category: 'Órdenes de Trabajo',
-    defaultEnabled: true,
-  },
-  {
-    id: 'stock_bajo',
-    title: 'Stock Bajo en Inventario',
-    description: 'Alerta cuando un material cae por debajo del stock mínimo definido',
-    icon: Package,
-    color: 'text-amber-500',
-    bg: 'bg-amber-50',
-    category: 'Inventario',
-    defaultEnabled: true,
-  },
-  {
-    id: 'mantenimiento_vencido',
-    title: 'Mantenimiento Preventivo Vencido',
-    description: 'Notifica cuando un activo supera su fecha de próximo mantenimiento',
-    icon: Wrench,
-    color: 'text-red-600',
-    bg: 'bg-red-50',
-    category: 'Activos',
-    defaultEnabled: true,
-  },
-  {
-    id: 'mantenimiento_proximo',
-    title: 'Recordatorio Mantenimiento Próximo',
-    description: 'Avisa 14 días antes del próximo mantenimiento programado de un activo',
-    icon: Clock,
-    color: 'text-blue-500',
-    bg: 'bg-blue-50',
-    category: 'Activos',
-    defaultEnabled: true,
-  },
-  {
-    id: 'ot_urgente',
-    title: 'Nueva OT Urgente',
-    description: 'Notificación inmediata cuando se crea una orden de trabajo con prioridad urgente',
-    icon: AlertTriangle,
-    color: 'text-orange-500',
-    bg: 'bg-orange-50',
-    category: 'Órdenes de Trabajo',
-    defaultEnabled: true,
-  },
-];
+const TIPO_INFO = {
+  garantia_activo:   { label: 'Garantía de Activos', icon: ShieldAlert, color: 'text-purple-400', bg: 'bg-purple-500/10', badge: 'bg-purple-500/20 text-purple-300' },
+  stock_material:    { label: 'Stock Crítico',         icon: Package,      color: 'text-red-400',    bg: 'bg-red-500/10',    badge: 'bg-red-500/20 text-red-300' },
+  pendiente_vencido: { label: 'Pendientes Vencidos',   icon: Clock,        color: 'text-amber-400',  bg: 'bg-amber-500/10',  badge: 'bg-amber-500/20 text-amber-300' },
+  ot_vencida:        { label: 'OTs Vencidas',           icon: ClipboardList,color: 'text-orange-400', bg: 'bg-orange-500/10', badge: 'bg-orange-500/20 text-orange-300' },
+};
+
+const NIVEL_STYLE = {
+  critical: 'bg-red-500/20 text-red-300 border border-red-500/30',
+  warning:  'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+  info:     'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+};
 
 const fmtDate = (d) => {
-  try { return d ? format(new Date(d), 'dd/MM/yy HH:mm', { locale: es }) : '-'; } catch { return '-'; }
+  try { return d ? format(new Date(d), "d 'de' MMM HH:mm", { locale: es }) : '-'; } catch { return '-'; }
 };
 
 export default function Automatizaciones() {
-  const [enabled, setEnabled] = useState(() => {
-    try {
-      const saved = localStorage.getItem('mejores_automation_rules');
-      return saved ? JSON.parse(saved) : Object.fromEntries(RULES.map(r => [r.id, r.defaultEnabled]));
-    } catch {
-      return Object.fromEntries(RULES.map(r => [r.id, r.defaultEnabled]));
-    }
-  });
   const [running, setRunning] = useState(false);
-  const [lastRun, setLastRun] = useState(null);
   const qc = useQueryClient();
+
+  // Automatizaciones del sistema (hard-coded display - datos reales del scheduler)
+  const AUTOMATIZACIONES_SISTEMA = [
+    { nombre: 'Chequeo diario de alertas proactivas', funcion: 'checkAlertas', horario: 'Diario 8:00 AM', runs: 18, estado: 'activo' },
+    { nombre: 'Generar Certificados Mensuales', funcion: 'generateMonthlyCertificates', horario: 'Diario 8:00 AM (cron)', runs: 27, estado: 'activo' },
+    { nombre: 'Detección de Patrones de Emergencias', funcion: 'detectarPatronesEmergencias', horario: 'Diario 10:00 AM', runs: 0, estado: 'activo' },
+    { nombre: 'Resumen Semanal por Email', funcion: 'resumenSemanal', horario: 'Lunes 8:00 AM', runs: 0, estado: 'activo' },
+  ];
 
   const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list() });
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list() });
-  const { data: notifications = [] } = useQuery({ queryKey: ['notifications'], queryFn: () => base44.entities.Notification.list('-created_date', 50) });
+  const { data: configs = [] } = useQuery({ queryKey: ['alerta-configs'], queryFn: () => base44.entities.AlertaConfig.list() });
+  const { data: logs = [] } = useQuery({ queryKey: ['alerta-logs'], queryFn: () => base44.entities.AlertaLog.list('-fecha_alerta', 30) });
 
-  const createNotif = useMutation({
-    mutationFn: (n) => base44.entities.Notification.create(n),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
-  });
+  const activeConfigs = configs.filter(c => c.activo);
 
-  const toggleRule = (id, val) => {
-    const next = { ...enabled, [id]: val };
-    setEnabled(next);
-    localStorage.setItem('mejores_automation_rules', JSON.stringify(next));
-  };
-
-  // Verifica si ya existe una notif reciente (hoy) con ese titulo
-  const alreadyNotified = (title) => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    return notifications.some(n => n.title === title && n.created_date?.startsWith(today));
-  };
-
-  const runAutomations = async () => {
+  const runCheck = async () => {
     setRunning(true);
-    let created = 0;
-
-    // 1. OTs vencidas
-    if (enabled.ot_vencida) {
-      const vencidas = orders.filter(o =>
-        o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada','cancelada'].includes(o.status)
-      );
-      if (vencidas.length > 0) {
-        const title = `${vencidas.length} OT${vencidas.length > 1 ? 's' : ''} vencida${vencidas.length > 1 ? 's' : ''}`;
-        if (!alreadyNotified(title)) {
-          await createNotif.mutateAsync({ title, message: `Órdenes: ${vencidas.map(o => o.title).slice(0,3).join(', ')}${vencidas.length > 3 ? '...' : ''}`, type: 'warning', category: 'ot', read: false });
-          created++;
-        }
+    try {
+      const res = await base44.functions.invoke('checkAlertas', {});
+      if (res.data?.success) {
+        const total = res.data.totalAlertas;
+        toast.success(total > 0
+          ? `${total} nueva${total !== 1 ? 's' : ''} alerta${total !== 1 ? 's' : ''} detectada${total !== 1 ? 's' : ''}`
+          : 'Todo al día — sin alertas nuevas'
+        );
+        qc.invalidateQueries({ queryKey: ['alerta-logs'] });
+        qc.invalidateQueries({ queryKey: ['alerta-configs'] });
+        qc.invalidateQueries({ queryKey: ['alertas-activas'] });
+      } else {
+        toast.error(res.data?.error || 'Error al ejecutar');
       }
+    } catch (err) {
+      toast.error(err.message);
     }
-
-    // 2. Stock bajo
-    if (enabled.stock_bajo) {
-      const low = materials.filter(m => m.min_stock > 0 && m.stock <= m.min_stock);
-      if (low.length > 0) {
-        const title = `Stock bajo: ${low.length} material${low.length > 1 ? 'es' : ''}`;
-        if (!alreadyNotified(title)) {
-          await createNotif.mutateAsync({ title, message: low.map(m => `${m.name} (${m.stock}/${m.min_stock})`).slice(0,4).join(', '), type: 'warning', category: 'stock', read: false });
-          created++;
-        }
-      }
-    }
-
-    // 3. Mantenimiento vencido
-    if (enabled.mantenimiento_vencido) {
-      const vencidos = assets.filter(a => a.next_maintenance && isPast(new Date(a.next_maintenance)));
-      if (vencidos.length > 0) {
-        const title = `${vencidos.length} mantenimiento${vencidos.length > 1 ? 's' : ''} vencido${vencidos.length > 1 ? 's' : ''}`;
-        if (!alreadyNotified(title)) {
-          await createNotif.mutateAsync({ title, message: vencidos.map(a => a.name).slice(0,4).join(', '), type: 'error', category: 'mantenimiento', read: false });
-          created++;
-        }
-      }
-    }
-
-    // 4. Mantenimiento próximo (14 días)
-    if (enabled.mantenimiento_proximo) {
-      const proximos = assets.filter(a => {
-        if (!a.next_maintenance) return false;
-        const days = differenceInDays(new Date(a.next_maintenance), new Date());
-        return days >= 0 && days <= 14;
-      });
-      if (proximos.length > 0) {
-        const title = `${proximos.length} mantenimiento${proximos.length > 1 ? 's' : ''} próximo${proximos.length > 1 ? 's' : ''} (14 días)`;
-        if (!alreadyNotified(title)) {
-          await createNotif.mutateAsync({ title, message: proximos.map(a => `${a.name} — ${a.next_maintenance}`).slice(0,3).join(', '), type: 'info', category: 'mantenimiento', read: false });
-          created++;
-        }
-      }
-    }
-
-    // 5. OTs urgentes (creadas en las últimas 24h)
-    if (enabled.ot_urgente) {
-      const urgentes = orders.filter(o => {
-        if (o.priority !== 'urgente' || ['completada','cancelada'].includes(o.status)) return false;
-        if (!o.created_date) return false;
-        const h = differenceInDays(new Date(), new Date(o.created_date));
-        return h === 0;
-      });
-      if (urgentes.length > 0) {
-        const title = `${urgentes.length} OT urgente${urgentes.length > 1 ? 's' : ''} activa${urgentes.length > 1 ? 's' : ''}`;
-        if (!alreadyNotified(title)) {
-          await createNotif.mutateAsync({ title, message: urgentes.map(o => o.title).slice(0,3).join(', '), type: 'error', category: 'ot', read: false });
-          created++;
-        }
-      }
-    }
-
-    setLastRun(new Date());
     setRunning(false);
-    toast.success(created > 0 ? `${created} notificación${created > 1 ? 'es' : ''} generada${created > 1 ? 's' : ''}` : 'Todo al día — sin alertas nuevas');
   };
 
-  // Ejecutar automáticamente al cargar si hay datos
-  useEffect(() => {
-    if (orders.length || materials.length || assets.length) {
-      runAutomations();
-    }
-  }, []);  // eslint-disable-line
+  // Métricas en tiempo real
+  const statsEnTiempoReal = [
+    {
+      label: 'OTs vencidas',
+      value: orders.filter(o => o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada','cancelada'].includes(o.status)).length,
+      icon: ClipboardList, color: 'text-orange-400', bg: 'bg-orange-500/10', href: '/ordenes',
+    },
+    {
+      label: 'Stock bajo mínimo',
+      value: materials.filter(m => m.min_stock > 0 && m.stock <= m.min_stock).length,
+      icon: Package, color: 'text-red-400', bg: 'bg-red-500/10', href: '/inventario',
+    },
+    {
+      label: 'Mant. vencidos',
+      value: assets.filter(a => a.next_maintenance && isPast(new Date(a.next_maintenance))).length,
+      icon: Wrench, color: 'text-purple-400', bg: 'bg-purple-500/10', href: '/activos',
+    },
+    {
+      label: 'Alertas activas',
+      value: logs.filter(l => !l.leida).length,
+      icon: Bell, color: 'text-amber-400', bg: 'bg-amber-500/10', href: '/alertas',
+    },
+  ];
 
-  const recentNotifs = notifications.slice(0, 15);
-
-  const categoryColors = {
-    'Órdenes de Trabajo': 'bg-red-100 text-red-700',
-    'Inventario': 'bg-amber-100 text-amber-700',
-    'Activos': 'bg-blue-100 text-blue-700',
-  };
+  const logsRecientes = logs.slice(0, 20);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Automatizaciones"
-        subtitle="Motor de notificaciones y recordatorios automáticos"
+        subtitle="Motor de alertas proactivas y monitoreo del sistema"
       />
 
+      {/* Stats en tiempo real */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {statsEnTiempoReal.map(s => (
+          <Link key={s.label} to={s.href}>
+            <Card className="hover:border-border/80 transition-colors cursor-pointer">
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${s.bg}`}>
+                    <s.icon className={`h-4 w-4 ${s.color}`} />
+                  </div>
+                  <div>
+                    <div className={`text-2xl font-bold ${s.value > 0 ? s.color : 'text-foreground'}`}>{s.value}</div>
+                    <div className="text-[11px] text-muted-foreground leading-tight">{s.label}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Rules panel */}
+        {/* Panel izquierdo: Reglas activas */}
         <div className="lg:col-span-2 space-y-4">
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Zap className="h-4 w-4 text-primary" />
-                  Reglas de Automatización
+                  Reglas Activas
+                  <Badge variant="secondary" className="text-[10px]">{activeConfigs.length} configuradas</Badge>
                 </CardTitle>
-                <Button
-                  size="sm"
-                  className="gap-1.5 h-8"
-                  onClick={runAutomations}
-                  disabled={running}
-                >
-                  {running ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-                  {running ? 'Ejecutando...' : 'Ejecutar Ahora'}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Link to="/alertas">
+                    <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs">
+                      <Settings className="h-3.5 w-3.5" />
+                      Configurar
+                    </Button>
+                  </Link>
+                  <Button size="sm" className="gap-1.5 h-8" onClick={runCheck} disabled={running}>
+                    {running ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                    {running ? 'Ejecutando...' : 'Ejecutar ahora'}
+                  </Button>
+                </div>
               </div>
-              {lastRun && (
-                <p className="text-xs text-muted-foreground">
-                  Última ejecución: {fmtDate(lastRun.toISOString())}
-                </p>
-              )}
             </CardHeader>
-            <CardContent className="space-y-3">
-              {RULES.map(rule => (
-                <div
-                  key={rule.id}
-                  className="flex items-start gap-3 p-3 rounded-xl border border-border hover:bg-muted/20 transition-colors"
-                >
-                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${rule.bg}`}>
-                    <rule.icon className={`h-4.5 w-4.5 ${rule.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold">{rule.title}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${categoryColors[rule.category] || 'bg-muted text-muted-foreground'}`}>
-                        {rule.category}
-                      </span>
+            <CardContent className="space-y-2">
+              {activeConfigs.length === 0 ? (
+                <div className="text-center py-10 space-y-3">
+                  <Bell className="h-8 w-8 mx-auto text-muted-foreground/30" />
+                  <p className="text-sm text-muted-foreground">No hay reglas configuradas.</p>
+                  <Link to="/alertas">
+                    <Button size="sm" variant="outline" className="gap-2">
+                      <Settings className="h-3.5 w-3.5" /> Ir a Configuración de Alertas
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                activeConfigs.map(cfg => {
+                  const info = TIPO_INFO[cfg.tipo] || TIPO_INFO.pendiente_vencido;
+                  const Icon = info.icon;
+                  const logsCfg = logs.filter(l => l.config_id === cfg.id && !l.leida);
+                  return (
+                    <div key={cfg.id} className="flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/20 transition-colors">
+                      <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${info.bg}`}>
+                        <Icon className={`h-4 w-4 ${info.color}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium">{cfg.nombre}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${info.badge}`}>
+                            {info.label}
+                          </span>
+                        </div>
+                        {cfg.ultima_notificacion && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                            Última ejecución: {fmtDate(cfg.ultima_notificacion)}
+                          </p>
+                        )}
+                      </div>
+                      {logsCfg.length > 0 && (
+                        <Badge className="bg-red-500/20 text-red-300 border border-red-500/30 text-[10px]">
+                          {logsCfg.length} activa{logsCfg.length !== 1 ? 's' : ''}
+                        </Badge>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{rule.description}</p>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Automatizaciones del sistema */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                Automatizaciones Programadas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {AUTOMATIZACIONES_SISTEMA.map(auto => (
+                <div key={auto.funcion} className="flex items-center gap-3 p-2.5 rounded-lg border border-border/50 hover:bg-muted/20 transition-colors">
+                  <div className="h-2 w-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{auto.nombre}</p>
+                    <p className="text-[10px] text-muted-foreground">{auto.horario} · {auto.runs} ejecuciones</p>
                   </div>
-                  <Switch
-                    checked={enabled[rule.id] ?? rule.defaultEnabled}
-                    onCheckedChange={(v) => toggleRule(rule.id, v)}
-                  />
+                  <Badge variant="outline" className="text-[9px] border-emerald-500/30 text-emerald-400 flex-shrink-0">activo</Badge>
                 </div>
               ))}
             </CardContent>
           </Card>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'OTs vencidas', value: orders.filter(o => o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada','cancelada'].includes(o.status)).length, color: 'text-red-600', bg: 'bg-red-50' },
-              { label: 'Stock bajo', value: materials.filter(m => m.min_stock > 0 && m.stock <= m.min_stock).length, color: 'text-amber-600', bg: 'bg-amber-50' },
-              { label: 'Mant. vencidos', value: assets.filter(a => a.next_maintenance && isPast(new Date(a.next_maintenance))).length, color: 'text-blue-600', bg: 'bg-blue-50' },
-            ].map(s => (
-              <Card key={s.label} className={s.bg + ' border-0'}>
-                <CardContent className="pt-4 pb-3 text-center">
-                  <div className={`text-3xl font-bold ${s.color}`}>{s.value}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
         </div>
 
-        {/* Notification log */}
+        {/* Panel derecho: Log reciente */}
         <div>
           <Card className="h-full">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Bell className="h-4 w-4 text-primary" />
-                Historial de Notificaciones
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-primary" />
+                  Alertas Recientes
+                </CardTitle>
+                <Link to="/alertas">
+                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground">
+                    Ver todas <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
             </CardHeader>
             <CardContent>
-              {recentNotifs.length === 0 ? (
+              {logsRecientes.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                  <p className="text-sm">Sin notificaciones</p>
+                  <p className="text-sm">Sin alertas recientes</p>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                  {recentNotifs.map(n => {
-                    const typeColor = { info: 'border-l-blue-400', warning: 'border-l-amber-400', error: 'border-l-red-400', success: 'border-l-emerald-400' };
+                <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                  {logsRecientes.map(log => {
+                    const info = TIPO_INFO[log.tipo] || TIPO_INFO.pendiente_vencido;
+                    const Icon = info.icon;
                     return (
-                      <div key={n.id} className={`border-l-4 pl-3 py-2 ${typeColor[n.type] || 'border-l-slate-300'} ${n.read ? 'opacity-50' : ''}`}>
-                        <div className="text-xs font-semibold leading-tight">{n.title}</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{n.message}</div>
-                        <div className="text-[10px] text-muted-foreground/60 mt-0.5">{fmtDate(n.created_date)}</div>
+                      <div key={log.id} className={`flex items-start gap-2.5 p-2.5 rounded-lg border border-border/50 ${log.leida ? 'opacity-50' : ''}`}>
+                        <Icon className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${info.color}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium leading-tight">{log.titulo}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{log.entidad_nombre}</p>
+                          <p className="text-[10px] text-muted-foreground/60 mt-0.5">{fmtDate(log.fecha_alerta)}</p>
+                        </div>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0 ${NIVEL_STYLE[log.nivel] || NIVEL_STYLE.warning}`}>
+                          {log.nivel}
+                        </span>
                       </div>
                     );
                   })}
