@@ -173,7 +173,7 @@ export default function GeneracionMasiva({ open, onClose, onSuccess }) {
           )}
 
           {/* Filtro por comuna */}
-          {archivos.length > 0 && comunas.length > 2 && (
+          {archivos.length > 0 && (
             <div className="flex gap-1.5 flex-wrap">
               {comunas.map(c => (
                 <button
