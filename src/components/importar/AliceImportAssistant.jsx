@@ -64,13 +64,29 @@ function buildAnalysisMessage(mappingResult) {
   let msg = `Analicé tu archivo y encontré **${sheets.length} hoja${sheets.length !== 1 ? 's' : ''}** con **${total.toLocaleString()} registros** listos para importar.\n\n`;
 
   if (comunasList.length > 0) {
-    msg += `🏘️ **Comuna${comunasList.length > 1 ? 's' : ''} detectada${comunasList.length > 1 ? 's' : ''}:** ${comunasList.map(c => `**${c}**`).join(', ')}\n\n`;
+    msg += `🏘️ **Comuna${comunasList.length > 1 ? 's' : ''} detectada${comunasList.length > 1 ? 's' : ''}:** ${comunasList.map(c => `**${c}**`).join(', ')}\n`;
+  }
+
+  // Detectar modelos de planilla
+  const modelosDetectados = new Set();
+  sheets.forEach(s => {
+    if (s.detected_planilla_model) modelosDetectados.add(s.detected_planilla_model);
+  });
+  const modelosList = Array.from(modelosDetectados).sort();
+  
+  if (modelosList.length > 0) {
+    const modelDescs = {
+      '8A': 'Hojas por inspector (estándar SAP)',
+      '8B': 'Formato pivotado (direcciones como columnas)',
+      '10A': 'Sin inspector (simplificado)'
+    };
+    msg += `📋 **Modelo${modelosList.length > 1 ? 's' : ''} de planilla:** ${modelosList.map(m => `**${m}** (${modelDescs[m] || ''})`).join(', ')}\n\n`;
   }
 
   if (highConf.length > 0) {
     msg += `✅ **Alta confianza:** ${highConf.map(s => {
-      const comunaTag = s.detected_comuna ? ` (${s.detected_comuna})` : '';
-      return `"${s.sheet_name}" → ${s.target_entity}${comunaTag}`;
+      const modelTag = s.detected_planilla_model ? ` [${s.detected_planilla_model}]` : '';
+      return `"${s.sheet_name}" → ${s.target_entity}${modelTag}`;
     }).join(', ')}\n`;
   }
   if (lowConf.length > 0) {

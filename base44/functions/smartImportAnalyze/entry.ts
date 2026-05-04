@@ -143,6 +143,39 @@ const ENTITY_SCHEMAS = {
   },
 };
 
+// Detectar el modelo de planilla por comuna
+function detectPlanillaModel(sheetName, headers) {
+  const sheetLower = sheetName.toLowerCase();
+  
+  // Modelo 8A: Hojas por inspector con columnas estándar (INSPECTOR, UBICACIÓN, ESTABLECIMIENTO, TAREAS, N° DE ORDEN, etc.)
+  if (headers.includes('INSPECTOR') && headers.includes('N° DE ORDEN') && headers.includes('TAREAS A REALIZAR')) {
+    return { model: '8A', pattern: 'inspector_sheets' };
+  }
+  
+  // Modelo 10A: Sin INSPECTOR, pero tiene UBICACIÓN, ESTABLECIMIENTO, TAREAS, N° DE ORDEN
+  if (!headers.includes('INSPECTOR') && headers.includes('N° DE ORDEN') && 
+      headers.includes('TAREAS A REALIZAR') && headers.includes('ESTABLECIMIENTO')) {
+    return { model: '10A', pattern: 'no_inspector' };
+  }
+  
+  // Modelo 8B: Formato pivotado (columnas dinámicas = direcciones/jefes, datos anidados)
+  // Detectar por: nombres de direcciones en headers, sin INSPECTOR, sin estructura SAP clara
+  const hasAddressLikeHeaders = headers.some(h => 
+    h.match(/^[A-Z].*\d{3,}/) || // Direcciones (ej: MONTIEL 3826)
+    h.match(/calle|avenida|avda|pasaje|pje/i)
+  );
+  
+  const hasSAPStructure = headers.some(h => 
+    h.match(/n° de orden|n° orden|numero orden|inspector|ubicacion|establecimiento/i)
+  );
+  
+  if (hasAddressLikeHeaders && !hasSAPStructure) {
+    return { model: '8B', pattern: 'pivoted_addresses' };
+  }
+  
+  return null;
+}
+
 // Pre-analysis: score each sheet against each entity based on header keyword matches
 function preScoreSheet(sheetName, headers) {
   const nameNorm = sheetName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -197,8 +230,14 @@ Deno.serve(async (req) => {
     headers.forEach((h, i) => {
       sample[h] = sampleRows.map(r => r[i]).filter(v => v !== '' && v !== null && v !== undefined).join(', ');
     });
+    
     const preScores = preScoreSheet(sheetName, headers);
     const topEntity = Object.entries(preScores).sort(([, a], [, b]) => b - a)[0];
+    
+    // Detectar modelo de planilla (8A, 8B, 10A)
+    const planillaModel = detectPlanillaModel(sheetName, headers);
+    const modelInfo = planillaModel ? `[${planillaModel.model} - ${planillaModel.pattern}]` : null;
+    
     return {
       sheetName,
       headers,
@@ -206,6 +245,8 @@ Deno.serve(async (req) => {
       rowCount: Math.max(0, rows.length - 1),
       pre_suggested_entity: topEntity[1] > 0 ? topEntity[0] : null,
       pre_score: topEntity[1],
+      planilla_model: planillaModel?.model || null,
+      planilla_pattern: planillaModel?.pattern || null,
     };
   });
 
@@ -237,7 +278,13 @@ REGLAS DE MAPEO (por orden de importancia):
 2. COINCIDENCIA SEMÁNTICA: Usa sinónimos y variantes regionales. Ej: "Razón Social"→name, "Fecha de Alta"→hire_date, "Jornal"→hourly_rate, "P.U."→unit_cost
 3. DATOS DE MUESTRA: Usa los valores de sample para confirmar el tipo. Ej: si parece CUIT (11 dígitos con guiones) → campo cuit. Si es DNI (7-8 dígitos) → campo dni
 4. NOMBRE DE HOJA: Considéralo como señal fuerte. "Empleados", "Personal", "RRHH" → Employee
-5. DETECTA LA COMUNA: Si encuentras referencias a "8A", "8B", "10A", "COMUNA 8A", etc. EN LOS DATOS O HEADERS, indicalo en detected_comuna
+5. DETECTA LA COMUNA Y MODELO:
+   - Comuna: Si encuentras "8A", "8B", "10A" EN EL NOMBRE DEL ARCHIVO O DATOS, indicalo en detected_comuna
+   - Modelo de planilla:
+     * 8A: Hojas por inspector (columnas INSPECTOR, UBICACIÓN, ESTABLECIMIENTO, TAREAS A REALIZAR, N° DE ORDEN, etc.)
+     * 8B: Formato pivotado (columnas = direcciones/jefes, sin INSPECTOR, datos anidados)
+     * 10A: Sin INSPECTOR, columnas simplificadas (UBICACIÓN, ESTABLECIMIENTO, TAREAS, N° DE ORDEN, pero sin INSPECTOR)
+   - Indicalo en detected_planilla_model
 6. pre_suggested_entity es una pista automática, valídala con headers y datos
 7. Si una columna no encaja en ningún campo del sistema, déjala vacía (no mapear)
 8. Si la hoja es claramente auxiliar o sin datos útiles, usa target_entity: "skip"
@@ -266,6 +313,7 @@ Responde con la lista de hojas ordenada por confidence DESCENDENTE (mayor confia
               confidence: { type: 'number' },
               row_count: { type: 'number' },
               detected_comuna: { type: 'string' },
+              detected_planilla_model: { type: 'string' },
               field_mapping: { type: 'object', additionalProperties: { type: 'string' } },
               sample_data: { type: 'object', additionalProperties: { type: 'string' } },
             },
