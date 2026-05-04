@@ -3,13 +3,14 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus } from 'lucide-react';
+import { Plus, Zap } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import UploadADA from '@/components/certificados/UploadADA';
 import CertificadoEditor from '@/components/certificados/CertificadoEditor';
 import CertificadoPreview from '@/components/certificados/CertificadoPreview';
 import CertificadosLista from '@/components/certificados/CertificadosLista';
 import CertificadosAutomatizados from '@/components/certificados/CertificadosAutomatizados';
+import GeneracionMasiva from '@/components/certificados/GeneracionMasiva';
 import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -17,6 +18,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 export default function Certificados() {
   const [view, setView] = useState('list');
   const [tab, setTab] = useState('abono_mensual');
+  const [showMasiva, setShowMasiva] = useState(false);
   const [extracted, setExtracted] = useState(null);
   const [editing, setEditing] = useState(null);
   const [previewing, setPreviewing] = useState(null);
@@ -163,6 +165,11 @@ export default function Certificados() {
         </TabsList>
 
         <TabsContent value="abono_mensual" className="mt-6">
+          <div className="flex justify-end mb-4">
+            <Button onClick={() => setShowMasiva(true)} className="gap-2 bg-violet-600 hover:bg-violet-700">
+              <Zap className="h-4 w-4" /> Generar Masivo
+            </Button>
+          </div>
           <CertificadosLista
             certificados={certificados.filter(c => c.tipo === 'abono_mensual')}
             isLoading={isLoading}
@@ -171,6 +178,11 @@ export default function Certificados() {
             onDelete={(id) => deleteMutation.mutate(id)}
             onPreviewPDF={handlePreviewPDF}
             emptyLabel="No hay certificados de Abono Mensual"
+          />
+          <GeneracionMasiva
+            open={showMasiva}
+            onClose={() => setShowMasiva(false)}
+            onSuccess={() => { setShowMasiva(false); queryClient.invalidateQueries({ queryKey: ['certificados'] }); }}
           />
         </TabsContent>
 
