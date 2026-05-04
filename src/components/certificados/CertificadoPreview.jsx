@@ -21,8 +21,10 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
   const pctCertificado = subtotalContrato > 0 ? (totalPresente / subtotalContrato) * 100 : 0;
 
   const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
+  const FIRMA_RAUL_GARCIA_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/317004861_FirmaRaulGArcia.jpg';
 
   const exportPDF = async () => {
+    const FIRMA_RAUL_GARCIA_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/317004861_FirmaRaulGArcia.jpg';
     let logoBase64 = null;
     try {
       const res = await fetch(MEJORES_LOGO_URL);
@@ -273,32 +275,34 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
       doc.text(`${fmt(totalPresente)} de ${fmt(subtotalContrato)}`, M + 32, y + barH + 5);
     }
 
-    // ── Firma del gerente (si aprobado) ──────────────────────────────────────
-    if (form.firma_gerente_url && form.estado === 'aprobado') {
+    // ── Firma del gerente Raúl García (siempre en aprobado) ──────────────────
+    if (form.estado === 'aprobado') {
       try {
-        const firmaRes = await fetch(form.firma_gerente_url);
+        const firmaRes = await fetch(FIRMA_RAUL_GARCIA_URL);
         const firmaBlob = await firmaRes.blob();
         const firmaBase64 = await new Promise((resolve) => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result);
           reader.readAsDataURL(firmaBlob);
         });
-        // Asegurarse que hay espacio
-        if (y + 30 > SAFE_BOTTOM) {
+        if (y + 35 > SAFE_BOTTOM) {
           drawFooter(pageNum, '??');
           doc.addPage();
           pageNum++;
           drawPageHeader(false);
           y = 26;
         }
-        y += 4;
+        y += 6;
         doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(90,90,90);
         doc.text('Firma y aprobación gerencial:', M, y + 5);
-        doc.addImage(firmaBase64, 'PNG', M, y + 7, 60, 18);
-        doc.setFontSize(7);
-        doc.text(form.aprobado_por || '', M, y + 28);
+        doc.addImage(firmaBase64, 'JPEG', M, y + 7, 55, 22);
         doc.setDrawColor(100,100,100); doc.setLineWidth(0.3);
-        doc.line(M, y + 26, M + 60, y + 26);
+        doc.line(M, y + 31, M + 55, y + 31);
+        doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(40,40,40);
+        doc.text('Arq. Raúl García', M, y + 35);
+        doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(90,90,90);
+        doc.text('Gerente de Contratos', M, y + 39);
+        doc.text('Mejores Hospitales S.A.', M, y + 43);
       } catch {}
     }
 
@@ -330,10 +334,14 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
         )}
         <Button className="gap-2" onClick={() => onSave(form)} disabled={saving}>{saving ? 'Guardando...' : 'Emitir y enviar a aprobación'}</Button>
       </div>
-      {isAprobado && form.firma_gerente_url && (
-        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5">
-          <span className="text-sm font-medium text-emerald-700">✓ Aprobado por {form.aprobado_por}</span>
-          <img src={form.firma_gerente_url} alt="Firma" className="h-10 object-contain border rounded bg-white px-1" />
+      {isAprobado && (
+        <div className="flex items-center gap-4 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+          <span className="text-sm font-medium text-emerald-700">✓ Aprobado por {form.aprobado_por || 'Arq. Raúl García'}</span>
+          <div className="flex flex-col items-center border-l pl-4 border-emerald-200">
+            <img src={FIRMA_RAUL_GARCIA_URL} alt="Firma Arq. Raúl García" className="h-14 object-contain bg-white px-1" />
+            <span className="text-[10px] font-bold text-slate-600 mt-0.5">Arq. Raúl García</span>
+            <span className="text-[10px] text-slate-500">Gerente de Contratos · Mejores Hospitales S.A.</span>
+          </div>
         </div>
       )}
       {!isAprobado && (
