@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
 
 const tipoOptions = [
   { value: 'avance_obra', label: 'Avance de Obra' },
@@ -35,6 +37,11 @@ const prioridadOptions = [
 
 export default function InformeFormDialog({ open, onOpenChange, initialData, onSave, saving }) {
   const [form, setForm] = useState({});
+
+  const { data: proveedores = [] } = useQuery({
+    queryKey: ['clientes-proveedores'],
+    queryFn: () => base44.entities.Client.list('name', 200),
+  });
 
   useEffect(() => {
     if (open) {
@@ -88,8 +95,15 @@ export default function InformeFormDialog({ open, onOpenChange, initialData, onS
               <Input value={form.proyecto_nombre || ''} onChange={e => set('proyecto_nombre', e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Cliente</Label>
-              <Input value={form.cliente_nombre || ''} onChange={e => set('cliente_nombre', e.target.value)} />
+              <Label>Proveedor</Label>
+              <Select value={form.cliente_nombre || ''} onValueChange={v => set('cliente_nombre', v)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar proveedor..." /></SelectTrigger>
+                <SelectContent>
+                  {proveedores.map(p => (
+                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Responsable</Label>
