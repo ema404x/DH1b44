@@ -33,6 +33,7 @@ const RUTA_MODULO = {
   '/calendario': 'Calendario',
   '/informes': 'Informes',
   '/facturacion': 'Facturación',
+  '/control-riesgo': 'Control de Riesgos',
 };
 
 const MODULOS_POR_ROL = {

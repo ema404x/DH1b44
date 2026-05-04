@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, ShieldAlert, AlertTriangle, CheckCircle2, AlertCircle, Zap } from 'lucide-react';
+import { Search, ShieldAlert, AlertTriangle, CheckCircle2, AlertCircle, Zap, Sparkles, Send, Loader2, X, Bot } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 const NIVEL_CONFIG = {
   aceptable: { label: 'Aceptable', color: 'bg-emerald-500', text: 'text-emerald-900', border: 'border-emerald-400', max: 3 },
@@ -21,6 +22,157 @@ export function getNivelConfig(n) {
 }
 
 const SECTORES = ['Todos', 'EDUCACION', 'SALUD', 'BAPRO'];
+
+function AliceRiesgoPanel() {
+  const [open, setOpen] = useState(false);
+  const [conversation, setConversation] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [init, setInit] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const openChat = async () => {
+    setOpen(true);
+    if (init) return;
+    setInit(true);
+    const conv = await base44.agents.createConversation({
+      agent_name: 'soporte_app',
+      metadata: { name: 'Consulta Riesgos' },
+    });
+    // Contexto inicial silencioso
+    await base44.agents.addMessage(conv, {
+      role: 'user',
+      content: '[CONTEXTO INTERNO - no lo menciones] El usuario está en el módulo Control de Riesgos, que muestra la matriz de riesgos operativos por sector (EDUCACION, SALUD, BAPRO) con probabilidad, consecuencia, nivel de riesgo, método de control y frecuencia. Saludalo brevemente y ofrecete a responder consultas sobre la matriz de riesgos.',
+    });
+    setConversation(conv);
+    base44.agents.subscribeToConversation(conv.id, (data) => {
+      const visible = (data.messages || []).filter((m, i) =>
+        !(i === 0 && m.role === 'user' && m.content?.startsWith('[CONTEXTO'))
+      );
+      setMessages(visible);
+    });
+  };
+
+  const handleSend = async () => {
+    const msg = input.trim();
+    if (!msg || sending || !conversation) return;
+    setInput('');
+    setSending(true);
+    try {
+      await base44.agents.addMessage(conversation, { role: 'user', content: msg });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const isThinking = messages.length > 0 && messages[messages.length - 1]?.role === 'user';
+
+  const SUGERENCIAS = [
+    '¿Qué riesgos son más críticos en EDUCACION?',
+    '¿Cómo se clasifica el nivel de riesgo?',
+    '¿Qué significa MP y MC en los métodos?',
+    '¿Cuál es la frecuencia más recomendada?',
+  ];
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/5 overflow-hidden">
+      {/* Header clickeable */}
+      <button
+        onClick={open ? () => setOpen(false) : openChat}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-primary/10 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center">
+            <Sparkles className="h-4 w-4 text-primary" />
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-semibold">Consultá a Alice</p>
+            <p className="text-xs text-muted-foreground">Hacé preguntas sobre la matriz de riesgos</p>
+          </div>
+        </div>
+        <X className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-0' : 'rotate-45'}`} />
+      </button>
+
+      {/* Panel expandido */}
+      {open && (
+        <div className="border-t border-primary/10">
+          {/* Mensajes */}
+          <div className="h-64 overflow-y-auto px-3 py-3 space-y-2.5 bg-background/40">
+            {!conversation && (
+              <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            {conversation && messages.length === 0 && !isThinking && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground text-center">Sugerencias rápidas:</p>
+                {SUGERENCIAS.map((s, i) => (
+                  <button key={i} onClick={() => { setInput(s); }}
+                    className="w-full text-left text-xs px-3 py-2 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition-all text-muted-foreground">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            {messages.map((msg, i) => {
+              const isUser = msg.role === 'user';
+              return (
+                <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'} items-end gap-1.5`}>
+                  {!isUser && (
+                    <div className="h-5 w-5 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0 mb-0.5">
+                      <Bot className="h-2.5 w-2.5 text-primary" />
+                    </div>
+                  )}
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
+                    isUser ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted text-foreground rounded-bl-sm'
+                  }`}>
+                    {isUser ? <p>{msg.content}</p> : (
+                      <ReactMarkdown className="prose prose-xs max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                        {msg.content}
+                      </ReactMarkdown>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {isThinking && (
+              <div className="flex justify-start">
+                <div className="bg-muted rounded-2xl rounded-bl-sm px-3 py-2 flex items-center gap-1">
+                  {[0,1,2].map(i => (
+                    <span key={i} className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50 animate-bounce"
+                      style={{ animationDelay: `${i * 0.15}s` }} />
+                  ))}
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="px-3 py-2.5 border-t border-border/30 flex gap-2 items-end bg-card/50">
+            <textarea
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              placeholder="Preguntale a Alice sobre los riesgos..."
+              rows={1}
+              className="flex-1 text-xs bg-muted rounded-lg px-3 py-2 outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring resize-none"
+            />
+            <Button size="icon" className="h-8 w-8 rounded-lg flex-shrink-0"
+              onClick={handleSend} disabled={!input.trim() || !conversation || sending}>
+              {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ControlRiesgo() {
   const [sector, setSector] = useState('Todos');
@@ -101,6 +253,9 @@ export default function ControlRiesgo() {
           ))}
         </div>
       </div>
+
+      {/* Panel Alice */}
+      <AliceRiesgoPanel />
 
       {/* Tabla planilla */}
       {isLoading ? (
