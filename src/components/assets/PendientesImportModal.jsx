@@ -17,9 +17,9 @@ const STEPS = ['upload', 'preview', 'importing', 'result'];
 
 export default function PendientesImportModal({ open, onOpenChange, onImported }) {
   const [step, setStep] = useState('upload');
-  const [file, setFile] = useState(null);
-  const [rawData, setRawData] = useState(null);
-  const [sheetPreview, setSheetPreview] = useState(null); // { headers, rows, sheetName }
+  const [files, setFiles] = useState([]);
+  const [processedData, setProcessedData] = useState([]);
+  const [sheetPreview, setSheetPreview] = useState(null);
   const [inspectorName, setInspectorName] = useState('');
   const [inspectorEmail, setInspectorEmail] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -29,67 +29,94 @@ export default function PendientesImportModal({ open, onOpenChange, onImported }
 
   const reset = () => {
     setStep('upload');
-    setFile(null);
-    setRawData(null);
+    setFiles([]);
+    setProcessedData([]);
     setSheetPreview(null);
     setResult(null);
     setIsProcessing(false);
   };
 
-  const processFile = (f) => {
-    setFile(f);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const raw = {};
-      wb.SheetNames.forEach(name => {
-        const ws = wb.Sheets[name];
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        raw[name] = data;
-      });
+  const processFiles = (fileList) => {
+    const newFiles = Array.from(fileList);
+    setFiles(prev => [...prev, ...newFiles]);
+    let totalPreviewRows = 0;
+    const allData = [];
 
-      setRawData(raw);
+    newFiles.forEach((f) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const raw = {};
+        wb.SheetNames.forEach(name => {
+          const ws = wb.Sheets[name];
+          const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          raw[name] = data;
+        });
 
-      // Pick best sheet for preview
-      const keys = Object.keys(raw);
-      const best = keys.find(k => {
-        const n = k.toLowerCase();
-        return n.includes('pendiente') || n.includes('sap') || n.includes('orden') || n.includes('aviso');
-      }) || keys[0];
+        allData.push({ filename: f.name, data: raw });
+        if (allData.length === newFiles.length) {
+          setProcessedData(allData);
 
-      const sheetRows = raw[best] || [];
-      const headers = (sheetRows[0] || []).map(h => String(h || '').trim());
-      const previewRows = sheetRows.slice(1, 6).filter(r => r.some(c => c !== null && c !== undefined && c !== ''));
+          // Crear preview de todos los sheets
+          const keys = [];
+          allData.forEach(({ data }) => keys.push(...Object.keys(data)));
+          const best = keys.find(k => {
+            const n = k.toLowerCase();
+            return n.includes('pendiente') || n.includes('sap') || n.includes('orden') || n.includes('aviso');
+          }) || keys[0];
 
-      setSheetPreview({ sheetName: best, headers, rows: previewRows, totalRows: Math.max(0, sheetRows.length - 1) });
-      setStep('preview');
-    };
-    reader.readAsArrayBuffer(f);
+          let totalRows = 0;
+          allData.forEach(({ data }) => {
+            const sheetRows = data[best] || [];
+            totalRows += Math.max(0, sheetRows.length - 1);
+          });
+
+          const sheetRows = allData[0]?.data[best] || [];
+          const headers = (sheetRows[0] || []).map(h => String(h || '').trim());
+          const previewRows = sheetRows.slice(1, 6).filter(r => r.some(c => c !== null && c !== undefined && c !== ''));
+
+          setSheetPreview({ sheetName: best, headers, rows: previewRows, totalRows, fileCount: newFiles.length });
+          setStep('preview');
+        }
+      };
+      reader.readAsArrayBuffer(f);
+    });
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) processFile(f);
+    processFiles(e.dataTransfer.files);
   };
 
   const handleFileChange = (e) => {
-    const f = e.target.files[0];
-    if (f) processFile(f);
+    processFiles(e.target.files);
   };
 
   const handleImport = async () => {
     setStep('importing');
     setIsProcessing(true);
     try {
-      const res = await base44.functions.invoke('importarPendientesSAP', {
-        raw_data: rawData,
-        filename: file?.name || 'importacion.xlsx',
-        inspector_name: inspectorName || null,
-        inspector_email: inspectorEmail || null,
+      let totalImported = 0;
+      let totalErrors = 0;
+
+      // Procesar cada archivo secuencialmente
+      for (const { data } of processedData) {
+        const res = await base44.functions.invoke('importarPendientesSAP', {
+          raw_data: data,
+          inspector_name: inspectorName || null,
+          inspector_email: inspectorEmail || null,
+        });
+        totalImported += res.data.totalImported || 0;
+        totalErrors += res.data.totalErrors || 0;
+      }
+
+      setResult({
+        imported: totalImported,
+        errors: totalErrors,
+        skipped: 0,
+        total_rows: totalImported + totalErrors,
       });
-      setResult(res.data);
       setStep('result');
       if (onImported) onImported();
     } catch (err) {
@@ -126,7 +153,7 @@ export default function PendientesImportModal({ open, onOpenChange, onImported }
               <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
               <p className="font-semibold text-foreground">Arrastrá el archivo o hacé clic para seleccionar</p>
               <p className="text-sm text-muted-foreground mt-1">Formatos: .xlsx, .xls, .csv</p>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} multiple />
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 space-y-1">
@@ -150,6 +177,7 @@ export default function PendientesImportModal({ open, onOpenChange, onImported }
                 <span className="font-semibold">{sheetPreview.sheetName}</span>
                 <Badge variant="secondary">{sheetPreview.totalRows} filas</Badge>
                 <Badge variant="secondary">{sheetPreview.headers.length} columnas</Badge>
+                {sheetPreview.fileCount > 1 && <Badge className="bg-blue-100 text-blue-700 border-blue-200">{sheetPreview.fileCount} archivos</Badge>}
               </div>
               <Button variant="ghost" size="sm" onClick={reset} className="gap-1 text-xs">
                 <X className="h-3.5 w-3.5" /> Cambiar archivo
