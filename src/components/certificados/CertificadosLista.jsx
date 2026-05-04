@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { FileText, Plus, Eye, Trash2, Download, Loader2, CheckCircle2, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -14,8 +15,9 @@ const estadoStyle = {
   aprobado: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
-export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete, onPreviewPDF }) {
+export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete }) {
   const [exporting, setExporting] = useState(null);
+  const [exportingPDF, setExportingPDF] = useState(null);
   const [search, setSearch] = useState('');
 
   const handleExport = async (cert, format) => {
@@ -154,11 +156,16 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                   size="icon" 
                   variant="ghost" 
                   className={`h-8 w-8 ${c.estado !== 'aprobado' ? 'opacity-30 cursor-not-allowed' : 'text-emerald-600 hover:text-emerald-700'}`}
-                  onClick={() => c.estado === 'aprobado' && onPreviewPDF && onPreviewPDF(c)} 
-                  disabled={c.estado !== 'aprobado'}
+                  onClick={async () => {
+                    if (c.estado !== 'aprobado') return;
+                    setExportingPDF(c.id);
+                    await exportCertificadoPDF(c);
+                    setExportingPDF(null);
+                  }}
+                  disabled={c.estado !== 'aprobado' || exportingPDF === c.id}
                   title={c.estado !== 'aprobado' ? 'PDF disponible solo tras aprobación gerencial' : 'Descargar PDF con firma'}
                 >
-                  <FileText className="h-4 w-4" />
+                  {exportingPDF === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                 </Button>
                 <Button 
                   size="icon" 
