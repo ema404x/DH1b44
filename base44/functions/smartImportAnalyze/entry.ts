@@ -224,6 +224,7 @@ Deno.serve(async (req) => {
 TAREA: Analiza las hojas de un archivo Excel/CSV y:
 1. Identifica qué entidad del sistema representa cada hoja
 2. Mapea cada columna al campo correcto del sistema con máxima precisión
+3. DETECTA LA COMUNA (8A, 8B o 10A) — las planillas varían según la comuna
 
 ENTIDADES DEL SISTEMA (con patrones de columnas clave):
 ${JSON.stringify(schemaSummary, null, 2)}
@@ -236,9 +237,10 @@ REGLAS DE MAPEO (por orden de importancia):
 2. COINCIDENCIA SEMÁNTICA: Usa sinónimos y variantes regionales. Ej: "Razón Social"→name, "Fecha de Alta"→hire_date, "Jornal"→hourly_rate, "P.U."→unit_cost
 3. DATOS DE MUESTRA: Usa los valores de sample para confirmar el tipo. Ej: si parece CUIT (11 dígitos con guiones) → campo cuit. Si es DNI (7-8 dígitos) → campo dni
 4. NOMBRE DE HOJA: Considéralo como señal fuerte. "Empleados", "Personal", "RRHH" → Employee
-5. pre_suggested_entity es una pista automática, valídala con headers y datos
-6. Si una columna no encaja en ningún campo del sistema, déjala vacía (no mapear)
-7. Si la hoja es claramente auxiliar o sin datos útiles, usa target_entity: "skip"
+5. DETECTA LA COMUNA: Si encuentras referencias a "8A", "8B", "10A", "COMUNA 8A", etc. EN LOS DATOS O HEADERS, indicalo en detected_comuna
+6. pre_suggested_entity es una pista automática, valídala con headers y datos
+7. Si una columna no encaja en ningún campo del sistema, déjala vacía (no mapear)
+8. Si la hoja es claramente auxiliar o sin datos útiles, usa target_entity: "skip"
 
 CALIBRACIÓN DE CONFIANZA:
 - 0.95+: Nombre de hoja + campos clave coinciden perfectamente
@@ -246,7 +248,7 @@ CALIBRACIÓN DE CONFIANZA:
 - 0.60-0.79: Coincidencia parcial, algunos campos reconocibles
 - <0.60: Dudoso, pocos campos reconocibles
 
-Responde con la lista de hojas ordenada por confidence DESCENDENTE (mayor confianza primero).`;
+Responde con la lista de hojas ordenada por confidence DESCENDENTE (mayor confianza primero). INCLUYE detected_comuna en cada hoja si la detectas.`;
 
   const result = await base44.integrations.Core.InvokeLLM({
     prompt,
@@ -263,6 +265,7 @@ Responde con la lista de hojas ordenada por confidence DESCENDENTE (mayor confia
               target_entity: { type: 'string' },
               confidence: { type: 'number' },
               row_count: { type: 'number' },
+              detected_comuna: { type: 'string' },
               field_mapping: { type: 'object', additionalProperties: { type: 'string' } },
               sample_data: { type: 'object', additionalProperties: { type: 'string' } },
             },

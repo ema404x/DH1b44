@@ -54,10 +54,24 @@ function buildAnalysisMessage(mappingResult) {
   const highConf = sheets.filter(s => s.confidence >= 0.85);
   const lowConf = sheets.filter(s => s.confidence < 0.6);
 
+  // Detectar comunas
+  const comunasDetectadas = new Set();
+  sheets.forEach(s => {
+    if (s.detected_comuna) comunasDetectadas.add(s.detected_comuna);
+  });
+  const comunasList = Array.from(comunasDetectadas).sort();
+
   let msg = `Analicé tu archivo y encontré **${sheets.length} hoja${sheets.length !== 1 ? 's' : ''}** con **${total.toLocaleString()} registros** listos para importar.\n\n`;
 
+  if (comunasList.length > 0) {
+    msg += `🏘️ **Comuna${comunasList.length > 1 ? 's' : ''} detectada${comunasList.length > 1 ? 's' : ''}:** ${comunasList.map(c => `**${c}**`).join(', ')}\n\n`;
+  }
+
   if (highConf.length > 0) {
-    msg += `✅ **Alta confianza:** ${highConf.map(s => `"${s.sheet_name}" → ${s.target_entity}`).join(', ')}\n`;
+    msg += `✅ **Alta confianza:** ${highConf.map(s => {
+      const comunaTag = s.detected_comuna ? ` (${s.detected_comuna})` : '';
+      return `"${s.sheet_name}" → ${s.target_entity}${comunaTag}`;
+    }).join(', ')}\n`;
   }
   if (lowConf.length > 0) {
     msg += `⚠️ **Necesitan revisión:** ${lowConf.map(s => `"${s.sheet_name}"`).join(', ')} — te recomiendo expandirlas y revisar el mapeo de columnas.\n`;
