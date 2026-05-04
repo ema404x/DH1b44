@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, ShieldAlert, AlertTriangle, CheckCircle2, AlertCircle, Zap, Sparkles, Send, Loader2, X, Bot } from 'lucide-react';
+import MatrizRiesgos from '@/components/riesgo/MatrizRiesgos';
 import ReactMarkdown from 'react-markdown';
 
 const NIVEL_CONFIG = {
@@ -215,6 +216,9 @@ export default function ControlRiesgo() {
           <p className="text-sm text-muted-foreground mt-0.5">Matriz de riesgos por sector — EDUCACION · SALUD · BAPRO</p>
         </div>
       </div>
+
+      {/* Matriz de Riesgos visual */}
+      <MatrizRiesgos />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
