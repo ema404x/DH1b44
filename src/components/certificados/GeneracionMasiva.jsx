@@ -54,7 +54,7 @@ export default function GeneracionMasiva({ open, onClose, onSuccess }) {
     const certNum = lastNum + idx + 1;
     const newCert = {
       numero: certNum,
-      tipo: data.tipo || 'abono_mensual',
+      tipo: 'abono_mensual',
       estado: 'emitido',
       generado_automaticamente: false,
       emprendimiento: data.emprendimiento || '',
