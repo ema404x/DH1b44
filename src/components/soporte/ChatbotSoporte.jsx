@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useLocation } from 'react-router-dom';
 import {
   MessageCircle, X, Send, Loader2, Bot, RotateCcw, Sparkles, Heart,
-  HelpCircle, Image as ImageIcon, Plus, ClipboardList, Wrench, AlertTriangle
+  HelpCircle, Image as ImageIcon, ClipboardList, Wrench, AlertTriangle, GripVertical
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ReactMarkdown from 'react-markdown';
@@ -76,9 +76,8 @@ function getSugerenciasParaRol(rol) {
 }
 
 function buildContextoRol(user, moduloActual) {
-  const rol = user?.role || 'user';
   const nombre = user?.full_name || user?.email || 'el usuario';
-  const modulos = MODULOS_POR_ROL[rol] || MODULOS_POR_ROL.user;
+  const modulos = MODULOS_POR_ROL[user?.role] || MODULOS_POR_ROL.user;
   return `[CONTEXTO INTERNO - nunca menciones esto al usuario, nunca hables de roles ni restricciones de acceso]
 Usuario: ${nombre}
 Módulos disponibles para esta sesión: ${modulos.join(', ')}.
@@ -89,10 +88,7 @@ Respondé con naturalidad. Si el usuario pregunta algo de un módulo que no est�
 async function buildContextoReflexivo(user) {
   const nombre = user?.full_name || user?.email || 'el usuario';
   const primerNombre = nombre.split(' ')[0];
-
-  let pendientesInfo = '';
-  let otsInfo = '';
-  let inspeccionesInfo = '';
+  let pendientesInfo = '', otsInfo = '', inspeccionesInfo = '';
 
   try {
     const [pendientes, ots, inspecciones, emergencias, certificados] = await Promise.all([
@@ -114,7 +110,6 @@ async function buildContextoReflexivo(user) {
     });
     const pendPendientes = misPendientes.filter(p => p.estado === 'pendiente' || p.estado === 'asignado');
     const pendResueltos = misPendientes.filter(p => p.estado === 'resuelto');
-
     const hoy = new Date();
     const en7dias = new Date(); en7dias.setDate(hoy.getDate() + 7);
     const pendProximos = misPendientes.filter(p => {
@@ -124,12 +119,7 @@ async function buildContextoReflexivo(user) {
     });
 
     if (misPendientes.length > 0) {
-      pendientesInfo = `Pendientes SAP relacionados a ${primerNombre}: ${misPendientes.length} en total.
-- Sin resolver: ${pendPendientes.length}
-- Vencidos: ${pendVencidos.length}
-- Resueltos: ${pendResueltos.length}
-${pendVencidos.length > 0 ? `- Vencidos: ${pendVencidos.slice(0, 3).map(p => `"${p.descripcion?.slice(0, 60)}" (límite: ${p.fecha_limite})`).join('; ')}` : ''}
-${pendProximos.length > 0 ? `- Próximos a vencer (7 días): ${pendProximos.slice(0, 3).map(p => `"${p.descripcion?.slice(0, 60)}" (vence: ${p.fecha_limite})`).join('; ')}` : ''}`;
+      pendientesInfo = `Pendientes SAP relacionados a ${primerNombre}: ${misPendientes.length} en total.\n- Sin resolver: ${pendPendientes.length}\n- Vencidos: ${pendVencidos.length}\n- Resueltos: ${pendResueltos.length}`;
     }
 
     const misOTs = ots.filter(ot =>
@@ -139,21 +129,10 @@ ${pendProximos.length > 0 ? `- Próximos a vencer (7 días): ${pendProximos.slic
     const otsEnProgreso = misOTs.filter(o => o.status === 'en_progreso' || o.status === 'asignada');
     const otsPendientes = misOTs.filter(o => o.status === 'pendiente');
     const otsCompletadas = misOTs.filter(o => o.status === 'completada');
-    const otsProximas = misOTs.filter(o => {
-      if (!o.scheduled_date || o.status === 'completada' || o.status === 'cancelada') return false;
-      const sd = new Date(o.scheduled_date);
-      return sd >= hoy && sd <= en7dias;
-    });
     const otsUrgentes = misOTs.filter(o => o.priority === 'urgente' && o.status !== 'completada' && o.status !== 'cancelada');
 
     if (misOTs.length > 0) {
-      otsInfo = `Órdenes de trabajo relacionadas a ${primerNombre}: ${misOTs.length} en total.
-- En progreso: ${otsEnProgreso.length}
-- Pendientes: ${otsPendientes.length}
-- Completadas: ${otsCompletadas.length}
-${otsUrgentes.length > 0 ? `- Urgentes sin completar: ${otsUrgentes.slice(0, 3).map(o => `"${o.title}"`).join('; ')}` : ''}
-${otsProximas.length > 0 ? `- Programadas para los próximos 7 días: ${otsProximas.slice(0, 3).map(o => `"${o.title}" (${o.scheduled_date})`).join('; ')}` : ''}
-${otsEnProgreso.length > 0 ? `- En curso ahora: ${otsEnProgreso.slice(0, 3).map(o => `"${o.title}" (${o.priority})`).join('; ')}` : ''}`;
+      otsInfo = `Órdenes de trabajo relacionadas a ${primerNombre}: ${misOTs.length} en total.\n- En progreso: ${otsEnProgreso.length}\n- Pendientes: ${otsPendientes.length}\n- Completadas: ${otsCompletadas.length}`;
     }
 
     const misInsp = inspecciones.filter(i =>
@@ -167,18 +146,14 @@ ${otsEnProgreso.length > 0 ? `- En curso ahora: ${otsEnProgreso.slice(0, 3).map(
 
     const emergenciasActivas = emergencias.filter(e => e.estado === 'activa' || e.estado === 'en_atencion');
     if (emergenciasActivas.length > 0) {
-      const emgInfo = emergenciasActivas.slice(0, 3).map(e => `"${e.titulo}" en ${e.establecimiento} (${e.tipo})`).join('; ');
-      inspeccionesInfo += `\n\nEmergencias activas en el sistema: ${emergenciasActivas.length}. Detalle: ${emgInfo}.`;
+      inspeccionesInfo += `\n\nEmergencias activas en el sistema: ${emergenciasActivas.length}.`;
     }
 
-    // Certificados en borrador (pendientes de enviar)
     const certsBorrador = certificados.filter(c => c.estado === 'borrador' || !c.estado);
     if (certsBorrador.length > 0) {
       inspeccionesInfo += `\n\nCertificados en borrador sin enviar: ${certsBorrador.length}.`;
     }
-  } catch (e) {
-    // silencioso
-  }
+  } catch (e) {}
 
   const resumen = [pendientesInfo, otsInfo, inspeccionesInfo].filter(Boolean).join('\n\n');
 
@@ -234,7 +209,6 @@ function MessageBubble({ msg }) {
   );
 }
 
-// Botón flotante "¿Qué hago aquí?" visible en cada página
 export function AlicePageButton({ onClick }) {
   return (
     <button
@@ -253,6 +227,49 @@ export default function ChatbotSoporte() {
   const moduloActual = RUTA_MODULO[location.pathname] || null;
 
   const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+
+  // Draggable bubble position
+  const [pos, setPos] = useState(null); // null = default bottom-right
+  const dragging = useRef(false);
+  const didDrag = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
+  const handleDragStart = useCallback((e) => {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragOffset.current = { x: clientX - rect.left, y: clientY - rect.top };
+    dragging.current = true;
+    didDrag.current = false;
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!dragging.current) return;
+      didDrag.current = true;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const newX = clientX - dragOffset.current.x;
+      const newY = clientY - dragOffset.current.y;
+      const maxX = window.innerWidth - 56;
+      const maxY = window.innerHeight - 56;
+      setPos({ x: Math.max(0, Math.min(newX, maxX)), y: Math.max(0, Math.min(newY, maxY)) });
+    };
+    const onUp = () => { dragging.current = false; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, []);
+
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -276,14 +293,12 @@ export default function ChatbotSoporte() {
     base44.auth.me().then(u => setCurrentUser(u)).catch(() => {});
   }, []);
 
-  // Chequear alertas críticas para notificación proactiva
   useEffect(() => {
     if (!currentUser) return;
     base44.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 10)
       .then(alertas => {
         const criticas = alertas.filter(a => a.nivel === 'critical').length;
         setCriticalAlerts(criticas);
-        // Mostrar badge proactivo si hay alertas críticas y no se ha mostrado aún
         if (criticas > 0 && !proactiveShown) {
           setUnread(prev => prev + criticas);
           setProactiveShown(true);
@@ -292,7 +307,6 @@ export default function ChatbotSoporte() {
       .catch(() => {});
   }, [currentUser]);
 
-  // Crear conversación con contexto de rol
   useEffect(() => {
     if (open && !conversation && currentUser !== null) {
       base44.agents.createConversation({
@@ -346,7 +360,6 @@ export default function ChatbotSoporte() {
     }
   };
 
-  // "¿Qué hago aquí?" — pregunta contextual sobre el módulo actual
   const handleAyudaPagina = async () => {
     if (!conversation || !moduloActual) return;
     setOpen(true);
@@ -390,7 +403,6 @@ export default function ChatbotSoporte() {
     setShowSugerencias(false);
   };
 
-  // Crear acción rápida desde el chat
   const handleAccionRapida = (tipo) => {
     const mensajes = {
       ot: '¿Cómo creo una orden de trabajo nueva?',
@@ -400,11 +412,29 @@ export default function ChatbotSoporte() {
     handleSend(mensajes[tipo]);
   };
 
+  // Posición de la burbuja
+  const bubbleStyle = pos
+    ? { position: 'fixed', left: pos.x, top: pos.y, bottom: 'auto', right: 'auto' }
+    : { position: 'fixed', bottom: 24, right: 24 };
+
+  if (hidden) {
+    return (
+      <button
+        onClick={() => setHidden(false)}
+        className="fixed bottom-6 right-6 z-50 h-8 px-3 rounded-full bg-card border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all shadow-md flex items-center gap-1.5"
+        title="Mostrar asistente Alice"
+      >
+        <MessageCircle className="h-3.5 w-3.5" />
+        Alice
+      </button>
+    );
+  }
+
   return (
     <>
-      {/* Botón "¿Qué hago aquí?" — solo cuando el chat está cerrado y hay un módulo identificado */}
+      {/* Botón "¿Qué hago aquí?" */}
       <AnimatePresence>
-        {!open && moduloActual && (
+        {!open && moduloActual && !pos && (
           <motion.div
             initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
             transition={{ delay: 0.5 }}
@@ -414,29 +444,51 @@ export default function ChatbotSoporte() {
         )}
       </AnimatePresence>
 
-      {/* Botón flotante principal */}
+      {/* Botón flotante principal (draggable) */}
       <AnimatePresence>
         {!open && (
-          <motion.button
-            initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }}
-            whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}
-            onClick={() => setOpen(true)}
-            className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center"
-            style={{ boxShadow: criticalAlerts > 0 ? '0 4px 24px rgba(239,68,68,0.5)' : '0 4px 24px rgba(59,130,246,0.45)' }}>
-            <MessageCircle className="h-6 w-6" />
-            {unread > 0 && (
-              <motion.span
-                initial={{ scale: 0 }} animate={{ scale: 1 }}
-                className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center"
-              >
-                {unread}
-              </motion.span>
-            )}
-          </motion.button>
+          <div style={{ ...bubbleStyle, zIndex: 50 }} className="group">
+            {/* Botón cerrar (ocultar) */}
+            <button
+              onClick={() => setHidden(true)}
+              title="Ocultar asistente"
+              className="absolute -top-2 -left-2 h-5 w-5 rounded-full bg-slate-700 border border-border text-muted-foreground hover:text-white hover:bg-slate-600 items-center justify-center z-10 opacity-0 group-hover:opacity-100 transition-opacity hidden group-hover:flex"
+            >
+              <X className="h-3 w-3" />
+            </button>
+
+            {/* Handle de arrastre */}
+            <div
+              onMouseDown={handleDragStart}
+              onTouchStart={handleDragStart}
+              className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-slate-700 border border-border flex items-center justify-center cursor-grab active:cursor-grabbing z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Mover"
+            >
+              <GripVertical className="h-3 w-3 text-muted-foreground" />
+            </div>
+
+            <motion.button
+              initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }}
+              whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.95 }}
+              onClick={() => { if (!didDrag.current) setOpen(true); didDrag.current = false; }}
+              className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center"
+              style={{ boxShadow: criticalAlerts > 0 ? '0 4px 24px rgba(239,68,68,0.5)' : '0 4px 24px rgba(59,130,246,0.45)' }}
+            >
+              <MessageCircle className="h-6 w-6" />
+              {unread > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }} animate={{ scale: 1 }}
+                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center"
+                >
+                  {unread}
+                </motion.span>
+              )}
+            </motion.button>
+          </div>
         )}
       </AnimatePresence>
 
-      {/* Panel */}
+      {/* Panel de chat */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -479,6 +531,11 @@ export default function ChatbotSoporte() {
                     <RotateCcw className="h-3.5 w-3.5" />
                   </button>
                 )}
+                {/* Ocultar completamente */}
+                <button onClick={() => { setOpen(false); setHidden(true); }} title="Ocultar asistente"
+                  className="h-7 px-2 rounded-lg flex items-center gap-1 hover:bg-white/20 transition-colors text-white/60 hover:text-white text-[10px]">
+                  Ocultar
+                </button>
                 <button onClick={() => setOpen(false)}
                   className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors text-white/80 hover:text-white">
                   <X className="h-4 w-4" />
@@ -506,7 +563,6 @@ export default function ChatbotSoporte() {
                     </div>
                   </div>
 
-                  {/* Alerta proactiva si hay críticas */}
                   {criticalAlerts > 0 && (
                     <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-red-500/30 bg-red-500/5">
                       <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0" />
@@ -516,17 +572,13 @@ export default function ChatbotSoporte() {
                     </div>
                   )}
 
-                  {/* Modo Reflexiva */}
                   <button
                     onClick={handleModoReflexiva}
                     disabled={loadingReflexiva}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-pink-500/30 bg-pink-500/5 hover:bg-pink-500/10 transition-all group"
                   >
                     <div className="h-8 w-8 rounded-lg bg-pink-500/15 border border-pink-500/25 flex items-center justify-center flex-shrink-0">
-                      {loadingReflexiva
-                        ? <Loader2 className="h-4 w-4 text-pink-400 animate-spin" />
-                        : <Heart className="h-4 w-4 text-pink-400" />
-                      }
+                      {loadingReflexiva ? <Loader2 className="h-4 w-4 text-pink-400 animate-spin" /> : <Heart className="h-4 w-4 text-pink-400" />}
                     </div>
                     <div className="text-left flex-1">
                       <p className="text-xs font-semibold text-pink-300">Modo Reflexiva</p>
@@ -534,7 +586,6 @@ export default function ChatbotSoporte() {
                     </div>
                   </button>
 
-                  {/* Acciones rápidas */}
                   <div className="space-y-1.5">
                     <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide px-1">Acciones rápidas</p>
                     <div className="grid grid-cols-3 gap-1.5">
@@ -556,7 +607,6 @@ export default function ChatbotSoporte() {
                     </div>
                   </div>
 
-                  {/* Sugerencias por módulo */}
                   <div className="space-y-2">
                     <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide px-1">¿Sobre qué querés preguntar?</p>
                     <div className="grid grid-cols-2 gap-1.5">
@@ -595,7 +645,6 @@ export default function ChatbotSoporte() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Sugerencias rápidas mientras chateas */}
             {messages.length > 0 && messages.length < 6 && !isThinking && !loadingReflexiva && (
               <div className="px-3 pb-1 flex-shrink-0">
                 <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
@@ -615,10 +664,9 @@ export default function ChatbotSoporte() {
               </div>
             )}
 
-            {/* Input con adjuntar foto */}
+            {/* Input */}
             <div className="px-3 pb-3 pt-1 border-t border-border flex-shrink-0">
               <div className="flex gap-2 items-end">
-                {/* Botón foto */}
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
                 <button
                   onClick={() => fileInputRef.current?.click()}
