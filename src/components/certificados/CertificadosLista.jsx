@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Plus, Eye, Trash2, Download, Loader2 } from 'lucide-react';
+import { FileText, Plus, Eye, Trash2, Download, Loader2, CheckCircle2, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -10,8 +10,8 @@ const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency:
 
 const estadoStyle = {
   borrador: 'bg-slate-100 text-slate-600 border-slate-200',
-  emitido: 'bg-blue-50 text-blue-700 border-blue-200',
-  aprobado: 'bg-green-50 text-green-700 border-green-200',
+  emitido:  'bg-blue-50 text-blue-700 border-blue-200',
+  aprobado: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
 export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete }) {
@@ -105,6 +105,18 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                       </>
                     )}
                   </div>
+                  {c.estado === 'aprobado' && c.aprobado_por && (
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      <span>Aprobado por {c.aprobado_por}</span>
+                    </div>
+                  )}
+                  {c.estado === 'emitido' && (
+                    <div className="flex items-center gap-1.5 text-xs text-blue-500 mt-1">
+                      <Clock className="h-3 w-3" />
+                      <span>Pendiente de aprobación gerencial</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -115,7 +127,10 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                 </div>
               </div>
 
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity items-center">
+                {c.estado === 'aprobado' && c.firma_gerente_url && (
+                  <img src={c.firma_gerente_url} alt="Firma" className="h-8 object-contain border rounded bg-white px-1" title={`Aprobado por ${c.aprobado_por || ''}`} />
+                )}
                 <Button 
                   size="icon" 
                   variant="ghost" 
@@ -138,10 +153,10 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                 <Button 
                   size="icon" 
                   variant="ghost" 
-                  className="h-8 w-8" 
-                  onClick={() => handleExport(c, 'pdf')} 
-                  disabled={exporting === `${c.id}-pdf`}
-                  title="Descargar PDF"
+                  className={`h-8 w-8 ${c.estado !== 'aprobado' ? 'opacity-30 cursor-not-allowed' : ''}`}
+                  onClick={() => c.estado === 'aprobado' && handleExport(c, 'pdf')} 
+                  disabled={exporting === `${c.id}-pdf` || c.estado !== 'aprobado'}
+                  title={c.estado !== 'aprobado' ? 'PDF disponible solo tras aprobación gerencial' : 'Descargar PDF'}
                 >
                   {exporting === `${c.id}-pdf` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 </Button>

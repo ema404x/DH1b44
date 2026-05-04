@@ -10,27 +10,64 @@ import CertificadoEditor from '@/components/certificados/CertificadoEditor';
 import CertificadoPreview from '@/components/certificados/CertificadoPreview';
 import CertificadosLista from '@/components/certificados/CertificadosLista';
 import CertificadosAutomatizados from '@/components/certificados/CertificadosAutomatizados';
+import { toast } from 'sonner';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 // view: 'list' | 'upload' | 'edit' | 'preview'
 export default function Certificados() {
   const [view, setView] = useState('list');
   const [tab, setTab] = useState('manuales');
-  const [extracted, setExtracted] = useState(null);   // datos extraídos del ADA
-  const [editing, setEditing] = useState(null);        // certificado en edición
-  const [previewing, setPreviewing] = useState(null);  // form para preview
+  const [extracted, setExtracted] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [previewing, setPreviewing] = useState(null);
   const queryClient = useQueryClient();
+  const { user } = useCurrentUser();
 
   const { data: certificados = [], isLoading } = useQuery({
     queryKey: ['certificados'],
     queryFn: () => base44.entities.Certificado.list('-created_date'),
   });
 
+  // Al guardar: siempre crea un registro nuevo (nunca actualiza el existente)
+  // y si el estado es 'emitido', crea automáticamente una SolicitudCertificado
   const saveMutation = useMutation({
-    mutationFn: (data) => data.id
-      ? base44.entities.Certificado.update(data.id, data)
-      : base44.entities.Certificado.create(data),
+    mutationFn: async (data) => {
+      // Si viene de edición aprobada → eliminar el viejo y crear uno nuevo (nuevo ID)
+      if (editing?.id && editing?.estado === 'aprobado') {
+        await base44.entities.Certificado.delete(editing.id);
+      }
+      // Siempre emitido al guardar
+      const payload = { ...data, id: undefined, estado: 'emitido' };
+      const cert = await base44.entities.Certificado.create(payload);
+
+      // Crear solicitud de aprobación automáticamente
+      const numero = `CERT-${cert.id.slice(-6).toUpperCase()}`;
+      await base44.entities.SolicitudCertificado.create({
+        numero,
+        titulo: `Certificado N°${cert.numero} — ${cert.contratista || cert.emprendimiento || ''}`,
+        establecimiento: cert.emprendimiento || cert.obra_servicio || '',
+        jefe_sitio: user?.full_name || user?.email || '',
+        jefe_sitio_email: user?.email || '',
+        descripcion_trabajo: cert.obra_servicio || '',
+        monto_solicitado: cert.monto_contratado || 0,
+        porcentaje_avance: cert.porcentaje_avance || 0,
+        periodo: cert.mes_periodo || '',
+        estado: 'enviada',
+        certificado_id: cert.id,
+        historial: [{
+          fecha: new Date().toISOString(),
+          estado: 'enviada',
+          usuario: user?.full_name || user?.email || '',
+          comentario: 'Certificado emitido — enviado automáticamente para aprobación',
+        }]
+      });
+
+      return cert;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['certificados'] });
+      queryClient.invalidateQueries({ queryKey: ['solicitudes-cert'] });
+      toast.success('Certificado emitido y enviado a aprobación gerencial');
       setView('list');
       setExtracted(null);
       setEditing(null);
@@ -49,6 +86,10 @@ export default function Certificados() {
   };
 
   const handleEdit = (certificado) => {
+    // Si está aprobado, avisar que editar genera nuevo ID y pierde la aprobación
+    if (certificado.estado === 'aprobado') {
+      if (!window.confirm('Este certificado ya fue aprobado. Editarlo generará un nuevo certificado con nuevo ID y perderá la aprobación actual. ¿Continuar?')) return;
+    }
     setEditing(certificado);
     setExtracted(certificado);
     setView('edit');
@@ -60,8 +101,8 @@ export default function Certificados() {
   };
 
   const handleSave = (formData) => {
-    const dataToSave = editing ? { ...formData, id: editing.id } : formData;
-    saveMutation.mutate(dataToSave);
+    // Siempre crea nuevo (nunca pasa ID al mutationFn para que no haga update)
+    saveMutation.mutate(formData);
   };
 
   if (view === 'upload') {

@@ -10,10 +10,10 @@
       "type": "string",
       "enum": [
         "abono_mensual",
-        "obra"
+        "obra",
+        "informe"
       ],
-      "default": "abono_mensual",
-      "description": "Tipo de certificado"
+      "default": "abono_mensual"
     },
     "estado": {
       "type": "string",
@@ -26,8 +26,7 @@
     },
     "generado_automaticamente": {
       "type": "boolean",
-      "default": false,
-      "description": "Indica si fue generado por automatizaci\u00f3n"
+      "default": false
     },
     "emprendimiento": {
       "type": "string"
@@ -39,8 +38,7 @@
       "type": "string"
     },
     "contratista_id": {
-      "type": "string",
-      "description": "ID del cliente/proveedor asociado"
+      "type": "string"
     },
     "ada_numero": {
       "type": "string"
@@ -65,6 +63,20 @@
     "monto_contratado": {
       "type": "number",
       "default": 0
+    },
+    "monto_obra_contratada": {
+      "type": "number",
+      "default": 0
+    },
+    "porcentaje_avance": {
+      "type": "number",
+      "default": 0
+    },
+    "condiciones_pago": {
+      "type": "string"
+    },
+    "plazo_entrega": {
+      "type": "string"
     },
     "base": {
       "type": "string"
@@ -139,14 +151,26 @@
       "default": 5
     },
     "pdf_url": {
-      "type": "string",
-      "description": "URL del PDF generado"
+      "type": "string"
     },
     "ada_pdf_url": {
       "type": "string"
     },
     "notas": {
       "type": "string"
+    },
+    "firma_gerente_url": {
+      "type": "string",
+      "description": "URL de la firma digital del gerente aprobador"
+    },
+    "aprobado_por": {
+      "type": "string",
+      "description": "Nombre del gerente que aprob\u00f3"
+    },
+    "fecha_aprobacion": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de aprobaci\u00f3n"
     }
   },
   "required": [

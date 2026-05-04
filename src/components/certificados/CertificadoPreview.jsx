@@ -273,6 +273,35 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
       doc.text(`${fmt(totalPresente)} de ${fmt(subtotalContrato)}`, M + 32, y + barH + 5);
     }
 
+    // ── Firma del gerente (si aprobado) ──────────────────────────────────────
+    if (form.firma_gerente_url && form.estado === 'aprobado') {
+      try {
+        const firmaRes = await fetch(form.firma_gerente_url);
+        const firmaBlob = await firmaRes.blob();
+        const firmaBase64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(firmaBlob);
+        });
+        // Asegurarse que hay espacio
+        if (y + 30 > SAFE_BOTTOM) {
+          drawFooter(pageNum, '??');
+          doc.addPage();
+          pageNum++;
+          drawPageHeader(false);
+          y = 26;
+        }
+        y += 4;
+        doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(90,90,90);
+        doc.text('Firma y aprobación gerencial:', M, y + 5);
+        doc.addImage(firmaBase64, 'PNG', M, y + 7, 60, 18);
+        doc.setFontSize(7);
+        doc.text(form.aprobado_por || '', M, y + 28);
+        doc.setDrawColor(100,100,100); doc.setLineWidth(0.3);
+        doc.line(M, y + 26, M + 60, y + 26);
+      } catch {}
+    }
+
     // ── Pies definitivos ─────────────────────────────────────────────────────
     const totalPages = doc.getNumberOfPages();
     for (let p = 1; p <= totalPages; p++) {
@@ -283,14 +312,35 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
     doc.save(`Certificado_N${form.numero}_${form.contratista?.replace(/ /g,'_') || ''}.pdf`);
   };
 
+  const isAprobado = form.estado === 'aprobado';
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>
         <h2 className="text-lg font-bold flex-1">Vista Previa — Certificado N° {form.numero}</h2>
-        <Button variant="outline" className="gap-2" onClick={exportPDF}><Download className="h-4 w-4" />PDF</Button>
-        <Button className="gap-2" onClick={() => onSave(form)} disabled={saving}>{saving ? 'Guardando...' : 'Guardar certificado'}</Button>
+        {isAprobado ? (
+          <Button variant="outline" className="gap-2" onClick={exportPDF}>
+            <Download className="h-4 w-4" />Descargar PDF
+          </Button>
+        ) : (
+          <Button variant="outline" className="gap-2 opacity-50 cursor-not-allowed" disabled title="Disponible tras aprobación gerencial">
+            <Download className="h-4 w-4" />PDF (pendiente aprobación)
+          </Button>
+        )}
+        <Button className="gap-2" onClick={() => onSave(form)} disabled={saving}>{saving ? 'Guardando...' : 'Emitir y enviar a aprobación'}</Button>
       </div>
+      {isAprobado && form.firma_gerente_url && (
+        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5">
+          <span className="text-sm font-medium text-emerald-700">✓ Aprobado por {form.aprobado_por}</span>
+          <img src={form.firma_gerente_url} alt="Firma" className="h-10 object-contain border rounded bg-white px-1" />
+        </div>
+      )}
+      {!isAprobado && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-sm text-amber-700">
+          ⏳ Este certificado está pendiente de aprobación gerencial. El PDF se habilitará una vez aprobado.
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden text-[13px]">
         {/* Header del certificado */}

@@ -60,7 +60,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
 
   const handleFirmada = async (firmaUrl, nombreGerente) => {
     setFirmaOpen(false);
-    const base = {
+    const basePayload = {
       aprobado_por: nombreGerente,
       aprobado_por_email: user?.email,
       fecha_aprobacion: new Date().toISOString(),
@@ -69,17 +69,27 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
     };
 
     if (accionPendiente === 'aprobar') {
+      // Actualizar la solicitud
       updateMutation.mutate({
-        ...base,
+        ...basePayload,
         estado: 'aprobada',
         historial: [
           ...(solicitud.historial || []),
           { fecha: new Date().toISOString(), estado: 'aprobada', usuario: nombreGerente, comentario: comentario || 'Aprobado' }
         ]
       });
+      // Actualizar el Certificado vinculado con firma y estado aprobado
+      if (solicitud.certificado_id) {
+        base44.entities.Certificado.update(solicitud.certificado_id, {
+          estado: 'aprobado',
+          firma_gerente_url: firmaUrl,
+          aprobado_por: nombreGerente,
+          fecha_aprobacion: new Date().toISOString(),
+        });
+      }
     } else if (accionPendiente === 'rechazar') {
       updateMutation.mutate({
-        ...base,
+        ...basePayload,
         estado: 'rechazada',
         motivo_rechazo: motivo,
         historial: [
@@ -87,6 +97,12 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
           { fecha: new Date().toISOString(), estado: 'rechazada', usuario: nombreGerente, comentario: motivo }
         ]
       });
+      // Revertir el certificado a borrador
+      if (solicitud.certificado_id) {
+        base44.entities.Certificado.update(solicitud.certificado_id, {
+          estado: 'borrador',
+        });
+      }
     }
     setAccionPendiente(null);
   };
