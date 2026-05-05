@@ -155,9 +155,14 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const removeItem = (i) => setForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }));
 
   const subtotal = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
-  const totalPresente = form.items.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0);
-  const totalSaldo = form.items.reduce((acc, it) => acc + (it.saldo_pendiente_importe || 0), 0);
-  const hasMedicion = totalPresente > 0;
+  // hasMedicion = true SOLO si algún ítem fue explícitamente editado por el usuario
+  const hasMedicion = form.items.some(it => it._med_editado);
+  const totalPresente = hasMedicion
+    ? form.items.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0)
+    : 0;
+  const totalSaldo = hasMedicion
+    ? form.items.reduce((acc, it) => acc + (it.saldo_pendiente_importe || 0), 0)
+    : 0;
   const baseCalculo = hasMedicion ? totalPresente : subtotal;
   const anticipo = baseCalculo * (form.anticipo_pct / 100);
   const fondoReparo = baseCalculo * (form.fondo_reparo_pct / 100);
@@ -174,10 +179,9 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
         ...item,
         cantidad: nuevaCantidad,
         importe_total: nuevoTotal,
-        ...(!item._med_editado && {
-          med_presente_importe: nuevoTotal,
-          med_acum_presente_importe: nuevoTotal,
-        }),
+        med_presente_importe: nuevoTotal,
+        med_acum_presente_importe: nuevoTotal,
+        _med_editado: true,
       };
     });
     setForm(f => ({ ...f, items: newItems }));
@@ -247,6 +251,7 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
         med_acum_presente_importe: acumPresImporte,
         saldo_pendiente_unidad: saldoUnidad,
         saldo_pendiente_importe: saldoImporte,
+        _med_editado: true,
       };
     });
 
