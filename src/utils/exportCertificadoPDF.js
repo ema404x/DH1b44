@@ -43,8 +43,10 @@ export async function exportCertificadoPDF(form) {
   const pdfFondoReparo = fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0;
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
-  // Monto contratado: usar el campo explícito del formulario (lo que el usuario puso)
-  const montoContratado = form.monto_contratado || subtotalContrato;
+  // Monto contratado: usar el campo explícito si es razonable (> subtotal * 0.1), si no usar subtotalContrato
+  const montoContratado = (form.monto_contratado && form.monto_contratado > subtotalContrato * 0.1)
+    ? form.monto_contratado
+    : subtotalContrato;
 
   const [logoBase64] = await Promise.all([
     loadImageAsBase64(MEJORES_LOGO_URL),

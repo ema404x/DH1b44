@@ -447,7 +447,7 @@ export default function ChatbotSoporte() {
         plazo_obra: extracted.plazo_obra || '',
         plazo_entrega: extracted.plazo_entrega || '',
         fecha_finalizacion: '',
-        monto_contratado: extracted.monto_contratado || subtotal,
+        monto_contratado: (extracted.monto_contratado && extracted.monto_contratado > 100) ? extracted.monto_contratado : subtotal,
         monto_obra_contratada: extracted.monto_obra_contratada || 0,
         porcentaje_avance: extracted.porcentaje_avance || 0,
         condiciones_pago: extracted.condiciones_pago || '',
