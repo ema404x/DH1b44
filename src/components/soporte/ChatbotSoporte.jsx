@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useLocation } from 'react-router-dom';
 import {
   MessageCircle, X, Send, Loader2, Bot, RotateCcw, Sparkles, Heart,
-  HelpCircle, Image as ImageIcon, ClipboardList, Wrench, AlertTriangle, GripVertical
+  HelpCircle, Image as ImageIcon, ClipboardList, Wrench, AlertTriangle, GripVertical, Paperclip
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ReactMarkdown from 'react-markdown';
@@ -281,11 +281,13 @@ export default function ChatbotSoporte() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loadingReflexiva, setLoadingReflexiva] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingPDF, setUploadingPDF] = useState(false);
   const [criticalAlerts, setCriticalAlerts] = useState(0);
   const [proactiveShown, setProactiveShown] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
+  const pdfInputRef = useRef(null);
 
   const isThinking = messages.length > 0 && messages[messages.length - 1]?.role === 'user';
   const sugerencias = getSugerenciasParaRol(currentUser?.role);
@@ -394,6 +396,41 @@ export default function ChatbotSoporte() {
       await handleSend('(foto adjunta para consulta)', [file_url]);
     } finally {
       setUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
+  const handlePDFUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPDF(true);
+    try {
+      // Subir el PDF
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      // Extraer datos del ADA/OC con la función existente
+      const res = await base44.functions.invoke('extractADA', { pdf_url: file_url, tipo: 'auto' });
+      const extracted = res?.data;
+      if (!extracted) throw new Error('No se pudo extraer el PDF');
+      // Construir el prompt para Alice con los datos extraídos
+      const prompt = `[ADA/OC SUBIDA - ACCIÓN REQUERIDA]
+El usuario subió el archivo "${file.name}" y necesita que generes el certificado automáticamente.
+
+Datos extraídos del documento:
+${JSON.stringify(extracted, null, 2)}
+
+Por favor:
+1. Confirmale al usuario los datos principales que detectaste (contratista, ADA N°, monto, ítems).
+2. Creá el certificado en la base de datos usando los datos extraídos (entidad Certificado).
+3. Informale que el certificado fue creado y que puede verlo en el módulo de Certificados.
+4. Si hay algo que necesite confirmación o corrección, preguntale antes de guardar.`;
+      await base44.agents.addMessage(conversation, { role: 'user', content: prompt });
+    } catch (err) {
+      await base44.agents.addMessage(conversation, {
+        role: 'user',
+        content: `Intenté subir el archivo "${file?.name}" pero hubo un error al procesarlo. ¿Podés ayudarme?`
+      });
+    } finally {
+      setUploadingPDF(false);
       e.target.value = '';
     }
   };
@@ -669,15 +706,27 @@ export default function ChatbotSoporte() {
             <div className="px-3 pb-3 pt-1 border-t border-border flex-shrink-0">
               <div className="flex gap-2 items-end">
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                <input ref={pdfInputRef} type="file" accept=".pdf" className="hidden" onChange={handlePDFUpload} />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={!conversation || uploadingPhoto}
+                  disabled={!conversation || uploadingPhoto || uploadingPDF}
                   title="Adjuntar foto"
                   className="h-9 w-9 rounded-xl flex-shrink-0 flex items-center justify-center border border-border hover:bg-muted transition-colors disabled:opacity-40"
                 >
                   {uploadingPhoto
                     ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     : <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                  }
+                </button>
+                <button
+                  onClick={() => pdfInputRef.current?.click()}
+                  disabled={!conversation || uploadingPhoto || uploadingPDF}
+                  title="Subir ADA / OC (PDF) para generar certificado"
+                  className="h-9 w-9 rounded-xl flex-shrink-0 flex items-center justify-center border border-primary/40 hover:bg-primary/10 transition-colors disabled:opacity-40"
+                >
+                  {uploadingPDF
+                    ? <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    : <Paperclip className="h-4 w-4 text-primary" />
                   }
                 </button>
                 <textarea
@@ -696,7 +745,7 @@ export default function ChatbotSoporte() {
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
-              <p className="text-[10px] text-muted-foreground/50 text-center mt-1.5">Enter para enviar · Podés adjuntar fotos 📷</p>
+              <p className="text-[10px] text-muted-foreground/50 text-center mt-1.5">Enter para enviar · 📷 foto · 📎 ADA/OC PDF → genera certificado</p>
             </div>
           </motion.div>
         )}
