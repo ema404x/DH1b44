@@ -23,24 +23,31 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const [form, setForm] = useState(() => {
     const items = (initialData?.items || []).map((item, i) => {
       const importe_total = item.importe_total || (item.cantidad * item.importe_unitario) || 0;
-      // Un ítem tiene medición manual si el flag está explícitamente marcado en los datos guardados
-      const medEditado = !!item._med_editado;
-      // Saldo: solo usar el guardado si hay medición manual, si no es 0
-      const saldo_pendiente_importe = medEditado ? (item.saldo_pendiente_importe || 0) : 0;
-      const saldo_pendiente_unidad = medEditado ? (item.saldo_pendiente_unidad || 0) : 0;
+      const medPresente = item.med_presente_importe ?? importe_total;
+      const acumAnterior = item.med_acum_anterior_importe || 0;
+      const acumPresente = item.med_acum_presente_importe ?? (acumAnterior + medPresente);
+      // Detectar si hay medición real: el presente es diferente al total del ítem
+      const medEditado = !!item._med_editado || (item.med_presente_importe != null && item.med_presente_importe !== importe_total);
+      // Saldo siempre recalculado (nunca del dato guardado para evitar residuos incorrectos)
+      const saldo_pendiente_importe = medEditado ? Math.max(0, importe_total - acumPresente) : 0;
+      const cantTotal = item.cantidad || 1;
+      const cantAnterior = item.med_acum_anterior_unidad || 0;
+      const cantPresente = item.med_presente_unidad ?? cantTotal;
+      const acumPresUnidad = item.med_acum_presente_unidad ?? (cantAnterior + cantPresente);
+      const saldo_pendiente_unidad = medEditado ? Math.max(0, cantTotal - acumPresUnidad) : 0;
       return {
         numero: i + 1,
         descripcion: item.descripcion || '',
         um: item.um || 'GL',
-        cantidad: item.cantidad || 1,
+        cantidad: cantTotal,
         importe_unitario: item.importe_unitario || 0,
         importe_total,
-        med_acum_anterior_unidad: item.med_acum_anterior_unidad || 0,
-        med_acum_anterior_importe: item.med_acum_anterior_importe || 0,
-        med_presente_unidad: item.med_presente_unidad ?? item.cantidad ?? 1,
-        med_presente_importe: item.med_presente_importe ?? importe_total,
-        med_acum_presente_unidad: item.med_acum_presente_unidad ?? item.cantidad ?? 1,
-        med_acum_presente_importe: item.med_acum_presente_importe ?? importe_total,
+        med_acum_anterior_unidad: cantAnterior,
+        med_acum_anterior_importe: acumAnterior,
+        med_presente_unidad: cantPresente,
+        med_presente_importe: medPresente,
+        med_acum_presente_unidad: acumPresUnidad,
+        med_acum_presente_importe: acumPresente,
         saldo_pendiente_unidad,
         saldo_pendiente_importe,
         _med_editado: medEditado,
