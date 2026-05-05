@@ -12,10 +12,11 @@ import CertificadosLista from '@/components/certificados/CertificadosLista';
 import CertificadosAutomatizados from '@/components/certificados/CertificadosAutomatizados';
 import GeneracionMasiva from '@/components/certificados/GeneracionMasiva';
 import AbonoMaestroPanel from '@/components/certificados/AbonoMaestroPanel';
+import AbonoManualForm from '@/components/certificados/AbonoManualForm';
 import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
-// view: 'list' | 'upload' | 'edit' | 'preview'
+// view: 'list' | 'upload' | 'edit' | 'preview' | 'manual'
 export default function Certificados() {
   const [view, setView] = useState('list');
   const [tab, setTab] = useState('abono_mensual');
@@ -160,6 +161,16 @@ export default function Certificados() {
     });
   };
 
+  if (view === 'manual') {
+    return (
+      <AbonoManualForm
+        onSave={handleSave}
+        onCancel={() => setView('list')}
+        saving={saveMutation.isPending}
+      />
+    );
+  }
+
   if (view === 'upload') {
     return (
       <div>
@@ -243,7 +254,10 @@ export default function Certificados() {
         </TabsList>
 
         <TabsContent value="abono_mensual" className="mt-6">
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-end gap-2 mb-4">
+            <Button variant="outline" onClick={() => setView('manual')} className="gap-2">
+              <Plus className="h-4 w-4" /> Cargar Manualmente
+            </Button>
             <Button onClick={() => setShowMasiva(true)} className="gap-2 bg-violet-600 hover:bg-violet-700">
               <Zap className="h-4 w-4" /> Generar Masivo
             </Button>
