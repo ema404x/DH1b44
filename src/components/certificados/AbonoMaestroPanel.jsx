@@ -87,12 +87,14 @@ export default function AbonoMaestroPanel() {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const parseMonto = (v) => {
-    if (typeof v === 'number' && !isNaN(v)) return v;
-    return parseFloat(String(v).replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+    // Quitar todo excepto dígitos y coma, luego reemplazar coma por punto
+    const clean = String(v).replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(clean);
+    return isNaN(n) ? 0 : n;
   };
   const parseEntero = (v) => {
-    if (typeof v === 'number' && !isNaN(v)) return Math.round(v);
-    return parseInt(String(v).replace(/\D/g, ''), 10) || 0;
+    const n = parseInt(String(v).replace(/\D/g, ''), 10);
+    return isNaN(n) ? 0 : n;
   };
 
   const montoPreview = parseMonto(form.monto_total_contrato);
@@ -144,7 +146,7 @@ export default function AbonoMaestroPanel() {
       ada_numero: abono.ada_numero || '',
       obra_servicio: abono.obra_servicio || '',
       emprendimiento: abono.emprendimiento || '',
-      monto_total_contrato: abono.monto_total_contrato || '',
+      monto_total_contrato: abono.monto_total_contrato ? String(abono.monto_total_contrato) : '',
       fecha_oc_emision: abono.fecha_oc_emision || '',
       duracion_meses: abono.duracion_meses || '',
       estado: abono.estado || 'activo',
@@ -321,11 +323,20 @@ export default function AbonoMaestroPanel() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Monto Total Contrato *</label>
-                <Input type="number" placeholder="0" value={form.monto_total_contrato} onChange={e => set('monto_total_contrato', e.target.valueAsNumber || e.target.value)} />
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Ej: 3.060.000"
+                  value={form.monto_total_contrato}
+                  onChange={e => set('monto_total_contrato', e.target.value)}
+                />
+                {parseMonto(form.monto_total_contrato) > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">{fmt(parseMonto(form.monto_total_contrato))}</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Duración (meses) *</label>
-                <Input type="number" min="1" placeholder="Ej: 6" value={form.duracion_meses} onChange={e => set('duracion_meses', e.target.valueAsNumber || e.target.value)} />
+                <Input type="number" min="1" placeholder="Ej: 6" value={form.duracion_meses} onChange={e => set('duracion_meses', e.target.value)} />
               </div>
               <div className="col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Fecha de emisión OC *</label>
