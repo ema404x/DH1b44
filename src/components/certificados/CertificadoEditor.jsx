@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2, Wand2 } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2, Wand2, Layers } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -18,6 +18,8 @@ function Field({ label, children }) {
 }
 
 export default function CertificadoEditor({ initialData, onSave, onCancel, onPreview, saving }) {
+  const [masivoPct, setMasivoPct] = useState('');
+
   const [form, setForm] = useState(() => {
     const items = (initialData?.items || []).map((item, i) => ({
       numero: i + 1,
@@ -124,6 +126,28 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const fondoReparo = baseCalculo * (form.fondo_reparo_pct / 100);
   const totalNeto = baseCalculo - anticipo - fondoReparo;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
+
+  const aplicarCantidadesMasivas = (pct) => {
+    if (!pct || pct <= 0) return;
+    const factor = pct / 100;
+    const newItems = form.items.map(item => {
+      const cantPresente = Math.round((item.cantidad || 0) * factor * 100) / 100;
+      const importePresente = Math.round((item.importe_total || 0) * factor);
+      const acumAnterior = item.med_acum_anterior_importe || 0;
+      const cantAnterior = item.med_acum_anterior_unidad || 0;
+      return {
+        ...item,
+        _med_editado: true,
+        med_presente_unidad: cantPresente,
+        med_presente_importe: importePresente,
+        med_acum_presente_unidad: cantAnterior + cantPresente,
+        med_acum_presente_importe: acumAnterior + importePresente,
+        saldo_pendiente_unidad: Math.max(0, (item.cantidad || 0) - cantAnterior - cantPresente),
+        saldo_pendiente_importe: Math.max(0, (item.importe_total || 0) - acumAnterior - importePresente),
+      };
+    });
+    setForm(f => ({ ...f, items: newItems }));
+  };
 
   const aplicarAvance = () => {
     const pct = (form.porcentaje_avance || 0) / 100;
@@ -326,9 +350,35 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
 
       {/* Ítems */}
       <div className="bg-card rounded-lg border p-5 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Ítems</h3>
-          <Button size="sm" variant="outline" className="gap-2" onClick={addItem}><Plus className="h-3.5 w-3.5" />Agregar ítem</Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Edición masiva */}
+            <div className="flex items-center gap-1.5 border rounded-lg px-3 py-1.5 bg-muted/30">
+              <Layers className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Certificar % masivo:</span>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                placeholder="ej: 50"
+                value={masivoPct}
+                onChange={e => setMasivoPct(e.target.value)}
+                className="w-20 h-7 text-xs"
+              />
+              <span className="text-xs text-muted-foreground">%</span>
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7 text-xs px-3 gap-1 bg-blue-600 hover:bg-blue-700"
+                onClick={() => { aplicarCantidadesMasivas(+masivoPct); setMasivoPct(''); }}
+                disabled={!masivoPct || +masivoPct <= 0}
+              >
+                <Wand2 className="h-3 w-3" /> Aplicar a todos
+              </Button>
+            </div>
+            <Button size="sm" variant="outline" className="gap-2" onClick={addItem}><Plus className="h-3.5 w-3.5" />Agregar ítem</Button>
+          </div>
         </div>
         <div className="space-y-3">
           {form.items.map((item, i) => (
