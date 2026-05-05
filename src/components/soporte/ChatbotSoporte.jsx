@@ -3,11 +3,12 @@ import { base44 } from '@/api/base44Client';
 import { useLocation } from 'react-router-dom';
 import {
   MessageCircle, X, Send, Loader2, Bot, RotateCcw, Sparkles, Heart,
-  HelpCircle, Image as ImageIcon, ClipboardList, Wrench, AlertTriangle, GripVertical, Paperclip
+  HelpCircle, Image as ImageIcon, ClipboardList, Wrench, AlertTriangle, GripVertical, Paperclip, FileCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
+import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 
 // Mapa de rutas a nombres de módulo
 const RUTA_MODULO = {
@@ -405,29 +406,90 @@ export default function ChatbotSoporte() {
     if (!file) return;
     setUploadingPDF(true);
     try {
-      // Subir el PDF
+      // 1. Subir el PDF
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      // Extraer datos del ADA/OC con la función existente
+
+      // 2. Extraer datos del ADA/OC
       const res = await base44.functions.invoke('extractADA', { file_url });
       const extracted = res?.data;
       if (!extracted) throw new Error('No se pudo extraer el PDF');
-      // Construir el prompt para Alice con los datos extraídos
-      const prompt = `[ADA/OC SUBIDA - ACCIÓN REQUERIDA]
-El usuario subió el archivo "${file.name}" y necesita que generes el certificado automáticamente.
 
-Datos extraídos del documento:
-${JSON.stringify(extracted, null, 2)}
+      // 3. Crear el certificado directamente en la DB (estado borrador → emitido)
+      const items = (extracted.items || []).map((item, i) => ({
+        numero: i + 1,
+        descripcion: item.descripcion || '',
+        um: item.um || 'GL',
+        cantidad: item.cantidad || 1,
+        importe_unitario: item.importe_unitario || 0,
+        importe_total: item.importe_total || (item.cantidad * item.importe_unitario) || 0,
+        med_acum_anterior_unidad: item.med_acum_anterior_unidad || 0,
+        med_acum_anterior_importe: item.med_acum_anterior_importe || 0,
+        med_presente_unidad: item.med_presente_unidad ?? (item.cantidad || 1),
+        med_presente_importe: item.med_presente_importe ?? (item.importe_total || 0),
+        med_acum_presente_unidad: item.med_acum_presente_unidad ?? (item.cantidad || 1),
+        med_acum_presente_importe: item.med_acum_presente_importe ?? (item.importe_total || 0),
+        saldo_pendiente_unidad: item.saldo_pendiente_unidad || 0,
+        saldo_pendiente_importe: item.saldo_pendiente_importe || 0,
+      }));
 
-Por favor:
-1. Confirmale al usuario los datos principales que detectaste (contratista, ADA N°, monto, ítems).
-2. Creá el certificado en la base de datos usando los datos extraídos (entidad Certificado).
-3. Informale que el certificado fue creado y que puede verlo en el módulo de Certificados.
-4. Si hay algo que necesite confirmación o corrección, preguntale antes de guardar.`;
+      const subtotal = items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
+
+      const certData = {
+        tipo: extracted.tipo || 'abono_mensual',
+        estado: 'borrador',
+        emprendimiento: extracted.emprendimiento || '',
+        obra_servicio: extracted.obra_servicio || '',
+        contratista: extracted.contratista || '',
+        ada_numero: extracted.ada_numero || '',
+        oc_numero: extracted.oc_numero || '',
+        mes_periodo: extracted.mes_periodo || '',
+        fecha_inicio: extracted.fecha_inicio || '',
+        plazo_obra: extracted.plazo_obra || '',
+        plazo_entrega: extracted.plazo_entrega || '',
+        fecha_finalizacion: '',
+        monto_contratado: extracted.monto_contratado || subtotal,
+        monto_obra_contratada: extracted.monto_obra_contratada || 0,
+        porcentaje_avance: extracted.porcentaje_avance || 0,
+        condiciones_pago: extracted.condiciones_pago || '',
+        subtotal,
+        anticipo_pct: 0,
+        fondo_reparo_pct: 0,
+        fecha_certificado: new Date().toISOString().split('T')[0],
+        ada_pdf_url: file_url,
+        items,
+        numero: 1,
+      };
+
+      const cert = await base44.entities.Certificado.create(certData);
+
+      // 4. Generar el PDF automáticamente
+      await exportCertificadoPDF({ ...certData, numero: cert.id?.slice(-4).toUpperCase() || 1 });
+
+      // 5. Notificar a Alice con resumen para que confirme al usuario
+      const tipoLabel = certData.tipo === 'abono_mensual' ? 'Abono Mensual' : certData.tipo === 'obra' ? 'Obra' : 'Informe';
+      const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+      const prompt = `[CERTIFICADO CREADO AUTOMÁTICAMENTE - solo informá al usuario]
+El sistema procesó el archivo "${file.name}" y creó el certificado exitosamente.
+
+Resumen del certificado creado:
+- Tipo: ${tipoLabel}
+- Contratista: ${certData.contratista || '(no detectado)'}
+- ADA N°: ${certData.ada_numero || '(no detectado)'}
+- OC N°: ${certData.oc_numero || '(no detectado)'}
+- Emprendimiento: ${certData.emprendimiento || '(no detectado)'}
+- Ítems extraídos: ${items.length}
+- Subtotal: ${fmt(subtotal)}
+- Estado: Borrador (guardado en el módulo de Certificados)
+- El PDF fue descargado automáticamente.
+
+Informale al usuario de forma breve y amigable que el certificado fue creado y el PDF generado. Mencionale que puede verlo y editarlo en el módulo Certificados. Si detectás que falta información importante (contratista, ADA N°), alertale para que lo complete.`;
+
       await base44.agents.addMessage(conversation, { role: 'user', content: prompt });
+
     } catch (err) {
       await base44.agents.addMessage(conversation, {
         role: 'user',
-        content: `Intenté subir el archivo "${file?.name}" pero hubo un error al procesarlo. ¿Podés ayudarme?`
+        content: `Intenté procesar el archivo "${file?.name}" pero hubo un error. El error fue: ${err.message}. ¿Podés ayudarme a resolverlo?`
       });
     } finally {
       setUploadingPDF(false);
