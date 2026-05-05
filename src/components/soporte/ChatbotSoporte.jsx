@@ -408,7 +408,7 @@ export default function ChatbotSoporte() {
       // Subir el PDF
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       // Extraer datos del ADA/OC con la función existente
-      const res = await base44.functions.invoke('extractADA', { pdf_url: file_url, tipo: 'auto' });
+      const res = await base44.functions.invoke('extractADA', { file_url });
       const extracted = res?.data;
       if (!extracted) throw new Error('No se pudo extraer el PDF');
       // Construir el prompt para Alice con los datos extraídos
