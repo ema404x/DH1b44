@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -126,6 +126,17 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const fondoReparo = baseCalculo * (form.fondo_reparo_pct / 100);
   const totalNeto = baseCalculo - anticipo - fondoReparo;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
+
+  // Para abono mensual: sincronizar monto_contratado y monto_obra_contratada con el total neto
+  useEffect(() => {
+    if (form.tipo !== 'abono_mensual') return;
+    if (totalNeto === 0) return;
+    setForm(f => ({
+      ...f,
+      monto_contratado: totalNeto,
+      monto_obra_contratada: totalNeto,
+    }));
+  }, [totalNeto, form.tipo]);
 
   const aplicarCantidadMasiva = (cant) => {
     if (cant === '' || cant === null || cant === undefined) return;
