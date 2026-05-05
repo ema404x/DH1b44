@@ -70,11 +70,32 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const setItem = (i, k, v) => {
     const items = [...form.items];
     items[i] = { ...items[i], [k]: v };
+
     if (k === 'cantidad' || k === 'importe_unitario') {
       items[i].importe_total = items[i].cantidad * items[i].importe_unitario;
-      items[i].med_presente_importe = items[i].importe_total;
-      items[i].med_acum_presente_importe = items[i].importe_total;
+      // Solo actualizar med_presente si no fue editado manualmente antes
+      if (!items[i]._med_editado) {
+        items[i].med_presente_importe = items[i].importe_total;
+        items[i].med_acum_presente_importe = items[i].importe_total;
+      }
     }
+
+    // Cuando el usuario edita manualmente el importe del presente, recalcular saldo
+    if (k === 'med_presente_importe') {
+      items[i]._med_editado = true;
+      const acumAnterior = items[i].med_acum_anterior_importe || 0;
+      items[i].med_acum_presente_importe = acumAnterior + v;
+      items[i].saldo_pendiente_importe = Math.max(0, (items[i].importe_total || 0) - items[i].med_acum_presente_importe);
+      const cantTotal = items[i].cantidad || 0;
+      const cantAnterior = items[i].med_acum_anterior_unidad || 0;
+      const cantPresente = items[i].importe_total > 0
+        ? Math.round((v / items[i].importe_total) * cantTotal * 100) / 100
+        : 0;
+      items[i].med_presente_unidad = cantPresente;
+      items[i].med_acum_presente_unidad = cantAnterior + cantPresente;
+      items[i].saldo_pendiente_unidad = Math.max(0, cantTotal - items[i].med_acum_presente_unidad);
+    }
+
     setForm(f => ({ ...f, items }));
   };
 
@@ -311,7 +332,7 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
         </div>
         <div className="space-y-3">
           {form.items.map((item, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 items-start p-3 rounded-lg bg-muted/30 border">
+            <div key={i} className="grid grid-cols-14 gap-2 items-start p-3 rounded-lg bg-muted/30 border" style={{gridTemplateColumns: 'repeat(14, minmax(0, 1fr))'}}>
               <div className="col-span-1">
                 <label className="text-xs text-muted-foreground">N°</label>
                 <Input className="mt-1 h-8 text-xs" value={item.numero} onChange={e => setItem(i, 'numero', +e.target.value)} />
@@ -333,10 +354,19 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
                 <Input className="mt-1 h-8 text-xs" type="number" value={item.importe_unitario} onChange={e => setItem(i, 'importe_unitario', +e.target.value)} />
               </div>
               <div className="col-span-2">
-                <label className="text-xs text-muted-foreground">Total</label>
+                <label className="text-xs text-muted-foreground">Total contrato</label>
                 <div className="mt-1 h-8 text-xs flex items-center px-3 bg-background rounded-md border font-medium">{fmt(item.importe_total)}</div>
               </div>
-              <div className="col-span-12 flex justify-end">
+              <div className="col-span-2">
+                <label className="text-xs text-muted-foreground text-blue-700 font-semibold">A certificar $</label>
+                <Input
+                  className="mt-1 h-8 text-xs border-blue-300 focus:ring-blue-400"
+                  type="number"
+                  value={item.med_presente_importe || 0}
+                  onChange={e => setItem(i, 'med_presente_importe', +e.target.value)}
+                />
+              </div>
+              <div className="col-span-14 flex justify-end" style={{gridColumn: 'span 14'}}>
                 <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeItem(i)}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             </div>

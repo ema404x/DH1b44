@@ -21,16 +21,27 @@ async function loadImageAsBase64(url) {
 }
 
 export async function exportCertificadoPDF(form) {
-  const subtotalContrato = (form.items || []).reduce((acc, it) => acc + (it.importe_total || 0), 0);
-  const totalPresente = (form.items || []).reduce((acc, it) => acc + (it.med_presente_importe || 0), 0);
-  const totalSaldo = (form.items || []).reduce((acc, it) => acc + (it.saldo_pendiente_importe || 0), 0);
+  const allItems = form.items || [];
+  const subtotalContrato = allItems.reduce((acc, it) => acc + (it.importe_total || 0), 0);
+  const totalPresente = allItems.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0);
+  const totalSaldo = allItems.reduce((acc, it) => acc + (it.saldo_pendiente_importe || 0), 0);
   const hasMedicion = totalPresente > 0;
   const anticipo_pct = form.anticipo_pct || 0;
   const fondo_reparo_pct = form.fondo_reparo_pct || 5;
+
+  // Si hay medición, mostrar SOLO los ítems que tienen algo certificado este período
+  const itemsToRender = hasMedicion
+    ? allItems.filter(it => (it.med_presente_importe || 0) > 0)
+    : allItems;
+
+  // El subtotal a certificar es lo que el usuario ingresó (presente), o el total si no hay medición
   const pdfSubtotal = hasMedicion ? totalPresente : subtotalContrato;
   const pdfAnticipo = pdfSubtotal * (anticipo_pct / 100);
   const pdfFondoReparo = pdfSubtotal * (fondo_reparo_pct / 100);
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
+
+  // Monto contratado: usar el campo explícito del formulario (lo que el usuario puso)
+  const montoContratado = form.monto_contratado || subtotalContrato;
 
   const [logoBase64] = await Promise.all([
     loadImageAsBase64(MEJORES_LOGO_URL),
@@ -121,7 +132,7 @@ export async function exportCertificadoPDF(form) {
     ['FECHA INICIO', fmtDate(form.fecha_inicio)],
     ['PLAZO', form.plazo_obra || '—'],
     ['FIN', fmtDate(form.fecha_finalizacion)],
-    ['MONTO CONTRATADO', fmt(form.monto_contratado)],
+    ['MONTO CONTRATADO', fmt(montoContratado)],
   ];
   const INFO_LINE = 5.5;
   doc.setFontSize(8); doc.setTextColor(40, 40, 40);
@@ -146,7 +157,7 @@ export async function exportCertificadoPDF(form) {
   y = drawTableHeader(y);
 
   doc.setFont('helvetica', 'normal');
-  (form.items || []).forEach((item, idx) => {
+  itemsToRender.forEach((item, idx) => {
     doc.setFontSize(7);
     const descLines = doc.splitTextToSize(item.descripcion || '', DESCR_COL.w - 2);
     const ROW_H = Math.max(7, descLines.length * 4.2 + 2);
@@ -207,7 +218,7 @@ export async function exportCertificadoPDF(form) {
 
   if (hasMedicion) {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
-    doc.text(`Total contrato: ${fmt(subtotalContrato)}`, W - M, y, { align: 'right' }); y += 6;
+    doc.text(`Total contrato: ${fmt(montoContratado)}`, W - M, y, { align: 'right' }); y += 6;
     doc.text(`Saldo pendiente: ${fmt(totalSaldo)}`, W - M, y, { align: 'right' }); y += 6;
   }
 
