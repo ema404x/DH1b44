@@ -166,15 +166,14 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const subtotal = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
   // hasMedicion = true SOLO si algún ítem fue explícitamente editado por el usuario
   const hasMedicion = form.items.some(it => it._med_editado);
+  // totalPresente y totalSaldo calculados en tiempo real, sin depender de campos guardados
   const totalPresente = hasMedicion
     ? form.items.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0)
     : 0;
-  const totalSaldo = hasMedicion
-    ? form.items.reduce((acc, it) => acc + (it.saldo_pendiente_importe || 0), 0)
-    : 0;
+  const totalSaldo = hasMedicion ? Math.max(0, subtotal - totalPresente) : 0;
   const baseCalculo = hasMedicion ? totalPresente : subtotal;
-  const anticipo = baseCalculo * (form.anticipo_pct / 100);
-  const fondoReparo = baseCalculo * (form.fondo_reparo_pct / 100);
+  const anticipo = form.anticipo_pct > 0 ? baseCalculo * (form.anticipo_pct / 100) : 0;
+  const fondoReparo = form.fondo_reparo_pct > 0 ? baseCalculo * (form.fondo_reparo_pct / 100) : 0;
   const totalNeto = baseCalculo - anticipo - fondoReparo;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
@@ -494,12 +493,24 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           )}
           <div className="flex justify-between w-full text-sm items-center gap-2">
             <span className="text-muted-foreground">Anticipo/Desacopio %:</span>
-            <Input type="number" className="w-20 h-7 text-xs" value={form.anticipo_pct} onChange={e => set('anticipo_pct', +e.target.value)} />
+            <Input type="number" min="0" className="w-20 h-7 text-xs" value={form.anticipo_pct} onChange={e => set('anticipo_pct', +e.target.value)} />
           </div>
+          {anticipo > 0 && (
+            <div className="flex justify-between w-full text-xs text-muted-foreground">
+              <span>Anticipo ({form.anticipo_pct}%):</span>
+              <span className="text-destructive">-{fmt(anticipo)}</span>
+            </div>
+          )}
           <div className="flex justify-between w-full text-sm items-center gap-2">
             <span className="text-muted-foreground">Fondo de Reparo %:</span>
-            <Input type="number" className="w-20 h-7 text-xs" value={form.fondo_reparo_pct} onChange={e => set('fondo_reparo_pct', +e.target.value)} />
+            <Input type="number" min="0" className="w-20 h-7 text-xs" value={form.fondo_reparo_pct} onChange={e => set('fondo_reparo_pct', +e.target.value)} />
           </div>
+          {fondoReparo > 0 && (
+            <div className="flex justify-between w-full text-xs text-muted-foreground">
+              <span>Fondo de Reparo ({form.fondo_reparo_pct}%):</span>
+              <span className="text-destructive">-{fmt(fondoReparo)}</span>
+            </div>
+          )}
           <div className="w-full border-t pt-2 flex justify-between font-bold">
             <span>Total Neto:</span><span className="text-primary">{fmt(totalNeto)}</span>
           </div>
