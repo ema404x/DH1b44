@@ -23,8 +23,11 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const [form, setForm] = useState(() => {
     const items = (initialData?.items || []).map((item, i) => {
       const importe_total = item.importe_total || (item.cantidad * item.importe_unitario) || 0;
-      // Bug #5 fix: detectar si el ítem ya tenía una medición presente manual (al reabrir un certificado guardado)
-      const teniaMedicionManual = item.med_presente_importe != null && item.med_presente_importe !== importe_total;
+      // Un ítem tiene medición manual si el flag está explícitamente marcado en los datos guardados
+      const medEditado = !!item._med_editado;
+      // Saldo: solo usar el guardado si hay medición manual, si no es 0
+      const saldo_pendiente_importe = medEditado ? (item.saldo_pendiente_importe || 0) : 0;
+      const saldo_pendiente_unidad = medEditado ? (item.saldo_pendiente_unidad || 0) : 0;
       return {
         numero: i + 1,
         descripcion: item.descripcion || '',
@@ -38,10 +41,9 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
         med_presente_importe: item.med_presente_importe ?? importe_total,
         med_acum_presente_unidad: item.med_acum_presente_unidad ?? item.cantidad ?? 1,
         med_acum_presente_importe: item.med_acum_presente_importe ?? importe_total,
-        saldo_pendiente_unidad: item.saldo_pendiente_unidad ?? 0,
-        saldo_pendiente_importe: item.saldo_pendiente_importe ?? 0,
-        // Preservar el flag de edición manual para que no se sobreescriba al reabrir
-        _med_editado: item._med_editado || teniaMedicionManual,
+        saldo_pendiente_unidad,
+        saldo_pendiente_importe,
+        _med_editado: medEditado,
       };
     });
     return {
