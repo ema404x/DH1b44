@@ -134,7 +134,7 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
               </div>
 
               <div className="text-right flex-shrink-0">
-                <div className="font-bold text-primary text-lg">{fmt(c.monto_contratado)}</div>
+                <div className="font-bold text-primary text-lg">{fmt(c.subtotal || c.monto_contratado)}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {c.created_date ? format(new Date(c.created_date), 'dd/MM', { locale: es }) : '—'}
                 </div>
