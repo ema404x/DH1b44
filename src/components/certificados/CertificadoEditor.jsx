@@ -66,7 +66,7 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       fecha_certificado: new Date().toISOString().split('T')[0],
       numero_recepcion: '',
       anticipo_pct: initialData?.anticipo_pct ?? 0,
-      fondo_reparo_pct: initialData?.fondo_reparo_pct ?? 5,
+      fondo_reparo_pct: initialData?.fondo_reparo_pct ?? 0,
       subtotal: initialData?.subtotal || 0,
       _validation: initialData?._validation || null,
       ada_pdf_url: initialData?.ada_pdf_url || '',
