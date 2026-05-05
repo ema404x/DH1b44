@@ -350,25 +350,28 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Ítems</h3>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Edición masiva de cantidad */}
-            <div className="flex items-center gap-1.5 border rounded-lg px-3 py-1.5 bg-muted/30">
-              <Layers className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Cant. masiva:</span>
+            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+              <Layers className="h-4 w-4 text-amber-500 shrink-0" />
+              <div className="flex flex-col leading-none">
+                <span className="text-[10px] font-semibold text-amber-500 uppercase tracking-wide">Cantidad masiva</span>
+                <span className="text-[10px] text-muted-foreground">Aplica a todos los ítems</span>
+              </div>
               <Input
                 type="number"
                 min="0"
                 placeholder="ej: 1"
                 value={masivoPct}
                 onChange={e => setMasivoPct(e.target.value)}
-                className="w-20 h-7 text-xs"
+                onKeyDown={e => { if (e.key === 'Enter' && masivoPct !== '') { aplicarCantidadMasiva(masivoPct); setMasivoPct(''); }}}
+                className="w-20 h-7 text-xs border-amber-500/40 focus:ring-amber-400"
               />
               <Button
                 size="sm"
-                variant="outline"
-                className="h-7 text-xs px-3 gap-1"
+                className="h-7 text-xs px-3 gap-1.5 bg-amber-500 hover:bg-amber-600 text-white"
                 onClick={() => { aplicarCantidadMasiva(masivoPct); setMasivoPct(''); }}
-                disabled={masivoPct === '' || masivoPct === undefined}
+                disabled={masivoPct === ''}
               >
-                <Wand2 className="h-3 w-3" /> Aplicar a todos
+                <Wand2 className="h-3 w-3" /> Aplicar
               </Button>
             </div>
             <Button size="sm" variant="outline" className="gap-2" onClick={addItem}><Plus className="h-3.5 w-3.5" />Agregar ítem</Button>
