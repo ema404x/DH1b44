@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -164,19 +164,6 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const totalNeto = baseCalculo - anticipo - fondoReparo;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
-  // Bug #1 fix: un único useEffect para sincronizar montos en abono mensual
-  // Bug #2 fix: solo correr cuando totalNeto cambia de verdad (evita loop)
-  useEffect(() => {
-    if (form.tipo !== 'abono_mensual') return;
-    if (totalNeto === 0) return;
-    // Evitar loop: solo actualizar si realmente difieren
-    if (form.monto_contratado === totalNeto && form.monto_obra_contratada === totalNeto) return;
-    setForm(f => ({
-      ...f,
-      monto_contratado: totalNeto,
-      monto_obra_contratada: totalNeto,
-    }));
-  }, [totalNeto, form.tipo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const aplicarCantidadMasiva = (cant) => {
     if (cant === '' || cant === null || cant === undefined) return;
