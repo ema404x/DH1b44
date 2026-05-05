@@ -60,7 +60,7 @@ export default function Certificados() {
         jefe_sitio: user?.full_name || user?.email || '',
         jefe_sitio_email: user?.email || '',
         descripcion_trabajo: cert.obra_servicio || '',
-        monto_solicitado: cert.monto_contratado || 0,
+        monto_solicitado: cert.subtotal || cert.monto_contratado || 0,
         porcentaje_avance: cert.porcentaje_avance || 0,
         periodo: cert.mes_periodo || '',
         estado: 'enviada',

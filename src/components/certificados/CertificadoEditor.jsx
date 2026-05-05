@@ -290,8 +290,8 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           }>
             {form.tipo === 'abono_mensual' ? 'Abono Mensual' : form.tipo === 'informe' ? 'Informe' : 'Obra'}
           </Badge>
-          <Button variant="outline" className="gap-2" onClick={() => onPreview(form)}><Eye className="h-4 w-4" />Vista previa</Button>
-          <Button className="gap-2" onClick={() => onSave(form)} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
+          <Button variant="outline" className="gap-2" onClick={() => onPreview({ ...form, subtotal: baseCalculo, _hasMedicion: hasMedicion })}><Eye className="h-4 w-4" />Vista previa</Button>
+          <Button className="gap-2" onClick={() => onSave({ ...form, subtotal: baseCalculo, _hasMedicion: hasMedicion })} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
         </div>
       </div>
 
