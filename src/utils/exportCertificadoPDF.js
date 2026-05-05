@@ -23,9 +23,12 @@ async function loadImageAsBase64(url) {
 export async function exportCertificadoPDF(form) {
   const allItems = form.items || [];
   const subtotalContrato = allItems.reduce((acc, it) => acc + (it.importe_total || 0), 0);
-  const totalPresente = allItems.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0);
-  const totalSaldo = allItems.reduce((acc, it) => acc + (it.saldo_pendiente_importe || 0), 0);
-  const hasMedicion = totalPresente > 0;
+  const hasMedicion = allItems.some(it => it._med_editado);
+  const totalPresente = hasMedicion
+    ? allItems.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0)
+    : 0;
+  // Saldo calculado dinámicamente, igual que en el editor
+  const totalSaldo = hasMedicion ? Math.max(0, subtotalContrato - totalPresente) : 0;
   const anticipo_pct = form.anticipo_pct ?? 0;
   const fondo_reparo_pct = form.fondo_reparo_pct ?? 0;
 
@@ -36,8 +39,8 @@ export async function exportCertificadoPDF(form) {
 
   // El subtotal a certificar es lo que el usuario ingresó (presente), o el total si no hay medición
   const pdfSubtotal = hasMedicion ? totalPresente : subtotalContrato;
-  const pdfAnticipo = pdfSubtotal * (anticipo_pct / 100);
-  const pdfFondoReparo = pdfSubtotal * (fondo_reparo_pct / 100);
+  const pdfAnticipo = anticipo_pct > 0 ? pdfSubtotal * (anticipo_pct / 100) : 0;
+  const pdfFondoReparo = fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0;
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
   // Monto contratado: usar el campo explícito del formulario (lo que el usuario puso)
@@ -230,8 +233,12 @@ export async function exportCertificadoPDF(form) {
   y += 10;
 
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
-  doc.text(`Anticipo/Desacopio (${anticipo_pct}%):   -${fmt(pdfAnticipo)}`, W - M, y, { align: 'right' }); y += 7;
-  doc.text(`Fondo de Reparo (${fondo_reparo_pct}%):   -${fmt(pdfFondoReparo)}`, W - M, y, { align: 'right' }); y += 7;
+  if (pdfAnticipo > 0) {
+    doc.text(`Anticipo/Desacopio (${anticipo_pct}%):   -${fmt(pdfAnticipo)}`, W - M, y, { align: 'right' }); y += 7;
+  }
+  if (pdfFondoReparo > 0) {
+    doc.text(`Fondo de Reparo (${fondo_reparo_pct}%):   -${fmt(pdfFondoReparo)}`, W - M, y, { align: 'right' }); y += 7;
+  }
 
   doc.setFillColor(15, 28, 46);
   doc.rect(W - M - 90, y, 90, 10, 'F');

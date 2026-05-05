@@ -10,13 +10,15 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
   const [exporting, setExporting] = useState(false);
 
   const subtotal = (form.items || []).reduce((a, i) => a + (i.importe_total || 0), 0);
-  const totalPresente = (form.items || []).reduce((a, i) => a + (i.med_presente_importe || 0), 0);
-  const hasMedicion = totalPresente > 0;
+  const hasMedicion = (form.items || []).some(i => i._med_editado);
+  const totalPresente = hasMedicion
+    ? (form.items || []).reduce((a, i) => a + (i.med_presente_importe || 0), 0)
+    : 0;
   const pdfSubtotal = hasMedicion ? totalPresente : subtotal;
   const anticipo_pct = form.anticipo_pct ?? 0;
   const fondo_reparo_pct = form.fondo_reparo_pct ?? 0;
-  const anticipo = pdfSubtotal * (anticipo_pct / 100);
-  const fondoReparo = pdfSubtotal * (fondo_reparo_pct / 100);
+  const anticipo = anticipo_pct > 0 ? pdfSubtotal * (anticipo_pct / 100) : 0;
+  const fondoReparo = fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0;
   const totalNeto = pdfSubtotal - anticipo - fondoReparo;
 
   const handleExportPDF = async () => {
@@ -158,16 +160,18 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
               <span>{hasMedicion ? 'Imp. Certificado:' : 'Subtotal:'}</span>
               <span className="font-semibold text-foreground">{fmt(pdfSubtotal)}</span>
             </div>
-            {anticipo_pct > 0 && (
+            {anticipo > 0 && (
               <div className="flex justify-between gap-8 text-muted-foreground">
                 <span>Anticipo ({anticipo_pct}%):</span>
                 <span>-{fmt(anticipo)}</span>
               </div>
             )}
-            <div className="flex justify-between gap-8 text-muted-foreground">
-              <span>Fondo de Reparo ({fondo_reparo_pct}%):</span>
-              <span>-{fmt(fondoReparo)}</span>
-            </div>
+            {fondoReparo > 0 && (
+              <div className="flex justify-between gap-8 text-muted-foreground">
+                <span>Fondo de Reparo ({fondo_reparo_pct}%):</span>
+                <span>-{fmt(fondoReparo)}</span>
+              </div>
+            )}
             <div className="flex justify-between gap-8 bg-primary text-primary-foreground font-bold rounded-lg px-3 py-2 text-base">
               <span>Total Neto:</span>
               <span>{fmt(totalNeto)}</span>
