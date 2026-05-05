@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Calendar, DollarSign, Clock, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, Clock, CheckCircle2, Loader2, AlertCircle, Upload, Sparkles, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
@@ -161,6 +161,36 @@ export default function AbonoMaestroPanel() {
     setShowForm(true);
   };
 
+  const [extractingOC, setExtractingOC] = useState(false);
+
+  const extractFromOC = async (file) => {
+    if (!file || file.type !== 'application/pdf') return toast.error('Solo se aceptan archivos PDF');
+    setExtractingOC(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const res = await base44.functions.invoke('extractADA', { file_url, tipo_override: 'abono_mensual' });
+      const data = res.data?.data;
+      if (!data) throw new Error('No se pudo extraer datos del PDF');
+
+      // Mapear los campos extraídos al formulario
+      setForm(f => ({
+        ...f,
+        contratista: data.contratista || f.contratista,
+        oc_numero: data.oc_numero || f.oc_numero,
+        ada_numero: data.ada_numero || f.ada_numero,
+        obra_servicio: data.obra_servicio || f.obra_servicio,
+        emprendimiento: data.emprendimiento || f.emprendimiento,
+        monto_total_contrato: data.subtotal ? String(Math.round(data.subtotal)) : f.monto_total_contrato,
+        fecha_oc_emision: data.fecha_inicio || f.fecha_oc_emision,
+      }));
+      toast.success('Datos extraídos del PDF correctamente');
+    } catch (e) {
+      toast.error('Error al extraer datos: ' + e.message);
+    } finally {
+      setExtractingOC(false);
+    }
+  };
+
   const estadoColor = {
     activo: 'bg-green-100 text-green-700 border-green-200',
     completado: 'bg-blue-100 text-blue-700 border-blue-200',
@@ -289,6 +319,32 @@ export default function AbonoMaestroPanel() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+
+            {/* Upload OC para autocompletar */}
+            <label className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-all ${extractingOC ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30'}`}>
+              <input type="file" accept="application/pdf" className="hidden" onChange={e => extractFromOC(e.target.files[0])} disabled={extractingOC} />
+              {extractingOC ? (
+                <>
+                  <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-primary">Extrayendo datos del PDF...</p>
+                    <p className="text-xs text-muted-foreground">Esto puede tomar unos segundos</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Subir OC / ADA en PDF</p>
+                    <p className="text-xs text-muted-foreground">La IA completa los campos automáticamente</p>
+                  </div>
+                  <Upload className="h-4 w-4 text-muted-foreground ml-auto shrink-0" />
+                </>
+              )}
+            </label>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Contratista *</label>
