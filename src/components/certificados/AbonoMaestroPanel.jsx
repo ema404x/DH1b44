@@ -84,19 +84,24 @@ export default function AbonoMaestroPanel() {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const { fechaInicio, fechaFin } = calcularFechas(form.fecha_oc_emision, Number(form.duracion_meses));
-  const montoMensual = form.monto_total_contrato && form.duracion_meses
-    ? Number(form.monto_total_contrato) / Number(form.duracion_meses)
-    : 0;
+  const montoPreview = parseFloat(String(form.monto_total_contrato).replace(/\./g, '').replace(',', '.')) || 0;
+  const mesesPreview = parseInt(String(form.duracion_meses), 10) || 0;
+  const { fechaInicio, fechaFin } = calcularFechas(form.fecha_oc_emision, mesesPreview);
+  const montoMensual = montoPreview && mesesPreview ? montoPreview / mesesPreview : 0;
+
+  const parseMonto = (v) => parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+  const parseEntero = (v) => parseInt(String(v), 10) || 0;
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      const { fechaInicio, fechaFin } = calcularFechas(data.fecha_oc_emision, Number(data.duracion_meses));
+      const monto = parseMonto(data.monto_total_contrato);
+      const meses = parseEntero(data.duracion_meses);
+      const { fechaInicio, fechaFin } = calcularFechas(data.fecha_oc_emision, meses);
       const payload = {
         ...data,
-        monto_total_contrato: Number(data.monto_total_contrato),
-        duracion_meses: Number(data.duracion_meses),
-        monto_mensual: Number(data.monto_total_contrato) / Number(data.duracion_meses),
+        monto_total_contrato: monto,
+        duracion_meses: meses,
+        monto_mensual: meses > 0 ? monto / meses : 0,
         fecha_inicio_validez: fechaInicio,
         fecha_fin_validez: fechaFin,
         certificados_emitidos: editingId ? undefined : 0,
