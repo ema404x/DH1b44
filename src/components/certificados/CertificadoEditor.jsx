@@ -127,23 +127,19 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const totalNeto = baseCalculo - anticipo - fondoReparo;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
-  const aplicarCantidadesMasivas = (pct) => {
-    if (!pct || pct <= 0) return;
-    const factor = pct / 100;
+  const aplicarCantidadMasiva = (cant) => {
+    if (cant === '' || cant === null || cant === undefined) return;
     const newItems = form.items.map(item => {
-      const cantPresente = Math.round((item.cantidad || 0) * factor * 100) / 100;
-      const importePresente = Math.round((item.importe_total || 0) * factor);
-      const acumAnterior = item.med_acum_anterior_importe || 0;
-      const cantAnterior = item.med_acum_anterior_unidad || 0;
+      const nuevaCantidad = +cant;
+      const nuevoTotal = nuevaCantidad * (item.importe_unitario || 0);
       return {
         ...item,
-        _med_editado: true,
-        med_presente_unidad: cantPresente,
-        med_presente_importe: importePresente,
-        med_acum_presente_unidad: cantAnterior + cantPresente,
-        med_acum_presente_importe: acumAnterior + importePresente,
-        saldo_pendiente_unidad: Math.max(0, (item.cantidad || 0) - cantAnterior - cantPresente),
-        saldo_pendiente_importe: Math.max(0, (item.importe_total || 0) - acumAnterior - importePresente),
+        cantidad: nuevaCantidad,
+        importe_total: nuevoTotal,
+        ...(!item._med_editado && {
+          med_presente_importe: nuevoTotal,
+          med_acum_presente_importe: nuevoTotal,
+        }),
       };
     });
     setForm(f => ({ ...f, items: newItems }));
@@ -353,26 +349,24 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Ítems</h3>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Edición masiva */}
+            {/* Edición masiva de cantidad */}
             <div className="flex items-center gap-1.5 border rounded-lg px-3 py-1.5 bg-muted/30">
-              <Layers className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Certificar % masivo:</span>
+              <Layers className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Cant. masiva:</span>
               <Input
                 type="number"
                 min="0"
-                max="100"
-                placeholder="ej: 50"
+                placeholder="ej: 1"
                 value={masivoPct}
                 onChange={e => setMasivoPct(e.target.value)}
                 className="w-20 h-7 text-xs"
               />
-              <span className="text-xs text-muted-foreground">%</span>
               <Button
                 size="sm"
-                variant="default"
-                className="h-7 text-xs px-3 gap-1 bg-blue-600 hover:bg-blue-700"
-                onClick={() => { aplicarCantidadesMasivas(+masivoPct); setMasivoPct(''); }}
-                disabled={!masivoPct || +masivoPct <= 0}
+                variant="outline"
+                className="h-7 text-xs px-3 gap-1"
+                onClick={() => { aplicarCantidadMasiva(masivoPct); setMasivoPct(''); }}
+                disabled={masivoPct === '' || masivoPct === undefined}
               >
                 <Wand2 className="h-3 w-3" /> Aplicar a todos
               </Button>
