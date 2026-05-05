@@ -67,6 +67,52 @@
       "default": "activo",
       "description": "Estado del contrato de abono"
     },
+    "plazo_obra": {
+      "type": "string",
+      "description": "Plazo de la obra/servicio (ej: Mensual, 6 meses)"
+    },
+    "plazo_entrega": {
+      "type": "string",
+      "description": "Plazo de entrega (ej: 30 d\u00edas h\u00e1biles)"
+    },
+    "condiciones_pago": {
+      "type": "string",
+      "description": "Condiciones de pago del contrato"
+    },
+    "anticipo_pct": {
+      "type": "number",
+      "description": "Porcentaje de anticipo/desacopio a descontar en cada certificado",
+      "default": 0
+    },
+    "fondo_reparo_pct": {
+      "type": "number",
+      "description": "Porcentaje de fondo de reparo a descontar en cada certificado",
+      "default": 0
+    },
+    "items": {
+      "type": "array",
+      "description": "\u00cdtems del contrato que se copiar\u00e1n en cada certificado mensual generado",
+      "items": {
+        "type": "object",
+        "properties": {
+          "descripcion": {
+            "type": "string"
+          },
+          "um": {
+            "type": "string"
+          },
+          "cantidad": {
+            "type": "number"
+          },
+          "importe_unitario": {
+            "type": "number"
+          },
+          "importe_total": {
+            "type": "number"
+          }
+        }
+      }
+    },
     "notas": {
       "type": "string",
       "description": "Observaciones adicionales"

@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Calendar, Clock, CheckCircle2, Loader2, AlertCircle, Upload, Sparkles, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, Clock, CheckCircle2, Loader2, AlertCircle, Upload, Sparkles, FileText, Layers } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
@@ -67,6 +68,12 @@ const EMPTY_FORM = {
   monto_total_contrato: '',
   fecha_oc_emision: '',
   duracion_meses: '',
+  plazo_obra: '',
+  plazo_entrega: '',
+  condiciones_pago: '',
+  anticipo_pct: 0,
+  fondo_reparo_pct: 0,
+  items: [{ descripcion: '', um: 'GL', cantidad: 1, importe_unitario: 0, importe_total: 0 }],
   estado: 'activo',
   notas: '',
 };
@@ -102,11 +109,27 @@ export default function AbonoMaestroPanel() {
   const { fechaInicio, fechaFin } = calcularFechas(form.fecha_oc_emision, mesesPreview);
   const montoMensual = montoPreview && mesesPreview ? montoPreview / mesesPreview : 0;
 
+  const setItem = (i, k, v) => {
+    const items = [...form.items];
+    items[i] = { ...items[i], [k]: v };
+    if (k === 'cantidad' || k === 'importe_unitario') {
+      items[i].importe_total = (items[i].cantidad || 0) * (items[i].importe_unitario || 0);
+    }
+    setForm(f => ({ ...f, items }));
+  };
+  const addItem = () => setForm(f => ({ ...f, items: [...f.items, { descripcion: '', um: 'GL', cantidad: 1, importe_unitario: 0, importe_total: 0 }] }));
+  const removeItem = (i) => setForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }));
+
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       const monto = parseMonto(data.monto_total_contrato);
       const meses = parseEntero(data.duracion_meses);
       const { fechaInicio, fechaFin } = calcularFechas(data.fecha_oc_emision, meses);
+      // Si el usuario cargó ítems, el subtotal es la suma de ellos; sino usamos el monto mensual
+      const itemsConTotal = (data.items || []).map(it => ({
+        ...it,
+        importe_total: it.importe_total || (it.cantidad * it.importe_unitario) || 0,
+      }));
       const payload = {
         ...data,
         monto_total_contrato: monto,
@@ -114,6 +137,7 @@ export default function AbonoMaestroPanel() {
         monto_mensual: meses > 0 ? monto / meses : 0,
         fecha_inicio_validez: fechaInicio,
         fecha_fin_validez: fechaFin,
+        items: itemsConTotal,
         certificados_emitidos: editingId ? undefined : 0,
       };
       if (editingId) {
@@ -149,6 +173,14 @@ export default function AbonoMaestroPanel() {
       monto_total_contrato: abono.monto_total_contrato ? String(abono.monto_total_contrato) : '',
       fecha_oc_emision: abono.fecha_oc_emision || '',
       duracion_meses: abono.duracion_meses || '',
+      plazo_obra: abono.plazo_obra || '',
+      plazo_entrega: abono.plazo_entrega || '',
+      condiciones_pago: abono.condiciones_pago || '',
+      anticipo_pct: abono.anticipo_pct ?? 0,
+      fondo_reparo_pct: abono.fondo_reparo_pct ?? 0,
+      items: abono.items?.length
+        ? abono.items
+        : [{ descripcion: '', um: 'GL', cantidad: 1, importe_unitario: 0, importe_total: 0 }],
       estado: abono.estado || 'activo',
       notas: abono.notas || '',
     });
@@ -182,6 +214,10 @@ export default function AbonoMaestroPanel() {
         emprendimiento: data.emprendimiento || f.emprendimiento,
         monto_total_contrato: data.subtotal ? String(Math.round(data.subtotal)) : f.monto_total_contrato,
         fecha_oc_emision: data.fecha_inicio || f.fecha_oc_emision,
+        plazo_obra: data.plazo_obra || f.plazo_obra,
+        plazo_entrega: data.plazo_entrega || f.plazo_entrega,
+        condiciones_pago: data.condiciones_pago || f.condiciones_pago,
+        items: data.items?.length ? data.items : f.items,
       }));
       toast.success('Datos extraídos del PDF correctamente');
     } catch (e) {
@@ -318,7 +354,7 @@ export default function AbonoMaestroPanel() {
             <DialogTitle>{editingId ? 'Editar Abono Maestro' : 'Nuevo Abono Maestro'}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-5 py-2 max-h-[75vh] overflow-y-auto pr-1">
 
             {/* Upload OC para autocompletar */}
             <label className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-all ${extractingOC ? 'border-primary/40 bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30'}`}>
@@ -326,10 +362,7 @@ export default function AbonoMaestroPanel() {
               {extractingOC ? (
                 <>
                   <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-primary">Extrayendo datos del PDF...</p>
-                    <p className="text-xs text-muted-foreground">Esto puede tomar unos segundos</p>
-                  </div>
+                  <div><p className="text-sm font-semibold text-primary">Extrayendo datos del PDF...</p></div>
                 </>
               ) : (
                 <>
@@ -345,58 +378,90 @@ export default function AbonoMaestroPanel() {
               )}
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Contratista *</label>
-                <Input placeholder="Nombre del contratista" value={form.contratista} onChange={e => set('contratista', e.target.value)} />
+            {/* Sección: Datos del Contrato */}
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Datos del Contrato</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Contratista *</label>
+                  <Input placeholder="Nombre del contratista" value={form.contratista} onChange={e => set('contratista', e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">N° Orden de Compra</label>
+                  <Input placeholder="Ej: OC-1234" value={form.oc_numero} onChange={e => set('oc_numero', e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">N° ADA</label>
+                  <Input placeholder="Ej: ADA-5678" value={form.ada_numero} onChange={e => set('ada_numero', e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Obra / Servicio</label>
+                  <Input placeholder="Descripción del servicio" value={form.obra_servicio} onChange={e => set('obra_servicio', e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Emprendimiento</label>
+                  <Input placeholder="Ej: EDUCACION COMUNA 8A" value={form.emprendimiento} onChange={e => set('emprendimiento', e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Estado</label>
+                  <Select value={form.estado} onValueChange={v => set('estado', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="activo">Activo</SelectItem>
+                      <SelectItem value="pausado">Pausado</SelectItem>
+                      <SelectItem value="completado">Completado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">N° Orden de Compra</label>
-                <Input placeholder="Ej: OC-1234" value={form.oc_numero} onChange={e => set('oc_numero', e.target.value)} />
+            </div>
+
+            {/* Sección: Plazos y Condiciones */}
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Plazos y Condiciones de Pago</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Plazo de Obra</label>
+                  <Input placeholder="Ej: Mensual / 6 meses" value={form.plazo_obra} onChange={e => set('plazo_obra', e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Plazo de Entrega</label>
+                  <Input placeholder="Ej: 30 días hábiles" value={form.plazo_entrega} onChange={e => set('plazo_entrega', e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Condiciones de Pago</label>
+                  <Textarea placeholder="Ej: 30 días hábiles desde presentación de factura..." value={form.condiciones_pago} onChange={e => set('condiciones_pago', e.target.value)} className="h-16 text-sm resize-none" />
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">N° ADA</label>
-                <Input placeholder="Ej: ADA-5678" value={form.ada_numero} onChange={e => set('ada_numero', e.target.value)} />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Obra / Servicio</label>
-                <Input placeholder="Descripción del servicio" value={form.obra_servicio} onChange={e => set('obra_servicio', e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Emprendimiento</label>
-                <Input placeholder="Ej: EDUCACION" value={form.emprendimiento} onChange={e => set('emprendimiento', e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Estado</label>
-                <Select value={form.estado} onValueChange={v => set('estado', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="activo">Activo</SelectItem>
-                    <SelectItem value="pausado">Pausado</SelectItem>
-                    <SelectItem value="completado">Completado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Monto Total Contrato *</label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="Ej: 3.060.000"
-                  value={form.monto_total_contrato}
-                  onChange={e => set('monto_total_contrato', e.target.value)}
-                />
-                {parseMonto(form.monto_total_contrato) > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">{fmt(parseMonto(form.monto_total_contrato))}</p>
-                )}
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Duración (meses) *</label>
-                <Input type="number" min="1" placeholder="Ej: 6" value={form.duracion_meses} onChange={e => set('duracion_meses', e.target.value)} />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Fecha de emisión OC *</label>
-                <Input type="date" value={form.fecha_oc_emision} onChange={e => set('fecha_oc_emision', e.target.value)} />
+            </div>
+
+            {/* Sección: Montos y Vigencia */}
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Montos y Vigencia</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Monto Total Contrato *</label>
+                  <Input type="text" inputMode="numeric" placeholder="Ej: 3.060.000" value={form.monto_total_contrato} onChange={e => set('monto_total_contrato', e.target.value)} />
+                  {parseMonto(form.monto_total_contrato) > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">{fmt(parseMonto(form.monto_total_contrato))}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Duración (meses) *</label>
+                  <Input type="number" min="1" placeholder="Ej: 6" value={form.duracion_meses} onChange={e => set('duracion_meses', e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Fecha de emisión OC *</label>
+                  <Input type="date" value={form.fecha_oc_emision} onChange={e => set('fecha_oc_emision', e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Anticipo / Desacopio %</label>
+                  <Input type="number" min="0" max="100" placeholder="0" value={form.anticipo_pct} onChange={e => set('anticipo_pct', +e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground block mb-1">Fondo de Reparo %</label>
+                  <Input type="number" min="0" max="100" placeholder="0" value={form.fondo_reparo_pct} onChange={e => set('fondo_reparo_pct', +e.target.value)} />
+                </div>
               </div>
             </div>
 
@@ -405,21 +470,55 @@ export default function AbonoMaestroPanel() {
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1.5 text-xs">
                 <p className="font-semibold text-primary text-sm">Resumen calculado</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <span className="text-muted-foreground">Inicio validez:</span>
-                    <span className="font-medium ml-1">{getMesPeriodoLabel(fechaInicio)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Fin validez:</span>
-                    <span className="font-medium ml-1">{getMesPeriodoLabel(fechaFin)}</span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">Monto mensual a certificar:</span>
-                    <span className="font-bold text-green-600 ml-1">{fmt(montoMensual)}</span>
-                  </div>
+                  <div><span className="text-muted-foreground">Inicio:</span><span className="font-medium ml-1">{getMesPeriodoLabel(fechaInicio)}</span></div>
+                  <div><span className="text-muted-foreground">Fin:</span><span className="font-medium ml-1">{getMesPeriodoLabel(fechaFin)}</span></div>
+                  <div className="col-span-2"><span className="text-muted-foreground">Monto mensual:</span><span className="font-bold text-green-600 ml-1">{fmt(montoMensual)}</span></div>
                 </div>
               </div>
             )}
+
+            {/* Sección: Ítems del Contrato */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Ítems del Certificado</p>
+                <Button size="sm" variant="outline" onClick={addItem} className="gap-1.5 h-7 text-xs">
+                  <Plus className="h-3 w-3" /> Agregar ítem
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {form.items.map((item, i) => (
+                  <div key={i} className="grid grid-cols-12 gap-1.5 items-end p-2.5 rounded-lg bg-muted/30 border">
+                    <div className="col-span-5">
+                      <label className="text-[10px] text-muted-foreground">Descripción</label>
+                      <Input className="mt-0.5 h-7 text-xs" value={item.descripcion} onChange={e => setItem(i, 'descripcion', e.target.value)} placeholder="Descripción" />
+                    </div>
+                    <div className="col-span-1">
+                      <label className="text-[10px] text-muted-foreground">UM</label>
+                      <Input className="mt-0.5 h-7 text-xs" value={item.um} onChange={e => setItem(i, 'um', e.target.value)} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] text-muted-foreground">Cantidad</label>
+                      <Input className="mt-0.5 h-7 text-xs" type="number" value={item.cantidad} onChange={e => setItem(i, 'cantidad', +e.target.value)} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[10px] text-muted-foreground">P. Unitario $</label>
+                      <Input className="mt-0.5 h-7 text-xs" type="number" value={item.importe_unitario} onChange={e => setItem(i, 'importe_unitario', +e.target.value)} />
+                    </div>
+                    <div className="col-span-1">
+                      <label className="text-[10px] text-muted-foreground">Total</label>
+                      <div className="mt-0.5 h-7 text-[11px] flex items-center px-2 bg-background rounded-md border font-semibold text-primary truncate">
+                        {fmt(item.importe_total)}
+                      </div>
+                    </div>
+                    <div className="col-span-1 flex justify-end pb-0.5">
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => removeItem(i)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); }}>

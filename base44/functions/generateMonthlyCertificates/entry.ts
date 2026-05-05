@@ -219,6 +219,25 @@ Deno.serve(async (req) => {
       const fechaCert = lastBizDay.toISOString().split('T')[0];
       const montoMensual = abono.monto_mensual || (abono.monto_total_contrato / abono.duracion_meses);
 
+      // Usar ítems del contrato maestro si existen, sino generar ítem genérico
+      const certItems = abono.items?.length
+        ? abono.items.map((it, idx) => ({
+            numero: idx + 1,
+            descripcion: it.descripcion || `Abono mensual – ${mesPeriodoLabel}`,
+            um: it.um || 'MES',
+            cantidad: it.cantidad || 1,
+            importe_unitario: it.importe_unitario || 0,
+            importe_total: it.importe_total || (it.cantidad * it.importe_unitario) || 0,
+          }))
+        : [{
+            numero: 1,
+            descripcion: `Abono mensual de mantenimiento – ${mesPeriodoLabel}`,
+            um: 'MES',
+            cantidad: 1,
+            importe_unitario: montoMensual,
+            importe_total: montoMensual,
+          }];
+
       const newCert = {
         numero: certNumber,
         tipo: 'abono_mensual',
@@ -231,18 +250,15 @@ Deno.serve(async (req) => {
         oc_numero: abono.oc_numero || '',
         mes_periodo: mesFormato,
         fecha_certificado: fechaCert,
+        fecha_inicio: abono.fecha_inicio_validez || '',
+        plazo_obra: abono.plazo_obra || 'Mensual',
+        plazo_entrega: abono.plazo_entrega || '',
+        condiciones_pago: abono.condiciones_pago || '',
         monto_contratado: abono.monto_total_contrato,
         subtotal: montoMensual,
-        anticipo_pct: 0,
-        fondo_reparo_pct: 0,
-        items: [{
-          numero: 1,
-          descripcion: `Abono mensual de mantenimiento – ${mesPeriodoLabel}`,
-          um: 'MES',
-          cantidad: 1,
-          importe_unitario: montoMensual,
-          importe_total: montoMensual,
-        }],
+        anticipo_pct: abono.anticipo_pct || 0,
+        fondo_reparo_pct: abono.fondo_reparo_pct || 0,
+        items: certItems,
         // Campos extra para el PDF
         numero_en_contrato: numeroEnContrato,
         duracion_meses_total: abono.duracion_meses,
