@@ -1,20 +1,20 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import jsPDF from 'npm:jspdf@4.0.0';
 
 // Feriados fijos argentinos
 const FERIADOS_FIJOS = [
-  { month: 1, day: 1 },   // Año Nuevo
-  { month: 3, day: 24 },  // Día de la Memoria
-  { month: 4, day: 2 },   // Veteranos de Malvinas
-  { month: 5, day: 1 },   // Día del Trabajo
-  { month: 5, day: 25 },  // Revolución de Mayo
-  { month: 6, day: 20 },  // Paso a la Inmortalidad de Belgrano
-  { month: 7, day: 9 },   // Independencia
-  { month: 8, day: 17 },  // Paso a la Inmortalidad de San Martín
-  { month: 10, day: 12 }, // Día del Respeto a la Diversidad Cultural
-  { month: 11, day: 20 }, // Día de la Soberanía Nacional
-  { month: 12, day: 8 },  // Inmaculada Concepción
-  { month: 12, day: 25 }, // Navidad
+  { month: 1, day: 1 },
+  { month: 3, day: 24 },
+  { month: 4, day: 2 },
+  { month: 5, day: 1 },
+  { month: 5, day: 25 },
+  { month: 6, day: 20 },
+  { month: 7, day: 9 },
+  { month: 8, day: 17 },
+  { month: 10, day: 12 },
+  { month: 11, day: 20 },
+  { month: 12, day: 8 },
+  { month: 12, day: 25 },
 ];
 
 function isHoliday(date) {
@@ -61,11 +61,10 @@ async function generateCertificatePDF(certificado) {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(14); doc.setFont('helvetica', 'bold');
     doc.text('MEJORES', M, 10);
-    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-    doc.text('en mantenimiento, obras y servicios', M, 16);
   }
   doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-  doc.text(`CERTIFICADO DE ABONO MENSUAL N° ${certificado.numero}`, W - M, 10, { align: 'right' });
+  doc.setTextColor(255, 255, 255);
+  doc.text(`CERTIFICADO DE ABONO MENSUAL N° ${certificado.numero_en_contrato} (${certificado.numero})`, W - M, 10, { align: 'right' });
   doc.setFontSize(8); doc.setFont('helvetica', 'normal');
   doc.text(`Mes: ${certificado.mes_periodo} · Fecha: ${certificado.fecha_certificado}`, W - M, 16, { align: 'right' });
 
@@ -78,44 +77,38 @@ async function generateCertificatePDF(certificado) {
   y += 8;
   doc.setFont('helvetica', 'bold'); doc.text('OBRA / SERVICIO:', M, y);
   doc.setFont('helvetica', 'normal'); doc.text(certificado.obra_servicio || '—', M + 30, y);
-  doc.setFont('helvetica', 'bold'); doc.text('ADA N°:', W / 2, y);
-  doc.setFont('helvetica', 'normal'); doc.text(certificado.ada_numero || '—', W / 2 + 18, y);
+  doc.setFont('helvetica', 'bold'); doc.text('OC N°:', W / 2, y);
+  doc.setFont('helvetica', 'normal'); doc.text(certificado.oc_numero || '—', W / 2 + 18, y);
+  y += 8;
+  doc.setFont('helvetica', 'bold'); doc.text('ADA N°:', M, y);
+  doc.setFont('helvetica', 'normal'); doc.text(certificado.ada_numero || '—', M + 18, y);
+  doc.setFont('helvetica', 'bold'); doc.text('CERTIFICADO:', W / 2, y);
+  doc.setFont('helvetica', 'normal'); doc.text(`${certificado.numero_en_contrato} de ${certificado.duracion_meses_total}`, W / 2 + 25, y);
+  y += 14;
+
+  // Item único: el abono mensual
+  doc.setFillColor(15, 28, 46); doc.rect(M, y, W - M * 2, 6, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFontSize(6.5); doc.setFont('helvetica', 'bold');
+  doc.text('DESCRIPCIÓN', M + 5, y + 4);
+  doc.text('UM', M + 160, y + 4);
+  doc.text('CANTIDAD', M + 180, y + 4);
+  doc.text('IMPORTE', W - M - 5, y + 4, { align: 'right' });
+  y += 8;
+
+  doc.setFillColor(247, 247, 247); doc.rect(M, y - 1, W - M * 2, 8, 'F');
+  doc.setTextColor(50, 50, 50); doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+  doc.text(`Abono mensual de mantenimiento – ${certificado.mes_periodo}`, M + 5, y + 4);
+  doc.text('MES', M + 160, y + 4);
+  doc.text('1', M + 185, y + 4);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`$${(certificado.subtotal || 0).toLocaleString('es-AR')}`, W - M - 5, y + 4, { align: 'right' });
   y += 12;
 
-  if (certificado.items && certificado.items.length > 0) {
-    doc.setFillColor(15, 28, 46); doc.rect(M, y, W - M * 2, 6, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(6); doc.setFont('helvetica', 'bold');
-    doc.text('N°', M + 2, y + 4);
-    doc.text('DESCRIPCIÓN', M + 10, y + 4);
-    doc.text('UM', M + 120, y + 4);
-    doc.text('CANTIDAD', M + 135, y + 4);
-    doc.text('P. UNITARIO', M + 158, y + 4);
-    doc.text('IMPORTE TOTAL', M + 185, y + 4);
-    y += 7;
-
-    doc.setTextColor(50, 50, 50); doc.setFont('helvetica', 'normal');
-    certificado.items.forEach((item, i) => {
-      if (y > 178) { doc.addPage(); y = 15; }
-      if (i % 2 === 0) { doc.setFillColor(247, 247, 247); doc.rect(M, y - 1, W - M * 2, 5.5, 'F'); }
-      doc.setFontSize(5.5);
-      doc.text(String(i + 1), M + 2, y + 3);
-      doc.text(doc.splitTextToSize(item.descripcion || '', 105)[0], M + 10, y + 3);
-      doc.text(item.um || '', M + 120, y + 3);
-      doc.text(String(item.cantidad || ''), M + 135, y + 3);
-      doc.text(`$${(item.importe_unitario || 0).toLocaleString('es-AR')}`, M + 158, y + 3);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`$${(item.importe_total || 0).toLocaleString('es-AR')}`, M + 185, y + 3);
-      doc.setFont('helvetica', 'normal');
-      y += 5.5;
-    });
-
-    y += 4;
-    const subtotal = certificado.subtotal || 0;
-    doc.setFillColor(230, 240, 255); doc.rect(W - M - 80, y, 80, 5, 'F');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(15, 28, 46);
-    doc.text('SUBTOTAL:', W - M - 78, y + 3.5);
-    doc.text(`$${subtotal.toLocaleString('es-AR')}`, W - M - 1, y + 3.5, { align: 'right' });
-  }
+  // Subtotal
+  doc.setFillColor(230, 240, 255); doc.rect(W - M - 80, y, 80, 6, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(15, 28, 46);
+  doc.text('IMPORTE DEL CERTIFICADO:', W - M - 78, y + 4);
+  doc.text(`$${(certificado.subtotal || 0).toLocaleString('es-AR')}`, W - M - 1, y + 4, { align: 'right' });
 
   // Footer
   const pages = doc.getNumberOfPages();
@@ -157,7 +150,7 @@ Deno.serve(async (req) => {
     if (!forceRun && !isLastBizDay) {
       return Response.json({
         shouldRun: false,
-        message: `No es el último día hábil del mes. Próxima emisión automática: ${lastBizDay.toLocaleDateString('es-AR')} (para el mes siguiente).`,
+        message: `No es el último día hábil del mes. Próxima emisión automática: ${lastBizDay.toLocaleDateString('es-AR')}.`,
         nextRunDate: lastBizDay.toISOString().split('T')[0],
       });
     }
@@ -167,51 +160,95 @@ Deno.serve(async (req) => {
     let certMonth = todayMonth + 1;
     if (certMonth > 12) { certMonth = 1; certYear++; }
     const mesFormato = `${certYear}-${String(certMonth).padStart(2, '0')}`;
+    const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const mesPeriodoLabel = `${MESES_ES[certMonth - 1]} ${certYear}`;
 
-    // Buscar clientes activos con abono_mensual activo
-    const clients = await base44.asServiceRole.entities.Client.filter({ status: 'activo' });
+    // Obtener todos los AbonoMaestro activos
+    const abonos = await base44.asServiceRole.entities.AbonoMaestro.filter({ estado: 'activo' });
 
     const generatedCerts = [];
     const skipped = [];
 
-    for (const client of clients) {
-      // Verificar idempotencia: no generar si ya existe para ese mes
+    for (const abono of abonos) {
+      // Verificar que el mes a certificar esté dentro del período de vigencia
+      if (abono.fecha_inicio_validez && abono.fecha_fin_validez) {
+        const inicioDate = new Date(abono.fecha_inicio_validez + 'T00:00:00');
+        const finDate = new Date(abono.fecha_fin_validez + 'T00:00:00');
+        const certDate = new Date(`${certYear}-${String(certMonth).padStart(2, '0')}-01T00:00:00`);
+
+        if (certDate < inicioDate || certDate > finDate) {
+          skipped.push({ contratista: abono.contratista, reason: 'Mes fuera del período de vigencia del contrato' });
+          continue;
+        }
+      }
+
+      // Verificar idempotencia: no generar si ya existe para ese mes y abono
       const existing = await base44.asServiceRole.entities.Certificado.filter({
-        contratista_id: client.id,
+        oc_numero: abono.oc_numero || '__NONE__',
         mes_periodo: mesFormato,
         tipo: 'abono_mensual',
         generado_automaticamente: true
       });
 
-      if (existing.length > 0) {
-        skipped.push({ contratista: client.name, reason: 'Ya existe para este mes' });
+      // También verificar por contratista si no hay OC
+      const existingPorContratista = !abono.oc_numero
+        ? await base44.asServiceRole.entities.Certificado.filter({
+            contratista: abono.contratista,
+            mes_periodo: mesFormato,
+            tipo: 'abono_mensual',
+            generado_automaticamente: true
+          })
+        : [];
+
+      if (existing.length > 0 || existingPorContratista.length > 0) {
+        skipped.push({ contratista: abono.contratista, reason: 'Ya existe para este mes' });
         continue;
       }
 
-      // Obtener último número de certificado
+      // Calcular el número de certificado DENTRO del contrato
+      const inicioDate = new Date((abono.fecha_inicio_validez || `${certYear}-${String(certMonth).padStart(2, '0')}-01`) + 'T00:00:00');
+      const certDate = new Date(`${certYear}-${String(certMonth).padStart(2, '0')}-01T00:00:00`);
+      const diffMeses = Math.round((certDate - inicioDate) / (1000 * 60 * 60 * 24 * 30.44));
+      const numeroEnContrato = diffMeses + 1;
+
+      // Número global de certificado
       const allCerts = await base44.asServiceRole.entities.Certificado.filter({}, '-numero', 1);
       const lastNum = allCerts.length > 0 ? (allCerts[0].numero || 0) : 0;
       const certNumber = lastNum + 1;
 
       const fechaCert = lastBizDay.toISOString().split('T')[0];
+      const montoMensual = abono.monto_mensual || (abono.monto_total_contrato / abono.duracion_meses);
 
       const newCert = {
         numero: certNumber,
         tipo: 'abono_mensual',
         estado: 'emitido',
         generado_automaticamente: true,
-        contratista: client.name,
-        contratista_id: client.id,
-        emprendimiento: client.notes || '',
+        contratista: abono.contratista,
+        emprendimiento: abono.emprendimiento || '',
+        obra_servicio: abono.obra_servicio || '',
+        ada_numero: abono.ada_numero || '',
+        oc_numero: abono.oc_numero || '',
         mes_periodo: mesFormato,
         fecha_certificado: fechaCert,
-        items: [],
-        subtotal: 0,
+        monto_contratado: abono.monto_total_contrato,
+        subtotal: montoMensual,
         anticipo_pct: 0,
-        fondo_reparo_pct: 5,
+        fondo_reparo_pct: 0,
+        items: [{
+          numero: 1,
+          descripcion: `Abono mensual de mantenimiento – ${mesPeriodoLabel}`,
+          um: 'MES',
+          cantidad: 1,
+          importe_unitario: montoMensual,
+          importe_total: montoMensual,
+        }],
+        // Campos extra para el PDF
+        numero_en_contrato: numeroEnContrato,
+        duracion_meses_total: abono.duracion_meses,
       };
 
-      // Intentar generar y subir PDF
+      // Generar y subir PDF
       let pdfUrl = '';
       try {
         const pdfBuffer = await generateCertificatePDF(newCert);
@@ -222,20 +259,32 @@ Deno.serve(async (req) => {
       }
 
       newCert.pdf_url = pdfUrl;
+
+      // Guardar el certificado
       const created = await base44.asServiceRole.entities.Certificado.create(newCert);
+
+      // Actualizar el contador de certificados emitidos en AbonoMaestro
+      const nuevosEmitidos = (abono.certificados_emitidos || 0) + 1;
+      const nuevoEstado = nuevosEmitidos >= abono.duracion_meses ? 'completado' : 'activo';
+      await base44.asServiceRole.entities.AbonoMaestro.update(abono.id, {
+        certificados_emitidos: nuevosEmitidos,
+        estado: nuevoEstado,
+      });
 
       generatedCerts.push({
         id: created.id,
         numero: certNumber,
-        contratista: client.name,
+        numero_en_contrato: numeroEnContrato,
+        contratista: abono.contratista,
         mes: mesFormato,
+        monto: montoMensual,
         pdf_url: pdfUrl
       });
     }
 
     return Response.json({
       success: true,
-      message: `Emisión para ${mesFormato}: ${generatedCerts.length} certificados generados, ${skipped.length} omitidos.`,
+      message: `Emisión para ${mesPeriodoLabel}: ${generatedCerts.length} certificados generados, ${skipped.length} omitidos.`,
       generatedCertificates: generatedCerts,
       skipped,
       mesPeriodo: mesFormato,

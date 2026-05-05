@@ -1,0 +1,81 @@
+{
+  "name": "AbonoMaestro",
+  "type": "object",
+  "properties": {
+    "contratista": {
+      "type": "string",
+      "description": "Nombre del contratista (de la columna SUBCONTRATISTA)"
+    },
+    "oc_numero": {
+      "type": "string",
+      "description": "N\u00famero de Orden de Compra"
+    },
+    "ada_numero": {
+      "type": "string",
+      "description": "N\u00famero de ADA asociado"
+    },
+    "obra_servicio": {
+      "type": "string",
+      "description": "Descripci\u00f3n de la obra o servicio"
+    },
+    "emprendimiento": {
+      "type": "string",
+      "description": "Emprendimiento (ej: EDUCACION, SALUD)"
+    },
+    "monto_total_contrato": {
+      "type": "number",
+      "description": "Monto total del contrato (de la columna PRECIO)",
+      "default": 0
+    },
+    "fecha_oc_emision": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de emisi\u00f3n de la OC (columna FECHA). El abono comienza el mes siguiente."
+    },
+    "duracion_meses": {
+      "type": "number",
+      "description": "Duraci\u00f3n total del contrato en meses (ingresado manualmente)",
+      "default": 1
+    },
+    "fecha_inicio_validez": {
+      "type": "string",
+      "format": "date",
+      "description": "Primer d\u00eda del mes siguiente a la emisi\u00f3n de la OC (calculado autom\u00e1ticamente)"
+    },
+    "fecha_fin_validez": {
+      "type": "string",
+      "format": "date",
+      "description": "\u00daltimo d\u00eda del contrato (calculado autom\u00e1ticamente)"
+    },
+    "monto_mensual": {
+      "type": "number",
+      "description": "Monto a certificar por mes (monto_total / duracion_meses)",
+      "default": 0
+    },
+    "certificados_emitidos": {
+      "type": "number",
+      "description": "Cantidad de certificados ya emitidos para este contrato",
+      "default": 0
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "activo",
+        "completado",
+        "pausado"
+      ],
+      "default": "activo",
+      "description": "Estado del contrato de abono"
+    },
+    "notas": {
+      "type": "string",
+      "description": "Observaciones adicionales"
+    }
+  },
+  "required": [
+    "contratista",
+    "monto_total_contrato",
+    "fecha_oc_emision",
+    "duracion_meses"
+  ]
+}

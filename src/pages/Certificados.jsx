@@ -11,6 +11,7 @@ import CertificadoPreview from '@/components/certificados/CertificadoPreview';
 import CertificadosLista from '@/components/certificados/CertificadosLista';
 import CertificadosAutomatizados from '@/components/certificados/CertificadosAutomatizados';
 import GeneracionMasiva from '@/components/certificados/GeneracionMasiva';
+import AbonoMaestroPanel from '@/components/certificados/AbonoMaestroPanel';
 import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -238,6 +239,7 @@ export default function Certificados() {
           <TabsTrigger value="obra">🟠 Obra</TabsTrigger>
           <TabsTrigger value="informe">🔵 Informe</TabsTrigger>
           <TabsTrigger value="automaticos">⚡ Automáticos</TabsTrigger>
+          <TabsTrigger value="abonos_maestro">📋 Abonos Maestros</TabsTrigger>
         </TabsList>
 
         <TabsContent value="abono_mensual" className="mt-6">
@@ -288,6 +290,10 @@ export default function Certificados() {
 
         <TabsContent value="automaticos" className="mt-6">
           <CertificadosAutomatizados />
+        </TabsContent>
+
+        <TabsContent value="abonos_maestro" className="mt-6">
+          <AbonoMaestroPanel />
         </TabsContent>
       </Tabs>
     </div>
