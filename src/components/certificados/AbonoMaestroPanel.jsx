@@ -80,14 +80,11 @@ export default function AbonoMaestroPanel() {
   const { data: abonos = [], isLoading } = useQuery({
     queryKey: ['abonos-maestro'],
     queryFn: () => base44.entities.AbonoMaestro.list('-created_date'),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  const montoPreview = parseMonto(form.monto_total_contrato);
-  const mesesPreview = parseEntero(form.duracion_meses);
-  const { fechaInicio, fechaFin } = calcularFechas(form.fecha_oc_emision, mesesPreview);
-  const montoMensual = montoPreview && mesesPreview ? montoPreview / mesesPreview : 0;
 
   const parseMonto = (v) => {
     if (typeof v === 'number' && !isNaN(v)) return v;
@@ -97,6 +94,11 @@ export default function AbonoMaestroPanel() {
     if (typeof v === 'number' && !isNaN(v)) return Math.round(v);
     return parseInt(String(v).replace(/\D/g, ''), 10) || 0;
   };
+
+  const montoPreview = parseMonto(form.monto_total_contrato);
+  const mesesPreview = parseEntero(form.duracion_meses);
+  const { fechaInicio, fechaFin } = calcularFechas(form.fecha_oc_emision, mesesPreview);
+  const montoMensual = montoPreview && mesesPreview ? montoPreview / mesesPreview : 0;
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
