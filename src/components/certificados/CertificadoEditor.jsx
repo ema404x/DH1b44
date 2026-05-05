@@ -74,7 +74,37 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
     };
   });
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const set = (k, v) => {
+    setForm(f => {
+      const updated = { ...f, [k]: v };
+      // Auto-rellenar fecha_inicio y plazo_obra al cambiar mes_periodo en abono mensual
+      if (k === 'mes_periodo' && f.tipo === 'abono_mensual') {
+        const parsed = parseMesPeriodo(v);
+        if (parsed) {
+          updated.fecha_inicio = parsed;
+          updated.plazo_obra = 'Mensual';
+        }
+      }
+      return updated;
+    });
+  };
+
+  // Parsea "Abril 2026", "abril 2026", "04/2026", "04-2026" → "2026-04-01"
+  const parseMesPeriodo = (str) => {
+    if (!str) return null;
+    const meses = { enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12 };
+    const lower = str.toLowerCase().trim();
+    // "abril 2026" o "abril de 2026"
+    const nombreMatch = lower.match(/([a-záéíóú]+)\s+(?:de\s+)?(\d{4})/);
+    if (nombreMatch) {
+      const mes = meses[nombreMatch[1]];
+      if (mes) return `${nombreMatch[2]}-${String(mes).padStart(2,'0')}-01`;
+    }
+    // "04/2026" o "04-2026"
+    const numMatch = lower.match(/(\d{1,2})[\/\-](\d{4})/);
+    if (numMatch) return `${numMatch[2]}-${String(numMatch[1]).padStart(2,'0')}-01`;
+    return null;
+  };
 
   const setItem = (i, k, v) => {
     const items = [...form.items];
