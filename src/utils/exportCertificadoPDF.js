@@ -26,8 +26,8 @@ export async function exportCertificadoPDF(form) {
   const totalPresente = allItems.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0);
   const totalSaldo = allItems.reduce((acc, it) => acc + (it.saldo_pendiente_importe || 0), 0);
   const hasMedicion = totalPresente > 0;
-  const anticipo_pct = form.anticipo_pct || 0;
-  const fondo_reparo_pct = form.fondo_reparo_pct || 5;
+  const anticipo_pct = form.anticipo_pct ?? 0;
+  const fondo_reparo_pct = form.fondo_reparo_pct ?? 0;
 
   // Si hay medición, mostrar SOLO los ítems que tienen algo certificado este período
   const itemsToRender = hasMedicion

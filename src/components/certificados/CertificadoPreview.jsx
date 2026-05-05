@@ -13,8 +13,8 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
   const totalPresente = (form.items || []).reduce((a, i) => a + (i.med_presente_importe || 0), 0);
   const hasMedicion = totalPresente > 0;
   const pdfSubtotal = hasMedicion ? totalPresente : subtotal;
-  const anticipo_pct = form.anticipo_pct || 0;
-  const fondo_reparo_pct = form.fondo_reparo_pct || 5;
+  const anticipo_pct = form.anticipo_pct ?? 0;
+  const fondo_reparo_pct = form.fondo_reparo_pct ?? 0;
   const anticipo = pdfSubtotal * (anticipo_pct / 100);
   const fondoReparo = pdfSubtotal * (fondo_reparo_pct / 100);
   const totalNeto = pdfSubtotal - anticipo - fondoReparo;
@@ -111,7 +111,7 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
           </div>
         </div>
 
-        {/* Tabla de ítems */}
+        {/* Tabla de ítems — Bug #4 fix: misma lógica de filtrado que el PDF */}
         {(form.items || []).length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
@@ -131,7 +131,7 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
                 </tr>
               </thead>
               <tbody>
-                {form.items.map((item, i) => (
+                {(hasMedicion ? form.items.filter(it => (it.med_presente_importe || 0) > 0) : form.items).map((item, i) => (
                   <tr key={i} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
                     <td className="px-2 py-1.5 text-muted-foreground">{item.numero || i + 1}</td>
                     <td className="px-2 py-1.5">{item.descripcion}</td>

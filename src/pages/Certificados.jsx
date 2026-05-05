@@ -37,8 +37,15 @@ export default function Certificados() {
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       // Si viene de edición aprobada → eliminar el viejo y crear uno nuevo (nuevo ID)
+      // Bug #3 fix: también limpiar la SolicitudCertificado huérfana asociada al viejo ID
       if (editing?.id && editing?.estado === 'aprobado') {
         await base44.entities.Certificado.delete(editing.id);
+        try {
+          const solicitudes = await base44.entities.SolicitudCertificado.filter({ certificado_id: editing.id });
+          for (const sol of solicitudes) {
+            await base44.entities.SolicitudCertificado.delete(sol.id);
+          }
+        } catch (_) { /* no bloquear si falla */ }
       }
       // Siempre emitido al guardar
       const payload = { ...data, id: undefined, estado: 'emitido' };

@@ -21,22 +21,29 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const [masivoPct, setMasivoPct] = useState('');
 
   const [form, setForm] = useState(() => {
-    const items = (initialData?.items || []).map((item, i) => ({
-      numero: i + 1,
-      descripcion: item.descripcion || '',
-      um: item.um || 'GL',
-      cantidad: item.cantidad || 1,
-      importe_unitario: item.importe_unitario || 0,
-      importe_total: item.importe_total || (item.cantidad * item.importe_unitario) || 0,
-      med_acum_anterior_unidad: 0,
-      med_acum_anterior_importe: 0,
-      med_presente_unidad: item.cantidad || 1,
-      med_presente_importe: item.importe_total || 0,
-      med_acum_presente_unidad: item.cantidad || 1,
-      med_acum_presente_importe: item.importe_total || 0,
-      saldo_pendiente_unidad: 0,
-      saldo_pendiente_importe: 0,
-    }));
+    const items = (initialData?.items || []).map((item, i) => {
+      const importe_total = item.importe_total || (item.cantidad * item.importe_unitario) || 0;
+      // Bug #5 fix: detectar si el ítem ya tenía una medición presente manual (al reabrir un certificado guardado)
+      const teniaMedicionManual = item.med_presente_importe != null && item.med_presente_importe !== importe_total;
+      return {
+        numero: i + 1,
+        descripcion: item.descripcion || '',
+        um: item.um || 'GL',
+        cantidad: item.cantidad || 1,
+        importe_unitario: item.importe_unitario || 0,
+        importe_total,
+        med_acum_anterior_unidad: item.med_acum_anterior_unidad || 0,
+        med_acum_anterior_importe: item.med_acum_anterior_importe || 0,
+        med_presente_unidad: item.med_presente_unidad ?? item.cantidad ?? 1,
+        med_presente_importe: item.med_presente_importe ?? importe_total,
+        med_acum_presente_unidad: item.med_acum_presente_unidad ?? item.cantidad ?? 1,
+        med_acum_presente_importe: item.med_acum_presente_importe ?? importe_total,
+        saldo_pendiente_unidad: item.saldo_pendiente_unidad ?? 0,
+        saldo_pendiente_importe: item.saldo_pendiente_importe ?? 0,
+        // Preservar el flag de edición manual para que no se sobreescriba al reabrir
+        _med_editado: item._med_editado || teniaMedicionManual,
+      };
+    });
     return {
       tipo: initialData?.tipo || 'abono_mensual',
       numero: initialData?.numero || 1,
@@ -58,8 +65,8 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       base: initialData?.base || '',
       fecha_certificado: new Date().toISOString().split('T')[0],
       numero_recepcion: '',
-      anticipo_pct: 0,
-      fondo_reparo_pct: 0,
+      anticipo_pct: initialData?.anticipo_pct ?? 0,
+      fondo_reparo_pct: initialData?.fondo_reparo_pct ?? 5,
       subtotal: initialData?.subtotal || 0,
       _validation: initialData?._validation || null,
       ada_pdf_url: initialData?.ada_pdf_url || '',
@@ -127,16 +134,19 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const totalNeto = baseCalculo - anticipo - fondoReparo;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
-  // Para abono mensual: sincronizar monto_contratado y monto_obra_contratada con el total neto
+  // Bug #1 fix: un único useEffect para sincronizar montos en abono mensual
+  // Bug #2 fix: solo correr cuando totalNeto cambia de verdad (evita loop)
   useEffect(() => {
     if (form.tipo !== 'abono_mensual') return;
     if (totalNeto === 0) return;
+    // Evitar loop: solo actualizar si realmente difieren
+    if (form.monto_contratado === totalNeto && form.monto_obra_contratada === totalNeto) return;
     setForm(f => ({
       ...f,
       monto_contratado: totalNeto,
       monto_obra_contratada: totalNeto,
     }));
-  }, [totalNeto, form.tipo]);
+  }, [totalNeto, form.tipo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const aplicarCantidadMasiva = (cant) => {
     if (cant === '' || cant === null || cant === undefined) return;
