@@ -84,13 +84,19 @@ export default function AbonoMaestroPanel() {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const montoPreview = parseFloat(String(form.monto_total_contrato).replace(/\./g, '').replace(',', '.')) || 0;
-  const mesesPreview = parseInt(String(form.duracion_meses), 10) || 0;
+  const montoPreview = parseMonto(form.monto_total_contrato);
+  const mesesPreview = parseEntero(form.duracion_meses);
   const { fechaInicio, fechaFin } = calcularFechas(form.fecha_oc_emision, mesesPreview);
   const montoMensual = montoPreview && mesesPreview ? montoPreview / mesesPreview : 0;
 
-  const parseMonto = (v) => parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
-  const parseEntero = (v) => parseInt(String(v), 10) || 0;
+  const parseMonto = (v) => {
+    if (typeof v === 'number' && !isNaN(v)) return v;
+    return parseFloat(String(v).replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+  };
+  const parseEntero = (v) => {
+    if (typeof v === 'number' && !isNaN(v)) return Math.round(v);
+    return parseInt(String(v).replace(/\D/g, ''), 10) || 0;
+  };
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
@@ -313,11 +319,11 @@ export default function AbonoMaestroPanel() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Monto Total Contrato *</label>
-                <Input type="number" placeholder="0" value={form.monto_total_contrato} onChange={e => set('monto_total_contrato', e.target.value)} />
+                <Input type="number" placeholder="0" value={form.monto_total_contrato} onChange={e => set('monto_total_contrato', e.target.valueAsNumber || e.target.value)} />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Duración (meses) *</label>
-                <Input type="number" min="1" placeholder="Ej: 6" value={form.duracion_meses} onChange={e => set('duracion_meses', e.target.value)} />
+                <Input type="number" min="1" placeholder="Ej: 6" value={form.duracion_meses} onChange={e => set('duracion_meses', e.target.valueAsNumber || e.target.value)} />
               </div>
               <div className="col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1">Fecha de emisión OC *</label>
