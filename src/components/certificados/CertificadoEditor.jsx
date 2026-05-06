@@ -23,16 +23,17 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const [form, setForm] = useState(() => {
     const items = (initialData?.items || []).map((item, i) => {
       const importe_total = item.importe_total || (item.cantidad * item.importe_unitario) || 0;
-      const medPresente = item.med_presente_importe ?? importe_total;
-      const acumAnterior = item.med_acum_anterior_importe || 0;
-      const acumPresente = item.med_acum_presente_importe ?? (acumAnterior + medPresente);
-      // Detectar si hay medición real: el presente es diferente al total del ítem
+      // Detectar si hay medición real: el presente fue editado explícitamente
       const medEditado = !!item._med_editado || (item.med_presente_importe != null && item.med_presente_importe !== importe_total);
-      // Saldo siempre recalculado (nunca del dato guardado para evitar residuos incorrectos)
+      const acumAnterior = item.med_acum_anterior_importe || 0;
+      // Si fue editado, usar el valor guardado; si no, el presente = total del ítem (sin saldo)
+      const medPresente = medEditado ? (item.med_presente_importe ?? importe_total) : importe_total;
+      const acumPresente = item.med_acum_presente_importe ?? (acumAnterior + medPresente);
+      // Saldo: solo si fue editado y hay algo pendiente
       const saldo_pendiente_importe = medEditado ? Math.max(0, importe_total - acumPresente) : 0;
       const cantTotal = item.cantidad || 1;
       const cantAnterior = item.med_acum_anterior_unidad || 0;
-      const cantPresente = item.med_presente_unidad ?? cantTotal;
+      const cantPresente = medEditado ? (item.med_presente_unidad ?? cantTotal) : cantTotal;
       const acumPresUnidad = item.med_acum_presente_unidad ?? (cantAnterior + cantPresente);
       const saldo_pendiente_unidad = medEditado ? Math.max(0, cantTotal - acumPresUnidad) : 0;
       return {
@@ -133,6 +134,7 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       items[i]._med_editado = true;
       const acumAnterior = items[i].med_acum_anterior_importe || 0;
       items[i].med_acum_presente_importe = acumAnterior + v;
+      // Si certifica 0, el saldo pendiente = total del ítem (queda todo pendiente)
       items[i].saldo_pendiente_importe = Math.max(0, (items[i].importe_total || 0) - items[i].med_acum_presente_importe);
       const cantTotal = items[i].cantidad || 0;
       const cantAnterior = items[i].med_acum_anterior_unidad || 0;

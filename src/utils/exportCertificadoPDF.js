@@ -32,10 +32,8 @@ export async function exportCertificadoPDF(form) {
   const anticipo_pct = form.anticipo_pct ?? 0;
   const fondo_reparo_pct = form.fondo_reparo_pct ?? 0;
 
-  // Si hay medición, mostrar SOLO los ítems que tienen algo certificado este período
-  const itemsToRender = hasMedicion
-    ? allItems.filter(it => (it.med_presente_importe || 0) > 0)
-    : allItems;
+  // Mostrar SIEMPRE todos los ítems — los que no se certifican este período aparecen con PRES. en 0 y saldo pendiente
+  const itemsToRender = allItems;
 
   // El subtotal a certificar es lo que el usuario ingresó (presente), o el total si no hay medición
   const pdfSubtotal = hasMedicion ? totalPresente : subtotalContrato;
@@ -43,10 +41,8 @@ export async function exportCertificadoPDF(form) {
   const pdfFondoReparo = fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0;
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
-  // Monto contratado: usar el campo explícito si es razonable (> subtotal * 0.1), si no usar subtotalContrato
-  const montoContratado = (form.monto_contratado && form.monto_contratado > subtotalContrato * 0.1)
-    ? form.monto_contratado
-    : subtotalContrato;
+  // Monto contratado: siempre usar el campo ingresado por el usuario
+  const montoContratado = form.monto_contratado || subtotalContrato;
 
   const [logoBase64] = await Promise.all([
     loadImageAsBase64(MEJORES_LOGO_URL),
