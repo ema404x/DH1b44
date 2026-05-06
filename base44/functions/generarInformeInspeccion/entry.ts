@@ -119,9 +119,6 @@ Indicar por sección la cantidad de fotos tomadas y una descripción breve de qu
 - Fecha sugerida para próxima inspección de seguimiento
 - Secciones pendientes que deben relevarse en la próxima visita
 
----
-*Informe generado por sistema de gestión DH1 Software · ${new Date().toLocaleDateString('es-AR')}*
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 REGLAS DE REDACCIÓN OBLIGATORIAS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
