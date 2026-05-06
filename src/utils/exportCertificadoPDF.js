@@ -73,8 +73,10 @@ export async function exportCertificadoPDF(form) {
   // Monto contratado: exactamente lo que el usuario ingresó, parseado correctamente
   const montoContratado = parseMonto(form.monto_contratado);
 
-  const [logoBase64] = await Promise.all([
+  const firmaUrl = form.firma_gerente_url || (form.estado === 'aprobado' ? FIRMA_RAUL_GARCIA_URL : null);
+  const [logoBase64, firmaBase64] = await Promise.all([
     loadImageAsBase64(MEJORES_LOGO_URL),
+    firmaUrl ? loadImageAsBase64(firmaUrl) : Promise.resolve(null),
   ]);
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -272,9 +274,39 @@ export async function exportCertificadoPDF(form) {
   doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
   doc.text('TOTAL NETO:', W - M - 88, y + 7);
   doc.text(fmt(pdfTotalNeto), W - M - 1, y + 7, { align: 'right' });
-  y += 14;
+  y += 18;
 
+  // Bloque de firma de Raúl García (si el certificado está aprobado)
+  if (firmaBase64) {
+    const FIRMA_W = 60;
+    const FIRMA_H = 22;
+    const FIRMA_X = M;
+    const FIRMA_Y = y;
 
+    if (FIRMA_Y + FIRMA_H + 10 > SAFE_BOTTOM) {
+      drawFooter(pageNum, '??');
+      doc.addPage();
+      pageNum++;
+      drawPageHeader();
+      y = 26;
+    }
+
+    doc.setDrawColor(200, 210, 230);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(FIRMA_X, FIRMA_Y, FIRMA_W, FIRMA_H + 12, 1.5, 1.5, 'S');
+
+    doc.addImage(firmaBase64, 'JPEG', FIRMA_X + 2, FIRMA_Y + 1, FIRMA_W - 4, FIRMA_H - 2);
+
+    doc.setDrawColor(150, 170, 200);
+    doc.setLineWidth(0.3);
+    doc.line(FIRMA_X + 3, FIRMA_Y + FIRMA_H + 0.5, FIRMA_X + FIRMA_W - 3, FIRMA_Y + FIRMA_H + 0.5);
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(15, 28, 46);
+    doc.text(form.aprobado_por || 'Arq. Raúl García', FIRMA_X + 3, FIRMA_Y + FIRMA_H + 5.5);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(80, 90, 110);
+    doc.text('Gerente de Contratos · Mejores Hospitales S.A.', FIRMA_X + 3, FIRMA_Y + FIRMA_H + 10);
+    y += FIRMA_H + 16;
+  }
 
   // Footers finales
   const totalPages = doc.getNumberOfPages();

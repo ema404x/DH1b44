@@ -166,6 +166,25 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
           </div>
         )}
 
+        {/* Firma aprobada */}
+        {(form.firma_gerente_url || form.estado === 'aprobado') && (
+          <div className="border border-emerald-200 bg-emerald-50/30 rounded-xl p-4 flex items-center gap-4">
+            <img
+              src={form.firma_gerente_url || 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/317004861_FirmaRaulGArcia.jpg'}
+              alt="Firma Arq. Raúl García"
+              className="h-14 object-contain border rounded bg-white p-1"
+            />
+            <div>
+              <p className="text-xs font-bold text-foreground">{form.aprobado_por || 'Arq. Raúl García'}</p>
+              <p className="text-xs text-muted-foreground">Gerente de Contratos</p>
+              <p className="text-xs text-muted-foreground">Mejores Hospitales S.A.</p>
+              {form.fecha_aprobacion && (
+                <p className="text-xs text-emerald-600 font-medium mt-1">✓ Aprobado</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Totales */}
         <div className="flex justify-end">
           <div className="space-y-2 text-sm min-w-64">
