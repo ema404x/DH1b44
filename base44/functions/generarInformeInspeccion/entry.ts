@@ -138,10 +138,29 @@ REGLAS DE REDACCIÓN OBLIGATORIAS:
     model: 'claude_sonnet_4_6',
   });
 
-  await base44.entities.InspeccionColegio.update(inspeccion_id, {
-    informe_generado: result,
-    estado: 'completado',
-  });
+  // El informe puede ser muy largo — intentar guardar directo primero,
+  // si falla por tamaño, subirlo como archivo y guardar la URL
+  try {
+    await base44.entities.InspeccionColegio.update(inspeccion_id, {
+      informe_generado: result,
+      estado: 'completado',
+    });
+  } catch (e) {
+    if (e.message?.includes('maximum allowed size')) {
+      // Subir el texto como archivo .txt
+      const blob = new Blob([result], { type: 'text/plain' });
+      const file = new File([blob], 'informe.txt', { type: 'text/plain' });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      // Guardar un resumen truncado + la URL del archivo completo
+      const resumen = result.substring(0, 3000) + '\n\n---\n⚠️ El informe completo fue guardado como archivo. URL: ' + file_url;
+      await base44.entities.InspeccionColegio.update(inspeccion_id, {
+        informe_generado: resumen,
+        estado: 'completado',
+      });
+    } else {
+      throw e;
+    }
+  }
 
   return Response.json({ informe: result });
 });
