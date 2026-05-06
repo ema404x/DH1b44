@@ -5,12 +5,25 @@ import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d || '—'; } };
+const parseMonto = (v) => {
+  if (!v && v !== 0) return 0;
+  if (typeof v === 'number') return v;
+  const clean = String(v).replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(clean);
+  return isNaN(n) ? 0 : n;
+};
 
 export default function CertificadoPreview({ form, onBack, onSave, saving }) {
   const [exporting, setExporting] = useState(false);
 
-  const subtotal = (form.items || []).reduce((a, i) => a + (i.importe_total || 0), 0);
-  const hasMedicion = (form.items || []).some(i => i._med_editado);
+  const subtotal = (form.items || []).reduce((a, i) => {
+    return a + (i.importe_total || (i.cantidad * i.importe_unitario) || 0);
+  }, 0);
+  const hasMedicion = (form.items || []).some(i => {
+    if (i._med_editado) return true;
+    const total = i.importe_total || (i.cantidad * i.importe_unitario) || 0;
+    return i.med_presente_importe != null && i.med_presente_importe !== total;
+  });
   const totalPresente = hasMedicion
     ? (form.items || []).reduce((a, i) => a + (i.med_presente_importe || 0), 0)
     : 0;
@@ -101,7 +114,7 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground font-medium">Monto contratado:</span>
-              <span className="font-semibold text-primary">{fmt(form.monto_contratado)}</span>
+              <span className="font-semibold text-primary">{fmt(parseMonto(form.monto_contratado))}</span>
             </div>
 
             {form.base && (

@@ -1,6 +1,20 @@
 import jsPDF from 'jspdf';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+
+// Parsea montos que pueden venir como string "1.098.000" o número 1098000 o erróneo 1.098
+const parseMonto = (v) => {
+  if (v === null || v === undefined || v === '') return 0;
+  if (typeof v === 'number') {
+    // Si el número es sospechosamente pequeño (< 100) para un monto de contrato,
+    // puede ser un error de parseo (ej: 1.098 en lugar de 1098000).
+    // En ese caso NO lo usamos — mejor retornar 0 y dejar que el subtotal tome el control.
+    return v;
+  }
+  const clean = String(v).replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(clean);
+  return isNaN(n) ? 0 : n;
+};
 const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d || '—'; } };
 
 const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
@@ -22,27 +36,44 @@ async function loadImageAsBase64(url) {
 
 export async function exportCertificadoPDF(form) {
   const allItems = form.items || [];
-  const subtotalContrato = allItems.reduce((acc, it) => acc + (it.importe_total || 0), 0);
-  const hasMedicion = allItems.some(it => it._med_editado);
+
+  // Detectar si hay medición parcial:
+  // Un ítem tiene medición si fue marcado explícitamente (_med_editado)
+  // O si el presente difiere del total del ítem (detección automática al cargar desde BD)
+  const hasMedicion = allItems.some(it => {
+    if (it._med_editado) return true;
+    const total = it.importe_total || (it.cantidad * it.importe_unitario) || 0;
+    return it.med_presente_importe != null && it.med_presente_importe !== total;
+  });
+
+  // Si hay medición: usar med_presente_importe por ítem; si no: usar importe_total
+  // Para el subtotal del contrato: suma de importe_total reales (solo los que tienen precio)
+  const subtotalContrato = allItems.reduce((acc, it) => {
+    const total = it.importe_total || (it.cantidad * it.importe_unitario) || 0;
+    return acc + total;
+  }, 0);
+
   const totalPresente = hasMedicion
     ? allItems.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0)
     : 0;
-  // Saldo calculado dinámicamente, igual que en el editor
+
   const totalSaldo = hasMedicion ? Math.max(0, subtotalContrato - totalPresente) : 0;
   const anticipo_pct = form.anticipo_pct ?? 0;
   const fondo_reparo_pct = form.fondo_reparo_pct ?? 0;
 
-  // Mostrar SIEMPRE todos los ítems — los que no se certifican este período aparecen con PRES. en 0 y saldo pendiente
+  // Mostrar SIEMPRE todos los ítems
   const itemsToRender = allItems;
 
-  // El subtotal a certificar es lo que el usuario ingresó (presente), o el total si no hay medición
+  // El subtotal a certificar es lo que el usuario certificó (presente), o el total del contrato
   const pdfSubtotal = hasMedicion ? totalPresente : subtotalContrato;
   const pdfAnticipo = anticipo_pct > 0 ? pdfSubtotal * (anticipo_pct / 100) : 0;
   const pdfFondoReparo = fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0;
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
-  // Monto contratado: siempre usar el campo ingresado por el usuario
-  const montoContratado = form.monto_contratado || subtotalContrato;
+  // Monto contratado: parsear siempre (puede venir como string "1.098.000" o número)
+  // Si viene como número muy pequeño (< 1000) es un error de parseo antiguo → usar subtotal
+  const rawMonto = parseMonto(form.monto_contratado);
+  const montoContratado = rawMonto > 1000 ? rawMonto : (subtotalContrato || rawMonto);
 
   const [logoBase64] = await Promise.all([
     loadImageAsBase64(MEJORES_LOGO_URL),

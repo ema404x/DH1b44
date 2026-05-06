@@ -28,13 +28,14 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const [form, setForm] = useState(() => {
     const items = (initialData?.items || []).map((item, i) => {
       const importe_total = item.importe_total || (item.cantidad * item.importe_unitario) || 0;
-      // Detectar si hay medición real: el presente fue editado explícitamente
-      const medEditado = !!item._med_editado || (item.med_presente_importe != null && item.med_presente_importe !== importe_total);
+      // Detectar medición: fue marcado explícitamente O el presente difiere del total del ítem
+      // (esto cubre certs cargados desde BD donde _med_editado no se persistió)
+      const medEditado = !!item._med_editado
+        || (item.med_presente_importe != null && item.med_presente_importe !== importe_total)
+        || (item.saldo_pendiente_importe != null && item.saldo_pendiente_importe > 0);
       const acumAnterior = item.med_acum_anterior_importe || 0;
-      // Si fue editado, usar el valor guardado; si no, el presente = total del ítem (sin saldo)
       const medPresente = medEditado ? (item.med_presente_importe ?? importe_total) : importe_total;
       const acumPresente = item.med_acum_presente_importe ?? (acumAnterior + medPresente);
-      // Saldo: solo si fue editado y hay algo pendiente
       const saldo_pendiente_importe = medEditado ? Math.max(0, importe_total - acumPresente) : 0;
       const cantTotal = item.cantidad || 1;
       const cantAnterior = item.med_acum_anterior_unidad || 0;
@@ -72,9 +73,18 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       fecha_inicio: initialData?.fecha_inicio || '',
       plazo_obra: initialData?.plazo_obra || '',
       fecha_finalizacion: initialData?.fecha_finalizacion || '',
-      monto_contratado: initialData?.monto_contratado
-        ? String(initialData.monto_contratado)
-        : (initialData?.subtotal ? String(initialData.subtotal) : ''),
+      monto_contratado: (() => {
+        const raw = initialData?.monto_contratado;
+        if (!raw && raw !== 0) return initialData?.subtotal ? String(Math.round(initialData.subtotal)) : '';
+        // Si el número es un entero grande (>= 1000), mostrarlo tal cual
+        // Si es un decimal pequeño (ej: 1.098 en lugar de 1.098.000), es un error histórico de parseo
+        // En ese caso, intentar multiplicarlo por 1000 para recuperar el valor real NO es seguro
+        // → mostramos vacío para que el usuario lo corrija, con fallback al subtotal
+        if (typeof raw === 'number' && raw < 1000 && raw > 0) {
+          return initialData?.subtotal ? String(Math.round(initialData.subtotal)) : '';
+        }
+        return String(Math.round(raw));
+      })(),
       monto_obra_contratada: initialData?.monto_obra_contratada || 0,
       porcentaje_avance: initialData?.porcentaje_avance || 0,
       condiciones_pago: initialData?.condiciones_pago || '',
@@ -299,8 +309,8 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           }>
             {form.tipo === 'abono_mensual' ? 'Abono Mensual' : form.tipo === 'informe' ? 'Informe' : 'Obra'}
           </Badge>
-          <Button variant="outline" className="gap-2" onClick={() => onPreview({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _hasMedicion: hasMedicion })}><Eye className="h-4 w-4" />Vista previa</Button>
-          <Button className="gap-2" onClick={() => onSave({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _hasMedicion: hasMedicion })} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
+          <Button variant="outline" className="gap-2" onClick={() => onPreview({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion })}><Eye className="h-4 w-4" />Vista previa</Button>
+          <Button className="gap-2" onClick={() => onSave({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion })} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
         </div>
       </div>
 
