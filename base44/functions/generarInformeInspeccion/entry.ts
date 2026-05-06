@@ -11,7 +11,6 @@ Deno.serve(async (req) => {
   const inspeccion = await base44.entities.InspeccionColegio.get(inspeccion_id);
   if (!inspeccion) return Response.json({ error: 'No encontrado' }, { status: 404 });
 
-  // Obtener preciario relevante (hasta 300 ítems para no saturar el prompt)
   const preciarioItems = await base44.entities.PrecarioMinisterio.filter({ activo: true, comuna: '8A' }, 'categoria', 300);
 
   const preciarioTexto = preciarioItems.length > 0
@@ -23,56 +22,116 @@ Deno.serve(async (req) => {
   const seccionesTexto = (inspeccion.secciones || [])
     .map(s => {
       const partes = [];
-      if (s.transcripcion) partes.push(`Audio: ${s.transcripcion}`);
-      if (s.notas_libres) partes.push(`Notas: ${s.notas_libres}`);
+      if (s.transcripcion) partes.push(`Audio transcripto: ${s.transcripcion}`);
+      if (s.notas_libres) partes.push(`Notas escritas: ${s.notas_libres}`);
       const fotosCount = s.fotos?.length || 0;
-      if (fotosCount > 0) partes.push(`Fotos adjuntas: ${fotosCount}`);
-      return `## ${s.nombre}\n${partes.join('\n') || 'Sin observaciones'}`;
+      partes.push(`Fotos adjuntas: ${fotosCount}`);
+      partes.push(`Estado de sección: ${s.completada ? 'COMPLETADA' : 'NO COMPLETADA / PENDIENTE'}`);
+      return `### SECCIÓN: ${s.nombre}\n${partes.join('\n') || 'Sin observaciones registradas'}`;
     }).join('\n\n');
 
-  const prompt = `Sos un profesional en inspección de establecimientos educativos con amplio conocimiento en construcción y mantenimiento edilicio.
-Generá un informe técnico formal de inspección en base a las observaciones del jefe de sitio.
+  const seccionesCompletadas = (inspeccion.secciones || []).filter(s => s.completada).map(s => s.nombre);
+  const seccionesPendientes = (inspeccion.secciones || []).filter(s => !s.completada).map(s => s.nombre);
+  const totalSecciones = (inspeccion.secciones || []).length;
 
+  const prompt = `Sos un ingeniero civil senior especializado en inspección de establecimientos educativos públicos, con amplia experiencia en mantenimiento edilicio, normativa de seguridad escolar y gestión de obras del Ministerio de Educación de la Ciudad de Buenos Aires.
+
+Tu tarea es redactar un INFORME TÉCNICO DE INSPECCIÓN exhaustivo, formal y completamente detallado, sin omitir ningún dato relevante. El informe debe ser útil para la toma de decisiones de la autoridad supervisora y debe dejar constancia explícita tanto de lo inspeccionado como de lo pendiente.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DATOS DE LA INSPECCIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Establecimiento: ${inspeccion.establecimiento}
 Dirección: ${inspeccion.direccion || 'No especificada'}
 Jefe de sitio: ${inspeccion.jefe_sitio}
-Fecha: ${inspeccion.fecha_inspeccion || new Date().toLocaleDateString('es-AR')}
+Fecha de inspección: ${inspeccion.fecha_inspeccion || new Date().toLocaleDateString('es-AR')}
+Inspector responsable: ${user.full_name || inspeccion.jefe_sitio}
+Secciones relevadas: ${seccionesCompletadas.length} de ${totalSecciones}
+Secciones completadas: ${seccionesCompletadas.length > 0 ? seccionesCompletadas.join(', ') : 'Ninguna'}
+Secciones NO relevadas / pendientes: ${seccionesPendientes.length > 0 ? seccionesPendientes.join(', ') : 'Todas completadas'}
 
-OBSERVACIONES POR SECCIÓN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OBSERVACIONES RELEVADAS POR SECCIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${seccionesTexto}
 
-PRECIARIO MINISTERIAL DISPONIBLE (para armar el listado de materiales):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PRECIARIO MINISTERIAL DISPONIBLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${preciarioTexto}
 
-Generá un informe técnico estructurado con los siguientes apartados exactos:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INSTRUCCIONES PARA REDACTAR EL INFORME
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# INFORME TÉCNICO DE INSPECCIÓN
+Generá el informe con EXACTAMENTE los siguientes apartados, sin saltear ninguno:
 
-## 1. Resumen Ejecutivo
-Síntesis general del estado del establecimiento.
+# INFORME TÉCNICO DE INSPECCIÓN EDILICIA
 
-## 2. Detalle por Sección
-Para cada sección inspeccionada: estado observado, problemas detectados y nivel de urgencia (Urgente / Importante / Leve / Sin novedad).
+## 1. Datos Generales
+Tabla resumen con: establecimiento, dirección, jefe de sitio, inspector, fecha, cantidad de secciones relevadas vs totales, estado general (Bueno / Regular / Deficiente / Crítico).
 
-## 3. Problemas Detectados
-Lista de los problemas encontrados ordenados por urgencia.
+## 2. Resumen Ejecutivo
+Párrafo de 4 a 6 oraciones describiendo el estado general del establecimiento, los hallazgos más relevantes, nivel de urgencia global y conclusión ejecutiva. Debe poder leerse de forma autónoma como síntesis del informe.
 
-## 4. Recomendaciones y Acciones Sugeridas
-Acciones concretas recomendadas.
+## 3. Detalle por Sección Relevada
+Para CADA sección que fue inspeccionada, incluí una subsección con:
+- **Estado general:** (Bueno / Regular / Deficiente / Crítico)
+- **Observaciones:** descripción detallada de todo lo observado
+- **Problemas detectados:** lista numerada de cada problema encontrado
+- **Nivel de urgencia de cada problema:** 🔴 URGENTE / 🟡 IMPORTANTE / 🟢 LEVE / ✅ SIN NOVEDAD
+- **Fotos:** indicar si hay fotos adjuntas y cuántas
 
-## 5. Listado de Materiales y Trabajos (según Preciario Ministerial)
-Basándote en los problemas detectados y el preciario disponible, armá una tabla con los ítems del preciario que se necesitarían para resolver los trabajos. Usá EXACTAMENTE este formato de tabla Markdown:
+## 4. Secciones No Relevadas / Pendientes
+Si hay secciones que NO fueron inspeccionadas, listarlas explícitamente con una nota indicando que quedaron pendientes de inspección y deben incluirse en la próxima visita. Si todas fueron completadas, indicarlo.
 
-| Código | Descripción | Unidad | Cantidad estimada | Observación |
-|--------|-------------|--------|-------------------|-------------|
-| ... | ... | ... | ... | ... |
+## 5. Cuadro Consolidado de Problemas Detectados
+Tabla con TODOS los problemas encontrados en toda la inspección, ordenados por urgencia:
 
-Solo incluí ítems que realmente apliquen a las observaciones. Si no encontrás el ítem exacto en el preciario, indicá el más cercano. Si no hay problemas que requieran materiales, indicalo.
+| N° | Sección | Problema | Urgencia | Estado |
+|----|---------|----------|----------|--------|
+| ... | ... | ... | 🔴 URGENTE / 🟡 IMPORTANTE / 🟢 LEVE | Pendiente de resolución |
 
-## 6. Conclusión
-Evaluación final del estado general y próximos pasos.
+## 6. Análisis de Riesgos
+Lista de los problemas que representan riesgo para la seguridad de alumnos y personal, con descripción del riesgo potencial. Si no hay riesgos críticos, indicarlo explícitamente.
 
-Usá un tono profesional y formal. El informe debe ser claro y accionable.`;
+## 7. Recomendaciones y Plan de Acción
+Para cada problema urgente o importante, indicar:
+- Acción concreta a realizar
+- Plazo sugerido (Inmediato / 7 días / 30 días / Próximo ciclo)
+- Responsable sugerido
+
+## 8. Materiales y Trabajos según Preciario Ministerial
+Basándote en los problemas detectados y el preciario disponible, armá la tabla completa:
+
+| Código | Descripción del ítem | Unidad | Cantidad est. | Sección | Observación |
+|--------|---------------------|--------|---------------|---------|-------------|
+| ... | ... | ... | ... | ... | ... |
+
+Si no encontrás el ítem exacto, usá el más cercano e indicalo en Observación. Incluí todos los ítems necesarios.
+
+## 9. Resumen Fotográfico
+Indicar por sección la cantidad de fotos tomadas y una descripción breve de qué documentan (inferirlo de las observaciones). Total de fotos: X.
+
+## 10. Conclusión y Próximos Pasos
+- Evaluación final del estado del establecimiento con puntaje general (1 a 10)
+- Lista de acciones prioritarias inmediatas
+- Fecha sugerida para próxima inspección de seguimiento
+- Secciones pendientes que deben relevarse en la próxima visita
+
+---
+*Informe generado por sistema de gestión DH1 Software · ${new Date().toLocaleDateString('es-AR')}*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGLAS DE REDACCIÓN OBLIGATORIAS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Usá lenguaje técnico formal, como lo haría un ingeniero civil en un informe oficial
+- NO omitás ninguna sección del informe aunque no haya problemas (en ese caso indicar "Sin novedades")
+- NO uses frases vagas como "se observaron problemas" — sé específico sobre QUÉ problema, DÓNDE exactamente, y CUÁL es el riesgo
+- Si una sección no fue relevada, SIEMPRE dejá constancia explícita de ello
+- Las tablas deben completarse íntegramente, sin filas vacías ni puntos suspensivos
+- Los niveles de urgencia deben ser coherentes con la gravedad real del problema
+- El informe debe ser autosuficiente: alguien que no estuvo en la inspección debe poder entender todo leyéndolo`;
 
   const result = await base44.integrations.Core.InvokeLLM({
     prompt,
