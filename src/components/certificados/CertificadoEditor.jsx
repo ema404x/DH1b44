@@ -7,6 +7,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2, Wand2, Layers } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+const parseMonto = (v) => {
+  const clean = String(v).replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(clean);
+  return isNaN(n) ? 0 : n;
+};
 
 function Field({ label, children }) {
   return (
@@ -67,7 +72,9 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       fecha_inicio: initialData?.fecha_inicio || '',
       plazo_obra: initialData?.plazo_obra || '',
       fecha_finalizacion: initialData?.fecha_finalizacion || '',
-      monto_contratado: initialData?.monto_contratado || initialData?.subtotal || 0,
+      monto_contratado: initialData?.monto_contratado
+        ? String(initialData.monto_contratado)
+        : (initialData?.subtotal ? String(initialData.subtotal) : ''),
       monto_obra_contratada: initialData?.monto_obra_contratada || 0,
       porcentaje_avance: initialData?.porcentaje_avance || 0,
       condiciones_pago: initialData?.condiciones_pago || '',
@@ -292,8 +299,8 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           }>
             {form.tipo === 'abono_mensual' ? 'Abono Mensual' : form.tipo === 'informe' ? 'Informe' : 'Obra'}
           </Badge>
-          <Button variant="outline" className="gap-2" onClick={() => onPreview({ ...form, subtotal: baseCalculo, _hasMedicion: hasMedicion })}><Eye className="h-4 w-4" />Vista previa</Button>
-          <Button className="gap-2" onClick={() => onSave({ ...form, subtotal: baseCalculo, _hasMedicion: hasMedicion })} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
+          <Button variant="outline" className="gap-2" onClick={() => onPreview({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _hasMedicion: hasMedicion })}><Eye className="h-4 w-4" />Vista previa</Button>
+          <Button className="gap-2" onClick={() => onSave({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _hasMedicion: hasMedicion })} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
         </div>
       </div>
 
@@ -336,7 +343,18 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           <Field label="Plazo de Obra"><Input value={form.plazo_obra} onChange={e => set('plazo_obra', e.target.value)} /></Field>
           <Field label="Plazo de Entrega"><Input value={form.plazo_entrega} onChange={e => set('plazo_entrega', e.target.value)} /></Field>
           <Field label="Fecha de Finalización"><Input type="date" value={form.fecha_finalizacion} onChange={e => set('fecha_finalizacion', e.target.value)} /></Field>
-          <Field label="Monto Contratado $"><Input type="number" value={form.monto_contratado} onChange={e => set('monto_contratado', +e.target.value)} /></Field>
+          <Field label="Monto Contratado $">
+            <Input
+              type="text"
+              inputMode="numeric"
+              placeholder="Ej: 1.098.000"
+              value={form.monto_contratado}
+              onChange={e => set('monto_contratado', e.target.value)}
+            />
+            {parseMonto(form.monto_contratado) > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">{fmt(parseMonto(form.monto_contratado))}</p>
+            )}
+          </Field>
           <Field label="Monto Obra Contratada $"><Input type="number" value={form.monto_obra_contratada} onChange={e => set('monto_obra_contratada', +e.target.value)} /></Field>
           <Field label="% Avance de Obra">
             <div className="flex gap-2">
