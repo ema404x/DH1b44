@@ -128,7 +128,8 @@ REGLAS DE REDACCIÓN OBLIGATORIAS:
 - Si una sección no fue relevada, SIEMPRE dejá constancia explícita de ello
 - Las tablas deben completarse íntegramente, sin filas vacías ni puntos suspensivos
 - Los niveles de urgencia deben ser coherentes con la gravedad real del problema
-- El informe debe ser autosuficiente: alguien que no estuvo en la inspección debe poder entender todo leyéndolo`;
+- El informe debe ser autosuficiente: alguien que no estuvo en la inspección debe poder entender todo leyéndolo
+- NO incluyas al final ningún bloque de firma, aclaración, ni campos como "Firma del inspector:", "Aclaración:", "Nombre:", ni nada similar. El informe termina con la sección 10.`;
 
   const result = await base44.integrations.Core.InvokeLLM({
     prompt,
