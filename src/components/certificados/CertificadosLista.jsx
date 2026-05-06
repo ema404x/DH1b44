@@ -169,7 +169,12 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                   className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
                   onClick={async () => {
                     setExportingPDF(c.id);
-                    await exportCertificadoPDF(c);
+                    // Fetch fresco para traer firma_gerente_url y estado actualizados
+                    let certData = c;
+                    try {
+                      certData = await base44.entities.Certificado.get(c.id);
+                    } catch (_) { /* usar el cacheado si falla */ }
+                    await exportCertificadoPDF(certData);
                     setExportingPDF(null);
                   }}
                   disabled={exportingPDF === c.id}

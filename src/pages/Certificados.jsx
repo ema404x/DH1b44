@@ -32,6 +32,8 @@ export default function Certificados() {
   const { data: certificados = [], isLoading } = useQuery({
     queryKey: ['certificados'],
     queryFn: () => base44.entities.Certificado.list('-created_date'),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   // Al guardar: siempre crea un registro nuevo (nunca actualiza el existente)
