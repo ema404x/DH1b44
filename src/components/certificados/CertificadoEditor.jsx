@@ -75,14 +75,7 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       fecha_finalizacion: initialData?.fecha_finalizacion || '',
       monto_contratado: (() => {
         const raw = initialData?.monto_contratado;
-        if (!raw && raw !== 0) return initialData?.subtotal ? String(Math.round(initialData.subtotal)) : '';
-        // Si el número es un entero grande (>= 1000), mostrarlo tal cual
-        // Si es un decimal pequeño (ej: 1.098 en lugar de 1.098.000), es un error histórico de parseo
-        // En ese caso, intentar multiplicarlo por 1000 para recuperar el valor real NO es seguro
-        // → mostramos vacío para que el usuario lo corrija, con fallback al subtotal
-        if (typeof raw === 'number' && raw < 1000 && raw > 0) {
-          return initialData?.subtotal ? String(Math.round(initialData.subtotal)) : '';
-        }
+        if (!raw && raw !== 0) return '';
         return String(Math.round(raw));
       })(),
       monto_obra_contratada: initialData?.monto_obra_contratada || 0,

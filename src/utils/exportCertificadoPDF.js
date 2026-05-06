@@ -70,10 +70,8 @@ export async function exportCertificadoPDF(form) {
   const pdfFondoReparo = fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0;
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
-  // Monto contratado: parsear siempre (puede venir como string "1.098.000" o número)
-  // Si viene como número muy pequeño (< 1000) es un error de parseo antiguo → usar subtotal
-  const rawMonto = parseMonto(form.monto_contratado);
-  const montoContratado = rawMonto > 1000 ? rawMonto : (subtotalContrato || rawMonto);
+  // Monto contratado: exactamente lo que el usuario ingresó, parseado correctamente
+  const montoContratado = parseMonto(form.monto_contratado);
 
   const [logoBase64] = await Promise.all([
     loadImageAsBase64(MEJORES_LOGO_URL),
@@ -250,7 +248,7 @@ export async function exportCertificadoPDF(form) {
 
   if (hasMedicion) {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
-    doc.text(`Total contrato: ${fmt(montoContratado)}`, W - M, y, { align: 'right' }); y += 6;
+    doc.text(`Total contrato: ${fmt(subtotalContrato)}`, W - M, y, { align: 'right' }); y += 6;
     doc.text(`Saldo pendiente: ${fmt(totalSaldo)}`, W - M, y, { align: 'right' }); y += 6;
   }
 
