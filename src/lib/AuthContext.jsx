@@ -5,6 +5,7 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [userPermissions, setUserPermissions] = useState(null); // permisos del rol del usuario
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingPublicSettings] = useState(false);
@@ -21,6 +22,19 @@ export const AuthProvider = ({ children }) => {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
+
+      // Cargar permisos del rol del usuario desde RolePermission
+      if (currentUser?.role) {
+        try {
+          const rolePerms = await base44.entities.RolePermission.filter({ role_name: currentUser.role });
+          if (rolePerms && rolePerms.length > 0) {
+            setUserPermissions(rolePerms[0].permissions);
+          }
+        } catch (_) {
+          // Si falla, no bloquear el login
+          setUserPermissions(null);
+        }
+      }
     } catch (error) {
       setIsAuthenticated(false);
       setUser(null);
@@ -49,6 +63,7 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={{
       user,
+      userPermissions,
       isAuthenticated,
       isLoadingAuth,
       isLoadingPublicSettings,

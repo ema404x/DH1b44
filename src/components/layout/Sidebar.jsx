@@ -117,24 +117,57 @@ function NavItem({ item, collapsed, active, onClick }) {
 
 export default function Sidebar() {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, userPermissions } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isJefeSitio = user?.role === 'jefe_sitio';
 
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
 
-  // Filtrar grupos de navegación según rol
+  // Mapeo de rutas → clave de módulo en RolePermission
+  const routeToModule = {
+    '/': 'Dashboard',
+    '/calendario': 'Dashboard',
+    '/emergencias': 'Dashboard',
+    '/proyectos': 'Project',
+    '/ordenes': 'WorkOrder',
+    '/activos': 'Pendientes',
+    '/informes': 'Informes',
+    '/inspeccion-colegio': 'Informes',
+    '/reportes': 'Reportes',
+    '/automatizaciones': 'Automatizaciones',
+    '/clientes': 'Client',
+    '/presupuestos': 'Quote',
+    '/presupuestos-obra': 'PresupuestosObra',
+    '/control-riesgo': 'PresupuestosObra',
+    '/certificados': 'Certificado',
+    '/aprobacion-certificados': 'Certificado',
+    '/facturacion': 'Invoice',
+    '/finanzas': 'Finanzas',
+    '/informacion-general': 'Employee',
+    '/empleados': 'Employee',
+    '/mapa': 'Mapa',
+    '/mapa-jefes': 'Mapa',
+    '/inventario': 'Inventory',
+    '/alertas': 'Alertas',
+    '/permisos': 'Permisos',
+    '/auditoria': 'AuditLog',
+    '/seguridad': 'Seguridad',
+    '/tutorial': null,
+    '/importar': 'ImportarDatos',
+  };
+
+  // Filtrar grupos según permisos del rol (si hay permisos configurados)
+  // admin siempre ve todo; si no hay permisos configurados también ve todo
   const visibleGroups = navGroups.map(group => ({
     ...group,
     items: group.items.filter(item => {
-      if (!isJefeSitio) return true;
-      // Para jefe_sitio: solo mostrar Dashboard, Órdenes, Pendientes, Informes, Mapa
-      const jefeSitioRoutes = ['/', '/ordenes', '/activos', '/informes', '/mapa', '/aprobacion-certificados'];
-      return jefeSitioRoutes.includes(item.path);
+      if (user?.role === 'admin' || !userPermissions) return true;
+      const moduleKey = routeToModule[item.path];
+      if (!moduleKey) return true; // rutas sin restricción (tutorial, etc.)
+      return userPermissions[moduleKey]?.read === true;
     })
   })).filter(group => group.items.length > 0);
 

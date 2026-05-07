@@ -214,7 +214,7 @@ export default function Employees() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="font-semibold text-white">{emp.full_name}</p>
-                          <Badge variant="secondary" className="mt-1 text-xs">{roleLabels[emp.role]}</Badge>
+                          <Badge variant="secondary" className="mt-1 text-xs">{emp.role}</Badge>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-cyan-400 hover:text-cyan-300" onClick={() => setQrEmployee(emp)}>
