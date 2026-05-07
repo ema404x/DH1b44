@@ -15,6 +15,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import AsignacionAutomatica from '@/components/employees/AsignacionAutomatica';
+import InviteUserDialog from '@/components/employees/InviteUserDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -49,6 +50,7 @@ export default function Employees() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [qrEmployee, setQrEmployee] = useState(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: employees = [], isLoading } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list('-created_date') });
@@ -109,9 +111,14 @@ export default function Employees() {
             </h1>
             <p className="text-slate-400 mt-1">{stats.activos} activos de {stats.total} total</p>
           </div>
-          <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-lg shadow-cyan-500/50 transition-all">
-            <Plus className="h-4 w-4" /> Nuevo Empleado
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setInviteOpen(true)} className="gap-2 border-slate-700/50 bg-slate-800/50 text-white hover:bg-slate-700/50">
+              <Mail className="h-4 w-4" /> Invitar
+            </Button>
+            <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-lg shadow-cyan-500/50 transition-all">
+              <Plus className="h-4 w-4" /> Nuevo Empleado
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -247,6 +254,8 @@ export default function Employees() {
         subtitle={`Fichaje · ${qrEmployee?.role || ''}`}
         value={qrEmployee ? `${window.location.origin}/fichar?id=${qrEmployee.id}` : ''}
       />
+
+      <InviteUserDialog open={inviteOpen} onOpenChange={setInviteOpen} />
 
       <EntityFormDialog
         open={dialogOpen}
