@@ -33,8 +33,9 @@ export default function AsignacionAutomatica({ employees, locations, onSyncCompl
       });
 
       // Sincronizar empleados jefes de sitio con sus ubicaciones
+      // Compatible con roles dinámicos: busca por nombre exacto en ubicaciones
       for (const emp of employees) {
-        if (emp.role === 'jefe_sitio' && emp.full_name) {
+        if (emp.full_name) {
           const ubicaciones = ubicacionesPorJefe[emp.full_name] || [];
           if (ubicaciones.length > 0) {
             await base44.entities.Employee.update(emp.id, {
@@ -80,8 +81,8 @@ export default function AsignacionAutomatica({ employees, locations, onSyncCompl
               <p className="text-xl font-bold">{employees.length}</p>
             </div>
             <div className="bg-white rounded-lg p-3 border border-orange-200">
-              <p className="text-muted-foreground text-xs">Jefes de Sitio</p>
-              <p className="text-xl font-bold">{employees.filter(e => e.role === 'jefe_sitio').length}</p>
+              <p className="text-muted-foreground text-xs">Con Ubicaciones</p>
+              <p className="text-xl font-bold">{employees.filter(e => e.assigned_location).length}</p>
             </div>
             <div className="bg-white rounded-lg p-3 border border-orange-200">
               <p className="text-muted-foreground text-xs">Ubicaciones</p>

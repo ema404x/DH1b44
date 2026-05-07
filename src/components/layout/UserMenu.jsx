@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
 import { LogOut, ChevronDown, UserCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function UserMenu() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => base44.auth.me() });
+  const { user } = useAuth();
 
   const initials = user?.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)

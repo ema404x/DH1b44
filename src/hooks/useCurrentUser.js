@@ -1,21 +1,12 @@
-import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { useContext, useMemo } from 'react';
+import { AuthContext } from '@/lib/AuthContext';
 
 /**
  * Hook que retorna el usuario actual y si es admin.
- * isAdmin: true -> puede ver todo
- * isAdmin: false -> solo ve lo que le compete (filtrar por nombre/email)
+ * Reutiliza el AuthContext — sin hacer llamadas API duplicadas.
  */
 export function useCurrentUser() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    base44.auth.me()
-      .then(u => setCurrentUser(u))
-      .catch(() => setCurrentUser(null))
-      .finally(() => setLoading(false));
-  }, []);
+  const { user: currentUser, userPermissions, isLoadingAuth: loading } = useContext(AuthContext);
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -36,5 +27,5 @@ export function useCurrentUser() {
     );
   }
 
-  return { currentUser, isAdmin, loading, filterByUser };
+  return { currentUser, user: currentUser, isAdmin, loading, filterByUser, userPermissions };
 }

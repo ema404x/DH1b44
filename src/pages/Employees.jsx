@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode, SettingsIcon, Plus, Users, TrendingUp, Zap } from 'lucide-react';
+import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode, SettingsIcon, Plus, Users, Zap } from 'lucide-react';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -67,8 +67,6 @@ export default function Employees() {
   const stats = useMemo(() => ({
     total: employees.length,
     activos: employees.filter(e => e.status === 'activo').length,
-    jefes: employees.filter(e => e.role === 'jefe_sitio').length,
-    tecnicos: employees.filter(e => e.role === 'tecnico').length,
   }), [employees]);
 
   const saveMutation = useMutation({
@@ -134,7 +132,6 @@ export default function Employees() {
           {[
             { label: 'Total', value: stats.total, icon: Users, color: 'from-blue-500' },
             { label: 'Activos', value: stats.activos, icon: Zap, color: 'from-emerald-500' },
-            { label: 'Jefes', value: stats.jefes, icon: TrendingUp, color: 'from-purple-500' },
           ].map((stat, i) => (
             <motion.div key={i} variants={item}>
               <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border border-slate-700/50 rounded-lg p-4">
@@ -273,7 +270,7 @@ export default function Employees() {
         onOpenChange={setDialogOpen}
         title={editing ? 'Editar Empleado' : 'Nuevo Empleado'}
         fields={computedEmployeeFields}
-        initialData={editing || { role: 'operario', status: 'activo' }}
+        initialData={editing || { role: computedEmployeeFields.find(f => f.key === 'role')?.options?.[0]?.value || '', status: 'activo' }}
         onSave={(data) => saveMutation.mutate(data)}
         saving={saveMutation.isPending}
       />
