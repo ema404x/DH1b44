@@ -27,7 +27,7 @@ const roleLabels = {
 const employeeFields = [
   { key: 'full_name', label: 'Nombre Completo', required: true },
   { key: 'dni', label: 'DNI' },
-  { key: 'role', label: 'Cargo', type: 'select', required: true, options: Object.entries(roleLabels).map(([value, label]) => ({ value, label })) },
+  { key: 'role', label: 'Cargo', type: 'select', required: true, options: [] }, // se sobreescribe dinámicamente abajo
   { key: 'assigned_location', label: 'Ubicación Asignada' },
   { key: 'assigned_jefe_sitio', label: 'Jefe de Sitio' },
   { key: 'assigned_comuna', label: 'Comuna', type: 'select', options: [
@@ -55,6 +55,14 @@ export default function Employees() {
 
   const { data: employees = [], isLoading } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list('-created_date') });
   const { data: locations = [] } = useQuery({ queryKey: ['locations'], queryFn: () => base44.entities.LocationData.list('-created_date', 500) });
+  const { data: rolePermissions = [] } = useQuery({ queryKey: ['rolePermissions'], queryFn: () => base44.entities.RolePermission.list() });
+
+  const computedEmployeeFields = useMemo(() => {
+    const roleOptions = rolePermissions.length > 0
+      ? rolePermissions.map(r => ({ value: r.role_name, label: r.role_name }))
+      : Object.entries(roleLabels).map(([value, label]) => ({ value, label }));
+    return employeeFields.map(f => f.key === 'role' ? { ...f, options: roleOptions } : f);
+  }, [rolePermissions]);
 
   const stats = useMemo(() => ({
     total: employees.length,
@@ -179,7 +187,10 @@ export default function Employees() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos los cargos</SelectItem>
-            {Object.entries(roleLabels).map(([value, label]) => (
+            {(rolePermissions.length > 0
+              ? rolePermissions.map(r => ({ value: r.role_name, label: r.role_name }))
+              : Object.entries(roleLabels).map(([value, label]) => ({ value, label }))
+            ).map(({ value, label }) => (
               <SelectItem key={value} value={value}>{label}</SelectItem>
             ))}
           </SelectContent>
@@ -261,7 +272,7 @@ export default function Employees() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         title={editing ? 'Editar Empleado' : 'Nuevo Empleado'}
-        fields={employeeFields}
+        fields={computedEmployeeFields}
         initialData={editing || { role: 'operario', status: 'activo' }}
         onSave={(data) => saveMutation.mutate(data)}
         saving={saveMutation.isPending}
