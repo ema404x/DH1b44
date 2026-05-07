@@ -88,12 +88,12 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
           <div key={c.id} className="bg-card border rounded-lg p-4 hover:shadow-sm hover:border-primary/20 transition-all group">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3 flex-1 min-w-0">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <FileText className="h-5 w-5 text-primary" />
+                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <FileText className="h-4 w-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h3 className="font-semibold">Certificado N° {c.numero}</h3>
+                    <h3 className="font-semibold text-sm">Certificado N° {c.numero}</h3>
                     <Badge className={`text-xs border ${estadoStyle[c.estado] || estadoStyle.borrador}`}>
                       {c.estado}
                     </Badge>
@@ -106,17 +106,11 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                       <Badge variant="secondary" className="text-xs">⚡ Auto</Badge>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">{c.contratista}</p>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5">
-                    <span>{c.emprendimiento}</span>
-                    <span className="text-border">·</span>
-                    <span>ADA: {c.ada_numero}</span>
-                    {c.mes_periodo && (
-                      <>
-                        <span className="text-border">·</span>
-                        <span>{c.mes_periodo}</span>
-                      </>
-                    )}
+                  <p className="text-sm text-muted-foreground truncate">{c.contratista}</p>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground mt-1">
+                    {c.emprendimiento && <span className="truncate max-w-[140px]">{c.emprendimiento}</span>}
+                    {c.ada_numero && <span>ADA: {c.ada_numero}</span>}
+                    {c.mes_periodo && <span>{c.mes_periodo}</span>}
                   </div>
                   {c.estado === 'aprobado' && c.aprobado_por && (
                     <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-1">
@@ -127,20 +121,42 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                   {c.estado === 'emitido' && (
                     <div className="flex items-center gap-1.5 text-xs text-blue-500 mt-1">
                       <Clock className="h-3 w-3" />
-                      <span>Pendiente de aprobación gerencial</span>
+                      <span>Pendiente de aprobación</span>
                     </div>
                   )}
+                  {/* Mobile actions */}
+                  <div className="flex gap-1 mt-2 sm:hidden">
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1" onClick={() => onEdit(c)}>
+                      <Eye className="h-3.5 w-3.5" /> Ver
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-emerald-600"
+                      onClick={async () => {
+                        setExportingPDF(c.id);
+                        let certData = c;
+                        try { certData = await base44.entities.Certificado.get(c.id); } catch (_) {}
+                        await exportCertificadoPDF(certData);
+                        setExportingPDF(null);
+                      }}
+                      disabled={exportingPDF === c.id}
+                    >
+                      {exportingPDF === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />} PDF
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive" onClick={() => onDelete(c.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </div>
 
               <div className="text-right flex-shrink-0">
-                <div className="font-bold text-primary text-lg">{fmt(c.subtotal || c.monto_contratado)}</div>
+                <div className="font-bold text-primary text-base sm:text-lg">{fmt(c.subtotal || c.monto_contratado)}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {c.created_date ? format(new Date(c.created_date), 'dd/MM', { locale: es }) : '—'}
                 </div>
               </div>
 
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity items-center">
+              {/* Desktop actions */}
+              <div className="hidden sm:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity items-center">
                 {c.estado === 'aprobado' && c.firma_gerente_url && (
                   <img src={c.firma_gerente_url} alt="Firma" className="h-8 object-contain border rounded bg-white px-1" title={`Aprobado por ${c.aprobado_por || ''}`} />
                 )}
@@ -169,11 +185,10 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                   className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
                   onClick={async () => {
                     setExportingPDF(c.id);
-                    // Fetch fresco para traer firma_gerente_url y estado actualizados
                     let certData = c;
                     try {
                       certData = await base44.entities.Certificado.get(c.id);
-                    } catch (_) { /* usar el cacheado si falla */ }
+                    } catch (_) {}
                     await exportCertificadoPDF(certData);
                     setExportingPDF(null);
                   }}

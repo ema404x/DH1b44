@@ -104,18 +104,18 @@ export default function Inventory() {
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-                <Package className="h-6 w-6 text-white" />
+            <h1 className="text-2xl sm:text-4xl font-bold text-white flex items-center gap-3">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0">
+                <Package className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
               Inventario · Pañol
             </h1>
             <p className="text-slate-400 mt-1">{stats.total} materiales • ${stats.totalValue.toLocaleString()}</p>
           </div>
-          <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg shadow-emerald-500/50 transition-all">
-            <Plus className="h-4 w-4" /> Nuevo Material
+          <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg shadow-emerald-500/50 transition-all shrink-0">
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo</span> Material
           </Button>
         </div>
 
@@ -195,7 +195,8 @@ export default function Inventory() {
               <EmptyState icon={Package} title="No hay materiales" description="Agregá materiales al inventario" actionLabel="Nuevo Material" onAction={() => { setEditing(null); setDialogOpen(true); }} />
             ) : (
               <motion.div variants={container} initial="hidden" animate="show">
-                <Card className="border-0 bg-slate-800/50 backdrop-blur overflow-hidden">
+                {/* Desktop: tabla */}
+                <Card className="border-0 bg-slate-800/50 backdrop-blur overflow-hidden hidden sm:block">
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -264,6 +265,64 @@ export default function Inventory() {
                     </Table>
                   </div>
                 </Card>
+
+                {/* Mobile: cards */}
+                <div className="sm:hidden space-y-2">
+                  {filtered.map((mat, idx) => {
+                    const isLow = mat.stock <= mat.min_stock && mat.min_stock > 0;
+                    return (
+                      <motion.div key={mat.id} variants={item} className={`rounded-xl border p-4 bg-slate-800/50 backdrop-blur ${isLow ? 'border-red-500/40 bg-red-500/5' : 'border-slate-700/50'}`}>
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-white truncate">{mat.name}</p>
+                            {mat.code && <p className="text-xs text-slate-500 font-mono mt-0.5">{mat.code}</p>}
+                          </div>
+                          <Badge variant="secondary" className="text-xs bg-slate-700 text-slate-200 shrink-0">{categoryLabels[mat.category]}</Badge>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-xs mb-3">
+                          <div>
+                            <p className="text-slate-500 mb-0.5">Stock</p>
+                            <p className={`font-bold ${isLow ? 'text-red-400' : 'text-white'}`}>{mat.stock} {unitLabels[mat.unit]}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500 mb-0.5">P. Unit.</p>
+                            <p className="font-medium text-slate-300">${mat.unit_cost?.toLocaleString() || 0}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500 mb-0.5">Total</p>
+                            <p className="font-medium text-white">${((mat.stock || 0) * (mat.unit_cost || 0)).toLocaleString()}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="ghost" className="flex-1 h-8 text-xs gap-1 text-emerald-400 border border-emerald-500/30" onClick={() => setMovimientoDialog({ tipo: 'entrada', material: mat })}>
+                            <ArrowDownCircle className="h-3.5 w-3.5" /> Entrada
+                          </Button>
+                          <Button size="sm" variant="ghost" className="flex-1 h-8 text-xs gap-1 text-orange-400 border border-orange-500/30" onClick={() => setMovimientoDialog({ tipo: 'salida', material: mat })}>
+                            <ArrowUpCircle className="h-3.5 w-3.5" /> Salida
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 text-slate-400 border border-slate-700/50" onClick={() => { setEditing(mat); setDialogOpen(true); }}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 text-red-500 border border-red-500/20"><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>¿Eliminar material?</AlertDialogTitle>
+                                <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteMutation.mutate(mat.id)}>Eliminar</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
               </motion.div>
             )}
           </TabsContent>

@@ -99,18 +99,18 @@ export default function Projects() {
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
-                <FolderKanban className="h-6 w-6 text-white" />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-4xl font-bold text-white flex items-center gap-3">
+              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shrink-0">
+                <FolderKanban className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
               Proyectos
             </h1>
-            <p className="text-slate-400 mt-1">Gestión integral de obras y proyectos</p>
+            <p className="text-slate-400 mt-1 text-sm">Gestión integral de obras y proyectos</p>
           </div>
-          <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:shadow-lg shadow-primary/50 transition-all">
-            <Plus className="h-4 w-4" /> Nuevo Proyecto
+          <Button size="sm" onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:shadow-lg shadow-primary/50 transition-all shrink-0">
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo </span>Proyecto
           </Button>
         </div>
 

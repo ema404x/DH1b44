@@ -247,12 +247,12 @@ export default function Certificados() {
        </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="abono_mensual">🟣 Abono Mensual</TabsTrigger>
-          <TabsTrigger value="obra">🟠 Obra</TabsTrigger>
-          <TabsTrigger value="informe">🔵 Informe</TabsTrigger>
-          <TabsTrigger value="automaticos">⚡ Automáticos</TabsTrigger>
-          <TabsTrigger value="abonos_maestro">📋 Abonos Maestros</TabsTrigger>
+        <TabsList className="flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="abono_mensual" className="text-xs sm:text-sm">🟣 <span className="hidden sm:inline">Abono </span>Mensual</TabsTrigger>
+          <TabsTrigger value="obra" className="text-xs sm:text-sm">🟠 Obra</TabsTrigger>
+          <TabsTrigger value="informe" className="text-xs sm:text-sm">🔵 Informe</TabsTrigger>
+          <TabsTrigger value="automaticos" className="text-xs sm:text-sm">⚡ <span className="hidden sm:inline">Automáticos</span><span className="sm:hidden">Auto</span></TabsTrigger>
+          <TabsTrigger value="abonos_maestro" className="text-xs sm:text-sm">📋 <span className="hidden sm:inline">Abonos Maestros</span><span className="sm:hidden">Maestros</span></TabsTrigger>
         </TabsList>
 
         <TabsContent value="abono_mensual" className="mt-6">
