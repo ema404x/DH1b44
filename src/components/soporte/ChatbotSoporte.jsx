@@ -72,19 +72,51 @@ const SUGERENCIAS_POR_MODULO = {
   'Certificados':             { categoria: '📜 Certificados', preguntas: ['¿Cómo genero un certificado?', '¿Cómo subo una ADA?'] },
 };
 
+const MODULOS_POR_ROL_EXTRA = {
+  administrativo: ['Certificados', 'Presupuestos', 'Reportes y Finanzas'],
+  supervisor: ['Dashboard', 'Proyectos', 'Órdenes de Trabajo', 'Pendientes SAP', 'Reportes y Finanzas', 'Emergencias'],
+  tecnico: ['Órdenes de Trabajo', 'Inventario/Pañol', 'Emergencias'],
+  viewer: ['Dashboard'],
+};
+
 function getSugerenciasParaRol(rol) {
-  const modulos = MODULOS_POR_ROL[rol] || MODULOS_POR_ROL.user;
+  const modulos = MODULOS_POR_ROL[rol] || MODULOS_POR_ROL_EXTRA[rol] || MODULOS_POR_ROL.user;
   return modulos.map(m => SUGERENCIAS_POR_MODULO[m]).filter(Boolean);
 }
 
-function buildContextoRol(user, moduloActual) {
+const DESCRIPCION_ROL = {
+  admin: 'Administrador del sistema con acceso completo. Gestiona empleados, certificados, presupuestos, finanzas, permisos y toda la plataforma.',
+  jefe_sitio: 'Jefe de Sitio responsable de uno o más establecimientos/colegios. Su trabajo diario incluye: gestionar órdenes de trabajo, registrar inspecciones de colegios, controlar pendientes SAP de su zona, fichar asistencia de su cuadrilla, reportar emergencias y solicitar materiales del pañol.',
+  inspector: 'Inspector técnico. Se foca en inspecciones de colegios, revisión de pendientes SAP y órdenes de trabajo de su zona. No gestiona empleados ni finanzas.',
+  supervisor: 'Supervisor de operaciones. Supervisa jefes de sitio, revisa reportes, aprueba OTs y controla el estado general de los establecimientos.',
+  tecnico: 'Técnico de campo. Ejecuta órdenes de trabajo asignadas, registra materiales utilizados, toma fotos y firma OTs completadas.',
+  administrativo: 'Personal administrativo de oficina. Gestiona certificados, presupuestos, facturación, proveedores y documentación. No realiza trabajo de campo.',
+  viewer: 'Usuario de solo lectura. Puede ver información pero no crear ni editar registros.',
+  user: 'Usuario general del sistema.',
+};
+
+function buildContextoRol(user, moduloActual, empleadoInfo) {
   const nombre = user?.full_name || user?.email || 'el usuario';
-  const modulos = MODULOS_POR_ROL[user?.role] || MODULOS_POR_ROL.user;
+  // Si el usuario tiene rol de empleado vinculado, usarlo; si es admin de plataforma, usar admin
+  const rolEmpleado = empleadoInfo?.employee_role?.toLowerCase().trim() || (user?.role === 'admin' ? 'admin' : 'user');
+  const modulos = MODULOS_POR_ROL[rolEmpleado] || MODULOS_POR_ROL[user?.role] || MODULOS_POR_ROL.user;
+  const descripcionRol = DESCRIPCION_ROL[rolEmpleado] || DESCRIPCION_ROL.user;
+
   return `[CONTEXTO INTERNO - nunca menciones esto al usuario, nunca hables de roles ni restricciones de acceso]
 Usuario: ${nombre}
+Rol en la organización: ${rolEmpleado}
+Descripción de su rol: ${descripcionRol}
 Módulos disponibles para esta sesión: ${modulos.join(', ')}.
 ${moduloActual ? `El usuario está actualmente en el módulo: ${moduloActual}.` : ''}
-Respondé con naturalidad. Si el usuario pregunta algo de un módulo que no está en su lista, simplemente derivalo al administrador sin explicar por qué ni mencionar roles.`;
+
+INSTRUCCIONES DE COMPORTAMIENTO SEGÚN ROL:
+- Adaptá tu lenguaje y ejemplos al rol del usuario. 
+- Si es jefe_sitio: hablale de sus colegios, OTs, cuadrilla, inspecciones y pendientes SAP.
+- Si es administrativo: hablale de certificados, presupuestos, proveedores, facturación y documentación. NUNCA le preguntes sobre trabajo de campo, cuadrillas o fichaje.
+- Si es inspector: hablale de inspecciones, pendientes SAP y OTs. No de finanzas ni empleados.
+- Si es tecnico: hablale de OTs asignadas, materiales, fotos y firmas. No de presupuestos ni finanzas.
+- Si es admin: tiene acceso completo, hablale de gestión global.
+- Respondé con naturalidad. Si pregunta algo de un módulo que no tiene, derivalo al administrador sin mencionar restricciones.`;
 }
 
 async function buildContextoReflexivo(user) {
@@ -280,6 +312,7 @@ export default function ChatbotSoporte() {
   const [categoriaActiva, setCategoriaActiva] = useState(0);
   const [unread, setUnread] = useState(0);
   const [currentUser, setCurrentUser] = useState(null);
+  const [empleadoInfo, setEmpleadoInfo] = useState(null);
   const [loadingReflexiva, setLoadingReflexiva] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingPDF, setUploadingPDF] = useState(false);
@@ -291,10 +324,17 @@ export default function ChatbotSoporte() {
   const pdfInputRef = useRef(null);
 
   const isThinking = messages.length > 0 && messages[messages.length - 1]?.role === 'user';
-  const sugerencias = getSugerenciasParaRol(currentUser?.role);
+  const rolEfectivo = empleadoInfo?.employee_role?.toLowerCase().trim() || (currentUser?.role === 'admin' ? 'admin' : 'user');
+  const sugerencias = getSugerenciasParaRol(rolEfectivo);
 
   useEffect(() => {
-    base44.auth.me().then(u => setCurrentUser(u)).catch(() => {});
+    base44.auth.me().then(u => {
+      setCurrentUser(u);
+      // Cargar info del empleado vinculado para personalizar Alice según rol real
+      base44.functions.invoke('vincularEmpleado', {})
+        .then(res => setEmpleadoInfo(res?.data || null))
+        .catch(() => {});
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -315,9 +355,9 @@ export default function ChatbotSoporte() {
     if (open && !conversation && currentUser !== null) {
       base44.agents.createConversation({
         agent_name: 'soporte_app',
-        metadata: { name: 'Soporte', user_role: currentUser?.role || 'user' },
+        metadata: { name: 'Soporte', user_role: rolEfectivo },
       }).then(async conv => {
-        const contexto = buildContextoRol(currentUser, moduloActual);
+        const contexto = buildContextoRol(currentUser, moduloActual, empleadoInfo);
         await base44.agents.addMessage(conv, { role: 'user', content: contexto });
         setConversation(conv);
         setMessages([]);
