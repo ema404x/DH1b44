@@ -2,38 +2,47 @@
   "name": "ObraCertificacion",
   "type": "object",
   "properties": {
-    "codigo": {
-      "type": "string",
-      "description": "C\u00f3digo \u00fanico de la obra"
-    },
     "titulo": {
       "type": "string",
-      "description": "Nombre o t\u00edtulo de la obra"
+      "description": "T\u00edtulo de la obra en SAP"
     },
-    "contratista": {
+    "direccion": {
       "type": "string",
-      "description": "Nombre del contratista"
+      "description": "Direcci\u00f3n del establecimiento"
     },
     "establecimiento": {
       "type": "string",
-      "description": "Establecimiento o ubicaci\u00f3n de la obra"
+      "description": "Nombre del establecimiento"
+    },
+    "comuna": {
+      "type": "string",
+      "enum": [
+        "8A",
+        "8B",
+        "10A"
+      ],
+      "description": "Comuna"
     },
     "jefe_sitio": {
       "type": "string",
       "description": "Jefe de sitio responsable"
     },
+    "inspector": {
+      "type": "string",
+      "description": "Inspector asignado"
+    },
     "oc_numero": {
       "type": "string",
-      "description": "N\u00famero de Orden de Compra"
+      "description": "N\u00b0 MTOM (Orden de trabajo SAP)"
     },
     "ada_numero": {
       "type": "string",
-      "description": "N\u00famero de ADA"
+      "description": "N\u00b0 MEIN (Orden de entrada SAP)"
     },
     "monto_contrato": {
       "type": "number",
       "default": 0,
-      "description": "Monto total del contrato"
+      "description": "Monto base de la obra"
     },
     "monto_a_cobrar": {
       "type": "number",
@@ -43,21 +52,26 @@
     "porcentaje_avance": {
       "type": "number",
       "default": 0,
-      "description": "Porcentaje de avance de la obra (0-100)"
+      "description": "Porcentaje de avance (0-1 o 0-100)"
     },
-    "periodo": {
-      "type": "string",
-      "description": "Per\u00edodo de certificaci\u00f3n (ej: Mayo 2025)"
+    "plazo_dias": {
+      "type": "number",
+      "default": 0,
+      "description": "Plazo de la obra en d\u00edas"
     },
     "fecha_inicio": {
       "type": "string",
       "format": "date",
-      "description": "Fecha de inicio de la obra"
+      "description": "Fecha del Acta de Inicio"
     },
     "fecha_fin_estimada": {
       "type": "string",
       "format": "date",
-      "description": "Fecha estimada de finalizaci\u00f3n"
+      "description": "Fecha del Acta de Recepci\u00f3n"
+    },
+    "periodo": {
+      "type": "string",
+      "description": "Per\u00edodo de certificaci\u00f3n (ej: Abril 2026)"
     },
     "estado_cobro": {
       "type": "string",
@@ -79,36 +93,13 @@
       ],
       "default": "normal"
     },
-    "descripcion": {
-      "type": "string",
-      "description": "Descripci\u00f3n del trabajo realizado"
-    },
-    "documentacion": {
-      "type": "array",
-      "description": "Documentos adjuntos",
-      "items": {
-        "type": "object",
-        "properties": {
-          "nombre": {
-            "type": "string"
-          },
-          "url": {
-            "type": "string"
-          },
-          "tipo": {
-            "type": "string"
-          }
-        }
-      }
-    },
     "notas": {
       "type": "string",
-      "description": "Observaciones adicionales"
+      "description": "Observaciones"
     }
   },
   "required": [
     "titulo",
-    "contratista",
     "estado_cobro"
   ]
 }

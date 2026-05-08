@@ -31,6 +31,7 @@ export default function CertificacionObras() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [filtroComuna, setFiltroComuna] = useState('todas');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -62,11 +63,15 @@ export default function CertificacionObras() {
   const filtered = obras.filter(o => {
     const matchSearch = !search ||
       o.titulo?.toLowerCase().includes(search.toLowerCase()) ||
-      o.contratista?.toLowerCase().includes(search.toLowerCase()) ||
       o.establecimiento?.toLowerCase().includes(search.toLowerCase()) ||
-      o.codigo?.toLowerCase().includes(search.toLowerCase());
+      o.direccion?.toLowerCase().includes(search.toLowerCase()) ||
+      o.jefe_sitio?.toLowerCase().includes(search.toLowerCase()) ||
+      o.inspector?.toLowerCase().includes(search.toLowerCase()) ||
+      o.oc_numero?.includes(search) ||
+      o.ada_numero?.includes(search);
     const matchEstado = filtroEstado === 'todos' || o.estado_cobro === filtroEstado;
-    return matchSearch && matchEstado;
+    const matchComuna = filtroComuna === 'todas' || o.comuna === filtroComuna;
+    return matchSearch && matchEstado && matchComuna;
   });
 
   // KPIs
@@ -150,6 +155,17 @@ export default function CertificacionObras() {
             className="pl-9"
           />
         </div>
+        <Select value={filtroComuna} onValueChange={setFiltroComuna}>
+          <SelectTrigger className="w-full sm:w-36">
+            <SelectValue placeholder="Comuna" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas las comunas</SelectItem>
+            <SelectItem value="8A">Comuna 8A</SelectItem>
+            <SelectItem value="8B">Comuna 8B</SelectItem>
+            <SelectItem value="10A">Comuna 10A</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={filtroEstado} onValueChange={setFiltroEstado}>
           <SelectTrigger className="w-full sm:w-44">
             <SelectValue placeholder="Estado" />
