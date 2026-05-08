@@ -75,12 +75,22 @@ export default function CertificacionObras() {
   });
 
   // KPIs
-  const totalMonto = obras.filter(o => o.estado_cobro !== 'cobrado').reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
+  const totalMonto = obras.reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
   const listoCertificar = obras.filter(o => o.estado_cobro === 'listo_certificar').length;
   const faltanActas    = obras.filter(o => o.estado_cobro === 'faltan_actas').length;
   const pendientes     = obras.filter(o => o.estado_cobro === 'pendiente').length;
   const observados     = obras.filter(o => o.estado_cobro === 'observado').length;
   const urgentes       = obras.filter(o => o.prioridad === 'urgente').length;
+
+  // Resumen por comuna
+  const comunas = ['8A', '8B', '10A'];
+  const resumenPorComuna = comunas.map(c => {
+    const obrasComuna = obras.filter(o => o.comuna === c);
+    const montoTotal  = obrasComuna.reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
+    const montoParcial = obrasComuna.filter(o => o.estado_cobro === 'listo_certificar').reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
+    const cantListo   = obrasComuna.filter(o => o.estado_cobro === 'listo_certificar').length;
+    return { comuna: c, montoTotal, montoParcial, cantListo, total: obrasComuna.length };
+  }).filter(r => r.total > 0);
 
   const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -180,6 +190,43 @@ export default function CertificacionObras() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Resumen por Comuna */}
+      {resumenPorComuna.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {resumenPorComuna.map(({ comuna, montoTotal, montoParcial, cantListo, total }) => (
+            <Card key={comuna} className="border-border">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-foreground">Comuna {comuna}</span>
+                  <span className="text-xs text-muted-foreground">{total} obra{total !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Monto total</span>
+                    <span className="text-sm font-bold text-foreground">{fmt(montoTotal)}</span>
+                  </div>
+                  <div className="w-full h-px bg-border" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> Listo certificar ({cantListo})
+                    </span>
+                    <span className="text-sm font-bold text-emerald-400">{fmt(montoParcial)}</span>
+                  </div>
+                  {montoTotal > 0 && (
+                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, (montoParcial / montoTotal) * 100)}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Alerta urgentes */}
       {urgentes > 0 && (
