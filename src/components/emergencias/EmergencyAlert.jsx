@@ -15,15 +15,16 @@ const TIPO_LABELS = {
 };
 
 export default function EmergencyAlert({ emergencia, onClose, onView }) {
-  // Auto-cerrar después de 15 segundos
+  // Auto-cerrar después de 15 segundos (solo cuando hay emergencia activa)
   useEffect(() => {
+    if (!emergencia) return;
     const timer = setTimeout(onClose, 15000);
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, [emergencia, onClose]);
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[9999] pointer-events-none">
+      {emergencia && <div className="fixed inset-0 z-[9999] pointer-events-none">
         {/* Flash rojo en los bordes de la pantalla */}
         <motion.div
           className="absolute inset-0 border-4 border-red-500 rounded-none pointer-events-none"
@@ -119,7 +120,7 @@ export default function EmergencyAlert({ emergencia, onClose, onView }) {
             />
           </div>
         </motion.div>
-      </div>
+      </div>}
     </AnimatePresence>
   );
 }

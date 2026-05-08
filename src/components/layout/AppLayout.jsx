@@ -45,13 +45,11 @@ export default function AppLayout() {
         </main>
       </div>
       <ChatbotSoporte />
-      {activeEmergency && (
-        <EmergencyAlert
-          emergencia={activeEmergency}
-          onClose={() => setActiveEmergency(null)}
-          onView={() => { navigate('/emergencias'); setActiveEmergency(null); }}
-        />
-      )}
+      <EmergencyAlert
+        emergencia={activeEmergency}
+        onClose={() => setActiveEmergency(null)}
+        onView={() => { navigate('/emergencias'); setActiveEmergency(null); }}
+      />
     </div>
   );
 }
