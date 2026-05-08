@@ -1,0 +1,114 @@
+{
+  "name": "ObraCertificacion",
+  "type": "object",
+  "properties": {
+    "codigo": {
+      "type": "string",
+      "description": "C\u00f3digo \u00fanico de la obra"
+    },
+    "titulo": {
+      "type": "string",
+      "description": "Nombre o t\u00edtulo de la obra"
+    },
+    "contratista": {
+      "type": "string",
+      "description": "Nombre del contratista"
+    },
+    "establecimiento": {
+      "type": "string",
+      "description": "Establecimiento o ubicaci\u00f3n de la obra"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Jefe de sitio responsable"
+    },
+    "oc_numero": {
+      "type": "string",
+      "description": "N\u00famero de Orden de Compra"
+    },
+    "ada_numero": {
+      "type": "string",
+      "description": "N\u00famero de ADA"
+    },
+    "monto_contrato": {
+      "type": "number",
+      "default": 0,
+      "description": "Monto total del contrato"
+    },
+    "monto_a_cobrar": {
+      "type": "number",
+      "default": 0,
+      "description": "Monto pendiente a cobrar"
+    },
+    "porcentaje_avance": {
+      "type": "number",
+      "default": 0,
+      "description": "Porcentaje de avance de la obra (0-100)"
+    },
+    "periodo": {
+      "type": "string",
+      "description": "Per\u00edodo de certificaci\u00f3n (ej: Mayo 2025)"
+    },
+    "fecha_inicio": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de inicio de la obra"
+    },
+    "fecha_fin_estimada": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha estimada de finalizaci\u00f3n"
+    },
+    "estado_cobro": {
+      "type": "string",
+      "enum": [
+        "pendiente",
+        "en_gestion",
+        "cobrado",
+        "rechazado"
+      ],
+      "default": "pendiente",
+      "description": "Estado del cobro"
+    },
+    "prioridad": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "alta",
+        "urgente"
+      ],
+      "default": "normal"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripci\u00f3n del trabajo realizado"
+    },
+    "documentacion": {
+      "type": "array",
+      "description": "Documentos adjuntos",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "notas": {
+      "type": "string",
+      "description": "Observaciones adicionales"
+    }
+  },
+  "required": [
+    "titulo",
+    "contratista",
+    "estado_cobro"
+  ]
+}

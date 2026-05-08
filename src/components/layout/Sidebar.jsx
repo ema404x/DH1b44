@@ -43,6 +43,7 @@ const navGroups = [
       { label: 'Control de Riesgos', icon: ShieldAlert, path: '/control-riesgo' },
       { label: 'Certificados', icon: Award, path: '/certificados' },
       { label: 'Aprobación Certificados', icon: FileCheck2, path: '/aprobacion-certificados' },
+      { label: 'Certificación de Obras', icon: FileCheck2, path: '/certificacion-obras' },
       { label: 'Facturación', icon: Receipt, path: '/facturacion' },
       { label: 'Finanzas', icon: TrendingUp, path: '/finanzas' },
     ]
@@ -144,6 +145,7 @@ export default function Sidebar() {
     '/control-riesgo': 'PresupuestosObra',
     '/certificados': 'Certificado',
     '/aprobacion-certificados': 'Certificado',
+    '/certificacion-obras': 'Certificado',
     '/facturacion': 'Invoice',
     '/finanzas': 'Finanzas',
     '/informacion-general': 'Employee',
