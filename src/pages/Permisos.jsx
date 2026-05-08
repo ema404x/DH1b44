@@ -36,6 +36,15 @@ const MODULES = [
 
 const ACTIONS = ['read', 'create', 'update', 'delete', 'export', 'approve'];
 
+const ACTION_LABELS = {
+  read: 'Ver',
+  create: 'Crear',
+  update: 'Editar',
+  delete: 'Eliminar',
+  export: 'Exportar',
+  approve: 'Aprobar',
+};
+
 export default function Permisos() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState(null);
@@ -144,7 +153,7 @@ export default function Permisos() {
                   <tr className="border-b">
                     <th className="px-4 py-2 text-left font-semibold">Módulo</th>
                     {ACTIONS.map(act => (
-                      <th key={act} className="px-4 py-2 text-center font-semibold capitalize">{act}</th>
+                      <th key={act} className="px-4 py-2 text-center font-semibold">{ACTION_LABELS[act]}</th>
                     ))}
                   </tr>
                 </thead>
