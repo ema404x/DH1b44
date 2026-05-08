@@ -29,12 +29,16 @@ export default function Certificados() {
   const queryClient = useQueryClient();
   const { user } = useCurrentUser();
 
-  const { data: certificados = [], isLoading } = useQuery({
+  const { filterByUser } = useCurrentUser();
+
+  const { data: rawCertificados = [], isLoading } = useQuery({
     queryKey: ['certificados'],
     queryFn: () => base44.entities.Certificado.list('-created_date'),
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
+
+  const certificados = filterByUser(rawCertificados, ['jefe_sitio', 'contratista_id', 'created_by']);
 
   // Al guardar: siempre crea un registro nuevo (nunca actualiza el existente)
   // y si el estado es 'emitido', crea automáticamente una SolicitudCertificado

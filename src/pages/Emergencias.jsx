@@ -11,6 +11,7 @@ import EmergenciaForm from '@/components/emergencias/EmergenciaForm';
 import EmergenciaCard from '@/components/emergencias/EmergenciaCard';
 import EmergenciasDashboard from '@/components/emergencias/EmergenciasDashboard';
 import { useAuth } from '@/lib/AuthContext';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 const FILTROS = [
   { id: 'all', label: 'Todas' },
@@ -25,13 +26,15 @@ export default function Emergencias() {
   const [tab, setTab] = useState('lista'); // 'lista' | 'dashboard'
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const { isAdmin, filterByUser } = useCurrentUser();
 
-  const { data: emergencias = [], isLoading, refetch } = useQuery({
+  const { data: rawEmergencias = [], isLoading, refetch } = useQuery({
     queryKey: ['emergencias'],
     queryFn: () => base44.entities.Emergencia.list('-created_date', 200),
-    refetchInterval: 30000, // auto-refresh cada 30s
+    refetchInterval: 30000,
   });
+
+  const emergencias = filterByUser(rawEmergencias, ['reportado_por', 'jefe_sitio_asignado', 'created_by']);
 
   const stats = {
     activas: emergencias.filter(e => e.estado === 'activa').length,

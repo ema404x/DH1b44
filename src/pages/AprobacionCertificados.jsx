@@ -29,7 +29,7 @@ const tabsJefe = [
 ];
 
 export default function AprobacionCertificados() {
-  const { user, isAdmin } = useCurrentUser();
+  const { user, isAdmin, isSuperAdmin } = useCurrentUser();
   const qc = useQueryClient();
   const [view, setView] = useState('list'); // 'list' | 'form' | 'detalle'
   const [selected, setSelected] = useState(null);
@@ -42,8 +42,8 @@ export default function AprobacionCertificados() {
     queryFn: () => base44.entities.SolicitudCertificado.list('-created_date'),
   });
 
-  // Filtrar por rol: jefe solo ve las suyas
-  const misSolicitudes = isAdmin
+  // Filtrar por rol: solo superAdmin ve todas; el resto ve las suyas
+  const misSolicitudes = isSuperAdmin
     ? solicitudes
     : solicitudes.filter(s => s.jefe_sitio_email === user?.email || s.created_by === user?.email);
 
@@ -71,7 +71,7 @@ export default function AprobacionCertificados() {
   const handleView = (sol) => { setSelected(sol); setView('detalle'); };
   const handleSaved = () => { qc.invalidateQueries({ queryKey: ['solicitudes-cert'] }); setView('list'); setEditing(null); setSelected(null); };
 
-  const tabs = isAdmin ? tabsAdmin : tabsJefe;
+  const tabs = isSuperAdmin ? tabsAdmin : tabsJefe;
 
   if (view === 'form') {
     return (
@@ -94,7 +94,7 @@ export default function AprobacionCertificados() {
       <div className="space-y-4">
         <SolicitudDetalle
           solicitud={selected}
-          isAdmin={isAdmin}
+          isAdmin={isSuperAdmin}
           user={user}
           onClose={() => setView('list')}
           onSaved={handleSaved}
@@ -107,14 +107,14 @@ export default function AprobacionCertificados() {
     <div className="space-y-6">
       <PageHeader
         title="Aprobación de Certificados"
-        subtitle={isAdmin ? 'Revisá, aprobá o rechazá solicitudes de certificados de obra' : 'Enviá solicitudes de certificados para aprobación de gerencia'}
-        actionLabel={!isAdmin ? 'Nueva solicitud' : undefined}
-        onAction={!isAdmin ? handleNew : undefined}
+        subtitle={isSuperAdmin ? 'Revisá, aprobá o rechazá solicitudes de certificados de obra' : 'Enviá solicitudes de certificados para aprobación de gerencia'}
+        actionLabel={!isSuperAdmin ? 'Nueva solicitud' : undefined}
+        onAction={!isSuperAdmin ? handleNew : undefined}
       />
 
       {/* KPIs */}
       {(() => {
-        const kpis = isAdmin ? [
+        const kpis = isSuperAdmin ? [
           { label: 'Enviadas', value: counts.enviada, icon: SendHorizonal, color: 'text-blue-500', bg: 'bg-blue-500/10' },
           { label: 'En revisión', value: counts.en_revision, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
           { label: 'Aprobadas', value: counts.aprobada, icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
@@ -153,7 +153,7 @@ export default function AprobacionCertificados() {
             className="pl-9"
           />
         </div>
-        {isAdmin && (
+        {isSuperAdmin && (
           <Button variant="outline" onClick={handleNew} className="gap-2">
             <Plus className="h-4 w-4" /> Nueva solicitud
           </Button>
@@ -185,7 +185,7 @@ export default function AprobacionCertificados() {
               <div className="text-center py-16 text-muted-foreground">
                 <FileCheck2 className="h-12 w-12 mx-auto mb-3 opacity-20" />
                 <p className="font-medium">No hay solicitudes</p>
-                {!isAdmin && <p className="text-sm mt-1">Creá una nueva solicitud de certificado</p>}
+                {!isSuperAdmin && <p className="text-sm mt-1">Creá una nueva solicitud de certificado</p>}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -193,7 +193,7 @@ export default function AprobacionCertificados() {
                   <SolicitudCard
                     key={sol.id}
                     solicitud={sol}
-                    isAdmin={isAdmin}
+                    isAdmin={isSuperAdmin}
                     onView={handleView}
                     onEdit={handleEdit}
                   />

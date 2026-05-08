@@ -9,6 +9,7 @@ import SeccionInspeccion from '@/components/inspeccion/SeccionInspeccion';
 import InformeViewer from '@/components/inspeccion/InformeViewer';
 import { format } from 'date-fns';
 import { useAuth } from '@/lib/AuthContext';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 const SECCIONES_DEFAULT = [
   'Fachada y accesos',
@@ -45,6 +46,7 @@ function buildSecciones() {
 
 export default function InspeccionColegioPage() {
   const { user } = useAuth();
+  const { filterByUser } = useCurrentUser();
   const queryClient = useQueryClient();
   const [vista, setVista] = useState('lista'); // 'lista' | 'nueva' | 'editar'
   const [inspeccionActiva, setInspeccionActiva] = useState(null);
@@ -59,10 +61,11 @@ export default function InspeccionColegioPage() {
     fecha_inspeccion: format(new Date(), 'yyyy-MM-dd'),
   });
 
-  const { data: inspecciones = [], isLoading } = useQuery({
+  const { data: rawInspecciones = [], isLoading } = useQuery({
     queryKey: ['inspecciones'],
     queryFn: () => base44.entities.InspeccionColegio.list('-created_date', 50),
   });
+  const inspecciones = filterByUser(rawInspecciones, ['jefe_sitio', 'created_by']);
 
   const { data: locations = [] } = useQuery({
     queryKey: ['locationData'],
