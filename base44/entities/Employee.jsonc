@@ -10,17 +10,7 @@
     },
     "role": {
       "type": "string",
-      "enum": [
-        "operario",
-        "tecnico",
-        "capataz",
-        "supervisor",
-        "ingeniero",
-        "administrativo",
-        "gerente",
-        "jefe_sitio"
-      ],
-      "default": "operario"
+      "description": "Rol del empleado \u2014 debe coincidir exactamente con un role_name en Control de Acceso (RolePermission)"
     },
     "specialty": {
       "type": "string",

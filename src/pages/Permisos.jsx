@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import DiagnosticoVinculacion from '@/components/permisos/DiagnosticoVinculacion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -157,6 +158,8 @@ export default function Permisos() {
           </div>
         </Card>
       )}
+
+      <DiagnosticoVinculacion />
 
       <div className="space-y-4">
         {roles.map((role) => (
