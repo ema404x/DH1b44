@@ -159,12 +159,18 @@ export default function Sidebar() {
     '/importar': 'ImportarDatos',
   };
 
-  // Filtrar grupos según permisos del rol (si hay permisos configurados)
-  // admin siempre ve todo; si no hay permisos configurados también ve todo
+  // Filtrar grupos según permisos del rol
+  // Solo los admins de Base44 (user.role === 'admin') ven todo sin restricciones
+  // Si hay permisos configurados → filtrar según read
+  // Si NO hay permisos configurados y NO es admin → mostrar solo Dashboard y Tutorial (acceso mínimo)
   const visibleGroups = navGroups.map(group => ({
     ...group,
     items: group.items.filter(item => {
-      if (user?.role === 'admin' || !userPermissions) return true;
+      if (user?.role === 'admin') return true;
+      if (!userPermissions) {
+        // Sin permisos configurados: solo acceso mínimo
+        return item.path === '/' || item.path === '/tutorial' || item.path === '/calendario';
+      }
       const moduleKey = routeToModule[item.path];
       if (!moduleKey) return true; // rutas sin restricción (tutorial, etc.)
       return userPermissions[moduleKey]?.read === true;

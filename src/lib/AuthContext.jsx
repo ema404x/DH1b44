@@ -36,8 +36,13 @@ export const AuthProvider = ({ children }) => {
       }
 
       // Vincular automáticamente la ficha de empleado via backend (service role)
+      // y obtener permisos reales basados en el rol del empleado
       try {
-        await base44.functions.invoke('vincularEmpleado', {});
+        const vinculacion = await base44.functions.invoke('vincularEmpleado', {});
+        if (vinculacion?.data?.employee_permissions) {
+          // Usar los permisos del rol del empleado (tiene precedencia sobre user.role de Base44)
+          setUserPermissions(vinculacion.data.employee_permissions);
+        }
       } catch (_) {
         // Si falla la vinculación, no bloquear el login
       }

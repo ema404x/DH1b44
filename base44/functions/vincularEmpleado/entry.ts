@@ -32,13 +32,27 @@ Deno.serve(async (req) => {
     const emp = matches[0];
 
     // Solo actualizar si aún no está vinculado correctamente
-    if (emp.user_id === user.id) {
-      return Response.json({ linked: true, employee_id: emp.id, already_linked: true });
+    if (emp.user_id !== user.id) {
+      await base44.asServiceRole.entities.Employee.update(emp.id, { user_id: user.id });
     }
 
-    await base44.asServiceRole.entities.Employee.update(emp.id, { user_id: user.id });
+    // Buscar los permisos del rol del empleado (basado en emp.role, no en user.role de Base44)
+    let employeePermissions = null;
+    let employeeRole = emp.role || null;
+    if (employeeRole) {
+      const rolePerms = await base44.asServiceRole.entities.RolePermission.filter({ role_name: employeeRole });
+      if (rolePerms && rolePerms.length > 0) {
+        employeePermissions = rolePerms[0].permissions;
+      }
+    }
 
-    return Response.json({ linked: true, employee_id: emp.id, already_linked: false });
+    return Response.json({
+      linked: true,
+      employee_id: emp.id,
+      already_linked: emp.user_id === user.id,
+      employee_role: employeeRole,
+      employee_permissions: employeePermissions
+    });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
