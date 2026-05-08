@@ -28,6 +28,12 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
             <div className="flex flex-wrap items-start gap-2">
               <h3 className="font-semibold text-foreground leading-tight">{obra.titulo}</h3>
               <Badge className={`text-xs border ${estado.color}`}>{estado.label}</Badge>
+              {obra.tramo_certificacion === 'primer_50' && (
+                <Badge className="text-xs bg-yellow-400/20 text-yellow-300 border border-yellow-400/40">🟡 1° 50%</Badge>
+              )}
+              {obra.tramo_certificacion === 'segundo_50' && (
+                <Badge className="text-xs bg-orange-400/20 text-orange-300 border border-orange-400/40">🟠 2° 50%</Badge>
+              )}
               {obra.prioridad !== 'normal' && (
                 <Badge className={`text-xs ${prioridad.color}`}>{prioridad.label}</Badge>
               )}

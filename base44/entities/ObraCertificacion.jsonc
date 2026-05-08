@@ -84,6 +84,14 @@
       "default": "pendiente",
       "description": "Estado del cobro"
     },
+    "tramo_certificacion": {
+      "type": "string",
+      "enum": [
+        "primer_50",
+        "segundo_50"
+      ],
+      "description": "Tramo de certificaci\u00f3n: primer 50% (amarillo) o segundo 50% (naranja)"
+    },
     "motivo_observacion": {
       "type": "string",
       "description": "Motivo por el que la obra est\u00e1 observada"

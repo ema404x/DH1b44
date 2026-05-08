@@ -13,6 +13,7 @@ const EMPTY = {
   porcentaje_avance: '', plazo_dias: '', periodo: '',
   fecha_inicio: '', fecha_fin_estimada: '',
   estado_cobro: 'pendiente', prioridad: 'normal',
+  tramo_certificacion: '',
   motivo_observacion: '', notas: ''
 };
 
@@ -144,6 +145,18 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
               </Select>
             </Field>
           </div>
+
+          {/* Tramo de certificación */}
+          <Field label="Tramo de Certificación">
+            <Select value={form.tramo_certificacion || ''} onValueChange={v => set('tramo_certificacion', v)}>
+              <SelectTrigger><SelectValue placeholder="Sin especificar" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={null}>Sin especificar</SelectItem>
+                <SelectItem value="primer_50">🟡 Primer 50% — Se certifica al 50%</SelectItem>
+                <SelectItem value="segundo_50">🟠 Segundo 50% — Se certifica el segundo 50%</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
 
           {form.estado_cobro === 'observado' && (
             <Field label="Motivo de observación *">

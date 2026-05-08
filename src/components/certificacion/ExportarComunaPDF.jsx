@@ -137,6 +137,11 @@ export function exportarComunaPDF(comuna, obras) {
     const titulo   = truncate(obra.titulo || '—', 38);
     const inspector = truncate(obra.inspector || '—', 18);
     const estadoLabel = ESTADO_LABEL[obra.estado_cobro] || obra.estado_cobro;
+    const tramoLabel = obra.tramo_certificacion === 'primer_50'
+      ? '1° 50%'
+      : obra.tramo_certificacion === 'segundo_50'
+        ? '2° 50%'
+        : '';
 
     const values = [
       estab,
@@ -147,16 +152,18 @@ export function exportarComunaPDF(comuna, obras) {
       obra.plazo_dias ? `${obra.plazo_dias}d` : '—',
       fmt(obra.monto_contrato),
       fmt(obra.monto_a_cobrar),
-      estadoLabel,
+      tramoLabel ? `${estadoLabel} (${tramoLabel})` : estadoLabel,
     ];
 
     let x = margin;
     values.forEach((val, vi) => {
       if (vi === 8) {
-        if      (obra.estado_cobro === 'listo_certificar') doc.setTextColor(22, 163, 74);
-        else if (obra.estado_cobro === 'faltan_actas')     doc.setTextColor(161, 120, 0);
-        else if (obra.estado_cobro === 'pendiente')        doc.setTextColor(200, 30, 30);
-        else                                               doc.setTextColor(100, 100, 100);
+        if      (obra.tramo_certificacion === 'primer_50')  doc.setTextColor(180, 140, 0);   // amarillo
+        else if (obra.tramo_certificacion === 'segundo_50') doc.setTextColor(200, 90, 0);    // naranja
+        else if (obra.estado_cobro === 'listo_certificar')  doc.setTextColor(22, 163, 74);
+        else if (obra.estado_cobro === 'faltan_actas')      doc.setTextColor(161, 120, 0);
+        else if (obra.estado_cobro === 'pendiente')         doc.setTextColor(200, 30, 30);
+        else                                                doc.setTextColor(100, 100, 100);
       } else {
         doc.setTextColor(40, 40, 40);
       }
