@@ -10,8 +10,10 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-export default function ObraCertificacionCard({ obra, estadoConfig, prioridadConfig, onEdit, onDelete, onEstadoChange, onTramoChange, fmt }) {
+export default function ObraCertificacionCard({ obra, estadoConfig, prioridadConfig, onEdit, onDelete, onEstadoChange, onTramoChange, onNotasChange, fmt }) {
   const [expanded, setExpanded] = useState(false);
+  const [editingNotas, setEditingNotas] = useState(false);
+  const [notasValue, setNotasValue] = useState(obra.notas || '');
   const estado = estadoConfig[obra.estado_cobro] || estadoConfig.pendiente;
   const prioridad = prioridadConfig[obra.prioridad] || prioridadConfig.normal;
 
@@ -114,9 +116,34 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
               })()}
             </div>
 
-            {/* Observaciones inline si hay */}
-            {obra.notas && (
-              <p className="text-xs text-muted-foreground italic border-l-2 border-border pl-2">{obra.notas}</p>
+            {/* Notas editables inline */}
+            {editingNotas ? (
+              <div className="flex items-start gap-2">
+                <textarea
+                  autoFocus
+                  value={notasValue}
+                  onChange={e => setNotasValue(e.target.value)}
+                  rows={2}
+                  className="flex-1 text-xs rounded-md border border-primary/40 bg-muted/30 px-2 py-1.5 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary resize-none"
+                  placeholder="Agregar nota..."
+                />
+                <div className="flex flex-col gap-1">
+                  <Button size="sm" className="h-6 text-xs px-2" onClick={() => { onNotasChange(obra.id, notasValue); setEditingNotas(false); }}>
+                    OK
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => { setNotasValue(obra.notas || ''); setEditingNotas(false); }}>
+                    ✕
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p
+                className="text-xs text-muted-foreground italic border-l-2 border-border pl-2 cursor-pointer hover:text-foreground hover:border-primary/50 transition-colors"
+                onClick={() => setEditingNotas(true)}
+                title="Click para editar"
+              >
+                {obra.notas || <span className="not-italic opacity-40">+ Agregar nota...</span>}
+              </p>
             )}
             {obra.estado_cobro === 'observado' && obra.motivo_observacion && (
               <div className="flex items-start gap-1.5 px-2 py-1.5 rounded-lg bg-slate-500/10 border border-slate-500/20">

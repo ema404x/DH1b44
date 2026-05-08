@@ -300,6 +300,7 @@ export default function CertificacionObras() {
               onDelete={() => deleteMutation.mutate(obra.id)}
               onEstadoChange={(id, estado) => saveMutation.mutate({ id, estado_cobro: estado })}
               onTramoChange={(id, tramo) => saveMutation.mutate({ id, tramo_certificacion: tramo || undefined })}
+              onNotasChange={(id, notas) => saveMutation.mutate({ id, notas })}
               fmt={fmt}
             />
           ))}
