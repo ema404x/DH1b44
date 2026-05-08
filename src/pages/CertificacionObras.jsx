@@ -7,12 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Plus, Search, FileCheck, DollarSign, Clock, TrendingUp, CheckCircle2,
-  AlertCircle, Filter, ChevronDown, Building2, User, Calendar, Hash, FileSpreadsheet
+  AlertCircle, Filter, ChevronDown, Building2, User, Calendar, Hash, FileSpreadsheet, Download
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ObraCertificacionDialog from '@/components/certificacion/ObraCertificacionDialog';
 import ObraCertificacionCard from '@/components/certificacion/ObraCertificacionCard';
 import ImportarObrasExcel from '@/components/certificacion/ImportarObrasExcel';
+import { exportarComunaPDF } from '@/components/certificacion/ExportarComunaPDF';
 
 const ESTADO_CONFIG = {
   listo_certificar: { label: 'Listo para Certificar', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
@@ -199,7 +200,18 @@ export default function CertificacionObras() {
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-foreground">Comuna {comuna}</span>
-                  <span className="text-xs text-muted-foreground">{total} obra{total !== 1 ? 's' : ''}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{total} obra{total !== 1 ? 's' : ''}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-primary"
+                      title={`Descargar PDF Comuna ${comuna}`}
+                      onClick={() => exportarComunaPDF(comuna, obras.filter(o => o.comuna === comuna))}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
