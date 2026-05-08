@@ -90,7 +90,13 @@ export default function Permisos() {
 
   const handlePermissionToggle = (roleId, module, action, current) => {
     const role = roles.find(r => r.id === roleId);
+    // Inicializar todos los módulos que falten en el objeto de permisos
     const newPerms = { ...role.permissions };
+    MODULES.forEach(mod => {
+      if (!newPerms[mod.key]) {
+        newPerms[mod.key] = ACTIONS.reduce((acc, act) => ({ ...acc, [act]: false }), {});
+      }
+    });
     newPerms[module] = { ...newPerms[module], [action]: !current };
     updateMutation.mutate({ id: roleId, data: { permissions: newPerms } });
   };
@@ -101,7 +107,18 @@ export default function Permisos() {
     MODULES.forEach(mod => {
       permissions[mod.key] = ACTIONS.reduce((acc, act) => ({ ...acc, [act]: false }), {});
     });
-    createMutation.mutate({ role_name: newRoleName, permissions, description: `Rol personalizado: ${newRoleName}` });
+    createMutation.mutate({ role_name: newRoleName.trim(), permissions, description: `Rol personalizado: ${newRoleName.trim()}` });
+  };
+
+  // Normaliza los permisos de un rol para que incluya todos los módulos actuales
+  const normalizePerms = (perms = {}) => {
+    const normalized = { ...perms };
+    MODULES.forEach(mod => {
+      if (!normalized[mod.key]) {
+        normalized[mod.key] = ACTIONS.reduce((acc, act) => ({ ...acc, [act]: false }), {});
+      }
+    });
+    return normalized;
   };
 
   if (isLoading) return <div className="text-center py-12">Cargando...</div>;
@@ -158,19 +175,22 @@ export default function Permisos() {
                   </tr>
                 </thead>
                 <tbody>
-                  {MODULES.map(mod => (
-                    <tr key={mod.key} className="border-b hover:bg-muted/40">
-                      <td className="px-4 py-2 font-medium">{mod.label}</td>
-                      {ACTIONS.map(act => (
-                        <td key={act} className="px-4 py-2 text-center">
-                          <Checkbox
-                            checked={role.permissions[mod.key]?.[act] || false}
-                            onCheckedChange={() => handlePermissionToggle(role.id, mod.key, act, role.permissions[mod.key]?.[act])}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
+                  {MODULES.map(mod => {
+                    const modPerms = normalizePerms(role.permissions)[mod.key];
+                    return (
+                      <tr key={mod.key} className="border-b hover:bg-muted/40">
+                        <td className="px-4 py-2 font-medium">{mod.label}</td>
+                        {ACTIONS.map(act => (
+                          <td key={act} className="px-4 py-2 text-center">
+                            <Checkbox
+                              checked={modPerms[act] || false}
+                              onCheckedChange={() => handlePermissionToggle(role.id, mod.key, act, modPerms[act])}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
