@@ -241,28 +241,28 @@ export default function WorkOrders() {
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl sm:text-4xl font-bold text-white flex items-center gap-3">
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shrink-0">
-                <ClipboardList className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-              </div>
-              Órdenes de Trabajo
-            </h1>
-            <p className="text-slate-400 mt-1 text-sm">{stats.total} órdenes en total {!isOnline && '• Offline'}</p>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shrink-0">
+              <ClipboardList className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-3xl font-bold text-white truncate">Órdenes de Trabajo</h1>
+              <p className="text-slate-400 text-xs sm:text-sm">{stats.total} órdenes en total {!isOnline && '• Offline'}</p>
+            </div>
           </div>
-          <div className="flex gap-1.5 flex-wrap justify-end shrink-0">
-            <Button variant="outline" size="sm" onClick={() => setModoCampo(v => !v)} className={`gap-1.5 border-slate-700 text-slate-300 hover:text-white text-xs ${modoCampo ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300' : ''}`}>
-              <Smartphone className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{modoCampo ? 'Escritorio' : 'Modo Campo'}</span><span className="sm:hidden">Campo</span>
+          <div className="flex gap-1 shrink-0">
+            <Button variant="outline" size="sm" onClick={() => setModoCampo(v => !v)} className={`gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2 ${modoCampo ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300' : ''}`}>
+              <Smartphone className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{modoCampo ? 'Escritorio' : 'Campo'}</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setHistorialOpen(true)} className="gap-1.5 border-slate-700 text-slate-300 hover:text-white text-xs">
+            <Button variant="outline" size="sm" onClick={() => setHistorialOpen(true)} className="gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2">
               <History className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Historial</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setTemplateOpen(true)} className="gap-1.5 border-slate-700 text-slate-300 hover:text-white text-xs">
+            <Button variant="outline" size="sm" onClick={() => setTemplateOpen(true)} className="gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2">
               <Layers className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Plantillas</span>
             </Button>
-            <Button size="sm" onClick={() => setNewDialogOpen(true)} className="gap-1.5 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/50 transition-all text-xs">
-              <Plus className="h-3.5 w-3.5" /> Nueva OT
+            <Button size="sm" onClick={() => setNewDialogOpen(true)} className="gap-1 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/50 transition-all text-xs px-2">
+              <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Nueva OT</span><span className="sm:hidden">Nueva</span>
             </Button>
           </div>
         </div>

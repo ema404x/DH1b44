@@ -215,7 +215,7 @@ export function AlicePageButton({ onClick }) {
   return (
     <button
       onClick={onClick}
-      className="fixed bottom-24 right-6 z-40 flex items-center gap-2 px-3 py-2 rounded-full border border-primary/30 bg-card/90 backdrop-blur-sm text-xs font-medium text-primary hover:bg-primary/10 transition-all shadow-lg"
+      className="fixed bottom-20 right-4 z-40 flex items-center gap-2 px-3 py-2 rounded-full border border-primary/30 bg-card/90 backdrop-blur-sm text-xs font-medium text-primary hover:bg-primary/10 transition-all shadow-lg"
       style={{ boxShadow: '0 2px 12px rgba(59,130,246,0.2)' }}
     >
       <HelpCircle className="h-3.5 w-3.5" />
@@ -594,8 +594,8 @@ Informale al usuario de forma breve y amigable que el certificado fue creado y e
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.2 }}
-            className="fixed bottom-6 right-6 z-50 w-[340px] sm:w-[400px] flex flex-col rounded-2xl border border-border overflow-hidden"
-            style={{ height: '600px', background: 'hsl(var(--card))', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}>
+            className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-50 w-full sm:w-[400px] flex flex-col sm:rounded-2xl border border-border overflow-hidden"
+            style={{ height: '92dvh', maxHeight: '600px', background: 'hsl(var(--card))', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}>
 
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 flex-shrink-0"
