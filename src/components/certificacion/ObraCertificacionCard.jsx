@@ -96,13 +96,13 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
                 const c = obra.color_avance || 'auto';
                 const barColor =
                   c === 'verde'    ? '#16a34a' :
-                  c === 'naranja'  ? '#dc6400' :
-                  c === 'amarillo' ? '#a1780a' :
+                  c === 'naranja'  ? '#f97316' :
+                  c === 'amarillo' ? '#eab308' :
                   c === 'rojo'     ? '#c81e1e' :
                   c === 'azul'     ? '#2563eb' :
                   c === 'gris'     ? '#787878' :
                   // auto
-                  pct >= 100 ? '#16a34a' : pct > 50 ? '#dc6400' : '#a1780a';
+                  pct >= 100 ? '#16a34a' : pct > 50 ? '#f97316' : '#eab308';
                 return (
                   <div className="flex items-center gap-2">
                     <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
