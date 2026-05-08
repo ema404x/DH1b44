@@ -121,25 +121,9 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
             <Field label="Monto a Cobrar ($)">
               <Input type="text" inputMode="decimal" value={form.monto_a_cobrar} onChange={e => set('monto_a_cobrar', e.target.value)} placeholder="0" />
             </Field>
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="% Avance">
-                <Input type="text" inputMode="decimal" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', e.target.value)} placeholder="0–100" />
-              </Field>
-              <Field label="Color % en PDF">
-                <Select value={form.color_avance || 'auto'} onValueChange={v => set('color_avance', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">🔄 Auto (por rango)</SelectItem>
-                    <SelectItem value="verde">🟢 Verde (100%)</SelectItem>
-                    <SelectItem value="naranja">🟠 Naranja (2° 50%)</SelectItem>
-                    <SelectItem value="amarillo">🟡 Amarillo (1° 50%)</SelectItem>
-                    <SelectItem value="rojo">🔴 Rojo</SelectItem>
-                    <SelectItem value="azul">🔵 Azul</SelectItem>
-                    <SelectItem value="gris">⚪ Gris</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
+            <Field label="% Avance">
+              <Input type="text" inputMode="decimal" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', e.target.value)} placeholder="0–100" />
+            </Field>
           </div>
 
           {/* Fechas y plazo */}
@@ -183,17 +167,19 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
             </Field>
           </div>
 
-          {/* Tramo de certificación */}
-          <Field label="Tramo de Certificación">
-            <Select value={form.tramo_certificacion || ''} onValueChange={v => set('tramo_certificacion', v)}>
-              <SelectTrigger><SelectValue placeholder="Sin especificar" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={null}>Sin especificar</SelectItem>
-                <SelectItem value="primer_50">🟡 Primer 50% — Se certifica al 50%</SelectItem>
-                <SelectItem value="segundo_50">🟠 Segundo 50% — Se certifica el segundo 50%</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
+          {/* Tramo de certificación — calculado automáticamente según % avance */}
+          {form.porcentaje_avance > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border text-xs text-muted-foreground">
+              <span>🔄 Tramo calculado automáticamente:</span>
+              <span className="font-semibold text-foreground">
+                {parseFloat(form.porcentaje_avance) >= 100
+                  ? '🟢 Completado (100%)'
+                  : parseFloat(form.porcentaje_avance) > 50
+                    ? '🟠 Segundo 50%'
+                    : '🟡 Primer 50%'}
+              </span>
+            </div>
+          )}
 
           {form.estado_cobro === 'observado' && (
             <Field label="Motivo de observación *">

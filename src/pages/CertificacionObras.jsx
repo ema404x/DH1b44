@@ -61,6 +61,29 @@ export default function CertificacionObras() {
   const handleNew = () => { setSelected(null); setDialogOpen(true); };
   const handleEdit = (obra) => { setSelected(obra); setDialogOpen(true); };
 
+  // Calcula automáticamente tramo y color según % de avance
+  const enriquecerObra = (data) => {
+    const pct = parseFloat(data.porcentaje_avance) || 0;
+    let tramo_certificacion = data.tramo_certificacion || undefined;
+    let color_avance = data.color_avance || 'auto';
+
+    // Solo calcular si el color es "auto"
+    if (color_avance === 'auto') {
+      if (pct >= 100) {
+        tramo_certificacion = undefined;
+        color_avance = 'verde';
+      } else if (pct > 50) {
+        tramo_certificacion = 'segundo_50';
+        color_avance = 'naranja';
+      } else if (pct > 0) {
+        tramo_certificacion = 'primer_50';
+        color_avance = 'amarillo';
+      }
+    }
+
+    return { ...data, tramo_certificacion, color_avance };
+  };
+
   const filtered = obras.filter(o => {
     const matchSearch = !search ||
       o.titulo?.toLowerCase().includes(search.toLowerCase()) ||
@@ -295,7 +318,7 @@ export default function CertificacionObras() {
         open={dialogOpen}
         onClose={() => { setDialogOpen(false); setSelected(null); }}
         obra={selected}
-        onSave={(data) => saveMutation.mutate(data)}
+        onSave={(data) => saveMutation.mutate(enriquecerObra(data))}
         saving={saveMutation.isPending}
         estadoConfig={ESTADO_CONFIG}
         prioridadConfig={PRIORIDAD_CONFIG}
