@@ -36,13 +36,16 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.Employee.update(emp.id, { user_id: user.id });
     }
 
-    // Buscar los permisos del rol del empleado (basado en emp.role, no en user.role de Base44)
+    // Buscar los permisos del rol del empleado (comparación case-insensitive)
     let employeePermissions = null;
     let employeeRole = emp.role || null;
     if (employeeRole) {
-      const rolePerms = await base44.asServiceRole.entities.RolePermission.filter({ role_name: employeeRole });
-      if (rolePerms && rolePerms.length > 0) {
-        employeePermissions = rolePerms[0].permissions;
+      const allRolePerms = await base44.asServiceRole.entities.RolePermission.filter({});
+      const match = allRolePerms.find(
+        rp => rp.role_name?.toLowerCase().trim() === employeeRole.toLowerCase().trim()
+      );
+      if (match) {
+        employeePermissions = match.permissions;
       }
     }
 
