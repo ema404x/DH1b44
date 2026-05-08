@@ -144,6 +144,26 @@ export function exportarComunaPDF(comuna, obras) {
         ? '2° 50%'
         : '';
 
+    // Calcular color del % de avance
+    const pct = obra.porcentaje_avance || 0;
+    const colorAvance = obra.color_avance || 'auto';
+    const COLOR_MAP = {
+      verde:    [22,  163, 74],
+      amarillo: [161, 120, 0],
+      rojo:     [200, 30,  30],
+      azul:     [37,  99,  235],
+      gris:     [120, 120, 120],
+    };
+    let pctColor;
+    if (colorAvance !== 'auto' && COLOR_MAP[colorAvance]) {
+      pctColor = COLOR_MAP[colorAvance];
+    } else {
+      // Auto: rojo < 50%, amarillo 50–99%, verde 100%
+      if (pct >= 100)      pctColor = COLOR_MAP.verde;
+      else if (pct >= 50)  pctColor = COLOR_MAP.amarillo;
+      else                 pctColor = COLOR_MAP.rojo;
+    }
+
     const values = [
       estab,
       titulo,
@@ -159,7 +179,12 @@ export function exportarComunaPDF(comuna, obras) {
 
     let x = margin;
     values.forEach((val, vi) => {
-      if (vi === 9) {
+      if (vi === 6) {
+        // Color del % de avance (manual o automático)
+        doc.setTextColor(...pctColor);
+        doc.setFont('helvetica', 'bold');
+      } else if (vi === 9) {
+        doc.setFont('helvetica', 'normal');
         if      (obra.tramo_certificacion === 'primer_50')  doc.setTextColor(180, 140, 0);
         else if (obra.tramo_certificacion === 'segundo_50') doc.setTextColor(200, 90, 0);
         else if (obra.estado_cobro === 'listo_certificar')  doc.setTextColor(22, 163, 74);
@@ -167,6 +192,7 @@ export function exportarComunaPDF(comuna, obras) {
         else if (obra.estado_cobro === 'pendiente')         doc.setTextColor(200, 30, 30);
         else                                                doc.setTextColor(100, 100, 100);
       } else {
+        doc.setFont('helvetica', 'normal');
         doc.setTextColor(40, 40, 40);
       }
       // Alinear montos a la derecha

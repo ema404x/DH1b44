@@ -91,17 +91,26 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
                   {fmt(obra.monto_contrato)}
                 </span>
               )}
-              {obra.porcentaje_avance > 0 && (
-                <div className="flex items-center gap-2">
-                  <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary rounded-full"
-                      style={{ width: `${Math.min(100, obra.porcentaje_avance)}%` }}
-                    />
+              {obra.porcentaje_avance > 0 && (() => {
+                const pct = obra.porcentaje_avance;
+                const c = obra.color_avance || 'auto';
+                const barColor =
+                  c === 'verde'    ? '#16a34a' :
+                  c === 'amarillo' ? '#a1780a' :
+                  c === 'rojo'     ? '#c81e1e' :
+                  c === 'azul'     ? '#2563eb' :
+                  c === 'gris'     ? '#787878' :
+                  // auto
+                  pct >= 100 ? '#16a34a' : pct >= 50 ? '#a1780a' : '#c81e1e';
+                return (
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: barColor }} />
+                    </div>
+                    <span className="text-xs font-semibold" style={{ color: barColor }}>{pct}%</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">{obra.porcentaje_avance}%</span>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* Observaciones inline si hay */}

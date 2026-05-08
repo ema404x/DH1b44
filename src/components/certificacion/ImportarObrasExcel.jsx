@@ -55,6 +55,7 @@ function mapRow(row, comuna) {
     estado_cobro,
     prioridad,
     monto_a_cobrar:   parseFloat(get('MONTO BASE FEB-23')) || 0,
+    color_avance:     'auto',
   };
 
   // Limpiar undefined

@@ -14,6 +14,7 @@ const EMPTY = {
   fecha_inicio: '', fecha_fin_estimada: '',
   estado_cobro: 'pendiente', prioridad: 'normal',
   tramo_certificacion: '',
+  color_avance: 'auto',
   motivo_observacion: '', notas: ''
 };
 
@@ -100,9 +101,24 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
             <Field label="Monto a Cobrar ($)">
               <Input type="number" value={form.monto_a_cobrar} onChange={e => set('monto_a_cobrar', e.target.value)} placeholder="0" min="0" />
             </Field>
-            <Field label="% Avance">
-              <Input type="number" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', e.target.value)} placeholder="0–100" min="0" max="100" />
-            </Field>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="% Avance">
+                <Input type="number" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', e.target.value)} placeholder="0–100" min="0" max="100" />
+              </Field>
+              <Field label="Color % en PDF">
+                <Select value={form.color_avance || 'auto'} onValueChange={v => set('color_avance', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">🔄 Auto (por rango)</SelectItem>
+                    <SelectItem value="verde">🟢 Verde</SelectItem>
+                    <SelectItem value="amarillo">🟡 Amarillo</SelectItem>
+                    <SelectItem value="rojo">🔴 Rojo</SelectItem>
+                    <SelectItem value="azul">🔵 Azul</SelectItem>
+                    <SelectItem value="gris">⚪ Gris</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
           </div>
 
           {/* Fechas y plazo */}
