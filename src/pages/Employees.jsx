@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode, SettingsIcon, Plus, Users, Zap } from 'lucide-react';
+import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode, SettingsIcon, Plus, Users, Zap, LinkIcon, UnlinkIcon } from 'lucide-react';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -238,7 +238,18 @@ export default function Employees() {
                         </div>
                       </div>
 
-                      <StatusBadge value={emp.status || 'activo'} />
+                      <div className="flex items-center gap-2 mt-1">
+                        <StatusBadge value={emp.status || 'activo'} />
+                        {emp.user_id ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                            <LinkIcon className="h-2.5 w-2.5" /> Vinculado
+                          </span>
+                        ) : emp.email ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                            <UnlinkIcon className="h-2.5 w-2.5" /> Sin vincular
+                          </span>
+                        ) : null}
+                      </div>
 
                       {emp.assigned_location && <p className="text-xs text-cyan-400 mt-2">📍 {emp.assigned_location}</p>}
 

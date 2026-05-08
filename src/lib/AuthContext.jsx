@@ -31,8 +31,23 @@ export const AuthProvider = ({ children }) => {
             setUserPermissions(rolePerms[0].permissions);
           }
         } catch (_) {
-          // Si falla, no bloquear el login
           setUserPermissions(null);
+        }
+      }
+
+      // Vincular automáticamente la ficha de empleado si existe con el mismo email
+      if (currentUser?.email) {
+        try {
+          const matches = await base44.entities.Employee.filter({ email: currentUser.email });
+          if (matches && matches.length > 0) {
+            const emp = matches[0];
+            // Solo actualizar si aún no está vinculado o si cambió el user_id
+            if (!emp.user_id || emp.user_id !== currentUser.id) {
+              await base44.entities.Employee.update(emp.id, { user_id: currentUser.id });
+            }
+          }
+        } catch (_) {
+          // Si falla la vinculación, no bloquear el login
         }
       }
     } catch (error) {

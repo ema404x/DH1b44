@@ -1,0 +1,97 @@
+{
+  "name": "Employee",
+  "type": "object",
+  "properties": {
+    "full_name": {
+      "type": "string"
+    },
+    "dni": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "operario",
+        "tecnico",
+        "capataz",
+        "supervisor",
+        "ingeniero",
+        "administrativo",
+        "gerente",
+        "jefe_sitio"
+      ],
+      "default": "operario"
+    },
+    "specialty": {
+      "type": "string",
+      "enum": [
+        "electricidad",
+        "plomeria",
+        "pintura",
+        "alba\u00f1ileria",
+        "carpinteria",
+        "herreria",
+        "climatizacion",
+        "general",
+        "otro"
+      ],
+      "default": "general"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "activo",
+        "licencia",
+        "vacaciones",
+        "inactivo"
+      ],
+      "default": "activo"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email del empleado \u2014 se usa para vincular con su cuenta de usuario"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "ID del usuario Base44 vinculado a este empleado (se completa autom\u00e1ticamente al iniciar sesi\u00f3n)"
+    },
+    "hire_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "hourly_rate": {
+      "type": "number"
+    },
+    "certifications": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "emergency_contact": {
+      "type": "string"
+    },
+    "emergency_phone": {
+      "type": "string"
+    },
+    "assigned_location": {
+      "type": "string"
+    },
+    "assigned_jefe_sitio": {
+      "type": "string"
+    },
+    "assigned_comuna": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "full_name",
+    "role"
+  ]
+}
