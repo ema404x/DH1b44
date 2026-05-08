@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import GlobalSearch from './GlobalSearch';
 import NotificationBell from './NotificationBell';
@@ -8,11 +8,21 @@ import OfflineBar from '@/components/pwa/OfflineBar';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { toast } from 'sonner';
 import ChatbotSoporte from '@/components/soporte/ChatbotSoporte';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useEmergencyNotifications } from '@/hooks/useEmergencyNotifications';
+import EmergencyAlert from '@/components/emergencias/EmergencyAlert';
+import { useState } from 'react';
 
 export default function AppLayout() {
   const { isOnline, pendingCount, isSyncing, syncPending } = useOfflineQueue((count) => {
     toast.success(`${count} orden${count !== 1 ? 'es' : ''} de trabajo sincronizada${count !== 1 ? 's' : ''} correctamente`);
   });
+  const { currentUser } = useCurrentUser();
+  const [activeEmergency, setActiveEmergency] = useState(null);
+  const navigate = useNavigate();
+
+  // Notificaciones de emergencia para gerencia (admin)
+  useEmergencyNotifications(currentUser, setActiveEmergency);
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0f1e34 55%, #091422 100%)' }}>
@@ -35,6 +45,13 @@ export default function AppLayout() {
         </main>
       </div>
       <ChatbotSoporte />
+      {activeEmergency && (
+        <EmergencyAlert
+          emergencia={activeEmergency}
+          onClose={() => setActiveEmergency(null)}
+          onView={() => { navigate('/emergencias'); setActiveEmergency(null); }}
+        />
+      )}
     </div>
   );
 }
