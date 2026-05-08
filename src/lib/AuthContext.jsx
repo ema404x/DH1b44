@@ -35,20 +35,11 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
-      // Vincular automáticamente la ficha de empleado si existe con el mismo email
-      if (currentUser?.email) {
-        try {
-          const matches = await base44.entities.Employee.filter({ email: currentUser.email });
-          if (matches && matches.length > 0) {
-            const emp = matches[0];
-            // Solo actualizar si aún no está vinculado o si cambió el user_id
-            if (!emp.user_id || emp.user_id !== currentUser.id) {
-              await base44.entities.Employee.update(emp.id, { user_id: currentUser.id });
-            }
-          }
-        } catch (_) {
-          // Si falla la vinculación, no bloquear el login
-        }
+      // Vincular automáticamente la ficha de empleado via backend (service role)
+      try {
+        await base44.functions.invoke('vincularEmpleado', {});
+      } catch (_) {
+        // Si falla la vinculación, no bloquear el login
       }
     } catch (error) {
       setIsAuthenticated(false);
