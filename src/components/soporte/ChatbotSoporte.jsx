@@ -186,7 +186,9 @@ async function buildContextoReflexivo(user) {
     if (certsBorrador.length > 0) {
       inspeccionesInfo += `\n\nCertificados en borrador sin enviar: ${certsBorrador.length}.`;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[Alice - buildContextoReflexivo] Error al cargar datos del sistema:', e?.message || e);
+  }
 
   const resumen = [pendientesInfo, otsInfo, inspeccionesInfo].filter(Boolean).join('\n\n');
 
@@ -258,6 +260,7 @@ export function AlicePageButton({ onClick }) {
 export default function ChatbotSoporte() {
   const location = useLocation();
   const moduloActual = RUTA_MODULO[location.pathname] || null;
+  const prevModuloRef = useRef(moduloActual);
 
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -350,32 +353,49 @@ export default function ChatbotSoporte() {
 
   useEffect(() => {
     if (open && !conversation && currentUser !== null) {
-      base44.agents.createConversation({
-        agent_name: 'soporte_app',
-        metadata: { name: 'Soporte', user_role: rolEfectivo },
-      }).then(async conv => {
+      // Esperar a que empleadoInfo esté disponible (puede llegar async después de currentUser)
+      const init = async () => {
+        const conv = await base44.agents.createConversation({
+          agent_name: 'soporte_app',
+          metadata: { name: 'Soporte', user_role: rolEfectivo },
+        });
         const contexto = buildContextoRol(currentUser, moduloActual, empleadoInfo);
         await base44.agents.addMessage(conv, { role: 'user', content: contexto });
         setConversation(conv);
         setMessages([]);
-      });
+      };
+      init();
     }
     if (open) {
       setUnread(0);
       setTimeout(() => inputRef.current?.focus(), 150);
     }
-  }, [open, conversation, currentUser]);
+  }, [open, conversation, currentUser, empleadoInfo]);
+
+  // Referencia para rastrear cantidad de mensajes ya vistos (evitar unread inflado)
+  const lastVisibleCount = useRef(0);
 
   useEffect(() => {
     if (!conversation?.id) return;
+    // Prefijos internos que NUNCA debe ver el usuario
+    const INTERNAL_PREFIXES = ['[CONTEXTO', '[MODO REFLEXIVA', '[AYUDA PÁGINA', '[CERTIFICADO CREADO'];
     const unsub = base44.agents.subscribeToConversation(conversation.id, (data) => {
-      const visible = (data.messages || []).filter((m, i) =>
-        !(i === 0 && m.role === 'user' && m.content?.startsWith('[CONTEXTO')) &&
-        !(m.role === 'user' && m.content?.startsWith('[MODO REFLEXIVA')) &&
-        !(m.role === 'user' && m.content?.startsWith('[AYUDA PÁGINA'))
+      const allMsgs = data.messages || [];
+      const visible = allMsgs.filter((m, i) =>
+        !(i === 0 && m.role === 'user') && // siempre ocultar primer mensaje (contexto inicial)
+        !(m.role === 'user' && INTERNAL_PREFIXES.some(p => m.content?.startsWith(p)))
       );
       setMessages(visible);
-      if (!open && visible.length > 0) setUnread(u => u + 1);
+      // Incrementar unread solo cuando llegan mensajes NUEVOS del bot (no updates de streaming)
+      if (!open) {
+        const botMsgs = visible.filter(m => m.role === 'assistant');
+        if (botMsgs.length > lastVisibleCount.current) {
+          setUnread(u => u + (botMsgs.length - lastVisibleCount.current));
+          lastVisibleCount.current = botMsgs.length;
+        }
+      } else {
+        lastVisibleCount.current = visible.filter(m => m.role === 'assistant').length;
+      }
     });
     return unsub;
   }, [conversation?.id, open]);
@@ -402,12 +422,15 @@ export default function ChatbotSoporte() {
   };
 
   const handleAyudaPagina = async () => {
-    if (!conversation || !moduloActual) return;
+    if (!moduloActual) return;
     setOpen(true);
+    // Esperar a que la conversación exista antes de enviar
+    const conv = conversation;
+    if (!conv) return;
     const prompt = `[AYUDA PÁGINA - contexto interno, no lo menciones]\nEl usuario está en el módulo "${moduloActual}" y quiere saber qué puede hacer aquí.\nExplicale en 3-4 puntos concretos las funciones principales de este módulo y cómo empezar. Sé directo y práctico.`;
     setSending(true);
     try {
-      await base44.agents.addMessage(conversation, { role: 'user', content: prompt });
+      await base44.agents.addMessage(conv, { role: 'user', content: prompt });
     } finally {
       setSending(false);
     }
@@ -425,13 +448,23 @@ export default function ChatbotSoporte() {
     }
   };
 
+  const MAX_PHOTO_MB = 8;
+
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_PHOTO_MB * 1024 * 1024) {
+      alert(`La imagen es demasiado grande. El límite es ${MAX_PHOTO_MB} MB.`);
+      e.target.value = '';
+      return;
+    }
     setUploadingPhoto(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       await handleSend('(foto adjunta para consulta)', [file_url]);
+    } catch (err) {
+      console.error('Error al subir foto:', err);
+      alert('No se pudo subir la imagen. Intentá de nuevo.');
     } finally {
       setUploadingPhoto(false);
       e.target.value = '';
@@ -442,15 +475,26 @@ export default function ChatbotSoporte() {
     setConversation(null);
     setMessages([]);
     setShowSugerencias(false);
+    lastVisibleCount.current = 0;
   };
 
-  const handleAccionRapida = (tipo) => {
+  // Reiniciar contexto de Alice cuando el usuario cambia de módulo (sin resetear mensajes)
+  useEffect(() => {
+    if (!conversation || !currentUser) return;
+    if (prevModuloRef.current === moduloActual) return;
+    prevModuloRef.current = moduloActual;
+    if (!moduloActual) return;
+    const aviso = `[CONTEXTO ACTUALIZADO - no lo menciones]\nEl usuario acaba de navegar al módulo: "${moduloActual}". Tenelo en cuenta para las próximas preguntas.`;
+    base44.agents.addMessage(conversation, { role: 'user', content: aviso }).catch(() => {});
+  }, [moduloActual, conversation, currentUser]);
+
+  const handleAccionRapida = async (tipo) => {
     const mensajes = {
       ot: '¿Cómo creo una orden de trabajo nueva?',
       pendiente: '¿Cómo creo un nuevo pendiente SAP manualmente?',
       emergencia: '¿Cómo registro una emergencia?',
     };
-    handleSend(mensajes[tipo]);
+    await handleSend(mensajes[tipo]);
   };
 
   // Posición de la burbuja
