@@ -7,11 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Plus, Search, FileCheck, DollarSign, Clock, TrendingUp, CheckCircle2,
-  AlertCircle, Filter, ChevronDown, Building2, User, Calendar, Hash
+  AlertCircle, Filter, ChevronDown, Building2, User, Calendar, Hash, FileSpreadsheet
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ObraCertificacionDialog from '@/components/certificacion/ObraCertificacionDialog';
 import ObraCertificacionCard from '@/components/certificacion/ObraCertificacionCard';
+import ImportarObrasExcel from '@/components/certificacion/ImportarObrasExcel';
 
 const ESTADO_CONFIG = {
   pendiente:   { label: 'Pendiente',   color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
@@ -32,6 +33,7 @@ export default function CertificacionObras() {
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: obras = [], isLoading } = useQuery({
     queryKey: ['obras-certificacion'],
@@ -87,9 +89,14 @@ export default function CertificacionObras() {
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">Listado de obras pendientes de cobro y en gestión</p>
         </div>
-        <Button onClick={handleNew} className="gap-2 shrink-0">
-          <Plus className="h-4 w-4" /> Nueva Obra
-        </Button>
+        <div className="flex gap-2 shrink-0">
+          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
+            <FileSpreadsheet className="h-4 w-4" /> Importar Excel
+          </Button>
+          <Button onClick={handleNew} className="gap-2">
+            <Plus className="h-4 w-4" /> Nueva Obra
+          </Button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -198,6 +205,15 @@ export default function CertificacionObras() {
           ))}
         </div>
       )}
+
+      <ImportarObrasExcel
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => {
+          qc.invalidateQueries({ queryKey: ['obras-certificacion'] });
+          setImportOpen(false);
+        }}
+      />
 
       <ObraCertificacionDialog
         open={dialogOpen}
