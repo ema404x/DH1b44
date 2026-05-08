@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Pencil, Trash2, Building2, User, DollarSign, Calendar, Hash, ChevronDown, ChevronUp,
-  MapPin, UserCheck, Clock, Eye
+  MapPin, UserCheck, Clock, Eye, MessageSquare
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -102,6 +102,12 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
             {obra.notas && (
               <p className="text-xs text-muted-foreground italic border-l-2 border-border pl-2">{obra.notas}</p>
             )}
+            {obra.estado_cobro === 'observado' && obra.motivo_observacion && (
+              <div className="flex items-start gap-1.5 px-2 py-1.5 rounded-lg bg-slate-500/10 border border-slate-500/20">
+                <MessageSquare className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-300"><span className="font-medium">Motivo:</span> {obra.motivo_observacion}</p>
+              </div>
+            )}
           </div>
 
           {/* Acciones */}
@@ -111,10 +117,10 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="en_gestion">En Gestión</SelectItem>
-                <SelectItem value="cobrado">Cobrado</SelectItem>
-                <SelectItem value="rechazado">Rechazado</SelectItem>
+                <SelectItem value="listo_certificar">✅ Listo para Certificar</SelectItem>
+                <SelectItem value="faltan_actas">⚠️ Faltan Cargar Actas</SelectItem>
+                <SelectItem value="pendiente">🔴 Pendiente</SelectItem>
+                <SelectItem value="observado">⚫ Observado</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpanded(!expanded)}>

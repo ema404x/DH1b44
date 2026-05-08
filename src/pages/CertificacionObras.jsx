@@ -15,10 +15,10 @@ import ObraCertificacionCard from '@/components/certificacion/ObraCertificacionC
 import ImportarObrasExcel from '@/components/certificacion/ImportarObrasExcel';
 
 const ESTADO_CONFIG = {
-  pendiente:   { label: 'Pendiente',   color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
-  en_gestion:  { label: 'En Gestión',  color: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
-  cobrado:     { label: 'Cobrado',     color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-  rechazado:   { label: 'Rechazado',   color: 'bg-red-500/15 text-red-400 border-red-500/30' },
+  listo_certificar: { label: 'Listo para Certificar', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+  faltan_actas:     { label: 'Faltan Cargar Actas',   color: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
+  pendiente:        { label: 'Pendiente',              color: 'bg-red-500/15 text-red-400 border-red-500/30' },
+  observado:        { label: 'Observado',              color: 'bg-slate-500/15 text-slate-400 border-slate-500/30' },
 };
 
 const PRIORIDAD_CONFIG = {
@@ -76,10 +76,11 @@ export default function CertificacionObras() {
 
   // KPIs
   const totalMonto = obras.filter(o => o.estado_cobro !== 'cobrado').reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
-  const pendientes = obras.filter(o => o.estado_cobro === 'pendiente').length;
-  const enGestion  = obras.filter(o => o.estado_cobro === 'en_gestion').length;
-  const cobrados   = obras.filter(o => o.estado_cobro === 'cobrado').length;
-  const urgentes   = obras.filter(o => o.prioridad === 'urgente' && o.estado_cobro !== 'cobrado').length;
+  const listoCertificar = obras.filter(o => o.estado_cobro === 'listo_certificar').length;
+  const faltanActas    = obras.filter(o => o.estado_cobro === 'faltan_actas').length;
+  const pendientes     = obras.filter(o => o.estado_cobro === 'pendiente').length;
+  const observados     = obras.filter(o => o.estado_cobro === 'observado').length;
+  const urgentes       = obras.filter(o => o.prioridad === 'urgente').length;
 
   const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -106,40 +107,40 @@ export default function CertificacionObras() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="border-amber-500/20 bg-amber-500/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-4 w-4 text-amber-400" />
-              <span className="text-xs text-muted-foreground">Pendientes</span>
-            </div>
-            <p className="text-2xl font-bold text-amber-400">{pendientes}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-blue-500/20 bg-blue-500/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="h-4 w-4 text-blue-400" />
-              <span className="text-xs text-muted-foreground">En Gestión</span>
-            </div>
-            <p className="text-2xl font-bold text-blue-400">{enGestion}</p>
-          </CardContent>
-        </Card>
         <Card className="border-emerald-500/20 bg-emerald-500/5">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
               <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <span className="text-xs text-muted-foreground">Cobrados</span>
+              <span className="text-xs text-muted-foreground">Listo para Certificar</span>
             </div>
-            <p className="text-2xl font-bold text-emerald-400">{cobrados}</p>
+            <p className="text-2xl font-bold text-emerald-400">{listoCertificar}</p>
           </CardContent>
         </Card>
-        <Card className="border-primary/20 bg-primary/5">
+        <Card className="border-yellow-500/20 bg-yellow-500/5">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <DollarSign className="h-4 w-4 text-primary" />
-              <span className="text-xs text-muted-foreground">Total a Cobrar</span>
+              <Clock className="h-4 w-4 text-yellow-400" />
+              <span className="text-xs text-muted-foreground">Faltan Actas</span>
             </div>
-            <p className="text-lg font-bold text-primary leading-tight">{fmt(totalMonto)}</p>
+            <p className="text-2xl font-bold text-yellow-400">{faltanActas}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-red-500/20 bg-red-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <AlertCircle className="h-4 w-4 text-red-400" />
+              <span className="text-xs text-muted-foreground">Pendiente</span>
+            </div>
+            <p className="text-2xl font-bold text-red-400">{pendientes}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-slate-500/20 bg-slate-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="h-4 w-4 text-slate-400" />
+              <span className="text-xs text-muted-foreground">Observados</span>
+            </div>
+            <p className="text-2xl font-bold text-slate-400">{observados}</p>
           </CardContent>
         </Card>
       </div>
@@ -172,10 +173,10 @@ export default function CertificacionObras() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos los estados</SelectItem>
+            <SelectItem value="listo_certificar">Listo para Certificar</SelectItem>
+            <SelectItem value="faltan_actas">Faltan Cargar Actas</SelectItem>
             <SelectItem value="pendiente">Pendiente</SelectItem>
-            <SelectItem value="en_gestion">En Gestión</SelectItem>
-            <SelectItem value="cobrado">Cobrado</SelectItem>
-            <SelectItem value="rechazado">Rechazado</SelectItem>
+            <SelectItem value="observado">Observado</SelectItem>
           </SelectContent>
         </Select>
       </div>

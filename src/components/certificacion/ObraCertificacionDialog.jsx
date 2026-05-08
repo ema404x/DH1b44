@@ -12,7 +12,8 @@ const EMPTY = {
   monto_contrato: '', monto_a_cobrar: '',
   porcentaje_avance: '', plazo_dias: '', periodo: '',
   fecha_inicio: '', fecha_fin_estimada: '',
-  estado_cobro: 'pendiente', prioridad: 'normal', notas: ''
+  estado_cobro: 'pendiente', prioridad: 'normal',
+  motivo_observacion: '', notas: ''
 };
 
 function Field({ label, children }) {
@@ -125,10 +126,10 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
               <Select value={form.estado_cobro} onValueChange={v => set('estado_cobro', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="en_gestion">En Gestión</SelectItem>
-                  <SelectItem value="cobrado">Cobrado</SelectItem>
-                  <SelectItem value="rechazado">Rechazado</SelectItem>
+                  <SelectItem value="listo_certificar">✅ Listo para Certificar</SelectItem>
+                  <SelectItem value="faltan_actas">⚠️ Faltan Cargar Actas</SelectItem>
+                  <SelectItem value="pendiente">🔴 Pendiente</SelectItem>
+                  <SelectItem value="observado">⚫ Observado</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -144,11 +145,23 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
             </Field>
           </div>
 
-          <Field label="Observaciones">
+          {form.estado_cobro === 'observado' && (
+            <Field label="Motivo de observación *">
+              <textarea
+                value={form.motivo_observacion}
+                onChange={e => set('motivo_observacion', e.target.value)}
+                placeholder="Explicá brevemente por qué está observada esta obra..."
+                rows={2}
+                className="w-full rounded-md border border-yellow-500/40 bg-yellow-500/5 px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-yellow-500/50 resize-none"
+              />
+            </Field>
+          )}
+
+          <Field label="Notas internas">
             <textarea
               value={form.notas}
               onChange={e => set('notas', e.target.value)}
-              placeholder="Observaciones..."
+              placeholder="Notas adicionales..."
               rows={2}
               className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
             />

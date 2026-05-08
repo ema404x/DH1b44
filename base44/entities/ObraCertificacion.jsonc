@@ -52,7 +52,7 @@
     "porcentaje_avance": {
       "type": "number",
       "default": 0,
-      "description": "Porcentaje de avance (0-1 o 0-100)"
+      "description": "Porcentaje de avance (0-100)"
     },
     "plazo_dias": {
       "type": "number",
@@ -76,13 +76,17 @@
     "estado_cobro": {
       "type": "string",
       "enum": [
+        "listo_certificar",
+        "faltan_actas",
         "pendiente",
-        "en_gestion",
-        "cobrado",
-        "rechazado"
+        "observado"
       ],
       "default": "pendiente",
       "description": "Estado del cobro"
+    },
+    "motivo_observacion": {
+      "type": "string",
+      "description": "Motivo por el que la obra est\u00e1 observada"
     },
     "prioridad": {
       "type": "string",
@@ -95,7 +99,7 @@
     },
     "notas": {
       "type": "string",
-      "description": "Observaciones"
+      "description": "Observaciones generales"
     }
   },
   "required": [

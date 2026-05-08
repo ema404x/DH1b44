@@ -25,12 +25,17 @@ function mapRow(row, comuna) {
 
   const avance = parseFloat(get('%')) || 0;
 
-  // Determinar estado y prioridad según observaciones
+  // Determinar estado según observaciones del Excel
   const obs = (get('OBSERVACIONES') || '').toUpperCase();
   let estado_cobro = 'pendiente';
   let prioridad = 'normal';
-  if (obs.includes('LISTO PARA CERTIFICAR')) { estado_cobro = 'en_gestion'; prioridad = 'alta'; }
-  else if (obs.includes('COBRADO')) { estado_cobro = 'cobrado'; }
+  if (obs.includes('LISTO PARA CERTIFICAR')) {
+    estado_cobro = 'listo_certificar'; prioridad = 'alta';
+  } else if (obs.includes('FALTA CARGAR ACTAS') || obs.includes('FALTAN ACTAS') || obs.includes('FALTA CARGAR')) {
+    estado_cobro = 'faltan_actas';
+  } else if (obs.includes('OBSERVADO') || obs.includes('OBSERVACION')) {
+    estado_cobro = 'observado';
+  }
 
   const obj = {
     titulo:           get('TITULO DE OBRA EN SAP') || '',
