@@ -3,12 +3,11 @@ import { base44 } from '@/api/base44Client';
 import { useLocation } from 'react-router-dom';
 import {
   MessageCircle, X, Send, Loader2, Bot, RotateCcw, Sparkles, Heart,
-  HelpCircle, Image as ImageIcon, ClipboardList, Wrench, AlertTriangle, GripVertical, Paperclip, FileCheck
+  HelpCircle, Image as ImageIcon, ClipboardList, Wrench, AlertTriangle, GripVertical
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
-import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 
 // Mapa de rutas a nombres de módulo
 const RUTA_MODULO = {
@@ -315,13 +314,11 @@ export default function ChatbotSoporte() {
   const [empleadoInfo, setEmpleadoInfo] = useState(null);
   const [loadingReflexiva, setLoadingReflexiva] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [uploadingPDF, setUploadingPDF] = useState(false);
   const [criticalAlerts, setCriticalAlerts] = useState(0);
   const [proactiveShown, setProactiveShown] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
-  const pdfInputRef = useRef(null);
 
   const isThinking = messages.length > 0 && messages[messages.length - 1]?.role === 'user';
   const rolEfectivo = empleadoInfo?.employee_role?.toLowerCase().trim() || (currentUser?.role === 'admin' ? 'admin' : 'user');
@@ -437,102 +434,6 @@ export default function ChatbotSoporte() {
       await handleSend('(foto adjunta para consulta)', [file_url]);
     } finally {
       setUploadingPhoto(false);
-      e.target.value = '';
-    }
-  };
-
-  const handlePDFUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingPDF(true);
-    try {
-      // 1. Subir el PDF
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-
-      // 2. Extraer datos del ADA/OC
-      const res = await base44.functions.invoke('extractADA', { file_url });
-      const extracted = res?.data;
-      if (!extracted) throw new Error('No se pudo extraer el PDF');
-
-      // 3. Crear el certificado directamente en la DB (estado borrador → emitido)
-      const items = (extracted.items || []).map((item, i) => ({
-        numero: i + 1,
-        descripcion: item.descripcion || '',
-        um: item.um || 'GL',
-        cantidad: item.cantidad || 1,
-        importe_unitario: item.importe_unitario || 0,
-        importe_total: item.importe_total || (item.cantidad * item.importe_unitario) || 0,
-        med_acum_anterior_unidad: item.med_acum_anterior_unidad || 0,
-        med_acum_anterior_importe: item.med_acum_anterior_importe || 0,
-        med_presente_unidad: item.med_presente_unidad ?? (item.cantidad || 1),
-        med_presente_importe: item.med_presente_importe ?? (item.importe_total || 0),
-        med_acum_presente_unidad: item.med_acum_presente_unidad ?? (item.cantidad || 1),
-        med_acum_presente_importe: item.med_acum_presente_importe ?? (item.importe_total || 0),
-        saldo_pendiente_unidad: item.saldo_pendiente_unidad || 0,
-        saldo_pendiente_importe: item.saldo_pendiente_importe || 0,
-      }));
-
-      const subtotal = items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
-
-      const certData = {
-        tipo: extracted.tipo || 'abono_mensual',
-        estado: 'borrador',
-        emprendimiento: extracted.emprendimiento || '',
-        obra_servicio: extracted.obra_servicio || '',
-        contratista: extracted.contratista || '',
-        ada_numero: extracted.ada_numero || '',
-        oc_numero: extracted.oc_numero || '',
-        mes_periodo: extracted.mes_periodo || '',
-        fecha_inicio: extracted.fecha_inicio || '',
-        plazo_obra: extracted.plazo_obra || '',
-        plazo_entrega: extracted.plazo_entrega || '',
-        fecha_finalizacion: '',
-        monto_contratado: (extracted.monto_contratado && extracted.monto_contratado > 100) ? extracted.monto_contratado : subtotal,
-        monto_obra_contratada: extracted.monto_obra_contratada || 0,
-        porcentaje_avance: extracted.porcentaje_avance || 0,
-        condiciones_pago: extracted.condiciones_pago || '',
-        subtotal,
-        anticipo_pct: 0,
-        fondo_reparo_pct: 0,
-        fecha_certificado: new Date().toISOString().split('T')[0],
-        ada_pdf_url: file_url,
-        items,
-        numero: 1,
-      };
-
-      const cert = await base44.entities.Certificado.create(certData);
-
-      // 4. Generar el PDF automáticamente
-      await exportCertificadoPDF({ ...certData, numero: cert.id?.slice(-4).toUpperCase() || 1 });
-
-      // 5. Notificar a Alice con resumen para que confirme al usuario
-      const tipoLabel = certData.tipo === 'abono_mensual' ? 'Abono Mensual' : certData.tipo === 'obra' ? 'Obra' : 'Informe';
-      const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
-      const prompt = `[CERTIFICADO CREADO AUTOMÁTICAMENTE - solo informá al usuario]
-El sistema procesó el archivo "${file.name}" y creó el certificado exitosamente.
-
-Resumen del certificado creado:
-- Tipo: ${tipoLabel}
-- Contratista: ${certData.contratista || '(no detectado)'}
-- ADA N°: ${certData.ada_numero || '(no detectado)'}
-- OC N°: ${certData.oc_numero || '(no detectado)'}
-- Emprendimiento: ${certData.emprendimiento || '(no detectado)'}
-- Ítems extraídos: ${items.length}
-- Subtotal: ${fmt(subtotal)}
-- Estado: Borrador (guardado en el módulo de Certificados)
-- El PDF fue descargado automáticamente.
-
-Informale al usuario de forma breve y amigable que el certificado fue creado y el PDF generado. Mencionale que puede verlo y editarlo en el módulo Certificados. Si detectás que falta información importante (contratista, ADA N°), alertale para que lo complete.`;
-
-      await base44.agents.addMessage(conversation, { role: 'user', content: prompt });
-
-    } catch (err) {
-      await base44.agents.addMessage(conversation, {
-        role: 'user',
-        content: `Intenté procesar el archivo "${file?.name}" pero hubo un error. El error fue: ${err.message}. ¿Podés ayudarme a resolverlo?`
-      });
-    } finally {
-      setUploadingPDF(false);
       e.target.value = '';
     }
   };
@@ -808,27 +709,15 @@ Informale al usuario de forma breve y amigable que el certificado fue creado y e
             <div className="px-3 pb-3 pt-1 border-t border-border flex-shrink-0">
               <div className="flex gap-2 items-end">
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-                <input ref={pdfInputRef} type="file" accept=".pdf" className="hidden" onChange={handlePDFUpload} />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={!conversation || uploadingPhoto || uploadingPDF}
+                  disabled={!conversation || uploadingPhoto}
                   title="Adjuntar foto"
                   className="h-9 w-9 rounded-xl flex-shrink-0 flex items-center justify-center border border-border hover:bg-muted transition-colors disabled:opacity-40"
                 >
                   {uploadingPhoto
                     ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     : <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                  }
-                </button>
-                <button
-                  onClick={() => pdfInputRef.current?.click()}
-                  disabled={!conversation || uploadingPhoto || uploadingPDF}
-                  title="Subir ADA / OC (PDF) para generar certificado"
-                  className="h-9 w-9 rounded-xl flex-shrink-0 flex items-center justify-center border border-primary/40 hover:bg-primary/10 transition-colors disabled:opacity-40"
-                >
-                  {uploadingPDF
-                    ? <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    : <Paperclip className="h-4 w-4 text-primary" />
                   }
                 </button>
                 <textarea
@@ -847,7 +736,7 @@ Informale al usuario de forma breve y amigable que el certificado fue creado y e
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
-              <p className="text-[10px] text-muted-foreground/50 text-center mt-1.5">Enter para enviar · 📷 foto · 📎 ADA/OC PDF → genera certificado</p>
+              <p className="text-[10px] text-muted-foreground/50 text-center mt-1.5">Enter para enviar · 📷 podés adjuntar fotos para consultas</p>
             </div>
           </motion.div>
         )}
