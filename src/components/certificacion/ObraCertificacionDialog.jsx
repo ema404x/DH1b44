@@ -116,14 +116,14 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
           {/* Financiero */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Field label="Monto Base ($)">
-              <Input type="number" value={form.monto_contrato} onChange={e => set('monto_contrato', e.target.value)} placeholder="0" min="0" />
+              <Input type="text" inputMode="decimal" value={form.monto_contrato} onChange={e => set('monto_contrato', e.target.value)} placeholder="0" />
             </Field>
             <Field label="Monto a Cobrar ($)">
-              <Input type="number" value={form.monto_a_cobrar} onChange={e => set('monto_a_cobrar', e.target.value)} placeholder="0" min="0" />
+              <Input type="text" inputMode="decimal" value={form.monto_a_cobrar} onChange={e => set('monto_a_cobrar', e.target.value)} placeholder="0" />
             </Field>
             <div className="grid grid-cols-2 gap-2">
               <Field label="% Avance">
-                <Input type="number" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', e.target.value)} placeholder="0–100" min="0" max="100" />
+                <Input type="text" inputMode="decimal" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', e.target.value)} placeholder="0–100" />
               </Field>
               <Field label="Color % en PDF">
                 <Select value={form.color_avance || 'auto'} onValueChange={v => set('color_avance', v)}>
@@ -150,7 +150,7 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
               <Input type="date" value={form.fecha_fin_estimada} onChange={e => set('fecha_fin_estimada', e.target.value)} />
             </Field>
             <Field label="Plazo (días)">
-              <Input type="number" value={form.plazo_dias} onChange={e => set('plazo_dias', e.target.value)} placeholder="0" min="0" />
+              <Input type="text" inputMode="numeric" value={form.plazo_dias} onChange={e => set('plazo_dias', e.target.value)} placeholder="0" />
             </Field>
           </div>
 
