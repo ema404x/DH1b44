@@ -299,6 +299,7 @@ export default function CertificacionObras() {
               onEdit={handleEdit}
               onDelete={() => deleteMutation.mutate(obra.id)}
               onEstadoChange={(id, estado) => saveMutation.mutate({ id, estado_cobro: estado })}
+              onTramoChange={(id, tramo) => saveMutation.mutate({ id, tramo_certificacion: tramo || undefined })}
               fmt={fmt}
             />
           ))}

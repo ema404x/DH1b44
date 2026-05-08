@@ -10,7 +10,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-export default function ObraCertificacionCard({ obra, estadoConfig, prioridadConfig, onEdit, onDelete, onEstadoChange, fmt }) {
+export default function ObraCertificacionCard({ obra, estadoConfig, prioridadConfig, onEdit, onDelete, onEstadoChange, onTramoChange, fmt }) {
   const [expanded, setExpanded] = useState(false);
   const estado = estadoConfig[obra.estado_cobro] || estadoConfig.pendiente;
   const prioridad = prioridadConfig[obra.prioridad] || prioridadConfig.normal;
@@ -127,7 +127,20 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
           </div>
 
           {/* Acciones */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 shrink-0">
+            <Select
+              value={obra.tramo_certificacion || 'sin_tramo'}
+              onValueChange={(v) => onTramoChange(obra.id, v === 'sin_tramo' ? null : v)}
+            >
+              <SelectTrigger className="h-8 w-32 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sin_tramo">— Sin tramo</SelectItem>
+                <SelectItem value="primer_50">🟡 1° 50%</SelectItem>
+                <SelectItem value="segundo_50">🟠 2° 50%</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={obra.estado_cobro} onValueChange={(v) => onEstadoChange(obra.id, v)}>
               <SelectTrigger className="h-8 w-36 text-xs">
                 <SelectValue />
