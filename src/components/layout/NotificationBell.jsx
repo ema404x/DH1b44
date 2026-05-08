@@ -88,7 +88,7 @@ export default function NotificationBell() {
 
       {open && (
         <>
-          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} style={{ touchAction: 'none' }} />
           <div className="fixed right-2 top-14 z-[70] w-[calc(100vw-16px)] sm:w-80 sm:absolute sm:right-0 sm:top-11 sm:fixed-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div>

@@ -28,8 +28,8 @@ export default function UserMenu() {
 
       {open && (
         <>
-          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
-          <div className="fixed right-2 top-14 z-[70] w-56 sm:absolute sm:right-0 sm:top-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1.5 overflow-hidden">
+          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} style={{ touchAction: 'none' }} />
+          <div className="fixed right-2 top-14 z-[70] w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl py-1.5 overflow-hidden">
             <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 mb-1">
               <div className="text-sm font-semibold truncate text-foreground">{user?.full_name || 'Usuario'}</div>
               <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
