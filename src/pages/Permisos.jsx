@@ -33,6 +33,7 @@ const MODULES = [
   { key: 'Emergencias', label: 'Emergencias' },
   { key: 'InspeccionColegio', label: 'Inspección de Colegios' },
   { key: 'ControlRiesgo', label: 'Control de Riesgos' },
+  { key: 'CertificacionObras', label: 'Certificación de Obras' },
   { key: 'InformacionGeneral', label: 'Información General' },
   { key: 'Calendario', label: 'Calendario' },
   { key: 'Alertas', label: 'Alertas Proactivas' },
