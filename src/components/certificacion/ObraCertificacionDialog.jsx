@@ -123,6 +123,15 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
             </Field>
             <Field label="% Avance">
               <Input type="text" inputMode="decimal" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', e.target.value)} placeholder="0–100" />
+              {form.porcentaje_avance > 0 && (
+                <div className="mt-1.5 text-xs font-semibold">
+                  {parseFloat(form.porcentaje_avance) >= 100
+                    ? <span className="text-emerald-400">🟢 Completado (100%)</span>
+                    : parseFloat(form.porcentaje_avance) > 50
+                      ? <span className="text-orange-400">🟠 Segundo 50%</span>
+                      : <span className="text-yellow-400">🟡 Primer 50%</span>}
+                </div>
+              )}
             </Field>
           </div>
 
@@ -167,19 +176,6 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
             </Field>
           </div>
 
-          {/* Tramo de certificación — calculado automáticamente según % avance */}
-          {form.porcentaje_avance > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border text-xs text-muted-foreground">
-              <span>🔄 Tramo calculado automáticamente:</span>
-              <span className="font-semibold text-foreground">
-                {parseFloat(form.porcentaje_avance) >= 100
-                  ? '🟢 Completado (100%)'
-                  : parseFloat(form.porcentaje_avance) > 50
-                    ? '🟠 Segundo 50%'
-                    : '🟡 Primer 50%'}
-              </span>
-            </div>
-          )}
 
           {form.estado_cobro === 'observado' && (
             <Field label="Motivo de observación *">
