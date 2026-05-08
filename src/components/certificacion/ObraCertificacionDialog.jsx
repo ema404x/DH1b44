@@ -32,14 +32,18 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
 
   useEffect(() => {
     if (!obra) { setForm(EMPTY); return; }
-    // Normalizar: null/undefined → valor vacío para inputs controlados
+    const roundNum = (v, decimals = 2) => {
+      const n = parseFloat(v);
+      if (isNaN(n)) return '';
+      return parseFloat(n.toFixed(decimals));
+    };
     setForm({
       ...EMPTY,
       ...obra,
-      monto_contrato:    obra.monto_contrato    ?? '',
-      monto_a_cobrar:    obra.monto_a_cobrar    ?? '',
-      porcentaje_avance: obra.porcentaje_avance ?? '',
-      plazo_dias:        obra.plazo_dias        ?? '',
+      monto_contrato:    obra.monto_contrato    != null ? roundNum(obra.monto_contrato, 2)    : '',
+      monto_a_cobrar:    obra.monto_a_cobrar    != null ? roundNum(obra.monto_a_cobrar, 2)    : '',
+      porcentaje_avance: obra.porcentaje_avance != null ? roundNum(obra.porcentaje_avance, 1) : '',
+      plazo_dias:        obra.plazo_dias        != null ? roundNum(obra.plazo_dias, 0)        : '',
       color_avance:      obra.color_avance      || 'auto',
       tramo_certificacion: obra.tramo_certificacion || '',
       fecha_inicio:      obra.fecha_inicio       || '',
