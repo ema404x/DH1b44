@@ -23,7 +23,22 @@ function mapRow(row, comuna) {
     } catch { return undefined; }
   };
 
-  const avance = parseFloat(get('%')) || 0;
+  const avanceRaw = parseFloat(get('%')) || 0;
+  const avance = avanceRaw <= 1 && avanceRaw > 0 ? avanceRaw * 100 : avanceRaw; // normalizar a 0-100
+
+  // Tramo y color según % de avance
+  let tramo_certificacion = undefined;
+  let color_avance = 'auto';
+  if (avance >= 100) {
+    tramo_certificacion = undefined;
+    color_avance = 'verde';
+  } else if (avance > 50) {
+    tramo_certificacion = 'segundo_50';
+    color_avance = 'naranja';
+  } else if (avance > 0) {
+    tramo_certificacion = 'primer_50';
+    color_avance = 'amarillo';
+  }
 
   // Determinar estado según observaciones del Excel
   const obs = (get('OBSERVACIONES') || '').toUpperCase();
@@ -47,7 +62,7 @@ function mapRow(row, comuna) {
     oc_numero:        get('N° MTOM') ? String(get('N° MTOM')) : '',
     ada_numero:       get('N° MEIN') ? String(get('N° MEIN')) : '',
     monto_contrato:   parseFloat(get('MONTO BASE FEB-23')) || 0,
-    porcentaje_avance: avance <= 1 ? avance * 100 : avance, // normalizar a 0-100
+    porcentaje_avance: avance,
     plazo_dias:       parseFloat(get('Plazo')) || 0,
     fecha_inicio:     toDateStr(get('Acta de inicio')),
     fecha_fin_estimada: toDateStr(get('Acta de recepcion')),
@@ -55,7 +70,8 @@ function mapRow(row, comuna) {
     estado_cobro,
     prioridad,
     monto_a_cobrar:   parseFloat(get('MONTO BASE FEB-23')) || 0,
-    color_avance:     'auto',
+    color_avance,
+    tramo_certificacion,
   };
 
   // Limpiar undefined

@@ -130,8 +130,9 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="auto">🔄 Auto (por rango)</SelectItem>
-                    <SelectItem value="verde">🟢 Verde</SelectItem>
-                    <SelectItem value="amarillo">🟡 Amarillo</SelectItem>
+                    <SelectItem value="verde">🟢 Verde (100%)</SelectItem>
+                    <SelectItem value="naranja">🟠 Naranja (2° 50%)</SelectItem>
+                    <SelectItem value="amarillo">🟡 Amarillo (1° 50%)</SelectItem>
                     <SelectItem value="rojo">🔴 Rojo</SelectItem>
                     <SelectItem value="azul">🔵 Azul</SelectItem>
                     <SelectItem value="gris">⚪ Gris</SelectItem>

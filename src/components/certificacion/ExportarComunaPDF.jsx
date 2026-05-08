@@ -148,6 +148,7 @@ export function exportarComunaPDF(comuna, obras) {
     const COLOR_MAP = {
       verde:    [22,  163, 74],
       amarillo: [161, 120, 0],
+      naranja:  [220, 100, 0],
       rojo:     [200, 30,  30],
       azul:     [37,  99,  235],
       gris:     [120, 120, 120],
@@ -156,10 +157,10 @@ export function exportarComunaPDF(comuna, obras) {
     if (colorAvance !== 'auto' && COLOR_MAP[colorAvance]) {
       pctColor = COLOR_MAP[colorAvance];
     } else {
-      // Auto: rojo < 50%, amarillo 50–99%, verde 100%
+      // Auto: amarillo <= 50%, naranja > 50%, verde 100%
       if (pct >= 100)      pctColor = COLOR_MAP.verde;
-      else if (pct >= 50)  pctColor = COLOR_MAP.amarillo;
-      else                 pctColor = COLOR_MAP.rojo;
+      else if (pct > 50)   pctColor = COLOR_MAP.naranja;
+      else                 pctColor = COLOR_MAP.amarillo;
     }
 
     const values = [
