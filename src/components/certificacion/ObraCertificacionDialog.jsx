@@ -31,7 +31,23 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
   const [form, setForm] = useState(EMPTY);
 
   useEffect(() => {
-    setForm(obra ? { ...EMPTY, ...obra } : EMPTY);
+    if (!obra) { setForm(EMPTY); return; }
+    // Normalizar: null/undefined → valor vacío para inputs controlados
+    setForm({
+      ...EMPTY,
+      ...obra,
+      monto_contrato:    obra.monto_contrato    ?? '',
+      monto_a_cobrar:    obra.monto_a_cobrar    ?? '',
+      porcentaje_avance: obra.porcentaje_avance ?? '',
+      plazo_dias:        obra.plazo_dias        ?? '',
+      color_avance:      obra.color_avance      || 'auto',
+      tramo_certificacion: obra.tramo_certificacion || '',
+      fecha_inicio:      obra.fecha_inicio       || '',
+      fecha_fin_estimada: obra.fecha_fin_estimada || '',
+      periodo:           obra.periodo            || '',
+      motivo_observacion: obra.motivo_observacion || '',
+      notas:             obra.notas              || '',
+    });
   }, [obra, open]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
