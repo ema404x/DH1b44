@@ -33,15 +33,16 @@ export function exportarComunaPDF(comuna, obras) {
 
   // Columnas — suma exacta = usableW (277mm)
   const cols = [
-    { header: 'Establecimiento',  w: 48 },
-    { header: 'Título SAP',       w: 58 },
-    { header: 'N° MTOM',          w: 26 },
-    { header: 'N° MEIN',          w: 26 },
-    { header: 'Inspector',        w: 30 },
-    { header: 'Plazo',            w: 14 },
+    { header: 'Establecimiento',  w: 46 },
+    { header: 'Título SAP',       w: 55 },
+    { header: 'N° MTOM',          w: 25 },
+    { header: 'N° MEIN',          w: 25 },
+    { header: 'Inspector',        w: 28 },
+    { header: 'Plazo',            w: 13 },
+    { header: '%',                w: 12 },
     { header: 'Monto Base',       w: 33 },
     { header: 'A Cobrar',         w: 33 },
-    { header: 'Estado',           w: 29 },
+    { header: 'Estado',           w: 27 },
   ]; // total: 297
 
   const headerH = 8;
@@ -150,6 +151,7 @@ export function exportarComunaPDF(comuna, obras) {
       obra.ada_numero || '—',
       inspector,
       obra.plazo_dias ? `${obra.plazo_dias}d` : '—',
+      obra.porcentaje_avance > 0 ? `${obra.porcentaje_avance}%` : '—',
       fmt(obra.monto_contrato),
       fmt(obra.monto_a_cobrar),
       tramoLabel ? `${estadoLabel} (${tramoLabel})` : estadoLabel,
@@ -157,9 +159,9 @@ export function exportarComunaPDF(comuna, obras) {
 
     let x = margin;
     values.forEach((val, vi) => {
-      if (vi === 8) {
-        if      (obra.tramo_certificacion === 'primer_50')  doc.setTextColor(180, 140, 0);   // amarillo
-        else if (obra.tramo_certificacion === 'segundo_50') doc.setTextColor(200, 90, 0);    // naranja
+      if (vi === 9) {
+        if      (obra.tramo_certificacion === 'primer_50')  doc.setTextColor(180, 140, 0);
+        else if (obra.tramo_certificacion === 'segundo_50') doc.setTextColor(200, 90, 0);
         else if (obra.estado_cobro === 'listo_certificar')  doc.setTextColor(22, 163, 74);
         else if (obra.estado_cobro === 'faltan_actas')      doc.setTextColor(161, 120, 0);
         else if (obra.estado_cobro === 'pendiente')         doc.setTextColor(200, 30, 30);
@@ -168,7 +170,7 @@ export function exportarComunaPDF(comuna, obras) {
         doc.setTextColor(40, 40, 40);
       }
       // Alinear montos a la derecha
-      if (vi === 6 || vi === 7) {
+      if (vi === 7 || vi === 8) {
         doc.text(String(val), x + cols[vi].w - 2, y + rowH - 2, { align: 'right' });
       } else {
         doc.text(String(val), x + 2, y + rowH - 2);
