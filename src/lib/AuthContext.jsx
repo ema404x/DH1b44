@@ -23,25 +23,18 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
       setIsAuthenticated(true);
 
-      // Cargar permisos del rol del usuario desde RolePermission
-      if (currentUser?.role) {
-        try {
-          const rolePerms = await base44.entities.RolePermission.filter({ role_name: currentUser.role });
-          if (rolePerms && rolePerms.length > 0) {
-            setUserPermissions(rolePerms[0].permissions);
-          }
-        } catch (_) {
-          setUserPermissions(null);
-        }
-      }
-
-      // Vincular automáticamente la ficha de empleado via backend (service role)
-      // y obtener permisos reales basados en el rol del empleado
+      // Vincular ficha de empleado y cargar permisos reales según su rol
+      // Esto corre en CADA carga (no solo al login) para garantizar permisos actualizados
       try {
         const vinculacion = await base44.functions.invoke('vincularEmpleado', {});
         if (vinculacion?.data?.employee_permissions) {
-          // Usar los permisos del rol del empleado (tiene precedencia sobre user.role de Base44)
+          // Permisos del rol del empleado (fuente de verdad)
           setUserPermissions(vinculacion.data.employee_permissions);
+        } else if (vinculacion?.data?.linked === false) {
+          // Empleado no encontrado: si no es admin, sin permisos
+          if (currentUser?.role !== 'admin') {
+            setUserPermissions({});
+          }
         }
       } catch (_) {
         // Si falla la vinculación, no bloquear el login
