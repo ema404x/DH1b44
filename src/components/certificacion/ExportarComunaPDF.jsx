@@ -117,8 +117,6 @@ export function exportarComunaPDF(comuna, obras) {
   obras.forEach((obra, idx) => {
     // ¿Necesita nueva página?
     if (y + rowH > bodyBottom) {
-      // footer página actual
-      addFooter(doc, pageW, pageH, margin, comuna);
       doc.addPage();
       y = margin;
       drawTableHeader(doc, cols, margin, y, headerH);
@@ -209,7 +207,6 @@ export function exportarComunaPDF(comuna, obras) {
     // Fila motivo observación
     if (obra.estado_cobro === 'observado' && obra.motivo_observacion) {
       if (y + 6 > bodyBottom) {
-        addFooter(doc, pageW, pageH, margin, comuna);
         doc.addPage();
         y = margin;
         drawTableHeader(doc, cols, margin, y, headerH);

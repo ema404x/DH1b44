@@ -142,7 +142,7 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
     }
     setImporting(false);
     setResult({ ok, fail });
-    onImported();
+    if (ok > 0) onImported();
   };
 
   // Agrupar preview por hoja para mostrar en tabla
@@ -241,10 +241,15 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
                             <td className="px-3 py-1.5 whitespace-nowrap">{r.jefe_sitio}</td>
                             <td className="px-3 py-1.5 whitespace-nowrap">
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                r.estado_cobro === 'en_gestion' ? 'bg-blue-500/20 text-blue-300' :
-                                r.estado_cobro === 'cobrado' ? 'bg-emerald-500/20 text-emerald-300' :
-                                'bg-amber-500/20 text-amber-300'
-                              }`}>{r.estado_cobro}</span>
+                                r.estado_cobro === 'listo_certificar' ? 'bg-emerald-500/20 text-emerald-300' :
+                                r.estado_cobro === 'faltan_actas'     ? 'bg-yellow-500/20 text-yellow-300' :
+                                r.estado_cobro === 'observado'        ? 'bg-slate-500/20 text-slate-300' :
+                                'bg-red-500/20 text-red-300'
+                              }`}>
+                                {r.estado_cobro === 'listo_certificar' ? 'Listo' :
+                                 r.estado_cobro === 'faltan_actas'     ? 'Faltan Actas' :
+                                 r.estado_cobro === 'observado'        ? 'Observado' : 'Pendiente'}
+                              </span>
                             </td>
                           </tr>
                         ))}
