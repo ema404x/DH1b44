@@ -75,7 +75,14 @@ function KpiCard({ title, value, subtitle, icon: Icon, trend, color = 'primary',
 }
 
 export default function Dashboard() {
-  const { isAdmin, filterByUser } = useCurrentUser();
+  const { isAdmin, filterByUser, userPermissions, user } = useCurrentUser();
+
+  // Verifica si el usuario tiene acceso de lectura a un módulo
+  const canRead = (moduleKey) => {
+    if (user?.role === 'admin') return true;
+    if (!userPermissions) return false;
+    return userPermissions[moduleKey]?.read === true;
+  };
 
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: () => base44.entities.Project.list() });
   const { data: allOrders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
@@ -156,12 +163,12 @@ export default function Dashboard() {
       {/* Critical Alerts */}
       {hasAlerts && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap gap-2">
-          {overdueOrders > 0 && (
+          {overdueOrders > 0 && canRead('WorkOrder') && (
             <Link to="/ordenes" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 transition-all">
               <AlertTriangle className="h-4 w-4" /> {overdueOrders} OT vencida{overdueOrders > 1 ? 's' : ''}
             </Link>
           )}
-          {lowStockItems.length > 0 && (
+          {lowStockItems.length > 0 && canRead('Inventory') && (
             <Link to="/inventario" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30 transition-all">
               <Package className="h-4 w-4" /> {lowStockItems.length} material{lowStockItems.length > 1 ? 'es' : ''} bajo
             </Link>
@@ -171,70 +178,80 @@ export default function Dashboard() {
 
       {/* KPI Grid */}
       <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard href="/proyectos"   title="Proyectos" value={activeProjects}       subtitle={`${projects.length} en total`}                     icon={FolderKanban}  color="blue" />
-        <KpiCard href="/ordenes"     title="OTs Pendientes"    value={pendingOrders}         subtitle={`${completedThisMonth} completadas`}        icon={ClipboardList} color="amber" />
-        <KpiCard href="/facturacion" title="Ingresos Mes"  value={fmt(revenueThisMonth)} subtitle={`${fmt(pendingInvoices)} por cobrar`}                icon={DollarSign}    color="green" trend={revenueTrend} />
-        <KpiCard href="/ordenes"     title="Eficiencia"    value={`${efficiency}%`}      subtitle={`${activeEmployees} técnicos activos`}               icon={BarChart3}     color="primary" />
+        {canRead('Project')    && <KpiCard href="/proyectos"   title="Proyectos"     value={activeProjects}        subtitle={`${projects.length} en total`}            icon={FolderKanban}  color="blue" />}
+        {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="OTs Pendientes" value={pendingOrders}        subtitle={`${completedThisMonth} completadas`}       icon={ClipboardList} color="amber" />}
+        {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos Mes"  value={fmt(revenueThisMonth)} subtitle={`${fmt(pendingInvoices)} por cobrar`}      icon={DollarSign}    color="green" trend={revenueTrend} />}
+        {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="Eficiencia"    value={`${efficiency}%`}     subtitle={`${activeEmployees} técnicos activos`}      icon={BarChart3}     color="primary" />}
       </motion.div>
 
       <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard href="/clientes"   title="Clientes"   value={activeClients}          subtitle={`${clients.length} en total`}                        icon={Users}         color="purple" />
-        <KpiCard href="/ordenes"    title="OTs Urgentes"       value={urgentOrders.length}     subtitle="Alta o urgente"                            icon={AlertTriangle} color={urgentOrders.length > 0 ? 'red' : 'green'} />
-        <KpiCard href="/activos"    title="Activos" value={assets.length}          subtitle={`${overdueAssets.length} mant. vencido`}         icon={Wrench}        color="amber" />
-        <KpiCard href="/inventario" title="Materiales" value={materials.length}       subtitle={`${lowStockItems.length} bajo mínimo`}               icon={Package}       color={lowStockItems.length > 0 ? 'red' : 'green'} />
+        {canRead('Client')    && <KpiCard href="/clientes"   title="Clientes"     value={activeClients}       subtitle={`${clients.length} en total`}              icon={Users}         color="purple" />}
+        {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="OTs Urgentes" value={urgentOrders.length} subtitle="Alta o urgente"                            icon={AlertTriangle} color={urgentOrders.length > 0 ? 'red' : 'green'} />}
+        {canRead('Asset')     && <KpiCard href="/activos"    title="Activos"      value={assets.length}       subtitle={`${overdueAssets.length} mant. vencido`}   icon={Wrench}        color="amber" />}
+        {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"   value={materials.length}    subtitle={`${lowStockItems.length} bajo mínimo`}     icon={Package}       color={lowStockItems.length > 0 ? 'red' : 'green'} />}
       </motion.div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="lg:col-span-2">
-          <RevenueChart invoices={invoices} />
-        </motion.div>
+        {canRead('Invoice') && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="lg:col-span-2">
+            <RevenueChart invoices={invoices} />
+          </motion.div>
+        )}
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-white">Proyectos en Curso</CardTitle>
-                <Link to="/proyectos">
-                  <Button variant="ghost" size="sm" className="text-xs h-7 gap-1 text-slate-400 hover:text-white">
-                    Ver todos <ArrowRight className="h-3 w-3" />
-                  </Button>
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {recentProjects.length === 0 ? (
-                <p className="text-xs text-slate-500 text-center py-4">Sin proyectos activos</p>
-              ) : (
-                recentProjects.map(p => (
-                  <motion.div key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-white truncate">{p.name}</span>
-                      <span className="text-xs font-bold text-primary flex-shrink-0">{p.progress || 0}%</span>
-                    </div>
-                    <Progress value={p.progress || 0} className="h-1.5 bg-slate-700" />
-                    <p className="text-xs text-slate-500">{p.client_name}</p>
-                  </motion.div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+        {canRead('Project') && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+            <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold text-white">Proyectos en Curso</CardTitle>
+                  <Link to="/proyectos">
+                    <Button variant="ghost" size="sm" className="text-xs h-7 gap-1 text-slate-400 hover:text-white">
+                      Ver todos <ArrowRight className="h-3 w-3" />
+                    </Button>
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {recentProjects.length === 0 ? (
+                  <p className="text-xs text-slate-500 text-center py-4">Sin proyectos activos</p>
+                ) : (
+                  recentProjects.map(p => (
+                    <motion.div key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-white truncate">{p.name}</span>
+                        <span className="text-xs font-bold text-primary flex-shrink-0">{p.progress || 0}%</span>
+                      </div>
+                      <Progress value={p.progress || 0} className="h-1.5 bg-slate-700" />
+                      <p className="text-xs text-slate-500">{p.client_name}</p>
+                    </motion.div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </div>
 
       {/* Emergencias */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-        <EmergenciasWidget />
-      </motion.div>
+      {canRead('Emergencias') && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+          <EmergenciasWidget />
+        </motion.div>
+      )}
 
       {/* OTs + Certificados */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-          <OTsPendientesPanel orders={orders} />
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-          <CertificadosPanel />
-        </motion.div>
+        {canRead('WorkOrder') && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+            <OTsPendientesPanel orders={orders} />
+          </motion.div>
+        )}
+        {canRead('Certificado') && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+            <CertificadosPanel />
+          </motion.div>
+        )}
       </div>
 
       {/* KPIs Jefe de Sitio */}
