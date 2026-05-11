@@ -230,7 +230,10 @@ export default function CertificacionObras() {
                       size="icon"
                       className="h-6 w-6 text-muted-foreground hover:text-primary"
                       title={`Descargar PDF Comuna ${comuna}`}
-                      onClick={() => exportarComunaPDF(comuna, obras.filter(o => o.comuna === comuna))}
+                      onClick={() => exportarComunaPDF(comuna, obras.filter(o => o.comuna === comuna).sort((a, b) => {
+                        const order = { listo_certificar: 0, faltan_actas: 1, pendiente: 2, observado: 3 };
+                        return (order[a.estado_cobro] ?? 9) - (order[b.estado_cobro] ?? 9);
+                      }))}
                     >
                       <Download className="h-3.5 w-3.5" />
                     </Button>
