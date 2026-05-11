@@ -39,7 +39,7 @@ export default function CertificacionObras() {
 
   const { data: obras = [], isLoading } = useQuery({
     queryKey: ['obras-certificacion'],
-    queryFn: () => base44.entities.ObraCertificacion.list('-created_date'),
+    queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 500),
   });
 
   const saveMutation = useMutation({
