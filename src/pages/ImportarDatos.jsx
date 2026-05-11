@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { 
   Sparkles, Upload, Brain, CheckCircle2, Users, TrendingUp,
@@ -50,8 +50,11 @@ export default function ImportarDatos() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Guardamos el mapping confirmado por el usuario en una ref para no depender del estado async
+  const confirmedMappingRef = useRef(null);
+
   const handleModuleSelect = (mod) => {
-    setSelectedModule(mod);
+    setSelectedModule(mod.key !== undefined ? mod : mod); // siempre pasar el objeto completo
     setStep(1);
   };
 
@@ -68,6 +71,12 @@ export default function ImportarDatos() {
       });
       let result = response.data?.sheets ? response.data : response.data?.response;
 
+      if (!result?.sheets || result.sheets.length === 0) {
+        toast.error('La IA no pudo detectar datos en el archivo. Revisá el formato.');
+        setStep(1);
+        return;
+      }
+
       // Si el usuario eligió un módulo específico, forzar target_entity en todas las hojas
       if (selectedModule?.key && result?.sheets) {
         result = {
@@ -76,6 +85,7 @@ export default function ImportarDatos() {
         };
       }
 
+      confirmedMappingRef.current = result;
       setMappingResult(result);
       setStep(3);
     } catch (error) {
@@ -86,11 +96,22 @@ export default function ImportarDatos() {
     }
   };
 
+  // onConfirm de ImportStepMapping actualiza tanto el estado como la ref
   const handleMappingConfirmed = (confirmedMapping) => {
+    confirmedMappingRef.current = confirmedMapping;
     setMappingResult(confirmedMapping);
   };
 
-  const handleImportConfirmed = async (finalMapping) => {
+  const handleImportConfirmed = async () => {
+    const finalMapping = confirmedMappingRef.current;
+    if (!finalMapping) {
+      toast.error('No hay mapeo confirmado. Revisá el paso anterior.');
+      return;
+    }
+    if (!uploadedFile?.rawData) {
+      toast.error('No hay datos del archivo cargado.');
+      return;
+    }
     setIsProcessing(true);
     try {
       const response = await base44.functions.invoke('smartImportExecute', {
@@ -98,6 +119,10 @@ export default function ImportarDatos() {
         raw_data: uploadedFile.rawData,
       });
       const result = response.data?.results ? response.data : response.data?.response;
+      if (!result) {
+        toast.error('La importación no devolvió resultados. Intentá nuevamente.');
+        return;
+      }
       setImportResult(result);
       setStep(4);
     } catch (error) {
@@ -208,8 +233,8 @@ export default function ImportarDatos() {
               {/* Step 1: Subir archivo */}
               {step === 1 && <ImportStepUpload onFileUploaded={handleFileUploaded} />}
 
-              {/* Step 2: Analizando */}
-              {step === 2 && isProcessing && (
+              {/* Step 2: Analizando — mostrar siempre que estemos en step 2 */}
+              {step === 2 && (isProcessing ? (
                 <Card className="border-0 bg-gradient-to-br from-slate-700/50 to-slate-800/50 backdrop-blur-xl">
                   <CardContent className="flex flex-col items-center justify-center py-24 gap-6">
                     <motion.div animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Infinity, ease: 'linear' }} className="relative">
@@ -233,7 +258,13 @@ export default function ImportarDatos() {
                     </div>
                   </CardContent>
                 </Card>
-              )}
+              ) : (
+                // Si terminó de procesar pero aún estamos en step 2 (no debería pasar, pero por seguridad)
+                <div className="flex flex-col items-center gap-4 py-12 text-slate-400">
+                  <p className="text-sm">Ocurrió un problema durante el análisis.</p>
+                  <Button variant="outline" onClick={() => setStep(1)}>← Volver</Button>
+                </div>
+              ))}
 
               {/* Step 3: Mapeo */}
               {step === 3 && mappingResult && (
@@ -246,7 +277,7 @@ export default function ImportarDatos() {
                   <div className="flex gap-3 justify-end mt-4">
                     <Button variant="outline" onClick={handleReset}>Cancelar</Button>
                     <Button
-                      onClick={() => { setIsProcessing(true); handleImportConfirmed(mappingResult); }}
+                      onClick={handleImportConfirmed}
                       disabled={isProcessing}
                       className="gap-2"
                     >
@@ -258,8 +289,15 @@ export default function ImportarDatos() {
               )}
 
               {/* Step 4: Resultado */}
-              {step === 4 && importResult && (
-                <ImportStepResult result={importResult} onReset={handleReset} />
+              {step === 4 && (
+                importResult
+                  ? <ImportStepResult result={importResult} onReset={handleReset} />
+                  : (
+                    <div className="flex flex-col items-center gap-4 py-12 text-slate-400">
+                      <p className="text-sm">No se recibieron resultados de la importación.</p>
+                      <Button variant="outline" onClick={handleReset}>Reiniciar</Button>
+                    </div>
+                  )
               )}
             </motion.div>
           )}
