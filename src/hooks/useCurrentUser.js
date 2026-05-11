@@ -17,7 +17,7 @@ export function useCurrentUser() {
   const employeeRole = userPermissions?._employeeRole || null;
 
   // Roles que deben ver solo sus propios datos
-  const FIELD_ROLES = ['jefe_sitio', 'inspector', 'tecnico', 'supervisor', 'administrativo'];
+  const FIELD_ROLES = ['jefe_sitio', 'inspector', 'tecnico', 'supervisor'];
 
   // Es "super admin" solo si tiene role=admin en la plataforma y NO tiene rol de campo
   const isSuperAdmin = currentUser?.role === 'admin' && !FIELD_ROLES.includes(employeeRole?.toLowerCase?.());
