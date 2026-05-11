@@ -235,7 +235,7 @@ export function exportarComunaPDF(comuna, obras) {
       obra.porcentaje_avance > 0 ? `${parseFloat(obra.porcentaje_avance.toFixed(1))}%` : '—',
       fmt(obra.monto_contrato),
       fmt(obra.monto_a_cobrar),
-      estadoLabel,
+      obra.estado_cobro === 'listo_certificar' ? estadoLabel : (tramoLabel || estadoLabel),
     ];
 
     let x = margin;
@@ -247,7 +247,11 @@ export function exportarComunaPDF(comuna, obras) {
         doc.setTextColor(...pctColor);
         doc.setFont('helvetica', 'bold');
       } else if (vi === 9) {
-        const rgb = ESTADO_COLOR[obra.estado_cobro] || [80,80,80];
+        const rgb = obra.estado_cobro === 'listo_certificar'
+          ? ESTADO_COLOR.listo_certificar
+          : obra.tramo_certificacion
+            ? TRAMO_COLOR[obra.tramo_certificacion] || [80,80,80]
+            : ESTADO_COLOR[obra.estado_cobro] || [80,80,80];
         doc.setTextColor(...rgb);
         doc.setFont('helvetica', 'bold');
       } else if (vi === 8) {
