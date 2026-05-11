@@ -19,8 +19,15 @@ export function useCurrentUser() {
   // Roles que deben ver solo sus propios datos
   const FIELD_ROLES = ['jefe_sitio', 'inspector', 'tecnico', 'supervisor'];
 
-  // Es "super admin" solo si tiene role=admin en la plataforma y NO tiene rol de campo
-  const isSuperAdmin = currentUser?.role === 'admin' && !FIELD_ROLES.includes(employeeRole?.toLowerCase?.());
+  // Roles de empleado que tienen visibilidad total (como admin)
+  const ADMIN_EMPLOYEE_ROLES = ['administrativo', 'admin', 'gerente'];
+
+  // Es "super admin" si:
+  // 1. Tiene role=admin en la plataforma y NO tiene rol de campo, O
+  // 2. Tiene un rol de empleado con visibilidad total
+  const isSuperAdmin = 
+    (currentUser?.role === 'admin' && !FIELD_ROLES.includes(employeeRole?.toLowerCase?.())) ||
+    ADMIN_EMPLOYEE_ROLES.includes(employeeRole?.toLowerCase?.());
 
   // Alias para compatibilidad — si es superAdmin se llama "admin"
   const isAdmin = isSuperAdmin;
