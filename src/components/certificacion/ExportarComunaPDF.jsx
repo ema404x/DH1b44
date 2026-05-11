@@ -235,7 +235,7 @@ export function exportarComunaPDF(comuna, obras) {
       obra.porcentaje_avance > 0 ? `${parseFloat(obra.porcentaje_avance.toFixed(1))}%` : '—',
       fmt(obra.monto_contrato),
       fmt(obra.monto_a_cobrar),
-      tramoLabel || estadoLabel,
+      tramoLabel ? `${estadoLabel} (${tramoLabel})` : estadoLabel,
     ];
 
     let x = margin;
