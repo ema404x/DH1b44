@@ -33,17 +33,17 @@ export function exportarComunaPDF(comuna, obras) {
 
   // Columnas — suma exacta = usableW (277mm)
   const cols = [
-    { header: 'Establecimiento',  w: 46 },
-    { header: 'Título SAP',       w: 55 },
-    { header: 'N° MTOM',          w: 25 },
-    { header: 'N° MEIN',          w: 25 },
-    { header: 'Inspector',        w: 28 },
-    { header: 'Plazo',            w: 13 },
-    { header: '%',                w: 12 },
-    { header: 'Monto Base',       w: 33 },
-    { header: 'A Cobrar',         w: 33 },
-    { header: 'Estado',           w: 27 },
-  ]; // total: 297
+    { header: 'Establecimiento',  w: 44 },
+    { header: 'Título SAP',       w: 50 },
+    { header: 'N° MTOM',          w: 24 },
+    { header: 'N° MEIN',          w: 24 },
+    { header: 'Inspector',        w: 26 },
+    { header: 'Plazo',            w: 12 },
+    { header: '%',                w: 11 },
+    { header: 'Monto Base',       w: 32 },
+    { header: 'A Cobrar',         w: 32 },
+    { header: 'Estado',           w: 22 },
+  ]; // total: 277mm = usableW
 
   const headerH = 8;
   const rowH    = 7;
