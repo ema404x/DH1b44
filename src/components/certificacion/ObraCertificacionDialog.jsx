@@ -126,10 +126,10 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
               {form.porcentaje_avance > 0 && (
                 <div className="mt-1.5 text-xs font-semibold">
                   {parseFloat(form.porcentaje_avance) >= 100
-                    ? <span className="text-emerald-400">🟢 Completado (100%)</span>
+                    ? <span className="text-emerald-400">Completado (100%)</span>
                     : parseFloat(form.porcentaje_avance) > 50
-                      ? <span className="text-orange-400">🟠 Segundo 50%</span>
-                      : <span className="text-yellow-400">🟡 Primer 50%</span>}
+                      ? <span className="text-orange-400">Segundo 50%</span>
+                      : <span className="text-yellow-400">Primer 50%</span>}
                 </div>
               )}
             </Field>

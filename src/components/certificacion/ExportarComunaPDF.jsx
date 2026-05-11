@@ -220,8 +220,8 @@ export function exportarComunaPDF(comuna, obras) {
     const titulo    = truncate(obra.titulo || '—', 36);
     const inspector = truncate(obra.inspector || '—', 18);
     const estadoLabel = ESTADO_LABEL[obra.estado_cobro] || obra.estado_cobro;
-    const tramoLabel  = obra.tramo_certificacion === 'primer_50' ? '🟡1°50%'
-                      : obra.tramo_certificacion === 'segundo_50' ? '🟠2°50%' : '';
+    const tramoLabel  = obra.tramo_certificacion === 'primer_50' ? '1er 50%'
+                      : obra.tramo_certificacion === 'segundo_50' ? '2do 50%' : '';
 
     const pctColor = getPctColor(obra);
 
@@ -232,7 +232,7 @@ export function exportarComunaPDF(comuna, obras) {
       obra.ada_numero || '—',
       inspector,
       obra.plazo_dias ? `${obra.plazo_dias}d` : '—',
-      obra.porcentaje_avance > 0 ? `${obra.porcentaje_avance}%` : '—',
+      obra.porcentaje_avance > 0 ? `${parseFloat(obra.porcentaje_avance.toFixed(1))}%` : '—',
       fmt(obra.monto_contrato),
       fmt(obra.monto_a_cobrar),
       tramoLabel || estadoLabel,

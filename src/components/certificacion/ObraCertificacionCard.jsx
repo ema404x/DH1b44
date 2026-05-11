@@ -110,7 +110,7 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
                     <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
                       <div className="h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: barColor }} />
                     </div>
-                    <span className="text-xs font-semibold" style={{ color: barColor }}>{pct}%</span>
+                    <span className="text-xs font-semibold" style={{ color: barColor }}>{parseFloat(pct.toFixed(1))}%</span>
                   </div>
                 );
               })()}
