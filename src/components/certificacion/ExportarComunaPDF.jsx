@@ -193,9 +193,11 @@ export function exportarComunaPDF(comuna, obras) {
     doc.rect(margin, y, usableW, rowH, 'F');
 
     // Borde izquierdo de color por estado
-    const estadoRgb = obra.tramo_certificacion
-      ? TRAMO_COLOR[obra.tramo_certificacion] || [100,100,100]
-      : ESTADO_COLOR[obra.estado_cobro] || [150, 150, 150];
+    const estadoRgb = obra.estado_cobro === 'listo_certificar'
+      ? ESTADO_COLOR.listo_certificar
+      : obra.tramo_certificacion
+        ? TRAMO_COLOR[obra.tramo_certificacion] || [100,100,100]
+        : ESTADO_COLOR[obra.estado_cobro] || [150, 150, 150];
     doc.setFillColor(...estadoRgb);
     doc.rect(margin, y, 2, rowH, 'F');
 
