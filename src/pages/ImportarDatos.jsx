@@ -3,7 +3,8 @@ import { base44 } from '@/api/base44Client';
 import { 
   Sparkles, Upload, Brain, CheckCircle2, Users, TrendingUp,
   Zap, Clock, Shield, Loader2, Package, Briefcase, ClipboardList,
-  Building2, FileText, DollarSign, MapPin, HardHat, ChevronRight
+  Building2, FileText, DollarSign, MapPin, HardHat, ChevronRight,
+  AlertTriangle, ShieldAlert, GraduationCap, ScrollText, Star
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,6 +30,11 @@ const MODULES = [
   { key: 'PrecarioMinisterio',  label: 'Preciario Ministerial',  icon: DollarSign,    color: 'from-lime-500',   hint: 'Código, descripción, PU mat, PU mo...' },
   { key: 'Quote',               label: 'Presupuestos',           icon: FileText,      color: 'from-teal-500',   hint: 'Título, cliente, subtotal, total...' },
   { key: 'Invoice',             label: 'Facturas',               icon: DollarSign,    color: 'from-red-500',    hint: 'Cliente, importe, fecha, estado...' },
+  { key: 'Informe',             label: 'Informes',               icon: ScrollText,    color: 'from-indigo-500', hint: 'Título, establecimiento, jefe de sitio...' },
+  { key: 'Emergencia',          label: 'Emergencias',            icon: AlertTriangle, color: 'from-rose-500',   hint: 'Tipo, establecimiento, estado, descripción...' },
+  { key: 'RiesgoControl',       label: 'Control de Riesgos',     icon: ShieldAlert,   color: 'from-yellow-500', hint: 'Evento, probabilidad, consecuencia, sector...' },
+  { key: 'ObraCertificacion',   label: 'Certificación de Obras', icon: Star,          color: 'from-orange-400', hint: 'Título SAP, MTOM, MEIN, monto, avance...' },
+  { key: 'Direccion',           label: 'Direcciones',            icon: Building2,     color: 'from-slate-500',  hint: 'Dirección, comuna, jefe de sitio, m2...' },
   { key: null,                  label: 'Detección Automática',   icon: Brain,         color: 'from-primary',    hint: 'La IA detecta automáticamente el módulo' },
 ];
 
@@ -320,7 +326,7 @@ export default function ImportarDatos() {
               { icon: Sparkles, title: 'IA Inteligente', desc: 'Detección automática' },
               { icon: Clock, title: 'Ultra Rápido', desc: 'Miles de registros' },
               { icon: Shield, title: 'Seguro', desc: 'Validación integrada' },
-              { icon: TrendingUp, title: '10 Módulos', desc: 'Cualquier entidad' },
+              { icon: TrendingUp, title: '16 Módulos', desc: 'Cualquier entidad' },
             ].map((f, i) => (
               <div key={i} className="text-center">
                 <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary/30 to-purple-600/30 flex items-center justify-center mx-auto mb-2">
