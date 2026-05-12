@@ -14,10 +14,10 @@ import * as XLSX from 'xlsx';
 const COMUNAS = ['8A', '8B', '10A', 'Otra'];
 const SKIP_SHEETS = ['PARA FORMATO CONDICIONAL', 'ESC'];
 
-export default function ImportarPendientesSAP({ onImportDone }) {
+export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8A' }) {
   const [file, setFile] = useState(null);
   const [fileUrl, setFileUrl] = useState(null);
-  const [comuna, setComuna] = useState('8A');
+  const [comuna, setComuna] = useState(defaultComuna);
   const [sheetInspectors, setSheetInspectors] = useState([]); // [{ sheet, inspector }]
   const [jefesMap, setJefesMap] = useState({}); // { "INSPECTOR NAME": { nombre, email } }
   const [preview, setPreview] = useState(null); // { sheets: [{name, rows}] }

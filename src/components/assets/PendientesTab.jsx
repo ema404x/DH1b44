@@ -9,18 +9,19 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Search, Plus, ClipboardList, AlertCircle, Upload,
-  LayoutGrid, Table2, X, ChevronUp, ChevronDown, Trash2, CheckSquare
+  LayoutGrid, Table2, X, ChevronUp, ChevronDown, Trash2
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { isPast, format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import PendienteDialog from '@/components/assets/PendienteDialog';
 import PendienteCard from '@/components/assets/PendienteCard';
 import ImportarPendientesSAP from '@/components/assets/ImportarPendientesSAP';
 import ExportarPendientesPDF from '@/components/assets/ExportarPendientesPDF';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+const COMUNAS = ['8A', '8B', '10A'];
 
 const estadoColors = {
   pendiente: 'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -43,11 +44,11 @@ const estadoLabels = {
 };
 
 export default function PendientesTab() {
+  const [activeComuna, setActiveComuna] = useState('8A');
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('all');
   const [filterInspector, setFilterInspector] = useState('all');
-  const [filterComuna, setFilterComuna] = useState('all');
-  const [viewMode, setViewMode] = useState('table'); // 'table' | 'cards'
+  const [viewMode, setViewMode] = useState('table');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -60,9 +61,15 @@ export default function PendientesTab() {
   const qc = useQueryClient();
   const { isAdmin, filterByUser } = useCurrentUser();
 
+  useEffect(() => { setCanDelete(isAdmin); }, [isAdmin]);
+
+  // Reset filters when switching commune
   useEffect(() => {
-    setCanDelete(isAdmin);
-  }, [isAdmin]);
+    setSearch('');
+    setFilterEstado('all');
+    setFilterInspector('all');
+    setSelectedIds(new Set());
+  }, [activeComuna]);
 
   const { data: pendientes = [], isLoading } = useQuery({
     queryKey: ['pendientes'],
@@ -101,14 +108,6 @@ export default function PendientesTab() {
     });
   };
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filtered.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filtered.map(p => p.id)));
-    }
-  };
-
   const handleBulkDelete = async () => {
     setBulkDeleting(true);
     try {
@@ -124,16 +123,36 @@ export default function PendientesTab() {
     }
   };
 
-  // Unique inspectors & comunas
-  const inspectors = useMemo(() => [...new Set(pendientes.map(p => p.inspector).filter(Boolean))].sort(), [pendientes]);
-  const comunas = useMemo(() => [...new Set(pendientes.map(p => p.comuna).filter(Boolean))].sort(), [pendientes]);
-
   const visiblePendientes = useMemo(() =>
     filterByUser(pendientes, ['jefe_sitio', 'jefe_sitio_email', 'inspector', 'created_by'])
   , [pendientes, isAdmin]);
 
+  // Stats per commune (for tab badges)
+  const statsByComuna = useMemo(() => {
+    const stats = {};
+    for (const c of COMUNAS) {
+      const cp = visiblePendientes.filter(p => p.comuna === c);
+      stats[c] = {
+        total: cp.length,
+        pendiente: cp.filter(p => p.estado === 'pendiente').length,
+        vencidos: cp.filter(p => p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado').length,
+      };
+    }
+    return stats;
+  }, [visiblePendientes]);
+
+  // Pendientes for active commune
+  const comunaPendientes = useMemo(() =>
+    visiblePendientes.filter(p => p.comuna === activeComuna)
+  , [visiblePendientes, activeComuna]);
+
+  // Unique inspectors in this commune
+  const inspectors = useMemo(() =>
+    [...new Set(comunaPendientes.map(p => p.inspector).filter(Boolean))].sort()
+  , [comunaPendientes]);
+
   const filtered = useMemo(() => {
-    let result = visiblePendientes.filter(p => {
+    let result = comunaPendientes.filter(p => {
       const matchSearch = !search ||
         p.descripcion?.toLowerCase().includes(search.toLowerCase()) ||
         p.numero_sap?.toLowerCase().includes(search.toLowerCase()) ||
@@ -143,11 +162,9 @@ export default function PendientesTab() {
         p.jefe_sitio?.toLowerCase().includes(search.toLowerCase());
       const matchEstado = filterEstado === 'all' || p.estado === filterEstado;
       const matchInspector = filterInspector === 'all' || p.inspector === filterInspector;
-      const matchComuna = filterComuna === 'all' || p.comuna === filterComuna;
-      return matchSearch && matchEstado && matchInspector && matchComuna;
+      return matchSearch && matchEstado && matchInspector;
     });
 
-    // Sort
     result = [...result].sort((a, b) => {
       let va = a[sortCol] || '';
       let vb = b[sortCol] || '';
@@ -161,15 +178,15 @@ export default function PendientesTab() {
     });
 
     return result;
-  }, [visiblePendientes, search, filterEstado, filterInspector, filterComuna, sortCol, sortDir]);
+  }, [comunaPendientes, search, filterEstado, filterInspector, sortCol, sortDir]);
 
-  const stats = {
-    total: visiblePendientes.length,
-    pendiente: visiblePendientes.filter(p => p.estado === 'pendiente').length,
-    asignado: visiblePendientes.filter(p => p.estado === 'asignado' || p.estado === 'en_progreso').length,
-    resuelto: visiblePendientes.filter(p => p.estado === 'resuelto').length,
-    vencidos: visiblePendientes.filter(p => p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado').length,
-  };
+  const stats = useMemo(() => ({
+    total: comunaPendientes.length,
+    pendiente: comunaPendientes.filter(p => p.estado === 'pendiente').length,
+    asignado: comunaPendientes.filter(p => p.estado === 'asignado' || p.estado === 'en_progreso').length,
+    resuelto: comunaPendientes.filter(p => p.estado === 'resuelto').length,
+    vencidos: comunaPendientes.filter(p => p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado').length,
+  }), [comunaPendientes]);
 
   function toggleSort(col) {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -183,7 +200,36 @@ export default function PendientesTab() {
 
   return (
     <div className="space-y-5">
-      {/* Stats */}
+      {/* COMMUNE TABS */}
+      <div className="flex gap-1 border-b border-border">
+        {COMUNAS.map(c => {
+          const s = statsByComuna[c] || {};
+          const isActive = activeComuna === c;
+          return (
+            <button
+              key={c}
+              onClick={() => setActiveComuna(c)}
+              className={`relative px-5 py-3 text-sm font-semibold transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+                isActive
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+              }`}
+            >
+              Comuna {c}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${isActive ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                {s.total || 0}
+              </span>
+              {s.vencidos > 0 && (
+                <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold">
+                  {s.vencidos} ⚠
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Stats for active commune */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           { label: 'Total', value: stats.total, color: 'border-l-slate-400' },
@@ -240,24 +286,13 @@ export default function PendientesTab() {
               </SelectContent>
             </Select>
           )}
-
-          {comunas.length > 0 && (
-            <Select value={filterComuna} onValueChange={setFilterComuna}>
-              <SelectTrigger className="w-36"><SelectValue placeholder="Comuna" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las comunas</SelectItem>
-                {comunas.map(c => <SelectItem key={c} value={c}>Comuna {c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
         </div>
 
         <div className="flex gap-2 justify-between">
           <div className="text-sm text-muted-foreground self-center">
-            {filtered.length.toLocaleString()} de {visiblePendientes.length.toLocaleString()} órdenes
+            {filtered.length.toLocaleString()} de {comunaPendientes.length.toLocaleString()} órdenes · Comuna {activeComuna}
           </div>
-          <div className="flex gap-2">
-            {/* View toggle */}
+          <div className="flex gap-2 flex-wrap justify-end">
             <div className="flex border rounded-md overflow-hidden">
               <button
                 onClick={() => setViewMode('table')}
@@ -275,9 +310,9 @@ export default function PendientesTab() {
             <ExportarPendientesPDF
               pendientes={filtered}
               filterInfo={[
+                `Comuna: ${activeComuna}`,
                 filterEstado !== 'all' ? `Estado: ${filterEstado}` : '',
                 filterInspector !== 'all' ? `Inspector: ${filterInspector}` : '',
-                filterComuna !== 'all' ? `Comuna: ${filterComuna}` : '',
                 search ? `Búsqueda: "${search}"` : '',
               ].filter(Boolean).join(' | ')}
             />
@@ -296,7 +331,7 @@ export default function PendientesTab() {
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>¿Eliminar {selectedIds.size} pendientes?</AlertDialogTitle>
-                      <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminarán permanentemente los {selectedIds.size} pendientes seleccionados.</AlertDialogDescription>
+                      <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -325,19 +360,26 @@ export default function PendientesTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted border-b">
-                  {canDelete && <th className="px-3 py-2.5 w-8" />}
+                  {canDelete && <th className="px-3 py-2.5 w-8">
+                    <Checkbox
+                      checked={selectedIds.size > 0 && selectedIds.size === filtered.length}
+                      onCheckedChange={() => {
+                        if (selectedIds.size === filtered.length) setSelectedIds(new Set());
+                        else setSelectedIds(new Set(filtered.map(p => p.id)));
+                      }}
+                    />
+                  </th>}
                   {[
                     { key: 'inspector', label: 'INSPECTOR' },
                     { key: 'sitio', label: 'UBICACIÓN' },
                     { key: 'establecimiento', label: 'ESTABLECIMIENTO' },
                     { key: 'descripcion', label: 'TAREAS A REALIZAR' },
                     { key: 'numero_sap', label: 'N° ORDEN' },
-                    { key: 'fecha_emision_sap', label: 'FECHA INICIO' },
-                    { key: 'fecha_limite', label: 'FECHA LÍMITE' },
+                    { key: 'fecha_emision_sap', label: 'INICIO' },
+                    { key: 'fecha_limite', label: 'LÍMITE' },
                     { key: 'clase_orden', label: 'CLASE' },
                     { key: 'estado', label: 'ESTADO' },
                     { key: 'jefe_sitio', label: 'JEFE SITIO' },
-                    { key: 'comuna', label: 'COMUNA' },
                     ...(canDelete ? [{ key: '_delete', label: '' }] : []),
                   ].map(col => (
                     <th
@@ -353,11 +395,18 @@ export default function PendientesTab() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {isLoading ? (
                   <tr>
-                    <td colSpan={11} className="text-center py-16 text-muted-foreground">
+                    <td colSpan={12} className="text-center py-16 text-muted-foreground">
+                      Cargando...
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={12} className="text-center py-16 text-muted-foreground">
                       <ClipboardList className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                      <p>No hay pendientes</p>
+                      <p>No hay pendientes en Comuna {activeComuna}</p>
+                      <p className="text-xs mt-1">Importá desde SAP o creá uno manualmente</p>
                     </td>
                   </tr>
                 ) : filtered.map((p, idx) => {
@@ -383,7 +432,7 @@ export default function PendientesTab() {
                       <td className="px-3 py-2 text-xs whitespace-nowrap">
                         {p.fecha_emision_sap ? format(new Date(p.fecha_emision_sap), 'dd/MM/yy') : '—'}
                       </td>
-                      <td className={`px-3 py-2 text-xs whitespace-nowrap font-medium ${isVencido ? 'text-red-600' : ''}`}>
+                      <td className={`px-3 py-2 text-xs whitespace-nowrap font-medium ${isVencido ? 'text-red-400' : ''}`}>
                         {p.fecha_limite ? format(new Date(p.fecha_limite), 'dd/MM/yy') : '—'}
                         {isVencido && ' ⚠'}
                       </td>
@@ -396,13 +445,7 @@ export default function PendientesTab() {
                       <td className="px-3 py-2 text-xs whitespace-nowrap">
                         {p.jefe_sitio
                           ? <span className="text-primary font-medium">{p.jefe_sitio}</span>
-                          : <span className="text-yellow-600 flex items-center gap-1"><AlertCircle className="h-3 w-3" />Sin asignar</span>
-                        }
-                      </td>
-                      <td className="px-3 py-2">
-                        {p.comuna
-                          ? <Badge variant="outline" className="text-[10px]">{p.comuna}</Badge>
-                          : <span className="text-xs text-muted-foreground">—</span>
+                          : <span className="text-yellow-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />Sin asignar</span>
                         }
                       </td>
                       {canDelete && (
@@ -452,7 +495,7 @@ export default function PendientesTab() {
           {filtered.length === 0 && !isLoading && (
             <div className="col-span-full text-center py-16 text-muted-foreground">
               <ClipboardList className="h-12 w-12 mx-auto mb-3 opacity-20" />
-              <p className="font-medium">No hay pendientes</p>
+              <p className="font-medium">No hay pendientes en Comuna {activeComuna}</p>
               <p className="text-sm mt-1">Importá desde SAP o creá uno manualmente</p>
             </div>
           )}
@@ -464,10 +507,11 @@ export default function PendientesTab() {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" /> Importar Pendientes SAP
+              <Upload className="h-5 w-5" /> Importar Pendientes SAP — Comuna {activeComuna}
             </DialogTitle>
           </DialogHeader>
           <ImportarPendientesSAP
+            defaultComuna={activeComuna}
             onImportDone={() => {
               qc.invalidateQueries({ queryKey: ['pendientes'] });
               setImportOpen(false);
