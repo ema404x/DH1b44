@@ -6,16 +6,30 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  ChevronDown, ChevronUp, MapPin, Users, Building2, Edit2, Trash2, Plus,
-  Search, Filter
+  ChevronDown, ChevronUp, MapPin, Users, Building2, Edit2, Check, X,
+  Search, UserCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Input as InputUI } from '@/components/ui/input';
 
 export default function DirectorioJerarquico() {
   const [search, setSearch] = useState('');
   const [selectedComuna, setSelectedComuna] = useState('all');
   const [expandedDir, setExpandedDir] = useState(null);
+  const [editingInspector, setEditingInspector] = useState(null); // id de dirección en edición
+  const [inspectorValue, setInspectorValue] = useState('');
   const queryClient = useQueryClient();
+
+  const updateDireccionMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Direccion.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['direcciones'] });
+      queryClient.invalidateQueries({ queryKey: ['locations'] });
+      toast.success('Inspector actualizado');
+      setEditingInspector(null);
+      setInspectorValue('');
+    },
+  });
 
   const { data: direcciones = [] } = useQuery({
     queryKey: ['direcciones'],
@@ -139,7 +153,7 @@ export default function DirectorioJerarquico() {
 
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-white">{dir.direccion}</p>
-                    <div className="flex gap-2 mt-1 flex-wrap">
+                    <div className="flex gap-2 mt-1 flex-wrap items-center">
                       <Badge variant="outline" className="text-xs border-slate-600 text-slate-300">
                         {dir.comuna}
                       </Badge>
@@ -148,10 +162,43 @@ export default function DirectorioJerarquico() {
                           <Users className="h-2.5 w-2.5 mr-1" /> {dir.jefe_sitio}
                         </Badge>
                       )}
-                      {dir.inspector && (
-                        <Badge className="bg-purple-500/20 text-purple-300 border-0 text-xs">
-                          {dir.inspector}
-                        </Badge>
+                      {editingInspector === dir.id ? (
+                        <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                          <input
+                            autoFocus
+                            value={inspectorValue}
+                            onChange={e => setInspectorValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') updateDireccionMutation.mutate({ id: dir.id, data: { inspector: inspectorValue } });
+                              if (e.key === 'Escape') { setEditingInspector(null); setInspectorValue(''); }
+                            }}
+                            className="bg-slate-700 border border-slate-600 rounded px-2 py-0.5 text-xs text-white w-36 outline-none focus:border-primary/50"
+                            placeholder="Nombre inspector..."
+                          />
+                          <button
+                            onClick={() => updateDireccionMutation.mutate({ id: dir.id, data: { inspector: inspectorValue } })}
+                            className="text-emerald-400 hover:text-emerald-300"
+                          ><Check className="h-3.5 w-3.5" /></button>
+                          <button
+                            onClick={() => { setEditingInspector(null); setInspectorValue(''); }}
+                            className="text-slate-400 hover:text-slate-300"
+                          ><X className="h-3.5 w-3.5" /></button>
+                        </span>
+                      ) : (
+                        <span
+                          onClick={e => { e.stopPropagation(); setEditingInspector(dir.id); setInspectorValue(dir.inspector || ''); }}
+                          className="cursor-pointer"
+                        >
+                          {dir.inspector ? (
+                            <Badge className="bg-purple-500/20 text-purple-300 border-0 text-xs hover:bg-purple-500/30">
+                              <UserCheck className="h-2.5 w-2.5 mr-1" />{dir.inspector}
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-slate-700/50 text-slate-500 border border-dashed border-slate-600 text-xs hover:border-slate-500 hover:text-slate-400">
+                              + Asignar inspector
+                            </Badge>
+                          )}
+                        </span>
                       )}
                     </div>
                   </div>
