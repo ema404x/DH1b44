@@ -19,6 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import ProjectDetailPanel from '@/components/projects/ProjectDetailPanel';
 import ProjectImporter from '@/components/projects/ProjectImporter';
 import ProjectAlerts from '@/components/projects/ProjectAlerts';
+import ImportarObrasExcelModal from '@/components/projects/ImportarObrasExcelModal';
 
 const typeLabels = {
   obra_nueva: 'Obra Nueva', remodelacion: 'Remodelación', mantenimiento_preventivo: 'Mant. Preventivo',
@@ -52,6 +53,7 @@ export default function Projects() {
   const [editing, setEditing] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
   const [showImporter, setShowImporter] = useState(false);
+  const [showObrasImporter, setShowObrasImporter] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: projects = [], isLoading } = useQuery({ queryKey: ['projects'], queryFn: () => base44.entities.Project.list('-created_date') });
@@ -169,6 +171,9 @@ export default function Projects() {
         <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowImporter(true)}>
           <Upload className="h-3.5 w-3.5" /> Importar
         </Button>
+        <Button variant="outline" size="sm" className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10" onClick={() => setShowObrasImporter(true)}>
+          <Upload className="h-3.5 w-3.5" /> Planilla Obras
+        </Button>
       </motion.div>
 
       {/* Grid */}
@@ -262,6 +267,13 @@ export default function Projects() {
         <ProjectImporter
           onClose={() => setShowImporter(false)}
           onImported={() => setShowImporter(false)}
+        />
+      )}
+
+      {showObrasImporter && (
+        <ImportarObrasExcelModal
+          onClose={() => setShowObrasImporter(false)}
+          onImported={() => setShowObrasImporter(false)}
         />
       )}
     </div>
