@@ -33,9 +33,7 @@ export default function ImportarPendientesSAP({ onImportDone }) {
     queryFn: () => base44.entities.Employee.list(),
   });
 
-  const supervisors = employees.filter(e =>
-    ['supervisor', 'capataz', 'ingeniero', 'gerente'].includes(e.role)
-  );
+  const jefesSitio = employees.filter(e => e.role === 'jefe_sitio');
 
   async function handleFile(f) {
     if (!f) return;
@@ -54,12 +52,18 @@ export default function ImportarPendientesSAP({ onImportDone }) {
       const ws = wb.Sheets[sheetName];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
       const validRows = rows.filter(r => {
-        const insp = r['INSPECTOR'];
-        return insp && insp !== '#N/A' && r['N° DE ORDEN'] && r['TAREAS A REALIZAR'];
+        const orden = r['N° DE ORDEN'] || r['N° DE ORDEN '] || r['NRO DE ORDEN'];
+        const tareas = r['TAREAS A REALIZAR'] || r['TAREAS A REALIZAR '] || r['TAREA'] || r['DESCRIPCION'];
+        return orden && tareas && String(tareas).trim() !== '' && String(orden).trim() !== '';
       });
 
-      // Unique inspectors in this sheet
-      const sheetInspSet = new Set(validRows.map(r => String(r['INSPECTOR']).trim().toUpperCase()));
+      // Unique inspectors in this sheet (may not exist in all formats)
+      const sheetInspSet = new Set(
+        validRows
+          .map(r => r['INSPECTOR'] ? String(r['INSPECTOR']).trim().toUpperCase() : null)
+          .filter(Boolean)
+          .filter(i => i !== '#N/A')
+      );
       sheetInspSet.forEach(i => inspectors.add(i));
 
       sheets.push({
@@ -234,9 +238,9 @@ export default function ImportarPendientesSAP({ onImportDone }) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={null}>Sin asignar</SelectItem>
-                      {(supervisors.length > 0 ? supervisors : employees).map(e => (
+                      {jefesSitio.map(e => (
                         <SelectItem key={e.id} value={e.full_name}>
-                          {e.full_name} — {e.role}
+                          {e.full_name}
                         </SelectItem>
                       ))}
                     </SelectContent>

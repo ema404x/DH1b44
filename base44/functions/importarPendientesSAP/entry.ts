@@ -84,8 +84,8 @@ Deno.serve(async (req) => {
       const ubicacion = row['UBICACIÓN'] || row['UBICACION'] || row['UBICACIÓN '];
       const establecimiento = row['ESTABLECIMIENTO'];
 
-      // Skip empty / #N/A rows
-      if (!nroOrden || !tareas || !inspector || inspector === '#N/A') continue;
+      // Skip empty rows — inspector is optional
+      if (!nroOrden || !tareas) continue;
       if (String(tareas).trim() === '' || String(nroOrden).trim() === '') continue;
 
       // Resolve jefe from inspector mapping
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
         jefe_sitio: jefeInfo?.nombre || null,
         jefe_sitio_email: jefeInfo?.email || null,
         fecha_emision_sap: parseDate(row['FECHA INICIO']),
-        fecha_limite: parseDate(row['FECHA LIMITE SAP']),
+        fecha_limite: parseDate(row['FECHA LIMITE SAP'] || row['FECHA LIMITE'] || row['FECHA LÍMITE']),
       };
 
       try {
