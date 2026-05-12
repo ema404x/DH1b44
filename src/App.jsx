@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -7,40 +7,51 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AppLayout from '@/components/layout/AppLayout';
-import Dashboard from '@/pages/Dashboard';
-import Projects from '@/pages/Projects';
-import WorkOrders from '@/pages/WorkOrders';
-import Clients from '@/pages/Clients';
-import Employees from '@/pages/Employees';
-import Inventory from '@/pages/Inventory.jsx';
-import Quotes from '@/pages/Quotes';
-import Invoices from '@/pages/Invoices';
-import Finanzas from '@/pages/Finanzas';
-import Presupuestos from '@/pages/Presupuestos.jsx';
-import Informes from '@/pages/Informes';
-import Assets from '@/pages/Assets';
-import Calendario from '@/pages/Calendario';
-import Reportes from '@/pages/Reportes';
-import Automatizaciones from '@/pages/Automatizaciones';
-import Certificados from '@/pages/Certificados';
-import Auditoria from '@/pages/Auditoria';
-import Permisos from '@/pages/Permisos';
-import Seguridad from '@/pages/Seguridad';
+
+// Páginas públicas — se cargan inmediatamente (no requieren auth)
 import Fichar from '@/pages/Fichar';
 import FicharUbicacion from '@/pages/FicharUbicacion';
-import Mapa from '@/pages/Mapa';
-import Tutorial from '@/pages/Tutorial';
-import ImportarDatos from '@/pages/ImportarDatos';
-import ConfigAlertas from '@/pages/ConfigAlertas';
 import OrdenTrabajoPublica from '@/pages/OrdenTrabajoPublica';
 import EjecutarOrdenPublica from '@/pages/EjecutarOrdenPublica';
-import InformacionGeneral from '@/pages/InformacionGeneral';
-import Emergencias from '@/pages/Emergencias';
-import MapaJefes from '@/pages/MapaJefes';
-import InspeccionColegio from '@/pages/InspeccionColegio';
-import AprobacionCertificados from '@/pages/AprobacionCertificados';
-import ControlRiesgo from '@/pages/ControlRiesgo';
-import CertificacionObras from '@/pages/CertificacionObras';
+
+// Páginas autenticadas — lazy loading (se cargan solo cuando el usuario navega a ellas)
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const Projects = lazy(() => import('@/pages/Projects'));
+const WorkOrders = lazy(() => import('@/pages/WorkOrders'));
+const Clients = lazy(() => import('@/pages/Clients'));
+const Employees = lazy(() => import('@/pages/Employees'));
+const Inventory = lazy(() => import('@/pages/Inventory'));
+const Quotes = lazy(() => import('@/pages/Quotes'));
+const Invoices = lazy(() => import('@/pages/Invoices'));
+const Finanzas = lazy(() => import('@/pages/Finanzas'));
+const Presupuestos = lazy(() => import('@/pages/Presupuestos'));
+const Informes = lazy(() => import('@/pages/Informes'));
+const Assets = lazy(() => import('@/pages/Assets'));
+const Calendario = lazy(() => import('@/pages/Calendario'));
+const Reportes = lazy(() => import('@/pages/Reportes'));
+const Automatizaciones = lazy(() => import('@/pages/Automatizaciones'));
+const Certificados = lazy(() => import('@/pages/Certificados'));
+const Auditoria = lazy(() => import('@/pages/Auditoria'));
+const Permisos = lazy(() => import('@/pages/Permisos'));
+const Seguridad = lazy(() => import('@/pages/Seguridad'));
+const Mapa = lazy(() => import('@/pages/Mapa'));
+const Tutorial = lazy(() => import('@/pages/Tutorial'));
+const ImportarDatos = lazy(() => import('@/pages/ImportarDatos'));
+const ConfigAlertas = lazy(() => import('@/pages/ConfigAlertas'));
+const InformacionGeneral = lazy(() => import('@/pages/InformacionGeneral'));
+const Emergencias = lazy(() => import('@/pages/Emergencias'));
+const MapaJefes = lazy(() => import('@/pages/MapaJefes'));
+const InspeccionColegio = lazy(() => import('@/pages/InspeccionColegio'));
+const AprobacionCertificados = lazy(() => import('@/pages/AprobacionCertificados'));
+const ControlRiesgo = lazy(() => import('@/pages/ControlRiesgo'));
+const CertificacionObras = lazy(() => import('@/pages/CertificacionObras'));
+
+// Spinner de carga mientras se descarga la página lazy
+const PageLoader = () => (
+  <div className="fixed inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm z-50">
+    <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
+  </div>
+);
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -85,6 +96,7 @@ const AuthenticatedApp = () => {
   }
 
   return (
+    <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<Dashboard />} />
@@ -120,6 +132,7 @@ const AuthenticatedApp = () => {
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </Suspense>
   );
 };
 
