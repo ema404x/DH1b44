@@ -31,40 +31,21 @@ export default function AlertasBanner() {
 
       // Verificar que las entidades referenciadas aún existen.
       // Si la entidad fue eliminada, marcar la alerta como leída automáticamente.
-      const checks = await Promise.allSettled(
-        logs.map(async (alerta) => {
-          if (!alerta.entidad_id || !alerta.entidad_tipo) return alerta;
-          try {
-            let exists = false;
-            if (alerta.entidad_tipo === 'Pendiente') {
-              const r = await base44.entities.Pendiente.filter({ id: alerta.entidad_id });
-              exists = r.length > 0;
-            } else if (alerta.entidad_tipo === 'Asset') {
-              const r = await base44.entities.Asset.filter({ id: alerta.entidad_id });
-              exists = r.length > 0;
-            } else if (alerta.entidad_tipo === 'Material') {
-              const r = await base44.entities.Material.filter({ id: alerta.entidad_id });
-              exists = r.length > 0;
-            } else if (alerta.entidad_tipo === 'WorkOrder') {
-              const r = await base44.entities.WorkOrder.filter({ id: alerta.entidad_id });
-              exists = r.length > 0;
-            } else {
-              exists = true; // tipo desconocido, conservar
-            }
-            if (!exists) {
-              await base44.entities.AlertaLog.update(alerta.id, { leida: true });
-              return null; // marcar para filtrar
-            }
-            return alerta;
-          } catch {
-            return alerta; // en caso de error de red, conservar
-          }
-        })
-      );
+      // Filtrar alertas muy viejas (más de 30 días) automáticamente
+      const hace30dias = new Date();
+      hace30dias.setDate(hace30dias.getDate() - 30);
 
-      return checks
-        .filter(r => r.status === 'fulfilled' && r.value !== null)
-        .map(r => r.value);
+      const logsRecientes = [];
+      for (const alerta of logs) {
+        if (alerta.fecha_alerta && new Date(alerta.fecha_alerta) < hace30dias) {
+          // Marcar como leída en background sin esperar
+          base44.entities.AlertaLog.update(alerta.id, { leida: true }).catch(() => {});
+          continue;
+        }
+        logsRecientes.push(alerta);
+      }
+
+      return logsRecientes;
     },
     refetchInterval: 5 * 60 * 1000,
   });
@@ -76,7 +57,9 @@ export default function AlertasBanner() {
 
   const marcarTodasLeidas = useMutation({
     mutationFn: async () => {
-      await Promise.all(alertas.map(a => base44.entities.AlertaLog.update(a.id, { leida: true })));
+      // Marcar TODAS las no leídas (no solo las visibles)
+      const todas = await base44.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 500);
+      await Promise.all(todas.map(a => base44.entities.AlertaLog.update(a.id, { leida: true })));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alertas-activas'] }),
   });
