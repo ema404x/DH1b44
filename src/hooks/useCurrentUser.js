@@ -34,19 +34,28 @@ export function useCurrentUser() {
 
   /**
    * Filtra una lista de registros según el usuario actual.
-   * Para no-superAdmins, conserva solo los registros donde alguno de los campos
-   * indicados contenga el nombre o email del usuario.
+   * - SuperAdmins y usuarios sin rol de campo: ven todo.
+   * - Roles de campo (jefe_sitio, inspector, etc.): ven solo sus registros
+   *   (donde su nombre/email aparece en alguno de los campos indicados,
+   *    O donde ellos mismos crearon el registro).
    */
   function filterByUser(list, fields = []) {
     if (isSuperAdmin || !currentUser) return list;
-    const name = currentUser.full_name?.toLowerCase() || '';
+    // Si no tiene employeeRole asignado, no restringir — puede ver todo
+    if (!employeeRole) return list;
+    // Solo restringir si es un rol de campo explícito
+    if (!FIELD_ROLES.includes(employeeRole?.toLowerCase?.())) return list;
+    const name  = currentUser.full_name?.toLowerCase() || '';
     const email = currentUser.email?.toLowerCase() || '';
-    return list.filter(item =>
-      fields.some(field => {
+    return list.filter(item => {
+      // Ver registros propios (creados por él)
+      if (item.created_by && email && item.created_by.toLowerCase() === email) return true;
+      // Ver registros asignados a él
+      return fields.some(field => {
         const val = (item[field] || '').toLowerCase();
         return (name && val.includes(name)) || (email && val === email);
-      })
-    );
+      });
+    });
   }
 
   return { currentUser, user: currentUser, isAdmin, isSuperAdmin, employeeRole, loading, filterByUser, userPermissions };
