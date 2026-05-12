@@ -185,7 +185,7 @@ export default function Dashboard() {
       </motion.div>
 
       <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {canRead('Client')    && <KpiCard href="/clientes"   title="Clientes"     value={activeClients}       subtitle={`${clients.length} en total`}              icon={Users}         color="purple" />}
+        {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"  value={activeClients}       subtitle={`${clients.length} en total`}              icon={Users}         color="purple" />}
         {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="OTs Urgentes" value={urgentOrders.length} subtitle="Alta o urgente"                            icon={AlertTriangle} color={urgentOrders.length > 0 ? 'red' : 'green'} />}
         {canRead('Asset')     && <KpiCard href="/activos"    title="Activos"      value={assets.length}       subtitle={`${overdueAssets.length} mant. vencido`}   icon={Wrench}        color="amber" />}
         {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"   value={materials.length}    subtitle={`${lowStockItems.length} bajo mínimo`}     icon={Package}       color={lowStockItems.length > 0 ? 'red' : 'green'} />}
