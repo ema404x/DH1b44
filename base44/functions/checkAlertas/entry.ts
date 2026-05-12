@@ -21,6 +21,26 @@ Deno.serve(async (req) => {
     let totalAlertas = 0;
     const resumen = [];
 
+    // ── LIMPIEZA: marcar como leídas las alertas de entidades eliminadas ──
+    const logsNoLeidos = await sb.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 200).catch(() => []);
+    if (logsNoLeidos.length > 0) {
+      await Promise.allSettled(logsNoLeidos.map(async (log) => {
+        if (!log.entidad_id || !log.entidad_tipo) return;
+        try {
+          let items = [];
+          if (log.entidad_tipo === 'Pendiente')   items = await sb.entities.Pendiente.filter({ id: log.entidad_id });
+          else if (log.entidad_tipo === 'Asset')   items = await sb.entities.Asset.filter({ id: log.entidad_id });
+          else if (log.entidad_tipo === 'Material') items = await sb.entities.Material.filter({ id: log.entidad_id });
+          else if (log.entidad_tipo === 'WorkOrder') items = await sb.entities.WorkOrder.filter({ id: log.entidad_id });
+          else return; // tipo desconocido, conservar
+
+          if (items.length === 0) {
+            await sb.entities.AlertaLog.update(log.id, { leida: true });
+          }
+        } catch { /* ignorar errores individuales */ }
+      }));
+    }
+
     // Pre-cargar logs de hoy para evitar duplicados
     const logsHoy = await sb.entities.AlertaLog.list('-fecha_alerta', 500);
     const logsHoyFiltrados = logsHoy.filter(l => l.fecha_alerta?.startsWith(hoy));
@@ -104,7 +124,9 @@ Deno.serve(async (req) => {
 
       // ── 3. PENDIENTES ALTAMENTE VENCIDOS ─────────────────────────────
       if (cfg.tipo === 'pendiente_vencido') {
-        const pendientes = await sb.entities.Pendiente.filter({ estado: 'pendiente' });
+        // Solo estados que realmente siguen abiertos (no resueltos ni eliminados)
+        const pendientes = await sb.entities.Pendiente.filter({ estado: 'pendiente' })
+          .catch(() => []);
         const diasLimite = cfg.dias_vencimiento_pendiente || 7;
 
         for (const p of pendientes) {

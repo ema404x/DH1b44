@@ -25,7 +25,47 @@ export default function AlertasBanner() {
 
   const { data: alertas = [] } = useQuery({
     queryKey: ['alertas-activas'],
-    queryFn: () => base44.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 50),
+    queryFn: async () => {
+      const logs = await base44.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 100);
+      if (logs.length === 0) return [];
+
+      // Verificar que las entidades referenciadas aún existen.
+      // Si la entidad fue eliminada, marcar la alerta como leída automáticamente.
+      const checks = await Promise.allSettled(
+        logs.map(async (alerta) => {
+          if (!alerta.entidad_id || !alerta.entidad_tipo) return alerta;
+          try {
+            let exists = false;
+            if (alerta.entidad_tipo === 'Pendiente') {
+              const r = await base44.entities.Pendiente.filter({ id: alerta.entidad_id });
+              exists = r.length > 0;
+            } else if (alerta.entidad_tipo === 'Asset') {
+              const r = await base44.entities.Asset.filter({ id: alerta.entidad_id });
+              exists = r.length > 0;
+            } else if (alerta.entidad_tipo === 'Material') {
+              const r = await base44.entities.Material.filter({ id: alerta.entidad_id });
+              exists = r.length > 0;
+            } else if (alerta.entidad_tipo === 'WorkOrder') {
+              const r = await base44.entities.WorkOrder.filter({ id: alerta.entidad_id });
+              exists = r.length > 0;
+            } else {
+              exists = true; // tipo desconocido, conservar
+            }
+            if (!exists) {
+              await base44.entities.AlertaLog.update(alerta.id, { leida: true });
+              return null; // marcar para filtrar
+            }
+            return alerta;
+          } catch {
+            return alerta; // en caso de error de red, conservar
+          }
+        })
+      );
+
+      return checks
+        .filter(r => r.status === 'fulfilled' && r.value !== null)
+        .map(r => r.value);
+    },
     refetchInterval: 5 * 60 * 1000,
   });
 
