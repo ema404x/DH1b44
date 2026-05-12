@@ -5,10 +5,23 @@ const SKIP_SHEETS = ['PARA FORMATO CONDICIONAL', 'ESC'];
 
 function parseDate(val) {
   if (!val) return null;
+
+  // Si es número serial de Excel (ej: 45123)
+  if (typeof val === 'number' || /^\d{5}$/.test(String(val).trim())) {
+    const serial = typeof val === 'number' ? val : parseInt(val);
+    // Excel epoch: 1 enero 1900 = serial 1 (con bug del año bisiesto 1900)
+    const date = new Date(Date.UTC(1900, 0, serial - 1));
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // Formato texto DD/MM/YYYY o DD-MM-YYYY o DD.MM.YYYY
   const s = String(val).trim();
-  const m = s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
-  if (!m) return null;
-  const [, d, mo, y] = m;
+  const match = s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
+  if (!match) return null;
+  const [, d, mo, y] = match;
   return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
 }
 
