@@ -81,11 +81,10 @@ function parseRows8B(ws) {
     const tareas = row[2] ? String(row[2]).trim() : null;
     const nroOrden = row[3];
     const desaprobado = row[4];
-    // col 5 es extra/vacía en 8B
-    const fechaInicio = row[6];
-    const fechaLimite = row[7];
-    const claseOrden = row[8] ? String(row[8]).trim() : null;
-    const status = row[9] ? String(row[9]).trim() : null;
+    const fechaInicio = row[5];
+    const fechaLimite = row[6];
+    const claseOrden = null; // 8B no tiene clase de orden por el momento
+    const status = null;     // 8B no tiene columna STATUS
 
     if (!nroOrden || !tareas || String(tareas).trim() === '') continue;
     if (String(nroOrden).trim() === '') continue;
