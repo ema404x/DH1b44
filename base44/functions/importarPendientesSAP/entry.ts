@@ -40,7 +40,7 @@ function statusToEstado(status) {
  * Detect the format of the Excel file based on the commune.
  * - '8A': multiple sheets per inspector, has INSPECTOR column, FECHA LIMITE SAP
  * - '8B': single sheet "PENDIENTES 8B", no INSPECTOR column — inspector name IS the column header,
- *         columns: [inspector_name, ubicacion, descripcion, nro_orden, col_5, fecha_inicio, fecha_limite, clase, status]
+ *         columns: [inspector_name, ubicacion, descripcion, nro_orden, col_4, col_5, fecha_inicio, fecha_limite, clase, status]
  * - '10A': single sheet "PENDIENTES C10A", no INSPECTOR column, FECHA LIMITE (no SAP suffix)
  */
 function detectFormat(comuna) {
@@ -57,19 +57,18 @@ function detectFormat(comuna) {
  *   1: ubicacion
  *   2: descripcion (TAREAS A REALIZAR)
  *   3: N° DE ORDEN
- *   4: (desaprobado or null)
- *   5: FECHA INICIO
- *   6: FECHA LIMITE
- *   7: CLASE DE ORDEN
- *   8: STATUS
+ *   4: (col extra / vacía)
+ *   5: (col extra / vacía)
+ *   6: FECHA INICIO
+ *   7: FECHA LIMITE
+ *   8: CLASE DE ORDEN
+ *   9: STATUS
  */
 function parseRows8B(ws) {
   // Read as array of arrays to get raw data without header interpretation
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
   if (!raw || raw.length < 2) return { rows: [], inspectors: new Set() };
 
-  // Row 0 is the actual first data row — the inspector name is in cell A1 (index 0)
-  // But xlsx uses row 0 as column headers. We need to re-parse with header:1 to get arrays.
   const records = [];
   const inspectors = new Set();
 
@@ -82,10 +81,11 @@ function parseRows8B(ws) {
     const tareas = row[2] ? String(row[2]).trim() : null;
     const nroOrden = row[3];
     const desaprobado = row[4];
-    const fechaInicio = row[5];
-    const fechaLimite = row[6];
-    const claseOrden = row[7] ? String(row[7]).trim() : null;
-    const status = row[8] ? String(row[8]).trim() : null;
+    // col 5 es extra/vacía en 8B
+    const fechaInicio = row[6];
+    const fechaLimite = row[7];
+    const claseOrden = row[8] ? String(row[8]).trim() : null;
+    const status = row[9] ? String(row[9]).trim() : null;
 
     if (!nroOrden || !tareas || String(tareas).trim() === '') continue;
     if (String(nroOrden).trim() === '') continue;
