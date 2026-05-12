@@ -94,8 +94,9 @@ function parseRows8B(ws) {
     const tareas = row[2] ? String(row[2]).trim() : null;
     const nroOrden = row[3];
     const desaprobado = row[4];
-    const fechaInicio = row[5];
-    const fechaLimite = row[6];
+    // col E(4)=desaprobado, col F(5)=vacía, col G(6)=FECHA INICIO, col H(7)=FECHA LIMITE
+    const fechaInicio = row[6];
+    const fechaLimite = row[7];
     const claseOrden = null; // 8B no tiene clase de orden por el momento
     const status = null;     // 8B no tiene columna STATUS
 
