@@ -1,10 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import * as XLSX from 'npm:xlsx@0.18.5';
 
-// Sheets to skip (auxiliary/config sheets)
 const SKIP_SHEETS = ['PARA FORMATO CONDICIONAL', 'ESC'];
 
-// Parse DD.MM.YYYY or DD/MM/YYYY → YYYY-MM-DD
 function parseDate(val) {
   if (!val) return null;
   const s = String(val).trim();
@@ -14,13 +12,11 @@ function parseDate(val) {
   return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
 }
 
-// Normalize inspector name from sheet/cell
 function normalizeName(s) {
   if (!s || s === '#N/A') return null;
   return String(s).trim().toUpperCase();
 }
 
-// Map clase_orden → tipo
 function claseToTipo(clase) {
   if (!clase) return 'mantenimiento';
   const c = String(clase).toUpperCase();
@@ -30,15 +26,156 @@ function claseToTipo(clase) {
   return 'mantenimiento';
 }
 
-// Map status SAP → estado interno
 function statusToEstado(status) {
   if (!status) return 'pendiente';
   const s = String(status).toUpperCase();
-  if (s === 'AEJE') return 'pendiente'; // A ejecutar
+  if (s === 'AEJE') return 'pendiente';
   if (s === 'EJER') return 'en_progreso';
   if (s === 'CIER' || s === 'CERR') return 'resuelto';
   if (s === 'CANC') return 'cancelado';
   return 'pendiente';
+}
+
+/**
+ * Detect the format of the Excel file based on the commune.
+ * - '8A': multiple sheets per inspector, has INSPECTOR column, FECHA LIMITE SAP
+ * - '8B': single sheet "PENDIENTES 8B", no INSPECTOR column — inspector name IS the column header,
+ *         columns: [inspector_name, ubicacion, descripcion, nro_orden, col_5, fecha_inicio, fecha_limite, clase, status]
+ * - '10A': single sheet "PENDIENTES C10A", no INSPECTOR column, FECHA LIMITE (no SAP suffix)
+ */
+function detectFormat(comuna) {
+  if (String(comuna).includes('8B')) return 'formato_8b';
+  if (String(comuna).includes('10') || String(comuna).includes('10A')) return 'formato_10a';
+  return 'formato_8a'; // default (8A, multiple sheets with INSPECTOR column)
+}
+
+/**
+ * Parse rows from formato_8b sheet.
+ * The sheet has NO proper headers — xlsx reads row 0 as headers.
+ * Column layout (positional, by index):
+ *   0: inspector name (the column header is the inspector's name)
+ *   1: ubicacion
+ *   2: descripcion (TAREAS A REALIZAR)
+ *   3: N° DE ORDEN
+ *   4: (desaprobado or null)
+ *   5: FECHA INICIO
+ *   6: FECHA LIMITE
+ *   7: CLASE DE ORDEN
+ *   8: STATUS
+ */
+function parseRows8B(ws) {
+  // Read as array of arrays to get raw data without header interpretation
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  if (!raw || raw.length < 2) return { rows: [], inspectors: new Set() };
+
+  // Row 0 is the actual first data row — the inspector name is in cell A1 (index 0)
+  // But xlsx uses row 0 as column headers. We need to re-parse with header:1 to get arrays.
+  const records = [];
+  const inspectors = new Set();
+
+  for (let i = 1; i < raw.length; i++) {
+    const row = raw[i];
+    if (!row || row.length < 4) continue;
+
+    const inspector = normalizeName(row[0]);
+    const ubicacion = row[1] ? String(row[1]).trim() : null;
+    const tareas = row[2] ? String(row[2]).trim() : null;
+    const nroOrden = row[3];
+    const desaprobado = row[4];
+    const fechaInicio = row[5];
+    const fechaLimite = row[6];
+    const claseOrden = row[7] ? String(row[7]).trim() : null;
+    const status = row[8] ? String(row[8]).trim() : null;
+
+    if (!nroOrden || !tareas || String(tareas).trim() === '') continue;
+    if (String(nroOrden).trim() === '') continue;
+
+    if (inspector) inspectors.add(inspector);
+
+    records.push({
+      inspector,
+      ubicacion,
+      tareas,
+      nroOrden: String(nroOrden).trim(),
+      desaprobado: desaprobado ? String(desaprobado).trim() : null,
+      fechaInicio,
+      fechaLimite,
+      claseOrden,
+      status,
+    });
+  }
+
+  return { rows: records, inspectors };
+}
+
+/**
+ * Parse rows from formato_10a (no INSPECTOR column).
+ * Columns: UBICACIÓN, ESTABLECIMIENTO, TAREAS A REALIZAR , N° DE ORDEN, 1° DESROBADO, FECHA INICIO, FECHA LIMITE, CLASE DE ORDEN, STATUS
+ */
+function parseRows10A(ws) {
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+  const records = [];
+
+  for (const row of rows) {
+    const nroOrden = row['N° DE ORDEN'] || row['N° DE ORDEN '] || row['NRO DE ORDEN'];
+    const tareas = row['TAREAS A REALIZAR'] || row['TAREAS A REALIZAR '] || row['TAREA'] || row['DESCRIPCION'];
+    const ubicacion = row['UBICACIÓN'] || row['UBICACION'] || row['UBICACIÓN '];
+    const establecimiento = row['ESTABLECIMIENTO'];
+    // "1° DESROBADO" is a typo for "1° DESAPROBADO" in the 10A format
+    const desaprobado = row['1° DESROBADO'] || row['1° DESAPROBADO'] || row['N° DE ORDEN 1° DESAPROBADO'];
+    const fechaLimite = row['FECHA LIMITE'] || row['FECHA LÍMITE'] || row['FECHA LIMITE SAP'];
+
+    if (!nroOrden || !tareas || String(tareas).trim() === '') continue;
+
+    records.push({
+      inspector: null,
+      ubicacion: ubicacion ? String(ubicacion).trim() : null,
+      establecimiento: establecimiento ? String(establecimiento).trim() : null,
+      tareas: String(tareas).trim(),
+      nroOrden: String(nroOrden).trim(),
+      desaprobado: desaprobado ? String(desaprobado).trim() : null,
+      fechaInicio: row['FECHA INICIO'],
+      fechaLimite,
+      claseOrden: row['CLASE DE ORDEN'] ? String(row['CLASE DE ORDEN']).trim() : null,
+      status: row['STATUS'] ? String(row['STATUS']).trim() : null,
+    });
+  }
+
+  return { rows: records, inspectors: new Set() };
+}
+
+/**
+ * Parse rows from formato_8a (standard, with INSPECTOR column).
+ */
+function parseRows8A(ws) {
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+  const records = [];
+  const inspectors = new Set();
+
+  for (const row of rows) {
+    const inspector = normalizeName(row['INSPECTOR']);
+    const nroOrden = row['N° DE ORDEN'] || row['N° DE ORDEN '] || row['NRO DE ORDEN'];
+    const tareas = row['TAREAS A REALIZAR'] || row['TAREAS A REALIZAR '] || row['TAREA'] || row['DESCRIPCION'];
+
+    if (!nroOrden || !tareas || String(tareas).trim() === '') continue;
+    if (!inspector || inspector === '#N/A') continue;
+
+    inspectors.add(inspector);
+    records.push({
+      inspector,
+      ubicacion: (row['UBICACIÓN'] || row['UBICACION'] || row['UBICACIÓN '] || '') ? String(row['UBICACIÓN'] || row['UBICACION'] || '').trim() : null,
+      establecimiento: row['ESTABLECIMIENTO'] ? String(row['ESTABLECIMIENTO']).trim() : null,
+      tareas: String(tareas).trim(),
+      nroOrden: String(nroOrden).trim(),
+      desaprobado: row['N° DE ORDEN 1° DESAPROBADO'] ? String(row['N° DE ORDEN 1° DESAPROBADO']).trim() : null,
+      fechaInicio: row['FECHA INICIO'],
+      fechaLimite: row['FECHA LIMITE SAP'] || row['FECHA LIMITE'] || row['FECHA LÍMITE'],
+      claseOrden: row['CLASE DE ORDEN'] ? String(row['CLASE DE ORDEN']).trim() : null,
+      status: row['STATUS'] ? String(row['STATUS']).trim() : null,
+    });
+  }
+
+  return { rows: records, inspectors };
 }
 
 Deno.serve(async (req) => {
@@ -47,69 +184,64 @@ Deno.serve(async (req) => {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { file_url, comuna, jefes_por_inspector } = await req.json();
-  // jefes_por_inspector: { "CARLA DONINI": { nombre: "...", email: "..." }, ... }
-
   if (!file_url) return Response.json({ error: 'file_url requerido' }, { status: 400 });
 
-  // Fetch and parse the Excel file
   const res = await fetch(file_url);
   if (!res.ok) return Response.json({ error: 'No se pudo descargar el archivo' }, { status: 400 });
 
   const buffer = await res.arrayBuffer();
   const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
 
+  const formato = detectFormat(comuna);
   const results = [];
   let totalImported = 0;
   let totalErrors = 0;
 
   for (const sheetName of workbook.SheetNames) {
-    if (SKIP_SHEETS.includes(sheetName.toUpperCase()) ||
-        SKIP_SHEETS.some(s => sheetName.toUpperCase().includes(s))) {
-      continue;
+    const upperSheet = sheetName.toUpperCase();
+    if (SKIP_SHEETS.some(s => upperSheet.includes(s))) continue;
+
+    const ws = workbook.Sheets[sheetName];
+    let parsedRows = [];
+
+    if (formato === 'formato_8b') {
+      const parsed = parseRows8B(ws);
+      parsedRows = parsed.rows;
+    } else if (formato === 'formato_10a') {
+      const parsed = parseRows10A(ws);
+      parsedRows = parsed.rows;
+    } else {
+      // formato_8a
+      const parsed = parseRows8A(ws);
+      parsedRows = parsed.rows;
     }
 
-    const sheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
-
-    if (!rows.length) continue;
+    if (!parsedRows.length) continue;
 
     let imported = 0;
     let errors = 0;
     const errorDetails = [];
 
-    for (const row of rows) {
-      const nroOrden = row['N° DE ORDEN'] || row['N° DE ORDEN '] || row['NRO DE ORDEN'];
-      const tareas = row['TAREAS A REALIZAR'] || row['TAREA'] || row['DESCRIPCION'];
-      const inspector = normalizeName(row['INSPECTOR']);
-      const ubicacion = row['UBICACIÓN'] || row['UBICACION'] || row['UBICACIÓN '];
-      const establecimiento = row['ESTABLECIMIENTO'];
-
-      // Skip empty rows — inspector is optional
-      if (!nroOrden || !tareas) continue;
-      if (String(tareas).trim() === '' || String(nroOrden).trim() === '') continue;
-
-      // Resolve jefe from inspector mapping
-      const jefeInfo = jefes_por_inspector?.[inspector] || null;
+    for (const r of parsedRows) {
+      const jefeInfo = r.inspector ? (jefes_por_inspector?.[r.inspector] || null) : null;
 
       const record = {
-        numero_sap: String(nroOrden).trim(),
-        numero_sap_desaprobado: row['N° DE ORDEN 1° DESAPROBADO']
-          ? String(row['N° DE ORDEN 1° DESAPROBADO']).trim()
-          : null,
-        descripcion: String(tareas).trim(),
-        sitio: ubicacion ? String(ubicacion).trim() : null,
-        establecimiento: establecimiento ? String(establecimiento).trim() : null,
-        inspector: inspector,
-        clase_orden: row['CLASE DE ORDEN'] ? String(row['CLASE DE ORDEN']).trim() : null,
-        status_sap: row['STATUS'] ? String(row['STATUS']).trim() : null,
+        numero_sap: r.nroOrden,
+        numero_sap_desaprobado: r.desaprobado || null,
+        descripcion: r.tareas,
+        sitio: r.ubicacion || null,
+        establecimiento: r.establecimiento || r.ubicacion || null,
+        inspector: r.inspector || null,
+        clase_orden: r.claseOrden || null,
+        status_sap: r.status || null,
         comuna: comuna || null,
-        tipo: claseToTipo(row['CLASE DE ORDEN']),
-        estado: jefeInfo ? 'asignado' : statusToEstado(row['STATUS']),
+        tipo: claseToTipo(r.claseOrden),
+        estado: jefeInfo ? 'asignado' : statusToEstado(r.status),
         prioridad: 'media',
         jefe_sitio: jefeInfo?.nombre || null,
         jefe_sitio_email: jefeInfo?.email || null,
-        fecha_emision_sap: parseDate(row['FECHA INICIO']),
-        fecha_limite: parseDate(row['FECHA LIMITE SAP'] || row['FECHA LIMITE'] || row['FECHA LÍMITE']),
+        fecha_emision_sap: parseDate(r.fechaInicio),
+        fecha_limite: parseDate(r.fechaLimite),
       };
 
       try {

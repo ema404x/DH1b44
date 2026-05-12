@@ -35,14 +35,59 @@ export default function ImportarPendientesSAP({ onImportDone }) {
 
   const jefesSitio = employees.filter(e => e.role === 'jefe_sitio');
 
+  // Detect format based on selected commune
+  function getFormato(c) {
+    if (String(c).includes('8B')) return 'formato_8b';
+    if (String(c).includes('10')) return 'formato_10a';
+    return 'formato_8a';
+  }
+
+  // Parse sheet locally for preview (mirrors backend logic)
+  function parseSheetLocal(ws, formato) {
+    const inspSet = new Set();
+    let count = 0;
+
+    if (formato === 'formato_8b') {
+      // Read as array of arrays — row 0 is first data row, inspector is col[0]
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+      for (let i = 1; i < raw.length; i++) {
+        const row = raw[i];
+        if (!row || !row[3] || !row[2] || String(row[2]).trim() === '') continue;
+        count++;
+        if (row[0] && row[0] !== '#N/A') inspSet.add(String(row[0]).trim().toUpperCase());
+      }
+    } else if (formato === 'formato_10a') {
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+      for (const r of rows) {
+        const orden = r['N° DE ORDEN'] || r['N° DE ORDEN '];
+        const tareas = r['TAREAS A REALIZAR'] || r['TAREAS A REALIZAR '];
+        if (!orden || !tareas || String(tareas).trim() === '') continue;
+        count++;
+      }
+    } else {
+      // formato_8a
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+      for (const r of rows) {
+        const orden = r['N° DE ORDEN'] || r['N° DE ORDEN '];
+        const tareas = r['TAREAS A REALIZAR'] || r['TAREAS A REALIZAR '];
+        const inspector = r['INSPECTOR'];
+        if (!orden || !tareas || !inspector || inspector === '#N/A') continue;
+        count++;
+        inspSet.add(String(inspector).trim().toUpperCase());
+      }
+    }
+
+    return { count, inspectors: inspSet };
+  }
+
   async function handleFile(f) {
     if (!f) return;
     setFile(f);
     setIsUploading(true);
 
-    // Parse locally to get inspector names per sheet
     const arrayBuf = await f.arrayBuffer();
     const wb = XLSX.read(new Uint8Array(arrayBuf), { type: 'array' });
+    const formato = getFormato(comuna);
 
     const sheets = [];
     const inspectors = new Set();
@@ -50,27 +95,13 @@ export default function ImportarPendientesSAP({ onImportDone }) {
     for (const sheetName of wb.SheetNames) {
       if (SKIP_SHEETS.some(s => sheetName.toUpperCase().includes(s))) continue;
       const ws = wb.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
-      const validRows = rows.filter(r => {
-        const orden = r['N° DE ORDEN'] || r['N° DE ORDEN '] || r['NRO DE ORDEN'];
-        const tareas = r['TAREAS A REALIZAR'] || r['TAREAS A REALIZAR '] || r['TAREA'] || r['DESCRIPCION'];
-        return orden && tareas && String(tareas).trim() !== '' && String(orden).trim() !== '';
-      });
+      const { count, inspectors: sheetInspSet } = parseSheetLocal(ws, formato);
 
-      // Unique inspectors in this sheet (may not exist in all formats)
-      const sheetInspSet = new Set(
-        validRows
-          .map(r => r['INSPECTOR'] ? String(r['INSPECTOR']).trim().toUpperCase() : null)
-          .filter(Boolean)
-          .filter(i => i !== '#N/A')
-      );
       sheetInspSet.forEach(i => inspectors.add(i));
-
       sheets.push({
         name: sheetName,
-        totalRows: validRows.length,
+        totalRows: count,
         inspectors: [...sheetInspSet],
-        sample: validRows.slice(0, 3),
       });
     }
 
