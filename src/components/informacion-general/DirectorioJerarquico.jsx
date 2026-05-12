@@ -77,41 +77,28 @@ export default function DirectorioJerarquico() {
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground mb-1">Direcciones</p>
-            <p className="text-2xl font-bold">{stats.direcciones}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground mb-1">Escuelas</p>
-            <p className="text-2xl font-bold">{stats.escuelas}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground mb-1">Jefes Sitio</p>
-            <p className="text-2xl font-bold">{stats.jefesSitio}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground mb-1">Superficie</p>
-            <p className="text-2xl font-bold">{(stats.m2Total / 1000).toFixed(1)}K</p>
-          </CardContent>
-        </Card>
+        {[
+          { label: 'Direcciones', value: stats.direcciones },
+          { label: 'Escuelas', value: stats.escuelas },
+          { label: 'Jefes Sitio', value: stats.jefesSitio },
+          { label: 'Superficie', value: `${(stats.m2Total / 1000).toFixed(1)}K` },
+        ].map((s, i) => (
+          <div key={i} className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-4">
+            <p className="text-xs text-slate-400 mb-1">{s.label}</p>
+            <p className="text-2xl font-bold text-white">{s.value}</p>
+          </div>
+        ))}
       </div>
 
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             placeholder="Buscar dirección, jefe, inspector..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500"
           />
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -119,10 +106,10 @@ export default function DirectorioJerarquico() {
             <button
               key={c.id}
               onClick={() => setSelectedComuna(selectedComuna === c.id ? 'all' : c.id)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
                 selectedComuna === c.id
                   ? c.color + ' shadow-md'
-                  : 'bg-white text-slate-600 border border-slate-200'
+                  : 'bg-slate-800/50 text-slate-400 border-slate-700/50 hover:border-slate-600/50'
               }`}
             >
               {c.label}
@@ -134,37 +121,35 @@ export default function DirectorioJerarquico() {
       {/* Directorio */}
       <div className="space-y-2">
         {directorioCompleto.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-12 text-center">
-              <MapPin className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-muted-foreground font-medium">Sin direcciones</p>
-            </CardContent>
-          </Card>
+          <div className="border border-dashed border-slate-700/50 rounded-lg py-12 text-center">
+            <MapPin className="h-12 w-12 text-slate-600 mx-auto mb-3" />
+            <p className="text-slate-400 font-medium">Sin direcciones</p>
+          </div>
         ) : (
           directorioCompleto.map(dir => (
-            <Card key={dir.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
+            <div key={dir.id} className="bg-slate-800/60 border border-slate-700/50 rounded-xl overflow-hidden hover:border-slate-600/50 transition-all">
               <button
                 onClick={() => setExpandedDir(expandedDir === dir.id ? null : dir.id)}
                 className="w-full text-left"
               >
-                <CardContent className="pt-4 pb-4 flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                    <MapPin className="h-5 w-5 text-orange-600" />
+                <div className="p-4 flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-lg bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                    <MapPin className="h-5 w-5 text-orange-400" />
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-900">{dir.direccion}</p>
+                    <p className="font-bold text-white">{dir.direccion}</p>
                     <div className="flex gap-2 mt-1 flex-wrap">
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs border-slate-600 text-slate-300">
                         {dir.comuna}
                       </Badge>
                       {dir.jefe_sitio && (
-                        <Badge className="bg-blue-100 text-blue-700 border-0 text-xs">
+                        <Badge className="bg-blue-500/20 text-blue-300 border-0 text-xs">
                           <Users className="h-2.5 w-2.5 mr-1" /> {dir.jefe_sitio}
                         </Badge>
                       )}
                       {dir.inspector && (
-                        <Badge className="bg-purple-100 text-purple-700 border-0 text-xs">
+                        <Badge className="bg-purple-500/20 text-purple-300 border-0 text-xs">
                           {dir.inspector}
                         </Badge>
                       )}
@@ -173,8 +158,8 @@ export default function DirectorioJerarquico() {
 
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="text-right">
-                      <p className="text-lg font-bold text-slate-900">{dir.escuelas.length}</p>
-                      <p className="text-xs text-muted-foreground">escuelas</p>
+                      <p className="text-lg font-bold text-white">{dir.escuelas.length}</p>
+                      <p className="text-xs text-slate-400">escuelas</p>
                     </div>
                     {expandedDir === dir.id ? (
                       <ChevronUp className="h-5 w-5 text-slate-400" />
@@ -182,28 +167,28 @@ export default function DirectorioJerarquico() {
                       <ChevronDown className="h-5 w-5 text-slate-400" />
                     )}
                   </div>
-                </CardContent>
+                </div>
               </button>
 
               {expandedDir === dir.id && (
-                <div className="border-t border-slate-100 bg-slate-50/50 px-6 py-4 space-y-2">
+                <div className="border-t border-slate-700/50 bg-slate-900/30 px-6 py-4 space-y-2">
                   {dir.escuelas.length === 0 ? (
-                    <p className="text-xs text-muted-foreground py-4">Sin escuelas asignadas</p>
+                    <p className="text-xs text-slate-500 py-4">Sin escuelas asignadas</p>
                   ) : (
                     dir.escuelas.map(esc => (
                       <div
                         key={esc.id}
-                        className="bg-white rounded-lg p-3 border border-slate-200 text-xs"
+                        className="bg-slate-800/80 rounded-lg p-3 border border-slate-700/50 text-xs"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="font-medium text-slate-900">{esc.establecimiento}</p>
-                            <p className="text-muted-foreground mt-1">{esc.ubic_tecnica}</p>
+                            <p className="font-medium text-white">{esc.establecimiento}</p>
+                            <p className="text-slate-400 mt-1">{esc.ubic_tecnica}</p>
                           </div>
                           {esc.m2 > 0 && (
                             <div className="text-right flex-shrink-0">
-                              <p className="font-bold text-slate-900">{esc.m2}</p>
-                              <p className="text-muted-foreground">m²</p>
+                              <p className="font-bold text-white">{esc.m2}</p>
+                              <p className="text-slate-400">m²</p>
                             </div>
                           )}
                         </div>
@@ -212,7 +197,7 @@ export default function DirectorioJerarquico() {
                   )}
                 </div>
               )}
-            </Card>
+            </div>
           ))
         )}
       </div>
