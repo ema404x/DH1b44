@@ -251,76 +251,116 @@ export async function exportWorkOrderPDF(order, timeLogs = []) {
     y += 4;
   }
 
-  // ── MATERIALES A UTILIZAR ─────────────────────────────────
+  // ── MATERIALES A UTILIZAR (siempre aparece) ───────────────
+  if (y + 30 > 272) { doc.addPage(); y = 14; }
+  sectionTitle(doc, 'MATERIALES A UTILIZAR', M, y, 65);
+  y += 6;
+
+  // Encabezado tabla
+  doc.setFillColor(...C.dark); doc.roundedRect(M, y, COL, 7, 1, 1, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...C.white);
+  doc.text('Material / Descripcion', M + 3, y + 4.8);
+  doc.text('Cantidad', M + 108, y + 4.8, { align: 'right' });
+  doc.text('Unidad', M + 140, y + 4.8, { align: 'right' });
+  doc.text('Observaciones', W - M - 2, y + 4.8, { align: 'right' });
+  y += 8;
+
   const materials = order.materials_used || [];
-  if (materials.length > 0) {
-    if (y + 25 > 272) { doc.addPage(); y = 14; }
-    sectionTitle(doc, 'MATERIALES A UTILIZAR', M, y, 65);
-    y += 6;
+  let matTotal = 0;
+  materials.forEach((m, i) => {
+    if (y + 7 > 272) { doc.addPage(); y = 14; }
+    const sub = (m.quantity || 0) * (m.unit_cost || 0);
+    matTotal += sub;
+    doc.setFillColor(...(i % 2 === 0 ? C.white : C.rowAlt));
+    doc.rect(M, y, COL, 7, 'F');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...C.gray1);
+    doc.text(doc.splitTextToSize(m.material_name || '', 95)[0], M + 3, y + 4.8);
+    doc.text(String(m.quantity || 0), M + 108, y + 4.8, { align: 'right' });
+    doc.setTextColor(...C.gray2);
+    doc.text('-', M + 140, y + 4.8, { align: 'right' });
+    doc.text(m.unit_cost > 0 ? fmt(m.unit_cost) : '-', W - M - 2, y + 4.8, { align: 'right' });
+    y += 7;
+  });
 
-    doc.setFillColor(...C.dark); doc.roundedRect(M, y, COL, 7, 1, 1, 'F');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...C.white);
-    doc.text('Material', M + 3, y + 4.8);
-    doc.text('Cant.', M + 108, y + 4.8, { align: 'right' });
-    doc.text('Costo/u', M + 140, y + 4.8, { align: 'right' });
-    doc.text('Subtotal', W - M - 2, y + 4.8, { align: 'right' });
-    y += 8;
-
-    let matTotal = 0;
-    materials.forEach((m, i) => {
-      if (y + 7 > 272) { doc.addPage(); y = 14; }
-      const sub = (m.quantity || 0) * (m.unit_cost || 0);
-      matTotal += sub;
-      doc.setFillColor(...(i % 2 === 0 ? C.white : C.rowAlt));
-      doc.rect(M, y, COL, 6.5, 'F');
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...C.gray1);
-      doc.text(doc.splitTextToSize(m.material_name || '', 95)[0], M + 3, y + 4.5);
-      doc.text(String(m.quantity || 0), M + 108, y + 4.5, { align: 'right' });
-      doc.setTextColor(...C.gray2);
-      doc.text(m.unit_cost > 0 ? fmt(m.unit_cost) : '-', M + 140, y + 4.5, { align: 'right' });
-      doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.gray1);
-      doc.text(sub > 0 ? fmt(sub) : '-', W - M - 2, y + 4.5, { align: 'right' });
-      y += 6.5;
-    });
-
-    if (matTotal > 0) {
-      doc.setFillColor(...C.dark); doc.roundedRect(W - M - 58, y + 1, 58, 8, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...C.white);
-      doc.text('TOTAL MATERIALES', W - M - 56, y + 6);
-      doc.setTextColor(...C.red); doc.text(fmt(matTotal), W - M - 2, y + 6, { align: 'right' });
-    }
-    y += 14;
+  // Filas en blanco para completar a mano (al menos 4 vacías, o hasta completar 5 filas total)
+  const blankRowsMat = Math.max(5 - materials.length, 4);
+  for (let b = 0; b < blankRowsMat; b++) {
+    if (y + 7 > 272) { doc.addPage(); y = 14; }
+    doc.setFillColor(...(( materials.length + b) % 2 === 0 ? C.white : C.rowAlt));
+    doc.rect(M, y, COL, 7, 'F');
+    doc.setDrawColor(...C.gray4); doc.setLineWidth(0.2);
+    // Líneas guía punteadas para escribir
+    doc.setLineDashPattern([1, 1], 0);
+    doc.line(M + 3, y + 5.5, M + 95, y + 5.5);
+    doc.line(M + 98, y + 5.5, M + 112, y + 5.5);
+    doc.line(M + 130, y + 5.5, M + 143, y + 5.5);
+    doc.line(M + 152, y + 5.5, W - M - 2, y + 5.5);
+    doc.setLineDashPattern([], 0);
+    y += 7;
   }
 
-  // ── MATERIALES FALTANTES ──────────────────────────────────
+  if (matTotal > 0) {
+    doc.setFillColor(...C.dark); doc.roundedRect(W - M - 58, y + 1, 58, 8, 1, 1, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...C.white);
+    doc.text('TOTAL MATERIALES', W - M - 56, y + 6);
+    doc.setTextColor(...C.red); doc.text(fmt(matTotal), W - M - 2, y + 6, { align: 'right' });
+    y += 10;
+  } else {
+    y += 4;
+  }
+
+  // ── MATERIALES FALTANTES (siempre aparece) ────────────────
+  if (y + 30 > 272) { doc.addPage(); y = 14; }
+
+  // Cabecera naranja
+  doc.setFillColor(...C.amberLt);
+  doc.roundedRect(M, y, COL, 10, 2, 2, 'F');
+  doc.setDrawColor(...C.amber); doc.setLineWidth(0.5);
+  doc.roundedRect(M, y, COL, 10, 2, 2, 'S');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...C.amber);
+  doc.text('MATERIALES QUE FALTARON', M + 4, y + 6.5);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(...C.gray2);
+  doc.text('(para que el operario complete en campo)', W - M - 2, y + 6.5, { align: 'right' });
+  y += 12;
+
+  // Encabezado tabla faltantes
+  doc.setFillColor(...[180, 120, 0]); doc.roundedRect(M, y, COL, 7, 1, 1, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...C.white);
+  doc.text('Material que faltó', M + 3, y + 4.8);
+  doc.text('Cantidad', M + 108, y + 4.8, { align: 'right' });
+  doc.text('Unidad', M + 140, y + 4.8, { align: 'right' });
+  doc.text('Motivo / Comentario', W - M - 2, y + 4.8, { align: 'right' });
+  y += 8;
+
   const faltantes = order.materiales_faltantes || [];
-  if (faltantes.length > 0) {
-    if (y + 20 > 272) { doc.addPage(); y = 14; }
+  faltantes.forEach((f, i) => {
+    if (y + 7 > 272) { doc.addPage(); y = 14; }
+    doc.setFillColor(...(i % 2 === 0 ? C.white : C.rowAlt));
+    doc.rect(M, y, COL, 7, 'F');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...C.gray1);
+    doc.text(doc.splitTextToSize(f.material_name || '', 90)[0], M + 3, y + 4.8);
+    doc.text(String(f.cantidad_faltante || ''), M + 108, y + 4.8, { align: 'right' });
+    doc.setTextColor(...C.gray2);
+    doc.text(f.motivo || '-', W - M - 2, y + 4.8, { align: 'right' });
+    y += 7;
+  });
 
-    const faltH = faltantes.length * 9 + 22;
-    doc.setFillColor(...C.amberLt);
-    doc.roundedRect(M, y, COL, faltH, 2, 2, 'F');
-    doc.setDrawColor(...C.amber); doc.setLineWidth(0.5);
-    doc.roundedRect(M, y, COL, faltH, 2, 2, 'S');
-
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...C.amber);
-    doc.text('MATERIALES QUE FALTARON', M + 4, y + 7);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(...C.gray2);
-    doc.text('Reportado por el operario durante la ejecucion', M + 4, y + 12);
-
-    let fy = y + 15;
-    faltantes.forEach((f) => {
-      if (fy + 8 > 272) { doc.addPage(); fy = 14; }
-      doc.setFillColor(...C.white); doc.roundedRect(M + 3, fy, COL - 6, 7.5, 1, 1, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...C.gray1);
-      doc.text('- ' + (f.material_name || ''), M + 5, fy + 5);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...C.gray2);
-      const detalle = '  Faltaron: ' + (f.cantidad_faltante || 0) + ' u.' + (f.motivo ? '  -  ' + f.motivo : '');
-      doc.text(detalle, M + 5 + 40, fy + 5);
-      fy += 9;
-    });
-    y = fy + 4;
+  // Filas en blanco para que el operario complete a mano
+  const blankRowsFalt = Math.max(5 - faltantes.length, 4);
+  for (let b = 0; b < blankRowsFalt; b++) {
+    if (y + 7 > 272) { doc.addPage(); y = 14; }
+    doc.setFillColor(...((faltantes.length + b) % 2 === 0 ? C.white : C.rowAlt));
+    doc.rect(M, y, COL, 7, 'F');
+    doc.setLineDashPattern([1, 1], 0);
+    doc.setDrawColor(...C.amber); doc.setLineWidth(0.2);
+    doc.line(M + 3, y + 5.5, M + 95, y + 5.5);
+    doc.line(M + 98, y + 5.5, M + 112, y + 5.5);
+    doc.line(M + 130, y + 5.5, M + 143, y + 5.5);
+    doc.line(M + 152, y + 5.5, W - M - 2, y + 5.5);
+    doc.setLineDashPattern([], 0);
+    y += 7;
   }
+  y += 6;
 
   // ── MOTIVOS INCOMPLETO ────────────────────────────────────
   const motivos = order.motivos_incompleto || [];
