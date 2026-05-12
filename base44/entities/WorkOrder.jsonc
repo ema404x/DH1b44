@@ -22,15 +22,13 @@
     },
     "location": {
       "type": "string",
-      "description": "Ubicaci\u00f3n del trabajo (texto libre o nombre del QR)"
+      "description": "Ubicaci\u00f3n del trabajo"
     },
     "location_qr_id": {
-      "type": "string",
-      "description": "ID de la ubicaci\u00f3n QR vinculada (para escaneo autom\u00e1tico)"
+      "type": "string"
     },
     "location_qr_name": {
-      "type": "string",
-      "description": "Nombre de la ubicaci\u00f3n QR (desnormalizado)"
+      "type": "string"
     },
     "type": {
       "type": "string",
@@ -91,7 +89,7 @@
     },
     "checklist": {
       "type": "array",
-      "description": "Lista de tareas de la OT",
+      "description": "Lista de tareas con foto adjunta opcional",
       "items": {
         "type": "object",
         "properties": {
@@ -107,6 +105,10 @@
           },
           "notes": {
             "type": "string"
+          },
+          "photo_url": {
+            "type": "string",
+            "description": "Foto de ejemplo de la tarea"
           }
         }
       }
@@ -119,15 +121,14 @@
       "description": "URLs de fotos adjuntas"
     },
     "signature_url": {
-      "type": "string",
-      "description": "URL de firma digital"
+      "type": "string"
     },
     "signature_name": {
-      "type": "string",
-      "description": "Nombre de quien firm\u00f3"
+      "type": "string"
     },
     "materials_used": {
       "type": "array",
+      "description": "Materiales planificados para la OT",
       "items": {
         "type": "object",
         "properties": {
@@ -143,22 +144,51 @@
         }
       }
     },
+    "materiales_faltantes": {
+      "type": "array",
+      "description": "Materiales que faltaron durante la ejecuci\u00f3n (reportado por operario)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "material_name": {
+            "type": "string"
+          },
+          "cantidad_faltante": {
+            "type": "number"
+          },
+          "motivo": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "motivos_incompleto": {
+      "type": "array",
+      "description": "Motivos por los que la OT no se complet\u00f3",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "texto": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "gps_latitude": {
-      "type": "number",
-      "description": "Latitud GPS capturada al guardar la OT desde campo"
+      "type": "number"
     },
     "gps_longitude": {
-      "type": "number",
-      "description": "Longitud GPS capturada al guardar la OT desde campo"
+      "type": "number"
     },
     "gps_accuracy": {
-      "type": "number",
-      "description": "Precisi\u00f3n GPS en metros"
+      "type": "number"
     },
     "gps_timestamp": {
       "type": "string",
-      "format": "date-time",
-      "description": "Momento en que se captur\u00f3 la ubicaci\u00f3n GPS"
+      "format": "date-time"
     },
     "gps_status": {
       "type": "string",
@@ -166,8 +196,7 @@
         "capturado",
         "denegado",
         "no_disponible"
-      ],
-      "description": "Estado de la captura GPS"
+      ]
     },
     "notes": {
       "type": "string"

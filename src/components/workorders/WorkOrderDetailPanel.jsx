@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode, Navigation, Layers } from 'lucide-react';
+import { X, Save, Loader2, MapPin, FileText, CheckSquare, Camera, PenTool, Package, Clock, DollarSign, Download, AlertTriangle, QrCode, Navigation, Layers, ClipboardX } from 'lucide-react';
 import { toast } from 'sonner';
 import WorkOrderQRButton from './WorkOrderQRButton';
 import QRCodeModal from '@/components/shared/QRCodeModal';
@@ -16,6 +16,7 @@ import WorkOrderSignature from './WorkOrderSignature';
 import WorkOrderMaterials from './WorkOrderMaterials';
 import WorkOrderTimeLogs from './WorkOrderTimeLogs';
 import WorkOrderCostSummary from './WorkOrderCostSummary';
+import WorkOrderIncompleteReason from './WorkOrderIncompleteReason';
 import { exportWorkOrderPDF } from '@/utils/exportWorkOrderPDF';
 
 const priorityColors = {
@@ -181,12 +182,16 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
         {/* Tabs body */}
         <div className="flex-1 overflow-y-auto">
           <Tabs defaultValue="trabajo" className="h-full flex flex-col">
-            <TabsList className="mx-4 mt-3 flex-shrink-0 grid grid-cols-5 h-8">
+            <TabsList className="mx-4 mt-3 flex-shrink-0 grid grid-cols-6 h-8">
               <TabsTrigger value="trabajo" className="text-[10px] gap-1"><CheckSquare className="h-3 w-3" />Trabajo</TabsTrigger>
               <TabsTrigger value="materiales" className="text-[10px] gap-1"><Package className="h-3 w-3" />Materiales</TabsTrigger>
               <TabsTrigger value="horas" className="text-[10px] gap-1"><Clock className="h-3 w-3" />Horas</TabsTrigger>
               <TabsTrigger value="media" className="text-[10px] gap-1"><Camera className="h-3 w-3" />Media</TabsTrigger>
               <TabsTrigger value="costos" className="text-[10px] gap-1"><DollarSign className="h-3 w-3" />Costos</TabsTrigger>
+              <TabsTrigger value="incompleto" className="text-[10px] gap-1">
+                <ClipboardX className="h-3 w-3 text-red-400" />
+                <span className="text-red-400">Incompleto</span>
+              </TabsTrigger>
             </TabsList>
 
             {/* Trabajo */}
@@ -264,7 +269,12 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
 
             {/* Materiales */}
             <TabsContent value="materiales" className="flex-1 overflow-y-auto p-5 mt-0">
-              <WorkOrderMaterials materials={data.materials_used || []} onChange={val => saveField('materials_used', val)} />
+              <WorkOrderMaterials
+                materials={data.materials_used || []}
+                faltantes={data.materiales_faltantes || []}
+                onChangeMaterials={val => saveField('materials_used', val)}
+                onChangeFaltantes={val => saveField('materiales_faltantes', val)}
+              />
             </TabsContent>
 
             {/* Horas */}
@@ -292,6 +302,14 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                 timeLogs={timeLogs}
                 estimatedHours={data.estimated_hours}
                 actualHours={data.actual_hours}
+              />
+            </TabsContent>
+
+            {/* Incompleto */}
+            <TabsContent value="incompleto" className="flex-1 overflow-y-auto p-5 mt-0">
+              <WorkOrderIncompleteReason
+                motivos={data.motivos_incompleto || []}
+                onChange={val => saveField('motivos_incompleto', val)}
               />
             </TabsContent>
           </Tabs>
