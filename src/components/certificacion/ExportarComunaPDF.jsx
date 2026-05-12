@@ -218,7 +218,7 @@ export function exportarComunaPDF(comuna, obras) {
 
     // Textos
     doc.setFontSize(6.8);
-    const estab     = truncate(obra.establecimiento || obra.direccion || '—', 28);
+    const estab     = truncate(obra.direccion || obra.establecimiento || '—', 28);
     const titulo    = truncate(obra.titulo || '—', 36);
     const inspector = truncate(obra.inspector || '—', 18);
     const estadoLabel = ESTADO_LABEL[obra.estado_cobro] || obra.estado_cobro;
