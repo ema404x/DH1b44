@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Search, FolderKanban, MapPin, Calendar, Trash2, Pencil, FileText, Upload, Plus, TrendingUp, Zap } from 'lucide-react';
+import { Search, FolderKanban, MapPin, Calendar, Trash2, Pencil, Upload, Plus, TrendingUp, Zap } from 'lucide-react';
 import { exportProyectosPDF } from '@/utils/exportPDF';
 import { format } from 'date-fns';
 import PageHeader from '@/components/shared/PageHeader';
