@@ -120,16 +120,16 @@ export function exportarComunaPDF(comuna, obras) {
 
   // Columnas — suma exacta = 277mm
   const cols = [
-    { header: 'Establecimiento', w: 44 },
-    { header: 'Título SAP',      w: 50 },
-    { header: 'N° MTOM',         w: 24 },
-    { header: 'N° MEIN',         w: 24 },
-    { header: 'Inspector',       w: 26 },
-    { header: 'Plazo',           w: 12 },
-    { header: '%',               w: 11, align: 'right' },
-    { header: 'Monto Base',      w: 32, align: 'right' },
-    { header: 'A Cobrar',        w: 32, align: 'right' },
-    { header: 'Estado',          w: 22 },
+    { header: 'Dirección',       w: 38 },
+    { header: 'Título SAP',      w: 46 },
+    { header: 'N° MTOM',         w: 22 },
+    { header: 'N° MEIN',         w: 22 },
+    { header: 'Jefe Sitio',      w: 24 },
+    { header: 'Inspector',       w: 24 },
+    { header: '%',               w: 10, align: 'right' },
+    { header: 'Monto Base',      w: 30, align: 'right' },
+    { header: 'A Cobrar',        w: 30, align: 'right' },
+    { header: 'Estado',          w: 31 },
   ]; // total: 277mm
 
   const headerH   = 8;
@@ -217,23 +217,22 @@ export function exportarComunaPDF(comuna, obras) {
     });
 
     // Textos
-    doc.setFontSize(6.8);
-    const estab     = truncate(obra.direccion || obra.establecimiento || '—', 28);
-    const titulo    = truncate(obra.titulo || '—', 36);
-    const inspector = truncate(obra.inspector || '—', 18);
+    doc.setFontSize(6.5);
+    const direccion  = truncate(obra.direccion || obra.establecimiento || '—', 24);
+    const titulo     = truncate(obra.titulo || '—', 32);
+    const jefeSitio  = truncate(obra.jefe_sitio || '—', 16);
+    const inspector  = truncate(obra.inspector || '—', 16);
     const estadoLabel = ESTADO_LABEL[obra.estado_cobro] || obra.estado_cobro;
-    const tramoLabel  = obra.tramo_certificacion === 'primer_50' ? '1er 50%'
-                      : obra.tramo_certificacion === 'segundo_50' ? '2do 50%' : '';
 
     const pctColor = getPctColor(obra);
 
     const values = [
-      estab,
+      direccion,
       titulo,
       obra.oc_numero  || '—',
       obra.ada_numero || '—',
+      jefeSitio,
       inspector,
-      obra.plazo_dias ? `${obra.plazo_dias}d` : '—',
       obra.porcentaje_avance > 0 ? `${parseFloat(obra.porcentaje_avance.toFixed(1))}%` : '—',
       fmt(obra.monto_contrato),
       fmt(obra.monto_a_cobrar),
@@ -246,19 +245,21 @@ export function exportarComunaPDF(comuna, obras) {
       const isRight = col.align === 'right';
 
       if (vi === 6) {
+        // % avance
         doc.setTextColor(...pctColor);
         doc.setFont('helvetica', 'bold');
+      } else if (vi === 8) {
+        // A Cobrar
+        doc.setTextColor(30, 70, 160);
+        doc.setFont('helvetica', 'bold');
       } else if (vi === 9) {
+        // Estado
         const rgb = obra.estado_cobro === 'listo_certificar'
           ? ESTADO_COLOR.listo_certificar
           : obra.tramo_certificacion
             ? TRAMO_COLOR[obra.tramo_certificacion] || [80,80,80]
             : ESTADO_COLOR[obra.estado_cobro] || [80,80,80];
         doc.setTextColor(...rgb);
-        doc.setFont('helvetica', 'bold');
-      } else if (vi === 8) {
-        // Monto a cobrar en azul oscuro para destacar
-        doc.setTextColor(30, 70, 160);
         doc.setFont('helvetica', 'bold');
       } else {
         doc.setFont('helvetica', 'normal');
