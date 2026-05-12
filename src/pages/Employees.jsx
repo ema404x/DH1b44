@@ -57,12 +57,21 @@ export default function Employees() {
   const { data: locations = [] } = useQuery({ queryKey: ['locations'], queryFn: () => base44.entities.LocationData.list('-created_date', 500) });
   const { data: rolePermissions = [] } = useQuery({ queryKey: ['rolePermissions'], queryFn: () => base44.entities.RolePermission.list() });
 
+  const jefesSitio = useMemo(() =>
+    employees.filter(e => e.role === 'jefe_sitio').map(e => ({ value: e.full_name, label: e.full_name })),
+    [employees]
+  );
+
   const computedEmployeeFields = useMemo(() => {
     const roleOptions = rolePermissions.length > 0
       ? rolePermissions.map(r => ({ value: r.role_name, label: r.role_name }))
       : Object.entries(roleLabels).map(([value, label]) => ({ value, label }));
-    return employeeFields.map(f => f.key === 'role' ? { ...f, options: roleOptions } : f);
-  }, [rolePermissions]);
+    return employeeFields.map(f => {
+      if (f.key === 'role') return { ...f, options: roleOptions };
+      if (f.key === 'assigned_jefe_sitio') return { ...f, type: 'select', options: jefesSitio };
+      return f;
+    });
+  }, [rolePermissions, jefesSitio]);
 
   const stats = useMemo(() => ({
     total: employees.length,
