@@ -78,30 +78,34 @@ function detectFormat(comuna) {
  *   9: STATUS
  */
 function parseRows8B(ws) {
-  // Read as array of arrays to get raw data without header interpretation
+  // Read as array of arrays — fila 0 del Excel es la primera fila real de datos
+  // (el xlsx la interpreta como header ficticio, por eso usamos header:1 y empezamos desde índice 0)
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
-  if (!raw || raw.length < 2) return { rows: [], inspectors: new Set() };
+  if (!raw || raw.length < 1) return { rows: [], inspectors: new Set() };
 
   const records = [];
   const inspectors = new Set();
 
-  for (let i = 1; i < raw.length; i++) {
+  // Estructura columnas 8B:
+  // 0=inspector, 1=ubicacion, 2=ubicacion2(dup), 3=tareas, 4=nro_orden, 5=col_vacia, 6=fecha_inicio, 7=fecha_limite, 8=clase_orden, 9=status
+  for (let i = 0; i < raw.length; i++) {
     const row = raw[i];
     if (!row || row.length < 4) continue;
 
+    const nroOrden = row[4];
+    const tareas = row[3] ? String(row[3]).trim() : null;
+
+    // Saltar filas sin orden válida o sin tarea
+    if (!nroOrden || !tareas || tareas === '') continue;
+    const nroStr = String(nroOrden).trim();
+    if (nroStr === '' || isNaN(Number(nroStr))) continue;
+
     const inspector = normalizeName(row[0]);
     const ubicacion = row[1] ? String(row[1]).trim() : null;
-    const tareas = row[2] ? String(row[2]).trim() : null;
-    const nroOrden = row[3];
-    const desaprobado = row[4];
-    // col E(4)=desaprobado, col F(5)=vacía, col G(6)=FECHA INICIO, col H(7)=FECHA LIMITE
     const fechaInicio = row[6];
     const fechaLimite = row[7];
-    const claseOrden = null; // 8B no tiene clase de orden por el momento
-    const status = null;     // 8B no tiene columna STATUS
-
-    if (!nroOrden || !tareas || String(tareas).trim() === '') continue;
-    if (String(nroOrden).trim() === '') continue;
+    const claseOrden = row[8] ? String(row[8]).trim() : null;
+    const status = row[9] ? String(row[9]).trim() : null;
 
     if (inspector) inspectors.add(inspector);
 
@@ -109,8 +113,8 @@ function parseRows8B(ws) {
       inspector,
       ubicacion,
       tareas,
-      nroOrden: String(nroOrden).trim(),
-      desaprobado: desaprobado ? String(desaprobado).trim() : null,
+      nroOrden: nroStr,
+      desaprobado: null,
       fechaInicio,
       fechaLimite,
       claseOrden,

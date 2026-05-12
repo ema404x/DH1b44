@@ -48,13 +48,19 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
     let count = 0;
 
     if (formato === 'formato_8b') {
-      // Read as array of arrays — row 0 is first data row, inspector is col[0]
+      // Col 0=inspector, 1=ubicacion, 2=ubicacion2(dup), 3=tareas, 4=nro_orden, 6=fecha_inicio, 7=fecha_limite, 8=clase, 9=status
       const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
-      for (let i = 1; i < raw.length; i++) {
+      for (let i = 0; i < raw.length; i++) {
         const row = raw[i];
-        if (!row || !row[3] || !row[2] || String(row[2]).trim() === '') continue;
+        if (!row || row.length < 4) continue;
+        const nroOrden = row[4];
+        const tareas = row[3] ? String(row[3]).trim() : null;
+        if (!nroOrden || !tareas || tareas === '') continue;
+        if (isNaN(Number(String(nroOrden).trim()))) continue;
         count++;
-        if (row[0] && row[0] !== '#N/A') inspSet.add(String(row[0]).trim().toUpperCase());
+        if (row[0] && String(row[0]).trim() !== '' && row[0] !== '#N/A') {
+          inspSet.add(String(row[0]).trim().toUpperCase());
+        }
       }
     } else if (formato === 'formato_10a') {
       const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
