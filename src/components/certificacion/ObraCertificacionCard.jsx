@@ -177,6 +177,7 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
                 <SelectItem value="faltan_actas">⚠️ Faltan Cargar Actas</SelectItem>
                 <SelectItem value="pendiente">🔴 Pendiente</SelectItem>
                 <SelectItem value="observado">⚫ Observado</SelectItem>
+                <SelectItem value="falta_aprobar_mein">🟣 Falta Aprobar Orden MEIN</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpanded(!expanded)}>

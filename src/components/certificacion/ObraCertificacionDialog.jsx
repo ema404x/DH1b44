@@ -161,6 +161,7 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
                   <SelectItem value="faltan_actas">⚠️ Faltan Cargar Actas</SelectItem>
                   <SelectItem value="pendiente">🔴 Pendiente</SelectItem>
                   <SelectItem value="observado">⚫ Observado</SelectItem>
+                  <SelectItem value="falta_aprobar_mein">🟣 Falta Aprobar Orden MEIN</SelectItem>
                 </SelectContent>
               </Select>
             </Field>

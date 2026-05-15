@@ -93,7 +93,8 @@
         "listo_certificar",
         "faltan_actas",
         "pendiente",
-        "observado"
+        "observado",
+        "falta_aprobar_mein"
       ],
       "default": "pendiente",
       "description": "Estado del cobro"

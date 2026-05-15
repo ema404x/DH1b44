@@ -16,10 +16,11 @@ import ImportarObrasExcel from '@/components/certificacion/ImportarObrasExcel';
 import { exportarComunaPDF } from '@/components/certificacion/ExportarComunaPDF';
 
 const ESTADO_CONFIG = {
-  listo_certificar: { label: 'Listo para Certificar', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-  faltan_actas:     { label: 'Faltan Cargar Actas',   color: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
-  pendiente:        { label: 'Pendiente',              color: 'bg-red-500/15 text-red-400 border-red-500/30' },
-  observado:        { label: 'Observado',              color: 'bg-slate-500/15 text-slate-400 border-slate-500/30' },
+  listo_certificar:    { label: 'Listo para Certificar',   color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+  faltan_actas:        { label: 'Faltan Cargar Actas',     color: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
+  pendiente:           { label: 'Pendiente',               color: 'bg-red-500/15 text-red-400 border-red-500/30' },
+  observado:           { label: 'Observado',               color: 'bg-slate-500/15 text-slate-400 border-slate-500/30' },
+  falta_aprobar_mein:  { label: 'Falta Aprobar Orden MEIN', color: 'bg-purple-500/15 text-purple-400 border-purple-500/30' },
 };
 
 const PRIORIDAD_CONFIG = {
@@ -100,11 +101,12 @@ export default function CertificacionObras() {
 
   // KPIs
   const totalMonto = obras.reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
-  const listoCertificar = obras.filter(o => o.estado_cobro === 'listo_certificar').length;
-  const faltanActas    = obras.filter(o => o.estado_cobro === 'faltan_actas').length;
-  const pendientes     = obras.filter(o => o.estado_cobro === 'pendiente').length;
-  const observados     = obras.filter(o => o.estado_cobro === 'observado').length;
-  const urgentes       = obras.filter(o => o.prioridad === 'urgente').length;
+  const listoCertificar   = obras.filter(o => o.estado_cobro === 'listo_certificar').length;
+  const faltanActas       = obras.filter(o => o.estado_cobro === 'faltan_actas').length;
+  const pendientes        = obras.filter(o => o.estado_cobro === 'pendiente').length;
+  const observados        = obras.filter(o => o.estado_cobro === 'observado').length;
+  const faltaAprobarMein  = obras.filter(o => o.estado_cobro === 'falta_aprobar_mein').length;
+  const urgentes          = obras.filter(o => o.prioridad === 'urgente').length;
 
   // Resumen por comuna
   const comunas = ['8A', '8B', '10A'];
@@ -140,7 +142,7 @@ export default function CertificacionObras() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card className="border-emerald-500/20 bg-emerald-500/5">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
@@ -177,6 +179,15 @@ export default function CertificacionObras() {
             <p className="text-2xl font-bold text-slate-400">{observados}</p>
           </CardContent>
         </Card>
+        <Card className="border-purple-500/20 bg-purple-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <FileCheck className="h-4 w-4 text-purple-400" />
+              <span className="text-xs text-muted-foreground">Falta Aprobar MEIN</span>
+            </div>
+            <p className="text-2xl font-bold text-purple-400">{faltaAprobarMein}</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filtros */}
@@ -211,6 +222,7 @@ export default function CertificacionObras() {
             <SelectItem value="faltan_actas">Faltan Cargar Actas</SelectItem>
             <SelectItem value="pendiente">Pendiente</SelectItem>
             <SelectItem value="observado">Observado</SelectItem>
+            <SelectItem value="falta_aprobar_mein">Falta Aprobar Orden MEIN</SelectItem>
           </SelectContent>
         </Select>
       </div>
