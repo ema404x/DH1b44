@@ -1,17 +1,19 @@
 import { jsPDF } from 'jspdf';
 
 const ESTADO_LABEL = {
-  listo_certificar: 'Listo p/ Certificar',
-  faltan_actas:     'Faltan Actas',
-  pendiente:        'Pendiente',
-  observado:        'Observado',
+  listo_certificar:   'Listo p/ Certificar',
+  faltan_actas:       'Faltan Actas',
+  pendiente:          'Pendiente',
+  observado:          'Observado',
+  falta_aprobar_mein: 'Falta Aprobar MEIN',
 };
 
 const ESTADO_COLOR = {
-  listo_certificar: [22, 163, 74],
-  faltan_actas:     [180, 140, 0],
-  pendiente:        [200, 30, 30],
-  observado:        [100, 100, 110],
+  listo_certificar:   [22, 163, 74],
+  faltan_actas:       [180, 140, 0],
+  pendiente:          [200, 30, 30],
+  observado:          [100, 100, 110],
+  falta_aprobar_mein: [124, 58, 237],
 };
 
 const TRAMO_COLOR = {
@@ -169,8 +171,9 @@ export function exportarComunaPDF(comuna, obras) {
   drawKpiCard(doc, margin,                         y, kpiW, kpiH, 'Total Obras',           obras.length,  `${cantListo} listas • ${pendientes} pend.`, [37, 99, 235]);
   drawKpiCard(doc, margin + (kpiW + kpiGap),       y, kpiW, kpiH, 'Monto Total a Cobrar',  fmt(montoTotal), null,                                       [100, 116, 139]);
   drawKpiCard(doc, margin + (kpiW + kpiGap) * 2,   y, kpiW, kpiH, 'Listo p/ Certificar',   `${cantListo} obras`, fmt(montoParcial),                    [22, 163, 74]);
-  drawKpiCard(doc, margin + (kpiW + kpiGap) * 3,   y, kpiW, kpiH, 'Requieren Atención',    faltanActas + pendientes + observados,
-    `Actas: ${faltanActas} | Obs: ${observados}`, [200, 80, 20]);
+  const faltaMein = obras.filter(o => o.estado_cobro === 'falta_aprobar_mein').length;
+  drawKpiCard(doc, margin + (kpiW + kpiGap) * 3,   y, kpiW, kpiH, 'Requieren Atención',    faltanActas + pendientes + observados + faltaMein,
+    `Actas: ${faltanActas} | Obs: ${observados} | MEIN: ${faltaMein}`, [200, 80, 20]);
 
   y += kpiH + 5;
 
