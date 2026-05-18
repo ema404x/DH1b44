@@ -94,7 +94,11 @@ export default function CertificacionObras() {
       o.inspector?.toLowerCase().includes(search.toLowerCase()) ||
       o.oc_numero?.includes(search) ||
       o.ada_numero?.includes(search);
-    const matchEstado = filtroEstado === 'todos' || o.estado_cobro === filtroEstado;
+    const matchEstado = filtroEstado === 'todos'
+      ? true
+      : filtroEstado === 'no_listo'
+        ? o.estado_cobro !== 'listo_certificar'
+        : o.estado_cobro === filtroEstado;
     const matchComuna = filtroComuna === 'todas' || o.comuna === filtroComuna;
     return matchSearch && matchEstado && matchComuna;
   });
@@ -218,6 +222,7 @@ export default function CertificacionObras() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos los estados</SelectItem>
+            <SelectItem value="no_listo">⚠️ No listo para Certificar</SelectItem>
             <SelectItem value="listo_certificar">Listo para Certificar</SelectItem>
             <SelectItem value="faltan_actas">Faltan Cargar Actas</SelectItem>
             <SelectItem value="pendiente">Pendiente</SelectItem>
