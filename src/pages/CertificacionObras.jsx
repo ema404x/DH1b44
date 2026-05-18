@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ObraCertificacionDialog from '@/components/certificacion/ObraCertificacionDialog';
 import ObraCertificacionCard from '@/components/certificacion/ObraCertificacionCard';
 import ImportarObrasExcel from '@/components/certificacion/ImportarObrasExcel';
-import { exportarComunaPDF } from '@/components/certificacion/ExportarComunaPDF';
+import { exportarComunaPDF, exportarFiltradoPDF } from '@/components/certificacion/ExportarComunaPDF';
 
 const ESTADO_CONFIG = {
   listo_certificar:    { label: 'Listo para Certificar',   color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
@@ -225,6 +225,21 @@ export default function CertificacionObras() {
             <SelectItem value="falta_aprobar_mein">Falta Aprobar Orden MEIN</SelectItem>
           </SelectContent>
         </Select>
+        <Button
+          variant="outline"
+          className="gap-2 shrink-0"
+          disabled={filtered.length === 0}
+          onClick={() => exportarFiltradoPDF(
+            filtered.sort((a, b) => {
+              const order = { listo_certificar: 0, faltan_actas: 1, pendiente: 2, observado: 3, falta_aprobar_mein: 4 };
+              return (order[a.estado_cobro] ?? 9) - (order[b.estado_cobro] ?? 9);
+            }),
+            { comuna: filtroComuna, estado: filtroEstado, search }
+          )}
+        >
+          <Download className="h-4 w-4" />
+          PDF ({filtered.length})
+        </Button>
       </div>
 
       {/* Resumen por Comuna */}

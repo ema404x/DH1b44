@@ -103,8 +103,39 @@ function drawKpiCard(doc, x, y, w, h, label, value, subvalue, color) {
   }
 }
 
+// ── Exportar PDF con filtros ─────────────────────────────────────────────────
+export function exportarFiltradoPDF(obras, filtros = {}) {
+  const { comuna, estado, search } = filtros;
+  // Construir título dinámico
+  const partes = [];
+  if (comuna && comuna !== 'todas') partes.push(`Comuna ${comuna}`);
+  if (estado && estado !== 'todos') {
+    const etiquetas = {
+      listo_certificar: 'Listo p/ Certificar', faltan_actas: 'Faltan Actas',
+      pendiente: 'Pendiente', observado: 'Observado', falta_aprobar_mein: 'Falta Aprobar MEIN',
+    };
+    partes.push(etiquetas[estado] || estado);
+  }
+  if (search) partes.push(`"${search}"`);
+  const titulo = partes.length > 0
+    ? `Certificación de Obras — ${partes.join(' · ')}`
+    : 'Certificación de Obras — Todas las Obras';
+
+  const comunaLabel = (comuna && comuna !== 'todas') ? comuna : 'TODAS';
+  exportarComunaPDFInternal(titulo, comunaLabel, obras);
+  const suffix = partes.length > 0 ? partes.join('_').replace(/[^a-zA-Z0-9_]/g, '') : 'todas';
+}
+
 // ── Exportar PDF ────────────────────────────────────────────────────────────
 export function exportarComunaPDF(comuna, obras) {
+  exportarComunaPDFInternal(`Certificación de Obras — Comuna ${comuna}`, comuna, obras, `certificacion_comuna_${comuna}_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+function exportarComunaPDFInternal(tituloHeader, comunaLabel, obras, filename) {
+  if (!filename) {
+    const date = new Date().toISOString().split('T')[0];
+    filename = `certificacion_${comunaLabel}_${date}.pdf`;
+  }
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const pageW  = doc.internal.pageSize.getWidth();  // 297mm
   const pageH  = doc.internal.pageSize.getHeight(); // 210mm
@@ -151,7 +182,7 @@ export function exportarComunaPDF(comuna, obras) {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(`Certificación de Obras — Comuna ${comuna}`, margin, 14);
+  doc.text(tituloHeader, margin, 14);
 
   // Subtítulo derecha
   doc.setFontSize(7.5);
@@ -184,7 +215,7 @@ export function exportarComunaPDF(comuna, obras) {
   obras.forEach((obra, idx) => {
     if (y + rowH > bodyBottom) {
       doc.addPage();
-      addFooter(doc, pageW, pageH, margin, comuna, null, null);
+      addFooter(doc, pageW, pageH, margin, comunaLabel, null, null);
       y = margin;
       drawTableHeader(doc, cols, margin, y, headerH);
       y += headerH;
@@ -280,7 +311,7 @@ export function exportarComunaPDF(comuna, obras) {
     if (obra.estado_cobro === 'observado' && obra.motivo_observacion) {
       if (y + 6 > bodyBottom) {
         doc.addPage();
-        addFooter(doc, pageW, pageH, margin, comuna, null, null);
+        addFooter(doc, pageW, pageH, margin, comunaLabel, null, null);
         y = margin;
         drawTableHeader(doc, cols, margin, y, headerH);
         y += headerH;
@@ -302,10 +333,10 @@ export function exportarComunaPDF(comuna, obras) {
   const pages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
-    addFooter(doc, pageW, pageH, margin, comuna, i, pages);
+    addFooter(doc, pageW, pageH, margin, comunaLabel, i, pages);
   }
 
-  doc.save(`certificacion_comuna_${comuna}_${new Date().toISOString().split('T')[0]}.pdf`);
+  doc.save(filename);
 }
 
 function addFooter(doc, pageW, pageH, margin, comuna, current, total) {
