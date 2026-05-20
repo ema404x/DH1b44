@@ -38,14 +38,11 @@ const prioridadOptions = [
 export default function InformeFormDialog({ open, onOpenChange, initialData, onSave, saving }) {
   const [form, setForm] = useState({});
 
-  const { data: proveedores = [] } = useQuery({
-    queryKey: ['clientes-proveedores'],
-    queryFn: () => base44.entities.Client.list('name', 200),
-  });
+
 
   useEffect(() => {
     if (open) {
-      setForm(initialData || { tipo: 'avance_obra', estado: 'pendiente', prioridad: 'media', requiere_firma: false, firma_obtenida: false });
+      setForm(initialData || { tipo: 'mantenimiento', estado: 'pendiente', prioridad: 'media', requiere_firma: false, firma_obtenida: false });
     }
   }, [open, initialData]);
 
@@ -71,10 +68,7 @@ export default function InformeFormDialog({ open, onOpenChange, initialData, onS
             </div>
             <div className="space-y-1.5">
               <Label>Tipo</Label>
-              <Select value={form.tipo || ''} onValueChange={v => set('tipo', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{tipoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-              </Select>
+              <Input value="Mantenimiento" disabled className="bg-muted" />
             </div>
             <div className="space-y-1.5">
               <Label>Estado</Label>
@@ -90,21 +84,7 @@ export default function InformeFormDialog({ open, onOpenChange, initialData, onS
                 <SelectContent>{prioridadOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Proyecto</Label>
-              <Input value={form.proyecto_nombre || ''} onChange={e => set('proyecto_nombre', e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Proveedor</Label>
-              <Select value={form.cliente_nombre || ''} onValueChange={v => set('cliente_nombre', v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar proveedor..." /></SelectTrigger>
-                <SelectContent>
-                  {proveedores.map(p => (
-                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
             <div className="space-y-1.5">
               <Label>Responsable</Label>
               <Input value={form.responsable || ''} onChange={e => set('responsable', e.target.value)} />
