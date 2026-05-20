@@ -119,8 +119,18 @@ Deno.serve(async (req) => {
 
     // Build enriched sheet info with pre-scores
     const sheetsInfo = Object.entries(raw_data).map(([sheetName, rows]) => {
-      // Los headers están siempre en la fila 0
-      const firstRowRaw = rows[0] || [];
+      // Skip empty rows at the beginning
+      let headerRowIdx = 0;
+      for (let i = 0; i < Math.min(rows.length, 5); i++) {
+        const row = rows[i] || [];
+        const nonEmptyCells = row.filter(cell => cell && String(cell).trim());
+        if (nonEmptyCells.length > 0) {
+          headerRowIdx = i;
+          break;
+        }
+      }
+
+      const firstRowRaw = rows[headerRowIdx] || [];
       const headers = firstRowRaw.map(h => String(h || '').trim());
       const validHeaders = headers.filter(h => h.length > 0);
       const actualHeaders = validHeaders.length > 0 ? validHeaders : headers;
@@ -130,7 +140,7 @@ Deno.serve(async (req) => {
           sheetName,
           headers: [],
           sample: {},
-          rowCount: Math.max(0, rows.length - 1),
+          rowCount: Math.max(0, rows.length - headerRowIdx - 1),
           pre_suggested_entity: null,
           pre_score: 0,
           planilla_model: null,
@@ -138,7 +148,7 @@ Deno.serve(async (req) => {
         };
       }
 
-      const sampleRows = rows.slice(1, 4);
+      const sampleRows = rows.slice(headerRowIdx + 1, headerRowIdx + 4);
       const sample = {};
       actualHeaders.forEach((h, i) => {
         if (h) sample[h] = sampleRows.map(r => r[i]).filter(v => v !== '' && v !== null && v !== undefined).join(', ');
@@ -154,7 +164,7 @@ Deno.serve(async (req) => {
         sheetName,
         headers: actualHeaders,
         sample,
-        rowCount: Math.max(0, rows.length - 1),
+        rowCount: Math.max(0, rows.length - headerRowIdx - 1),
         pre_suggested_entity: topEntity && topEntity[1] > 0 ? topEntity[0] : null,
         pre_score: topEntity ? topEntity[1] : 0,
         planilla_model: planillaModel?.model || null,
@@ -162,154 +172,99 @@ Deno.serve(async (req) => {
       };
     });
 
-    // Build a concise schema summary with patterns for the LLM
-    const schemaSummary = Object.entries(ENTITY_SCHEMAS).map(([entity, schema]) => ({
-      entity,
-      description: schema.description,
-      fields: schema.fields,
-      key_fields: schema.key_fields,
-      common_header_patterns: schema.key_patterns,
-      name_aliases: schema.aliases,
-    }));
+    // Pre-detect entity type based on headers (heuristic)
+    const detectEntityType = (headers) => {
+      const headersLower = headers.map(h => String(h || '').toLowerCase().trim());
+      
+      // InformePlaneacion patterns
+      const planificacionPatterns = ['proveedor', 'contacto', 'estado', 'descripcion', 'mes', 'periodo'];
+      const planificacionMatches = headersLower.filter(h => planificacionPatterns.some(p => h.includes(p))).length;
+      
+      // WorkOrder patterns
+      const workorderPatterns = ['orden', 'tarea', 'ubicacion', 'establecimiento', 'inspector', 'status', 'fecha'];
+      const workorderMatches = headersLower.filter(h => workorderPatterns.some(p => h.includes(p))).length;
+      
+      if (planificacionMatches >= 3) return 'InformePlaneacion';
+      if (workorderMatches >= 4) return 'WorkOrder';
+      if (planificacionMatches >= 1) return 'InformePlaneacion'; // Fallback
+      if (workorderMatches >= 2) return 'WorkOrder'; // Fallback
+      return 'skip';
+    };
 
-    const prompt = `Sos un INGENIERO SENIOR ANALISTA especializado en gestión de órdenes de trabajo y mantenimiento edilicio.
+    // Detect each sheet
+    const detectedSheets = sheetsInfo.map(info => {
+      const detectedEntity = detectEntityType(info.headers);
+      return {
+        ...info,
+        detected_entity: detectedEntity,
+        headers_list: info.headers
+      };
+    });
 
-TAREA: Analiza las hojas de Excel y:
-1. Detecta CADA PENDIENTE/ORDEN como un registro independiente
-2. Identifica qué entidad representa cada hoja
-3. Mapea cada columna al campo correcto del sistema
-4. Reconoce los MODELOS DE PLANILLA por comuna (8A, 8B, 10A)
+    // Build LLM prompt for field mapping (not classification)
+    const prompt = `You are a data mapping expert. Map Excel headers to database fields.
 
-ENTIDADES DEL SISTEMA (con patrones de columnas clave):
-${JSON.stringify(schemaSummary, null, 2)}
+Headers and detected entity types:
+${JSON.stringify(detectedSheets.map(s => ({
+  sheet_name: s.sheetName,
+  headers: s.headers,
+  detected_entity: s.detected_entity,
+  sample: s.sample
+})), null, 2)}
 
-HOJAS A ANALIZAR (pre-análisis automático):
-${JSON.stringify(sheetsInfo, null, 2)}
+For EACH sheet, create field mappings. For InformePlaneacion, map to: mes, descripcion, proveedor_2025, contacto_2025, estado_contacto, etc.
+For WorkOrder, map to: code, title, location, assigned_name, status, scheduled_date, etc.
 
-REGLAS DE DETECCIÓN POR MODELO:
-- **8A**: Hojas POR INSPECTOR. Estructura: INSPECTOR | UBICACIÓN | ESTABLECIMIENTO | TAREAS A REALIZAR | N° DE ORDEN | FECHA INICIO | FECHA LIMITE | CLASE DE ORDEN | STATUS
-  → CADA ROW = 1 pendiente/orden de trabajo
-  
-- **8B**: Formato PIVOTADO. Estructura: Columnas = nombres de direcciones/jefes. Datos anidados.
-  → Requiere PIVOT/desagregación: cada dirección dentro de una celda = múltiples pendientes
-  
-- **10A**: SIN INSPECTOR. Estructura: UBICACIÓN | ESTABLECIMIENTO | TAREAS A REALIZAR | N° DE ORDEN | FECHA INICIO | FECHA LIMITE | STATUS
-  → Similar a 8A pero sin columna INSPECTOR
-  
-DETECTA EL MODELO: Analiza headers y estructura. Si ves "INSPECTOR" en headers → 8A. Si ves direcciones dinámicas como headers y NO ves "INSPECTOR" → 8B. Si ves N° DE ORDEN pero NO INSPECTOR → 10A.
-
-ANÁLISIS DETALLADO PARA CADA HOJA:
-1. **Identifica el modelo** (8A, 8B o 10A) analizando:
-   - Headers presentes (INSPECTOR? N° DE ORDEN? TAREAS?)
-   - Estructura de datos (¿cada row es 1 pendiente o hay datos anidados?)
-   - Nombres de columnas (¿son direcciones/ubicaciones dinámicas?)
-
-2. **Para WorkOrder (Pendientes/Órdenes)**:
-   - code → "N° DE ORDEN" o equivalente
-   - title → "TAREAS A REALIZAR" o "descripcion"
-   - location → "UBICACIÓN" o "ESTABLECIMIENTO"
-   - assigned_name → "INSPECTOR" (si existe, para 8A)
-   - status → "STATUS" (mapear AEJE→pendiente, DESAPROBADO→cancelada, etc.)
-   - scheduled_date → "FECHA INICIO"
-   - description → concatenar TAREAS + detalles
-
-3. **Para InformePlaneacion**:
-   - mes → "MES"
-   - descripcion → "DESCRIPCIÓN" o "TAREAS A REALIZAR"
-   - proveedor_2025 → "PROVEEDOR" o "PROVEEDOR 2025"
-   - contacto_2025 → "CONTACTO" o similar
-   - estado_contacto → "ESTADO" o "ESTADO CONTACTO"
-
-4. **CRÍTICO PARA 8B**: Si es formato pivotado, INDICA en output:
-   - planilla_model: "8B"
-   - needs_unpivot: true
-   - pivot_columns: [lista de columnas que contienen direcciones]
-
-MAPEO ESPECÍFICO PARA INFORMEPLANEACION:
-- MES / PERIODO → mes
-- DESCRIPCIÓN / DESCRIPCION / TAREAS → descripcion
-- PROVEEDOR / PROVEEDOR 2025 → proveedor_2025
-- CONTACTO / CONTACTO 2025 → contacto_2025
-- PROVEEDOR INVITADO 2026 → proveedor_invitado_2026
-- ESTADO / ESTADO CONTACTO → estado_contacto
-- PROVEEDOR CONTRATADO 2026 → proveedor_contratado_2026
-- ESTADO ACTUAL / ESTADO EJECUCIÓN → estado_actual
-
-CALIBRACIÓN DE CONFIANZA:
-- 0.98+: WorkOrder o InformePlaneacion con modelo claro (tiene campos clave mapeados)
-- 0.90-0.97: Estructura clara pero algunos campos faltantes
-- 0.70-0.89: Hojas auxiliares → target_entity: "skip"
-- <0.70: Dudoso
-
-Responde con JSON. Para cada hoja:
-- sheet_name, target_entity, confidence
-- detected_planilla_model (8A/8B/10A si aplica)
-- detected_comuna (8A/8B/10A si aplica)
-- field_mapping (mapeo de columnas)
-- sample_data`;
+Respond ONLY with valid JSON array:
+[{
+  "sheet_name": "exact name",
+  "target_entity": "InformePlaneacion" | "WorkOrder" | "skip",
+  "field_mapping": { "HEADER": "field_name", ... }
+}]`;
 
     const response = await base44.integrations.Core.InvokeLLM({
       prompt,
       model: 'claude_sonnet_4_6',
     });
 
-    // InvokeLLM devuelve directamente un string de texto
-    const result = response;
-    
-    console.log('Raw LLM response:', typeof response);
-    console.log('Raw LLM result:', typeof result, String(result).substring(0, 300));
-
     let sheetsArray = [];
     
-    // Intentar parsear si es texto JSON
-    if (typeof result === 'string') {
+    // Parse LLM response
+    if (typeof response === 'string') {
       try {
-        const parsed = JSON.parse(result);
-        sheetsArray = parsed.sheets || parsed || [];
+        const jsonMatch = response.match(/\[[\s\S]*\]/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : response;
+        sheetsArray = JSON.parse(jsonStr);
+        if (!Array.isArray(sheetsArray)) {
+          sheetsArray = [sheetsArray];
+        }
       } catch (e) {
-        console.error('JSON parse error:', e.message);
+        console.error('JSON parse failed:', e.message);
       }
-    } else if (Array.isArray(result)) {
-      sheetsArray = result;
-    } else if (result && typeof result === 'object') {
-      sheetsArray = result.sheets || [];
+    } else if (Array.isArray(response)) {
+      sheetsArray = response;
     }
 
-    // Asegurar que sea un array
-    if (!Array.isArray(sheetsArray)) {
-      sheetsArray = [];
-    }
+    // Merge LLM mappings with pre-detected entity types
+    const finalSheets = sheetsArray.map(llmSheet => {
+      const detected = detectedSheets.find(d => d.sheetName === llmSheet.sheet_name);
+      return {
+        sheet_name: llmSheet.sheet_name,
+        target_entity: llmSheet.target_entity || detected?.detected_entity || 'skip',
+        confidence: detected ? 0.85 : 0.7,
+        field_mapping: llmSheet.field_mapping || {},
+        detected_planilla_model: detected?.planilla_model || null,
+      };
+    });
 
-    // Procesar y enriquecer con datos reales
+    sheetsArray = finalSheets;
+
+    // Enrich with row counts
     const processedSheets = sheetsArray.map(sheet => {
-      const rawRows = raw_data[sheet.sheet_name];
       const sheetInfo = sheetsInfo.find(s => s.sheetName === sheet.sheet_name);
-      const model = sheet.detected_planilla_model || sheetInfo?.planilla_model;
-
-      let actualRowCount = rawRows ? Math.max(0, rawRows.length - 1) : (sheet.row_count || 0);
-
-      // Para 8B pivotado: contar celdas con datos
-      if (model === '8B' && rawRows && rawRows.length > 1) {
-        let cellCount = 0;
-        const headers = (rawRows[0] || []).map(h => String(h || '').trim());
-
-        rawRows.slice(1).forEach(row => {
-          headers.forEach((header, colIdx) => {
-            const cellValue = row[colIdx];
-            if (cellValue !== null && cellValue !== undefined && cellValue !== '' && cellValue !== '#N/A') {
-              const items = String(cellValue).split(/[\n,;]/).filter(v => v.trim());
-              cellCount += items.length;
-            }
-          });
-        });
-
-        actualRowCount = cellCount > 0 ? cellCount : actualRowCount;
-      }
-
       return {
         ...sheet,
-        row_count: actualRowCount,
-        detected_planilla_model: model || null,
+        row_count: sheetInfo?.rowCount || 0,
       };
     });
 
