@@ -28,7 +28,7 @@ export default function InformesTabla({ informes, onEdit, onDelete, isLoading, h
   const getDaysChip = (informe) => {
     if (!informe.fecha_limite || ['enviado', 'aprobado'].includes(informe.estado)) return null;
     const days = differenceInDays(new Date(informe.fecha_limite), today);
-    if (days < 0) return <span className="text-xs font-semibold text-red-600">Vencido</span>;
+    if (days < 0) return <span className="text-xs font-semibold text-red-600">{format(new Date(informe.fecha_limite), 'dd/MM/yy')}</span>;
     if (days === 0) return <span className="text-xs font-semibold text-red-500">Hoy</span>;
     if (days <= 3) return <span className="text-xs font-semibold text-orange-500">{days}d</span>;
     if (days <= 7) return <span className="text-xs font-semibold text-amber-500">{days}d</span>;
