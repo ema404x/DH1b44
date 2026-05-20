@@ -19,6 +19,7 @@ import MetricasOperacion from '@/components/dashboard/MetricasOperacion';
 import AlertasBanner from '@/components/dashboard/AlertasBanner';
 import EmergenciasWidget from '@/components/dashboard/EmergenciasWidget';
 import KpisJefeSitio from '@/components/dashboard/KpisJefeSitio';
+import AuroraEffect from '@/components/dashboard/AuroraEffect';
 import { format, differenceInDays, isPast, parseISO, startOfMonth, subMonths } from 'date-fns';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { es } from 'date-fns/locale';
@@ -142,6 +143,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 space-y-6">
+      <AuroraEffect />
       {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/30 rounded-full blur-3xl opacity-20 animate-pulse" />
