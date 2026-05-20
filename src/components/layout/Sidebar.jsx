@@ -186,17 +186,30 @@ export default function Sidebar() {
         "flex items-center gap-3 px-4 py-4 border-b border-white/8",
         collapsed && "justify-center px-2 py-4"
       )}>
-        <img
-          src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png"
-          alt="DH1 Software"
-          className={cn(
-            "object-contain mix-blend-screen transition-all duration-300",
-            collapsed ? "h-8 w-8" : "h-10"
-          )}
-        />
+        <div className={cn("relative flex-shrink-0", collapsed ? "h-8 w-8" : "h-10")}>
+          <img
+            src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png"
+            alt="DH1 Software"
+            className={cn(
+              "object-contain mix-blend-screen transition-all duration-300 relative z-10",
+              collapsed ? "h-8 w-8" : "h-10"
+            )}
+            style={{ filter: 'drop-shadow(0 0 6px rgba(0,180,255,0.7)) drop-shadow(0 0 14px rgba(0,220,130,0.45))' }}
+          />
+        </div>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="text-white font-semibold text-sm leading-tight tracking-wide">DH1 Software</p>
+            <p
+              className="font-semibold text-sm leading-tight tracking-wide"
+              style={{
+                background: 'linear-gradient(90deg, #fff 0%, #7df9e8 40%, #5bc8ff 70%, #fff 100%)',
+                backgroundSize: '200% auto',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                animation: 'shimmerText 3.5s linear infinite',
+              }}
+            >DH1 Software</p>
             <p className="text-sidebar-foreground/40 text-[10px] tracking-widest uppercase">Platform</p>
           </div>
         )}
