@@ -87,7 +87,7 @@ function NavItem({ item, collapsed, active, onClick }) {
           collapsed && "justify-center px-0 mx-1",
           active
             ? "bg-primary/15 text-white"
-            : "text-sidebar-foreground/65 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+              : "text-white/80 hover:bg-sidebar-accent/70 hover:text-white"
         )}
       >
         {/* Active indicator bar */}
