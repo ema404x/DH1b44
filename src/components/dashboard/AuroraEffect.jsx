@@ -76,7 +76,7 @@ export default function AuroraEffect() {
       {/* Fade hacia el contenido */}
       <div
         className="absolute bottom-0 inset-x-0 h-24"
-        style={{ background: 'linear-gradient(to bottom, transparent, hsl(215,30%,10%))' }}
+        style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--background)))' }}
       />
     </div>
   );
