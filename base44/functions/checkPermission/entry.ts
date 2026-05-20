@@ -18,22 +18,33 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'module y action son requeridos' }, { status: 400 });
     }
 
-    // Obtener permisos del rol del usuario
-    const rolePerms = await base44.asServiceRole.entities.RolePermission.filter({
-      role_name: user.role || 'user'
-    });
+    // Buscar el empleado vinculado a este usuario por email
+    const employees = await base44.asServiceRole.entities.Employee.filter({});
+    const emp = employees.find(
+      e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim()
+    );
 
-    if (!rolePerms || rolePerms.length === 0) {
-      return Response.json({ allowed: false, reason: 'Role not configured' }, { status: 403 });
+    if (!emp || !emp.role) {
+      return Response.json({ allowed: false, reason: 'Employee not found or has no role' }, { status: 403 });
     }
 
-    const perms = rolePerms[0].permissions[module];
+    // Buscar el RolePermission por el rol del empleado (case-insensitive)
+    const allRolePerms = await base44.asServiceRole.entities.RolePermission.filter({});
+    const roleMatch = allRolePerms.find(
+      rp => rp.role_name?.toLowerCase().trim() === emp.role.toLowerCase().trim()
+    );
+
+    if (!roleMatch) {
+      return Response.json({ allowed: false, reason: `Role "${emp.role}" not configured` }, { status: 403 });
+    }
+
+    const perms = roleMatch.permissions[module];
     const allowed = !!(perms && perms[action] === true);
 
-    return Response.json({ 
-      allowed, 
+    return Response.json({
+      allowed,
       permissions: perms || {},
-      role: user.role 
+      role: emp.role,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

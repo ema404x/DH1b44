@@ -22,23 +22,32 @@ Deno.serve(async (req) => {
     const resumen = [];
 
     // ── LIMPIEZA: marcar como leídas las alertas de entidades eliminadas ──
+    // Cargamos todas las entidades referenciadas en bulk para evitar N+1 requests.
     const logsNoLeidos = await sb.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 200).catch(() => []);
     if (logsNoLeidos.length > 0) {
-      await Promise.allSettled(logsNoLeidos.map(async (log) => {
-        if (!log.entidad_id || !log.entidad_tipo) return;
-        try {
-          let items = [];
-          if (log.entidad_tipo === 'Pendiente')   items = await sb.entities.Pendiente.filter({ id: log.entidad_id });
-          else if (log.entidad_tipo === 'Asset')   items = await sb.entities.Asset.filter({ id: log.entidad_id });
-          else if (log.entidad_tipo === 'Material') items = await sb.entities.Material.filter({ id: log.entidad_id });
-          else if (log.entidad_tipo === 'WorkOrder') items = await sb.entities.WorkOrder.filter({ id: log.entidad_id });
-          else return; // tipo desconocido, conservar
+      const [allPend, allAssets, allMats, allWOs] = await Promise.all([
+        sb.entities.Pendiente.list('-created_date', 1000).catch(() => []),
+        sb.entities.Asset.list('-created_date', 500).catch(() => []),
+        sb.entities.Material.list('-created_date', 500).catch(() => []),
+        sb.entities.WorkOrder.list('-created_date', 1000).catch(() => []),
+      ]);
+      const existingIds = {
+        Pendiente:  new Set(allPend.map(e => e.id)),
+        Asset:      new Set(allAssets.map(e => e.id)),
+        Material:   new Set(allMats.map(e => e.id)),
+        WorkOrder:  new Set(allWOs.map(e => e.id)),
+      };
 
-          if (items.length === 0) {
-            await sb.entities.AlertaLog.update(log.id, { leida: true });
-          }
-        } catch { /* ignorar errores individuales */ }
-      }));
+      const toMarkRead = logsNoLeidos.filter(log => {
+        if (!log.entidad_id || !log.entidad_tipo) return false;
+        const set = existingIds[log.entidad_tipo];
+        if (!set) return false;
+        return !set.has(log.entidad_id);
+      });
+
+      await Promise.allSettled(
+        toMarkRead.map(log => sb.entities.AlertaLog.update(log.id, { leida: true }).catch(() => {}))
+      );
     }
 
     // Pre-cargar logs de hoy para evitar duplicados
@@ -52,7 +61,7 @@ Deno.serve(async (req) => {
 
       // ── 1. GARANTÍA DE ACTIVOS ────────────────────────────────────────
       if (cfg.tipo === 'garantia_activo') {
-        const assets = await sb.entities.Asset.list();
+        const assets = await sb.entities.Asset.list('-updated_date', 500);
         const diasAnticipacion = cfg.dias_anticipacion || 30;
 
         for (const asset of assets) {
@@ -89,7 +98,7 @@ Deno.serve(async (req) => {
 
       // ── 2. STOCK CRÍTICO DE MATERIALES ───────────────────────────────
       if (cfg.tipo === 'stock_material') {
-        const materials = await sb.entities.Material.list();
+        const materials = await sb.entities.Material.list('-updated_date', 500);
         const pctExtra = cfg.umbral_stock_pct || 0;
 
         for (const mat of materials) {
@@ -160,7 +169,7 @@ Deno.serve(async (req) => {
 
       // ── 4. OTs VENCIDAS ──────────────────────────────────────────────
       if (cfg.tipo === 'ot_vencida') {
-        const orders = await sb.entities.WorkOrder.list();
+        const orders = await sb.entities.WorkOrder.list('-updated_date', 500);
         const diasLimite = cfg.dias_vencimiento_ot || 1;
 
         for (const ot of orders) {

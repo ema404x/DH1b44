@@ -30,12 +30,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Intentar obtener el usuario que disparó la acción desde el token de request.
+    // En automaciones de entidad el contexto es sistema, fallback a created_by del registro.
+    let actorEmail = 'sistema';
+    try {
+      const actor = await base44.auth.me();
+      if (actor?.email) actorEmail = actor.email;
+    } catch { /* automación sin sesión de usuario — es normal */ }
+    if (actorEmail === 'sistema') {
+      actorEmail = (event.type === 'update' ? old_data?.created_by : data?.created_by) || 'sistema';
+    }
+
     const auditEntry = {
       entity_type: event.entity_name,
       entity_id: event.entity_id,
       action: event.type,
-      user_email: data?.created_by || old_data?.created_by || 'sistema',
-      user_role: 'sistema',
+      user_email: actorEmail,
+      user_role: actorEmail === 'sistema' ? 'sistema' : 'usuario',
       timestamp: new Date().toISOString(),
       old_values: event.type === 'update' ? old_data : null,
       new_values: event.type === 'update' ? data : null,

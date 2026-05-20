@@ -22,7 +22,8 @@ export default function EmergenciasWidget() {
   const { data: emergencias = [] } = useQuery({
     queryKey: ['emergencias-widget'],
     queryFn: () => base44.entities.Emergencia.filter({ estado: ['activa', 'en_atencion'] }, '-created_date', 5),
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    staleTime: 1000 * 30,
   });
 
   const activas = emergencias.filter(e => e.estado === 'activa').length;

@@ -21,6 +21,7 @@ export default function CertificadosPanel() {
   const { data: certs = [] } = useQuery({
     queryKey: ['certificados-dash'],
     queryFn: () => base44.entities.Certificado.list('-created_date', 200),
+    staleTime: 1000 * 60 * 5,
   });
 
   const thisMonth = startOfMonth(new Date());
