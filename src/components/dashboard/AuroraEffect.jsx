@@ -18,12 +18,12 @@ export default function AuroraEffect() {
 
     // Bandas de aurora — cada una es una onda ondulante
     const bands = [
-      { color: [0, 255, 120],   baseY: 0.08, amp: 0.07, freq: 0.6,  speed: 0.18, phase: 0,    width: 0.32, opacity: 0.55 },
-      { color: [0, 220, 200],   baseY: 0.05, amp: 0.09, freq: 0.45, speed: 0.14, phase: 1.2,  width: 0.28, opacity: 0.45 },
-      { color: [80, 180, 255],  baseY: 0.03, amp: 0.06, freq: 0.75, speed: 0.22, phase: 2.5,  width: 0.25, opacity: 0.40 },
-      { color: [160, 60, 255],  baseY: 0.06, amp: 0.10, freq: 0.35, speed: 0.11, phase: 0.8,  width: 0.22, opacity: 0.35 },
-      { color: [255, 80, 200],  baseY: 0.04, amp: 0.07, freq: 0.55, speed: 0.16, phase: 3.8,  width: 0.18, opacity: 0.28 },
-      { color: [0, 255, 160],   baseY: 0.10, amp: 0.05, freq: 0.90, speed: 0.25, phase: 1.6,  width: 0.20, opacity: 0.38 },
+      { color: [0, 255, 120],   baseY: 0.08, amp: 0.07, freq: 0.6,  speed: 0.18, phase: 0,    width: 0.32, opacity: 0.13 },
+      { color: [0, 220, 200],   baseY: 0.05, amp: 0.09, freq: 0.45, speed: 0.14, phase: 1.2,  width: 0.28, opacity: 0.10 },
+      { color: [80, 180, 255],  baseY: 0.03, amp: 0.06, freq: 0.75, speed: 0.22, phase: 2.5,  width: 0.25, opacity: 0.09 },
+      { color: [160, 60, 255],  baseY: 0.06, amp: 0.10, freq: 0.35, speed: 0.11, phase: 0.8,  width: 0.22, opacity: 0.08 },
+      { color: [255, 80, 200],  baseY: 0.04, amp: 0.07, freq: 0.55, speed: 0.16, phase: 3.8,  width: 0.18, opacity: 0.07 },
+      { color: [0, 255, 160],   baseY: 0.10, amp: 0.05, freq: 0.90, speed: 0.25, phase: 1.6,  width: 0.20, opacity: 0.09 },
     ];
 
     let t = 0;
