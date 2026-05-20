@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode, SettingsIcon, Plus, Users, Zap, LinkIcon, UnlinkIcon } from 'lucide-react';
+import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode, SettingsIcon, Plus, Users, Zap, LinkIcon, UnlinkIcon, MapPin, Building2 } from 'lucide-react';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -22,6 +22,23 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 const roleLabels = {
   operario: 'Operario', tecnico: 'Técnico', capataz: 'Capataz', supervisor: 'Supervisor',
   ingeniero: 'Ingeniero', administrativo: 'Administrativo', gerente: 'Gerente', jefe_sitio: 'Jefe de Sitio',
+  inspector: 'Inspector', admin: 'Administrador', viewer: 'Visualizador',
+};
+
+const roleBadgeColors = {
+  jefe_sitio: 'bg-violet-500/20 text-violet-300 border border-violet-500/30',
+  inspector:  'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30',
+  supervisor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+  gerente:    'bg-rose-500/20 text-rose-300 border border-rose-500/30',
+  admin:      'bg-rose-500/20 text-rose-300 border border-rose-500/30',
+  tecnico:    'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+  operario:   'bg-slate-500/20 text-slate-300 border border-slate-500/30',
+};
+
+const comunaColors = {
+  '8A':  'bg-emerald-500/20 text-emerald-300',
+  '8B':  'bg-sky-500/20 text-sky-300',
+  '10A': 'bg-orange-500/20 text-orange-300',
 };
 
 const employeeFields = [
@@ -73,9 +90,22 @@ export default function Employees() {
     });
   }, [rolePermissions, jefesSitio]);
 
+  // Resuelve el label legible del rol
+  const getRoleLabel = (roleKey) => {
+    if (!roleKey) return '—';
+    const fromPermissions = rolePermissions.find(r => r.role_name === roleKey);
+    if (fromPermissions?.description) return fromPermissions.description;
+    return roleLabels[roleKey] || roleKey;
+  };
+
+  const getRoleBadgeClass = (roleKey) =>
+    roleBadgeColors[roleKey] || 'bg-slate-500/20 text-slate-300 border border-slate-500/30';
+
   const stats = useMemo(() => ({
     total: employees.length,
     activos: employees.filter(e => e.status === 'activo').length,
+    jefesSitio: employees.filter(e => e.role === 'jefe_sitio').length,
+    inspectores: employees.filter(e => e.role === 'inspector').length,
   }), [employees]);
 
   const saveMutation = useMutation({
@@ -141,6 +171,8 @@ export default function Employees() {
           {[
             { label: 'Total', value: stats.total, icon: Users, color: 'from-blue-500' },
             { label: 'Activos', value: stats.activos, icon: Zap, color: 'from-emerald-500' },
+            { label: 'Jefes de Sitio', value: stats.jefesSitio, icon: Building2, color: 'from-violet-500' },
+            { label: 'Inspectores', value: stats.inspectores, icon: UserCog, color: 'from-cyan-500' },
           ].map((stat, i) => (
             <motion.div key={i} variants={item}>
               <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border border-slate-700/50 rounded-lg p-4">
@@ -194,7 +226,7 @@ export default function Employees() {
           <SelectContent>
             <SelectItem value="all">Todos los cargos</SelectItem>
             {(rolePermissions.length > 0
-              ? rolePermissions.map(r => ({ value: r.role_name, label: r.role_name }))
+              ? rolePermissions.map(r => ({ value: r.role_name, label: r.description || roleLabels[r.role_name] || r.role_name }))
               : Object.entries(roleLabels).map(([value, label]) => ({ value, label }))
             ).map(({ value, label }) => (
               <SelectItem key={value} value={value}>{label}</SelectItem>
@@ -220,7 +252,17 @@ export default function Employees() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="font-semibold text-white">{emp.full_name}</p>
-                          <Badge variant="secondary" className="mt-1 text-xs">{emp.role}</Badge>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full font-medium ${getRoleBadgeClass(emp.role)}`}>
+                              {getRoleLabel(emp.role)}
+                            </span>
+                            {emp.assigned_comuna && (
+                              <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium ${comunaColors[emp.assigned_comuna] || 'bg-slate-500/20 text-slate-300'}`}>
+                                <MapPin className="h-2.5 w-2.5" />
+                                {emp.assigned_comuna}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-cyan-400 hover:text-cyan-300" onClick={() => setQrEmployee(emp)}>
@@ -260,7 +302,16 @@ export default function Employees() {
                         ) : null}
                       </div>
 
-                      {emp.assigned_location && <p className="text-xs text-cyan-400 mt-2">📍 {emp.assigned_location}</p>}
+                      {emp.assigned_location && (
+                        <p className="text-xs text-cyan-400 mt-2 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 flex-shrink-0" />{emp.assigned_location}
+                        </p>
+                      )}
+                      {emp.assigned_jefe_sitio && emp.role !== 'jefe_sitio' && (
+                        <p className="text-xs text-violet-400 mt-1 flex items-center gap-1">
+                          <Building2 className="h-3 w-3 flex-shrink-0" />Jefe: {emp.assigned_jefe_sitio}
+                        </p>
+                      )}
 
                       <div className="mt-3 space-y-1">
                         {emp.phone && <p className="text-xs text-slate-400 flex items-center gap-1.5"><Phone className="h-3 w-3" />{emp.phone}</p>}
