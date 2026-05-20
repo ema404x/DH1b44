@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 export default function AuroraEffect() {
   return (
-    <div className="fixed inset-x-0 top-0 h-72 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+    <div className="fixed inset-x-0 top-0 h-72 pointer-events-none overflow-hidden hidden md:block" style={{ zIndex: 0 }}>
 
       {/* Banda verde principal — ondulación amplia */}
       <motion.div
