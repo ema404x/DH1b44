@@ -22,31 +22,34 @@ const ENTITY_LABELS = {
 
 function parseValue(value, field) {
   if (value === null || value === undefined || value === '') return undefined;
+  
+  // Convert non-string values to string first
+  const stringVal = String(value).trim();
+  if (!stringVal) return undefined;
 
   const numericFields = ['stock', 'min_stock', 'unit_cost', 'hourly_rate', 'estimated_budget', 'actual_cost',
     'progress', 'purchase_cost', 'pu_mat', 'pu_mo', 'coef_pase', 'coef_oferta', 'subtotal', 'total', 'tax_rate',
-    'estimated_hours'];
+    'estimated_hours', 'm2'];
   if (numericFields.includes(field)) {
-    const num = parseFloat(String(value).replace(',', '.').replace(/[^0-9.-]/g, ''));
+    const num = parseFloat(stringVal.replace(',', '.').replace(/[^0-9.-]/g, ''));
     return isNaN(num) ? 0 : num;
   }
 
-  const dateFields = ['start_date', 'end_date', 'hire_date', 'purchase_date', 'issue_date', 'due_date', 'valid_until', 'scheduled_date', 'completed_date'];
+  const dateFields = ['start_date', 'end_date', 'hire_date', 'purchase_date', 'issue_date', 'due_date', 'valid_until', 'scheduled_date', 'completed_date', 'fecha_emision_sap', 'fecha_limite'];
   if (dateFields.includes(field)) {
-    const s = String(value).trim();
     // Try to parse Excel serial date numbers
-    if (/^\d{4,5}$/.test(s)) {
+    if (/^\d{4,5}$/.test(stringVal)) {
       const excelEpoch = new Date(1899, 11, 30);
-      const d = new Date(excelEpoch.getTime() + parseInt(s) * 86400000);
+      const d = new Date(excelEpoch.getTime() + parseInt(stringVal) * 86400000);
       return d.toISOString().split('T')[0];
     }
-    // Try standard date strings
-    const d = new Date(s);
+    // Try standard date strings (DD/MM/YYYY, YYYY-MM-DD, etc.)
+    const d = new Date(stringVal);
     if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-    return s;
+    return stringVal;
   }
 
-  return String(value).trim();
+  return stringVal;
 }
 
 const BATCH_SIZE = 50;
@@ -94,7 +97,7 @@ Deno.serve(async (req) => {
     const colIndex = {};
     headers.forEach((h, i) => { colIndex[h] = i; });
 
-    const activeMappings = Object.entries(fieldMapping).filter(([, v]) => v && v.trim());
+    const activeMappings = Object.entries(fieldMapping).filter(([, v]) => v && typeof v === 'string' && v.trim());
 
     // Build all valid records first
     const records = [];
@@ -121,24 +124,31 @@ Deno.serve(async (req) => {
     }
 
     // Insert in batches using bulkCreate
-    for (let i = 0; i < records.length; i += BATCH_SIZE) {
-      const batch = records.slice(i, i + BATCH_SIZE);
-      try {
-        await base44.asServiceRole.entities[entityKey].bulkCreate(batch);
-        imported += batch.length;
-      } catch (batchErr) {
-        // If bulk fails, try one by one to get individual errors
-        for (const record of batch) {
-          try {
-            await base44.asServiceRole.entities[entityKey].create(record);
-            imported++;
-          } catch (err) {
-            const preview = Object.entries(record).slice(0, 3).map(([k, v]) => `${k}: ${v}`).join(', ');
-            errorDetails.push(`[${preview}] → ${err.message}`);
-          }
-        }
-      }
-    }
+     for (let i = 0; i < records.length; i += BATCH_SIZE) {
+       const batch = records.slice(i, i + BATCH_SIZE);
+       try {
+         await base44.asServiceRole.entities[entityKey].bulkCreate(batch);
+         imported += batch.length;
+       } catch (batchErr) {
+         // If bulk fails, try one by one to get individual errors
+         for (const record of batch) {
+           try {
+             await base44.asServiceRole.entities[entityKey].create(record);
+             imported++;
+           } catch (err) {
+             const recordSummary = [
+               record.name || record.full_name || record.title || record.codigo,
+               record.code || record.dni || record.email || ''
+             ].filter(Boolean).join(' - ');
+
+             const errorMsg = err.message || String(err);
+             const shortError = errorMsg.length > 120 ? errorMsg.substring(0, 120) + '...' : errorMsg;
+
+             errorDetails.push(`${recordSummary || 'Registro desconocido'}: ${shortError}`);
+           }
+         }
+       }
+     }
 
     results.push({
       entity: ENTITY_LABELS[entityKey] || entityKey,
