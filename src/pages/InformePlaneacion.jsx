@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { 
   Plus, Pencil, Trash2, Eye, Calendar, AlertCircle, CheckCircle2, 
-  Clock, Filter, Download, Zap 
+  Clock, Filter, Download, Zap, Upload 
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
@@ -28,6 +28,7 @@ export default function InformePlaneacion() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterMes, setFilterMes] = useState('all');
   const [editingId, setEditingId] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -42,6 +43,21 @@ export default function InformePlaneacion() {
       queryClient.invalidateQueries({ queryKey: ['informes-planeacion'] });
     },
   });
+
+  const handleImportFile = async (file) => {
+    if (!file) return;
+    setIsImporting(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const result = await base44.functions.invoke('importarInformesPlaneacion', { file_url });
+      queryClient.invalidateQueries({ queryKey: ['informes-planeacion'] });
+      alert(`✓ Se importaron ${result.success} de ${result.total} informes`);
+    } catch (err) {
+      alert(`Error al importar: ${err.message}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const meses = ['FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO'];
   const statusOptions = ['CONTRATADO', 'SE SOLICITO INFORME', 'se sinvito a cotizar', 'EN PROCESO', 'PENDIENTE', 'PRESENTADOS A SAP'];
@@ -95,9 +111,26 @@ export default function InformePlaneacion() {
             </h1>
             <p className="text-slate-400 mt-1 text-sm">Gestiona contrataciones, proveedores y solicitudes</p>
           </div>
-          <Button className="gap-2 bg-primary hover:bg-primary/90">
-            <Plus className="h-4 w-4" /> Nuevo Informe
-          </Button>
+          <div className="flex gap-2">
+            <Button className="gap-2 bg-primary hover:bg-primary/90">
+              <Plus className="h-4 w-4" /> Nuevo Informe
+            </Button>
+            <Button 
+              variant="outline" 
+              className="gap-2" 
+              disabled={isImporting}
+              onClick={() => document.getElementById('excel-input').click()}
+            >
+              <Upload className="h-4 w-4" /> {isImporting ? 'Importando...' : 'Importar Excel'}
+            </Button>
+            <input 
+              id="excel-input" 
+              type="file" 
+              accept=".xlsx,.xls" 
+              className="hidden" 
+              onChange={(e) => handleImportFile(e.target.files?.[0])}
+            />
+          </div>
         </div>
       </motion.div>
 
