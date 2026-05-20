@@ -1,320 +1,178 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// Full schemas with field types for richer LLM context
-const ENTITY_SCHEMAS = {
-   InformePlaneacion: {
-     fields: ['mes', 'descripcion', 'proveedor_2025', 'contacto_2025', 'proveedor_invitado_2026', 'estado_contacto', 'proveedor_contratado_2026', 'fecha_envio_contratar', 'estado_actual', 'notas'],
-     key_fields: ['descripcion'],
-     description: 'Informes de planificación de contrataciones y proveedores',
-     aliases: ['planificacion', 'informes', 'contratacion', 'proveedor', 'planning', 'planning informes'],
-     patterns: ['MES', 'DESCRIPCION', 'PROVEEDOR', 'CONTACTO', 'ESTADO']
-   },
-   Client: {
-     fields: ['name', 'type', 'cuit', 'contact_name', 'email', 'phone', 'address', 'city', 'status', 'notes'],
-     key_fields: ['cuit', 'name', 'email'],
-     description: 'Empresas o personas que son clientes del negocio',
-     aliases: ['cliente', 'clientes', 'empresa', 'empresas', 'proveedor', 'proveedores', 'client', 'customers'],
-    key_patterns: {
-      cuit: ['cuit', 'cuil', 'rut', 'nif', 'tax_id', 'numero fiscal', 'identificacion fiscal'],
-      name: ['razon social', 'razon_social', 'nombre empresa', 'nombre_empresa', 'company', 'company name', 'nombre'],
-      contact_name: ['contacto', 'contact', 'responsable', 'nombre contacto'],
-      email: ['email', 'correo', 'mail', 'e-mail'],
-      phone: ['telefono', 'tel', 'celular', 'phone', 'movil'],
-      city: ['ciudad', 'localidad', 'city', 'municipio'],
-      address: ['direccion', 'domicilio', 'address', 'calle'],
-    }
-  },
-  Employee: {
-    fields: ['full_name', 'dni', 'role', 'specialty', 'status', 'phone', 'email', 'hire_date', 'hourly_rate', 'notes'],
-    key_fields: ['dni', 'full_name'],
-    description: 'Empleados, operarios, técnicos del equipo',
-    aliases: ['empleado', 'empleados', 'personal', 'operario', 'operarios', 'tecnico', 'tecnicos', 'trabajador', 'worker', 'employee'],
-    key_patterns: {
-      dni: ['dni', 'documento', 'cedula', 'id', 'numero documento', 'doc', 'nro doc'],
-      full_name: ['nombre completo', 'nombre_completo', 'apellido y nombre', 'apellido nombre', 'nombre y apellido', 'full name', 'nombre'],
-      hire_date: ['fecha ingreso', 'fecha_ingreso', 'fecha alta', 'ingreso', 'hire date', 'inicio'],
-      hourly_rate: ['tarifa', 'hora', 'valor hora', 'tarifa hora', 'hourly', 'costo hora'],
-      role: ['rol', 'cargo', 'puesto', 'role', 'position'],
-      specialty: ['especialidad', 'especialización', 'especialidad', 'specialty', 'oficio'],
-    }
-  },
-  Material: {
-    fields: ['name', 'code', 'category', 'unit', 'stock', 'min_stock', 'unit_cost', 'supplier', 'location', 'notes'],
-    key_fields: ['code', 'name'],
-    description: 'Materiales, insumos, repuestos del inventario',
-    aliases: ['material', 'materiales', 'insumo', 'insumos', 'inventario', 'stock', 'repuesto', 'repuestos', 'item', 'items'],
-    key_patterns: {
-      code: ['codigo', 'cod', 'code', 'sku', 'referencia', 'ref', 'numero parte'],
-      unit_cost: ['precio', 'costo', 'valor', 'precio unitario', 'cost', 'unit cost', 'p.u.'],
-      stock: ['stock', 'cantidad', 'existencia', 'qty', 'quantity'],
-      min_stock: ['stock minimo', 'minimo', 'stock_minimo', 'min stock', 'punto reorden'],
-      supplier: ['proveedor', 'supplier', 'vendedor', 'fabricante'],
-      unit: ['unidad', 'um', 'unit', 'medida', 'u.m.'],
-    }
-  },
-  Project: {
-    fields: ['name', 'code', 'client_name', 'type', 'status', 'priority', 'description', 'address', 'start_date', 'end_date', 'estimated_budget', 'progress', 'notes'],
-    key_fields: ['code', 'name'],
-    description: 'Obras, proyectos de construcción o mantenimiento',
-    aliases: ['proyecto', 'proyectos', 'obra', 'obras', 'project', 'projects', 'licitacion', 'contrato'],
-    key_patterns: {
-      code: ['codigo', 'cod proyecto', 'numero obra', 'nro obra', 'expediente', 'code'],
-      client_name: ['cliente', 'comitente', 'contratante', 'client', 'empresa'],
-      start_date: ['inicio', 'fecha inicio', 'comienzo', 'start date', 'start'],
-      end_date: ['fin', 'fecha fin', 'finalizacion', 'vencimiento', 'end date', 'end'],
-      estimated_budget: ['presupuesto', 'monto', 'budget', 'importe', 'valor contrato'],
-      progress: ['avance', 'progreso', 'porcentaje', 'progress', '% avance'],
-    }
-  },
-  WorkOrder: {
-    fields: ['title', 'code', 'project_name', 'asset_name', 'location', 'type', 'status', 'priority', 'description', 'assigned_name', 'scheduled_date', 'estimated_hours', 'notes'],
-    key_fields: ['code', 'title'],
-    description: 'Órdenes de trabajo, tareas de mantenimiento o reparación',
-    aliases: ['orden', 'ordenes', 'ot', 'work order', 'workorder', 'tarea', 'tareas', 'mantenimiento', 'correctivo', 'preventivo'],
-    key_patterns: {
-      code: ['numero ot', 'nro ot', 'codigo ot', 'ot', 'orden numero', 'code', 'numero orden'],
-      title: ['titulo', 'descripcion corta', 'title', 'nombre tarea'],
-      assigned_name: ['asignado', 'tecnico', 'responsable', 'assigned', 'ejecutor'],
-      scheduled_date: ['fecha programada', 'fecha planificada', 'scheduled', 'fecha ejecucion'],
-      estimated_hours: ['horas estimadas', 'horas', 'duration', 'duracion'],
-      asset_name: ['equipo', 'activo', 'maquina', 'asset', 'bien'],
-    }
-  },
-  Asset: {
-    fields: ['name', 'code', 'type', 'brand', 'model', 'serial_number', 'location', 'project_name', 'status', 'criticality', 'purchase_date', 'purchase_cost', 'notes'],
-    key_fields: ['serial_number', 'code', 'name'],
-    description: 'Activos, equipos, máquinas, instalaciones',
-    aliases: ['activo', 'activos', 'equipo', 'equipos', 'maquina', 'maquinas', 'asset', 'assets', 'instalacion', 'bien'],
-    key_patterns: {
-      serial_number: ['serie', 'numero serie', 'serial', 'n° serie', 'nro serie', 'sn'],
-      brand: ['marca', 'brand', 'fabricante', 'manufacturer'],
-      model: ['modelo', 'model', 'tipo modelo'],
-      purchase_date: ['fecha compra', 'fecha adquisicion', 'compra', 'adquisicion', 'purchase date'],
-      purchase_cost: ['costo compra', 'valor compra', 'precio compra', 'valor adquisicion'],
-      criticality: ['criticidad', 'criticality', 'prioridad', 'importancia'],
-    }
-  },
-  PrecarioMinisterio: {
-    fields: ['codigo', 'descripcion', 'unidad', 'categoria', 'subcategoria', 'comuna', 'pu_mat', 'pu_mo', 'coef_pase', 'coef_oferta'],
-    key_fields: ['codigo'],
-    description: 'Preciario ministerial de obras con códigos, precios unitarios y coeficientes',
-    aliases: ['preciario', 'precario', 'ministerio', 'precios ministeriales', 'tabla precios'],
-    key_patterns: {
-      codigo: ['codigo', 'cod', 'code', 'item', 'rubro'],
-      pu_mat: ['pu mat', 'p.u. mat', 'precio mat', 'materiales', 'mat'],
-      pu_mo: ['pu mo', 'p.u. mo', 'mano obra', 'mo', 'labor'],
-      coef_pase: ['coeficiente pase', 'coef pase', 'coef_pase'],
-      coef_oferta: ['coeficiente oferta', 'coef oferta', 'coef_oferta'],
-      unidad: ['unidad', 'um', 'u.m.', 'unit'],
-    }
-  },
-  LocationData: {
-    fields: ['ubic_tecnica', 'establecimiento', 'elem_pep', 'm2', 'comuna', 'jefe_sitio', 'inspector'],
-    key_fields: ['ubic_tecnica'],
-    description: 'Ubicaciones técnicas, escuelas o establecimientos con su ubicación y responsables',
-    aliases: ['ubicacion', 'ubicaciones', 'establecimiento', 'escuela', 'escuelas', 'colegio', 'colegios', 'location', 'sitio', 'sitios'],
-    key_patterns: {
-      ubic_tecnica: ['ubic tecnica', 'ubicacion tecnica', 'ubic_tecnica', 'codigo ubicacion', 'cod ubic', 'ubicacion', 'codigo sitio'],
-      establecimiento: ['establecimiento', 'escuela', 'nombre escuela', 'nombre establecimiento', 'colegio', 'nombre colegio'],
-      jefe_sitio: ['jefe sitio', 'jefe_sitio', 'jefe', 'responsable sitio', 'encargado'],
-      inspector: ['inspector', 'insp', 'inspector asignado'],
-      m2: ['m2', 'metros', 'superficie', 'area', 'superficie m2'],
-      comuna: ['comuna', 'zona', 'district'],
-      elem_pep: ['elem pep', 'pep', 'elemento pep', 'elem_pep'],
-    }
-  },
-  Quote: {
-    fields: ['title', 'client_name', 'description', 'status', 'subtotal', 'tax_rate', 'total', 'valid_until', 'notes'],
-    key_fields: ['title', 'client_name'],
-    description: 'Presupuestos o cotizaciones enviadas a clientes',
-    aliases: ['presupuesto', 'presupuestos', 'cotizacion', 'cotizaciones', 'quote', 'oferta', 'propuesta'],
-    key_patterns: {
-      title: ['titulo', 'nombre presupuesto', 'descripcion', 'concepto'],
-      valid_until: ['validez', 'valido hasta', 'vencimiento', 'valid until', 'expira'],
-      subtotal: ['subtotal', 'neto', 'importe neto'],
-      tax_rate: ['iva', 'impuesto', 'tax', 'alicuota'],
-      total: ['total', 'importe total', 'monto total'],
-    }
-  },
-  Invoice: {
-    fields: ['client_name', 'project_name', 'status', 'subtotal', 'tax_rate', 'total', 'issue_date', 'due_date', 'notes'],
-    key_fields: ['client_name', 'issue_date'],
-    description: 'Facturas emitidas a clientes',
-    aliases: ['factura', 'facturas', 'invoice', 'remito', 'comprobante', 'facturacion'],
-    key_patterns: {
-      issue_date: ['fecha emision', 'fecha factura', 'fecha', 'issue date', 'emision'],
-      due_date: ['vencimiento', 'fecha vencimiento', 'due date', 'pagar antes de'],
-      subtotal: ['subtotal', 'neto', 'importe neto', 'base imponible'],
-      total: ['total', 'importe total', 'monto total', 'a pagar'],
-    }
-  },
-};
+Deno.serve(async (req) => {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-// Detectar el modelo de planilla por comuna
-function detectPlanillaModel(sheetName, headers) {
-  const sheetLower = sheetName.toLowerCase();
-  // Normalizar headers igual que en preScoreSheet
-  const headersNorm = headers.map(h => h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
-  
-  // Contar matches de palabras clave
-  const hasInspector = headersNorm.some(h => h.includes('inspector'));
-  const hasOrdenNumber = headersNorm.some(h => h.includes('n°') && h.includes('orden') || h.includes('numero') && h.includes('orden'));
-  const hasTareas = headersNorm.some(h => h.includes('tarea'));
-  const hasUbicacion = headersNorm.some(h => h.includes('ubicacion'));
-  const hasEstablecimiento = headersNorm.some(h => h.includes('establecimiento'));
-  const hasStatus = headersNorm.some(h => h.includes('status') || h.includes('estado'));
-  
-  // Modelo 8A: Tiene INSPECTOR + estructura SAP completa
-  if (hasInspector && hasOrdenNumber && hasTareas) {
-    return { model: '8A', pattern: 'inspector_sheets', confidence: 0.95 };
-  }
-  
-  // Modelo 10A: SIN INSPECTOR pero TIENE estructura SAP (N° DE ORDEN, TAREAS, ESTABLECIMIENTO)
-  if (!hasInspector && hasOrdenNumber && hasTareas && hasEstablecimiento) {
-    return { model: '10A', pattern: 'no_inspector', confidence: 0.95 };
-  }
-  
-  // Modelo 8B: Direcciones como nombres de columnas, sin estructura SAP clara
-  const hasAddressLikeHeaders = headers.some(h => {
-    const clean = h.trim().toUpperCase();
-    // Direcciones: patrón típico es "PALABRA PALABRA NUMERO" (ej: MONTIEL 3826)
-    return /^[A-Z\s]+\s+\d{4}/.test(clean) && !hasOrdenNumber;
-  });
-  
-  if (hasAddressLikeHeaders && !hasInspector && !hasOrdenNumber) {
-    return { model: '8B', pattern: 'pivoted_addresses', confidence: 0.90 };
-  }
-  
-  return null;
-}
-
-// Pre-analysis: score each sheet against each entity based on header keyword matches
-function preScoreSheet(sheetName, headers) {
-  const nameNorm = sheetName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const headersNorm = headers.map(h => h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
-  const scores = {};
-
-  for (const [entity, schema] of Object.entries(ENTITY_SCHEMAS)) {
-    let score = 0;
-
-    // Sheet name alias match (strong signal)
-    for (const alias of schema.aliases) {
-      if (nameNorm.includes(alias)) { score += 3; break; }
+    // Helper functions
+    function detectWorkOrder(sheetName, headers) {
+      const headerLower = headers.join(' ').toLowerCase();
+      const patterns = ['orden', 'tarea', 'ubicación', 'establecimiento', 'inspector', 'status', 'pendiente'];
+      const matches = patterns.filter(p => headerLower.includes(p)).length;
+      return matches >= 3 ? 0.95 : (matches >= 2 ? 0.70 : 0);
     }
 
-    // Key field pattern match in headers
-    let keyMatches = 0;
-    for (const [field, patterns] of Object.entries(schema.key_patterns)) {
-      for (const header of headersNorm) {
-        if (patterns.some(p => header.includes(p) || p.includes(header))) {
-          score += schema.key_fields.includes(field) ? 2 : 1;
-          keyMatches++;
-          break;
-        }
+    function detectEmployee(headers) {
+      const headerLower = headers.join(' ').toLowerCase();
+      const patterns = ['nombre', 'email', 'teléfono', 'rol', 'especialidad'];
+      const matches = patterns.filter(p => headerLower.includes(p)).length;
+      return matches >= 3 ? 0.85 : (matches >= 2 ? 0.60 : 0);
+    }
+
+    function detectClient(headers) {
+      const headerLower = headers.join(' ').toLowerCase();
+      const patterns = ['empresa', 'proveedor', 'rubro', 'contacto'];
+      const matches = patterns.filter(p => headerLower.includes(p)).length;
+      return matches >= 2 ? 0.80 : (matches >= 1 ? 0.50 : 0);
+    }
+
+    function detectInformePlaneacion(headers) {
+      const headerLower = headers.join(' ').toLowerCase();
+      const patterns = ['mes', 'descripción', 'proveedor', 'contacto', 'estado'];
+      const matches = patterns.filter(p => headerLower.includes(p)).length;
+      return matches >= 3 ? 0.90 : (matches >= 2 ? 0.65 : 0);
+    }
+
+    function preScoreSheet(sheetName, headers) {
+      return {
+        WorkOrder: detectWorkOrder(sheetName, headers),
+        Employee: detectEmployee(headers),
+        Client: detectClient(headers),
+        InformePlaneacion: detectInformePlaneacion(headers),
+      };
+    }
+
+    function detectPlanillaModel(sheetName, headers) {
+      const headerLower = headers.join('|').toLowerCase();
+      const hasInspector = headerLower.includes('inspector');
+      const hasNroOrden = headerLower.includes('n°') || headerLower.includes('nro') || headerLower.includes('numero');
+      const hasTareas = headerLower.includes('tarea');
+
+      if (hasInspector && hasNroOrden && hasTareas) return { model: '8A', pattern: 'Por Inspector' };
+      if (!hasInspector && hasNroOrden && hasTareas) return { model: '10A', pattern: 'Sin Inspector' };
+      if (headerLower.includes('dirección') || headerLower.includes('jefe')) return { model: '8B', pattern: 'Pivotado' };
+      return null;
+    }
+
+    // Entity schemas
+    const ENTITY_SCHEMAS = {
+      WorkOrder: {
+        description: 'Órdenes de trabajo y pendientes SAP',
+        fields: ['code', 'title', 'description', 'location', 'assigned_name', 'status', 'type', 'priority', 'scheduled_date', 'created_date'],
+        key_fields: ['code', 'title', 'location'],
+        key_patterns: ['N° DE ORDEN', 'N° ORDEN', 'NUMERO ORDEN', 'TAREAS A REALIZAR', 'DESCRIPCION', 'UBICACIÓN', 'ESTABLECIMIENTO', 'INSPECTOR', 'STATUS'],
+        aliases: { 'Nro Orden': 'code', 'Tarea': 'title', 'Ubicac': 'location' },
+      },
+      InformePlaneacion: {
+        description: 'Informes de planificación y procurement',
+        fields: ['mes', 'descripcion', 'proveedor_2025', 'contacto_2025', 'proveedor_invitado_2026', 'estado_contacto', 'proveedor_contratado_2026', 'estado_actual'],
+        key_fields: ['descripcion', 'estado_contacto'],
+        key_patterns: ['MES', 'DESCRIPCION', 'PROVEEDOR', 'CONTACTO', 'ESTADO', 'INVITADO'],
+        aliases: { 'Desc': 'descripcion', 'Prov': 'proveedor_2025' },
+      },
+      Employee: {
+        description: 'Empleados y técnicos',
+        fields: ['full_name', 'email', 'phone', 'role', 'specialty', 'status'],
+        key_fields: ['full_name', 'email'],
+        key_patterns: ['NOMBRE', 'EMAIL', 'TELÉFONO', 'ESPECIALIDAD', 'ROL', 'ESTADO'],
+        aliases: { 'Nom': 'full_name', 'Mail': 'email' },
+      },
+      Client: {
+        description: 'Clientes y proveedores',
+        fields: ['name', 'email', 'phone', 'rubro', 'contact_name', 'cuit'],
+        key_fields: ['name'],
+        key_patterns: ['NOMBRE', 'EMPRESA', 'PROVEEDOR', 'RUBRO', 'EMAIL', 'TELÉFONO'],
+        aliases: { 'Razón Social': 'name', 'Contacto': 'contact_name' },
+      },
+    };
+
+    let raw_data = null;
+    const body = await req.json();
+
+    // Si viene raw_data desde frontend (caso manual), usar eso
+    if (body.raw_data && Object.keys(body.raw_data).length > 0) {
+      raw_data = body.raw_data;
+    }
+    // Si viene file_urls, descargar y parsear
+    else if (body.file_urls && Array.isArray(body.file_urls)) {
+      const { default: XLSX } = await import('npm:xlsx@0.18.5');
+      raw_data = {};
+
+      for (const url of body.file_urls) {
+        const res = await fetch(url);
+        const buffer = await res.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+
+        wb.SheetNames.forEach(sheetName => {
+          const ws = wb.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          raw_data[sheetName] = rows;
+        });
       }
     }
 
-    // Bonus for multiple key field matches
-    if (keyMatches >= 2) score += 2;
-
-    scores[entity] = score;
-  }
-
-  return scores;
-}
-
-Deno.serve(async (req) => {
-   try {
-     const base44 = createClientFromRequest(req);
-     const user = await base44.auth.me();
-     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-     let raw_data = null;
-     const body = await req.json();
-  
-  // Si viene raw_data desde frontend (caso manual), usar eso
-  if (body.raw_data && Object.keys(body.raw_data).length > 0) {
-    raw_data = body.raw_data;
-  } 
-  // Si viene file_urls, descargar y parsear
-  else if (body.file_urls && Array.isArray(body.file_urls)) {
-    const { default: XLSX } = await import('npm:xlsx@0.18.5');
-    raw_data = {};
-    
-    for (const url of body.file_urls) {
-      const res = await fetch(url);
-      const buffer = await res.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'array' });
-      
-      wb.SheetNames.forEach(sheetName => {
-        const ws = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        raw_data[sheetName] = rows;
-      });
+    if (!raw_data || Object.keys(raw_data).length === 0) {
+      return Response.json({ error: 'No se encontraron datos en el archivo' }, { status: 400 });
     }
-  }
 
-  if (!raw_data || Object.keys(raw_data).length === 0) {
-    return Response.json({ error: 'No se encontraron datos en el archivo' }, { status: 400 });
-  }
+    // Build enriched sheet info with pre-scores
+    const sheetsInfo = Object.entries(raw_data).map(([sheetName, rows]) => {
+      // Los headers están siempre en la fila 0
+      const firstRowRaw = rows[0] || [];
+      const headers = firstRowRaw.map(h => String(h || '').trim());
+      const validHeaders = headers.filter(h => h.length > 0);
+      const actualHeaders = validHeaders.length > 0 ? validHeaders : headers;
 
-  // Build enriched sheet info with pre-scores
-   const sheetsInfo = Object.entries(raw_data).map(([sheetName, rows]) => {
-     // Los headers están siempre en la fila 0
-     const firstRowRaw = rows[0] || [];
-     const headers = firstRowRaw.map(h => String(h || '').trim());
-     const validHeaders = headers.filter(h => h.length > 0);
-     const actualHeaders = validHeaders.length > 0 ? validHeaders : headers;
+      if (!actualHeaders || actualHeaders.length === 0) {
+        return {
+          sheetName,
+          headers: [],
+          sample: {},
+          rowCount: Math.max(0, rows.length - 1),
+          pre_suggested_entity: null,
+          pre_score: 0,
+          planilla_model: null,
+          planilla_pattern: null,
+        };
+      }
 
-     if (!actualHeaders || actualHeaders.length === 0) {
-       return {
-         sheetName,
-         headers: [],
-         sample: {},
-         rowCount: Math.max(0, rows.length - 1),
-         pre_suggested_entity: null,
-         pre_score: 0,
-         planilla_model: null,
-         planilla_pattern: null,
-       };
-     }
+      const sampleRows = rows.slice(1, 4);
+      const sample = {};
+      actualHeaders.forEach((h, i) => {
+        if (h) sample[h] = sampleRows.map(r => r[i]).filter(v => v !== '' && v !== null && v !== undefined).join(', ');
+      });
 
-     const sampleRows = rows.slice(1, 4);
-     const sample = {};
-     actualHeaders.forEach((h, i) => {
-       if (h) sample[h] = sampleRows.map(r => r[i]).filter(v => v !== '' && v !== null && v !== undefined).join(', ');
-     });
+      const preScores = preScoreSheet(sheetName, actualHeaders) || {};
+      const topEntity = Object.entries(preScores).length > 0 ? Object.entries(preScores).sort(([, a], [, b]) => b - a)[0] : null;
 
-     const preScores = preScoreSheet(sheetName, actualHeaders) || {};
-     const topEntity = Object.entries(preScores).length > 0 ? Object.entries(preScores).sort(([, a], [, b]) => b - a)[0] : null;
+      // Detectar modelo de planilla (8A, 8B, 10A)
+      const planillaModel = detectPlanillaModel(sheetName, actualHeaders);
 
-     // Detectar modelo de planilla (8A, 8B, 10A)
-     const planillaModel = detectPlanillaModel(sheetName, actualHeaders);
-     const modelInfo = planillaModel ? `[${planillaModel.model} - ${planillaModel.pattern}]` : null;
+      return {
+        sheetName,
+        headers: actualHeaders,
+        sample,
+        rowCount: Math.max(0, rows.length - 1),
+        pre_suggested_entity: topEntity && topEntity[1] > 0 ? topEntity[0] : null,
+        pre_score: topEntity ? topEntity[1] : 0,
+        planilla_model: planillaModel?.model || null,
+        planilla_pattern: planillaModel?.pattern || null,
+      };
+    });
 
-     return {
-       sheetName,
-       headers: actualHeaders,
-       sample,
-       rowCount: Math.max(0, rows.length - 1),
-       pre_suggested_entity: topEntity && topEntity[1] > 0 ? topEntity[0] : null,
-       pre_score: topEntity ? topEntity[1] : 0,
-       planilla_model: planillaModel?.model || null,
-       planilla_pattern: planillaModel?.pattern || null,
-     };
-   });
+    // Build a concise schema summary with patterns for the LLM
+    const schemaSummary = Object.entries(ENTITY_SCHEMAS).map(([entity, schema]) => ({
+      entity,
+      description: schema.description,
+      fields: schema.fields,
+      key_fields: schema.key_fields,
+      common_header_patterns: schema.key_patterns,
+      name_aliases: schema.aliases,
+    }));
 
-  // Build a concise schema summary with patterns for the LLM
-  const schemaSummary = Object.entries(ENTITY_SCHEMAS).map(([entity, schema]) => ({
-    entity,
-    description: schema.description,
-    fields: schema.fields,
-    key_fields: schema.key_fields,
-    common_header_patterns: schema.key_patterns,
-    name_aliases: schema.aliases,
-  }));
-
-  const prompt = `Sos un INGENIERO SENIOR ANALISTA especializado en gestión de órdenes de trabajo y mantenimiento edilicio.
+    const prompt = `Sos un INGENIERO SENIOR ANALISTA especializado en gestión de órdenes de trabajo y mantenimiento edilicio.
 
 TAREA: Analiza las hojas de Excel y:
 1. Detecta CADA PENDIENTE/ORDEN como un registro independiente
@@ -355,111 +213,109 @@ ANÁLISIS DETALLADO PARA CADA HOJA:
    - scheduled_date → "FECHA INICIO"
    - description → concatenar TAREAS + detalles
 
-3. **CRÍTICO PARA 8B**: Si es formato pivotado, INDICA en output:
+3. **Para InformePlaneacion**:
+   - mes → "MES"
+   - descripcion → "DESCRIPCIÓN" o "TAREAS A REALIZAR"
+   - proveedor_2025 → "PROVEEDOR" o "PROVEEDOR 2025"
+   - contacto_2025 → "CONTACTO" o similar
+   - estado_contacto → "ESTADO" o "ESTADO CONTACTO"
+
+4. **CRÍTICO PARA 8B**: Si es formato pivotado, INDICA en output:
    - planilla_model: "8B"
    - needs_unpivot: true
    - pivot_columns: [lista de columnas que contienen direcciones]
-   - Explicación: "Esta hoja requiere desagregación. Las direcciones son columnas, cada una contiene múltiples pendientes anidadas"
 
-4. **COMUNAS**: Detecta de:
-   - Nombre archivo (PENDIENTESCOMUNA8A, PENDIENTESCOMUNA8B, etc.)
-   - Datos en hojas (si ves "8A", "COMUNA 8A" en los datos)
-
-MAPEO ESPECÍFICO PARA PENDIENTES (WorkOrder):
-- N° DE ORDEN / N° ORDEN / NUMERO ORDEN → code
-- TAREAS A REALIZAR / TAREA / DESCRIPCION → title
-- UBICACIÓN / ESTABLECIMIENTO / DIRECCION → location
-- INSPECTOR / RESPONSABLE (solo 8A) → assigned_name
-- FECHA INICIO / FECHA LIMITE / FECHA PROGRAMADA → scheduled_date
-- STATUS / ESTADO / CLASE DE ORDEN → status
-- FECHA LIMITE SAP → (info adicional, no mapear)
+MAPEO ESPECÍFICO PARA INFORMEPLANEACION:
+- MES / PERIODO → mes
+- DESCRIPCIÓN / DESCRIPCION / TAREAS → descripcion
+- PROVEEDOR / PROVEEDOR 2025 → proveedor_2025
+- CONTACTO / CONTACTO 2025 → contacto_2025
+- PROVEEDOR INVITADO 2026 → proveedor_invitado_2026
+- ESTADO / ESTADO CONTACTO → estado_contacto
+- PROVEEDOR CONTRATADO 2026 → proveedor_contratado_2026
+- ESTADO ACTUAL / ESTADO EJECUCIÓN → estado_actual
 
 CALIBRACIÓN DE CONFIANZA:
-- 0.98+: WorkOrder con modelo 8A/10A completo (tiene N° ORDEN + TAREAS + UBICACIÓN)
-- 0.90-0.97: WorkOrder con estructura clara pero algunos campos faltantes
-- 0.70-0.89: Hojas auxiliares (ESC, Formato Condicional) → target_entity: "skip"
+- 0.98+: WorkOrder o InformePlaneacion con modelo claro (tiene campos clave mapeados)
+- 0.90-0.97: Estructura clara pero algunos campos faltantes
+- 0.70-0.89: Hojas auxiliares → target_entity: "skip"
 - <0.70: Dudoso
 
 Responde con JSON. Para cada hoja:
 - sheet_name, target_entity, confidence
-- detected_planilla_model (8A/8B/10A)
+- detected_planilla_model (8A/8B/10A si aplica)
 - detected_comuna (8A/8B/10A si aplica)
 - field_mapping (mapeo de columnas)
-- sample_data
-- Si es 8B, agregar: needs_unpivot, pivot_columns`;
+- sample_data`;
 
-  const result = await base44.integrations.Core.InvokeLLM({
-    prompt,
-    model: 'claude_sonnet_4_6',
-    response_json_schema: {
-      type: 'object',
-      properties: {
-        sheets: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              sheet_name: { type: 'string' },
-              target_entity: { type: 'string' },
-              confidence: { type: 'number' },
-              row_count: { type: 'number' },
-              detected_comuna: { type: 'string' },
-              detected_planilla_model: { type: 'string' },
-              needs_unpivot: { type: 'boolean' },
-              pivot_columns: { type: 'array', items: { type: 'string' } },
-              field_mapping: { type: 'object', additionalProperties: { type: 'string' } },
-              sample_data: { type: 'object', additionalProperties: { type: 'string' } },
-            },
-            required: ['sheet_name', 'target_entity', 'confidence', 'field_mapping', 'sample_data']
-          }
-        }
+    const response = await base44.integrations.Core.InvokeLLM({
+      prompt,
+      model: 'claude_sonnet_4_6',
+    });
+
+    // InvokeLLM devuelve directamente un string de texto
+    const result = response;
+    
+    console.log('Raw LLM response:', typeof response);
+    console.log('Raw LLM result:', typeof result, String(result).substring(0, 300));
+
+    let sheetsArray = [];
+    
+    // Intentar parsear si es texto JSON
+    if (typeof result === 'string') {
+      try {
+        const parsed = JSON.parse(result);
+        sheetsArray = parsed.sheets || parsed || [];
+      } catch (e) {
+        console.error('JSON parse error:', e.message);
       }
+    } else if (Array.isArray(result)) {
+      sheetsArray = result;
+    } else if (result && typeof result === 'object') {
+      sheetsArray = result.sheets || [];
     }
-  });
 
-  // Ensure row_count is always set from real data (not LLM guess)
-  // También asegurarse de que detected_planilla_model esté poblado
-  // Para 8B pivotado, contar pendientes únicos (no filas crudas)
-  if (result && result.sheets) {
-    result.sheets = result.sheets.map(sheet => {
+    // Asegurar que sea un array
+    if (!Array.isArray(sheetsArray)) {
+      sheetsArray = [];
+    }
+
+    // Procesar y enriquecer con datos reales
+    const processedSheets = sheetsArray.map(sheet => {
       const rawRows = raw_data[sheet.sheet_name];
       const sheetInfo = sheetsInfo.find(s => s.sheetName === sheet.sheet_name);
       const model = sheet.detected_planilla_model || sheetInfo?.planilla_model;
-      
+
       let actualRowCount = rawRows ? Math.max(0, rawRows.length - 1) : (sheet.row_count || 0);
-      
-      // Para 8B pivotado: contar celdas con datos (no filas)
+
+      // Para 8B pivotado: contar celdas con datos
       if (model === '8B' && rawRows && rawRows.length > 1) {
         let cellCount = 0;
         const headers = (rawRows[0] || []).map(h => String(h || '').trim());
-        
-        // Iterar filas y contar celdas que contengan datos válidos
+
         rawRows.slice(1).forEach(row => {
           headers.forEach((header, colIdx) => {
             const cellValue = row[colIdx];
-            // Contar celdas que tengan contenido (excluir vacíos, #N/A, null)
             if (cellValue !== null && cellValue !== undefined && cellValue !== '' && cellValue !== '#N/A') {
-              // Si la celda contiene múltiples pendientes delimitados (comas, saltos), contar cada uno
               const items = String(cellValue).split(/[\n,;]/).filter(v => v.trim());
               cellCount += items.length;
             }
           });
         });
-        
+
         actualRowCount = cellCount > 0 ? cellCount : actualRowCount;
       }
-      
+
       return {
         ...sheet,
         row_count: actualRowCount,
         detected_planilla_model: model || null,
       };
     });
-  }
 
-  return Response.json({ sheets: result?.sheets || [] });
-   } catch (err) {
-     console.error('Error en smartImportAnalyze:', err);
-     return Response.json({ error: String(err), sheets: [] }, { status: 500 });
-   }
- });
+    return Response.json({ sheets: processedSheets });
+  } catch (err) {
+    console.error('Error en smartImportAnalyze:', err);
+    return Response.json({ error: String(err), sheets: [] }, { status: 500 });
+  }
+});
