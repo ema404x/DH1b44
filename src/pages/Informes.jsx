@@ -16,13 +16,13 @@ export default function Informes() {
 
   const { data: informes = [], isLoading } = useQuery({
     queryKey: ['informes'],
-    queryFn: () => base44.entities.InformePlaneacion.list('-created_date'),
+    queryFn: () => base44.entities.Informe.list('-created_date'),
   });
 
   const saveMutation = useMutation({
     mutationFn: (data) => editing
-      ? base44.entities.InformePlaneacion.update(editing.id, data)
-      : base44.entities.InformePlaneacion.create(data),
+      ? base44.entities.Informe.update(editing.id, data)
+      : base44.entities.Informe.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['informes'] });
       setDialogOpen(false);
@@ -31,7 +31,7 @@ export default function Informes() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.InformePlaneacion.delete(id),
+    mutationFn: (id) => base44.entities.Informe.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['informes'] }),
   });
 
