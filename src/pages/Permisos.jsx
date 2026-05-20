@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Plus, Save, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
 const MODULES = [
@@ -170,10 +171,25 @@ export default function Permisos() {
                 <h2 className="text-xl font-bold">{role.role_name}</h2>
                 <p className="text-sm text-muted-foreground">{role.description}</p>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(role.id)} 
-                className="text-destructive hover:text-destructive" disabled={deleteMutation.isPending}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={deleteMutation.isPending}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Eliminar rol "{role.role_name}"?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Se eliminarán todos los permisos configurados para este rol. Los empleados con este rol quedarán sin permisos asignados.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => deleteMutation.mutate(role.id)}>Eliminar</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
 
             <div className="overflow-x-auto">

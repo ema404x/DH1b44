@@ -1,13 +1,23 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 Deno.serve(async (req) => {
-  const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const { module, action } = await req.json();
-
   try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // Los admins de plataforma tienen acceso total
+    if (user.role === 'admin') {
+      return Response.json({ allowed: true, permissions: {}, role: 'admin' });
+    }
+
+    const body = await req.json();
+    const { module, action } = body;
+
+    if (!module || !action) {
+      return Response.json({ error: 'module y action son requeridos' }, { status: 400 });
+    }
+
     // Obtener permisos del rol del usuario
     const rolePerms = await base44.asServiceRole.entities.RolePermission.filter({
       role_name: user.role || 'user'
@@ -18,7 +28,7 @@ Deno.serve(async (req) => {
     }
 
     const perms = rolePerms[0].permissions[module];
-    const allowed = perms && perms[action] === true;
+    const allowed = !!(perms && perms[action] === true);
 
     return Response.json({ 
       allowed, 
