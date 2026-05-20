@@ -5,9 +5,10 @@ export const queryClientInstance = new QueryClient({
 	defaultOptions: {
 		queries: {
 			refetchOnWindowFocus: false,
+			refetchOnReconnect: false,
 			retry: 1,
-			staleTime: 1000 * 60 * 2,      // datos frescos por 2 min — evita refetches al cambiar de tab
-			gcTime: 1000 * 60 * 10,         // mantener en caché 10 min
+			staleTime: 1000 * 60 * 5,      // datos frescos por 5 min
+			gcTime: 1000 * 60 * 30,         // mantener en caché 30 min
 		},
 	},
 });
