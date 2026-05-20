@@ -31,7 +31,7 @@ const typeLabels = {
   instalacion: 'Instalación', inspeccion: 'Inspección', reparacion: 'Reparación', emergencia: 'Emergencia'
 };
 
-function NewOrderDialog({ open, onOpenChange, onSave, saving }) {
+function NewOrderDialog({ open, onOpenChange, onSave, saving, employees = [] }) {
   const [form, setForm] = useState({ title: '', type: 'mantenimiento_correctivo', priority: 'media', status: 'pendiente' });
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -118,7 +118,17 @@ function NewOrderDialog({ open, onOpenChange, onSave, saving }) {
 
           <div>
             <label className="text-xs font-medium text-slate-300 uppercase">Asignado a</label>
-            <Input className="mt-1 bg-slate-700 border-slate-600 text-white" placeholder="Técnico" value={form.assigned_name || ''} onChange={e => set('assigned_name', e.target.value)} />
+            <Select value={form.assigned_name || '__none__'} onValueChange={v => set('assigned_name', v === '__none__' ? '' : v)}>
+              <SelectTrigger className="mt-1 bg-slate-700 border-slate-600 text-white">
+                <SelectValue placeholder="Seleccionar técnico..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— Sin asignar —</SelectItem>
+                {employees.map(e => (
+                  <SelectItem key={e.id} value={e.full_name}>{e.full_name}{e.specialty ? ` · ${e.specialty}` : ''}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <Button className="w-full bg-gradient-to-r from-primary to-purple-600" onClick={() => onSave(form)} disabled={!form.title.trim() || saving}>
@@ -189,6 +199,13 @@ export default function WorkOrders() {
     queryKey: ['workorders'],
     queryFn: () => base44.entities.WorkOrder.list('-created_date')
   });
+
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => base44.entities.Employee.list('full_name', 200),
+    staleTime: 1000 * 60 * 10,
+  });
+  const activeEmployees = employees.filter(e => e.status === 'activo' || !e.status);
 
   const createMutation = useMutation({
     mutationFn: async (data) => base44.entities.WorkOrder.create(data),
@@ -338,6 +355,7 @@ export default function WorkOrders() {
         onOpenChange={setNewDialogOpen}
         onSave={createMutation.mutate}
         saving={createMutation.isPending}
+        employees={activeEmployees}
       />
 
       <OTTemplateSelector

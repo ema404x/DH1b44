@@ -37,6 +37,13 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const queryClient = useQueryClient();
 
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => base44.entities.Employee.list('full_name', 200),
+    staleTime: 1000 * 60 * 10,
+  });
+  const activeEmployees = employees.filter(e => e.status === 'activo' || !e.status);
+
   const handleSaveAsTemplate = async () => {
     const nombre = prompt('Nombre de la plantilla:', data.title);
     if (!nombre) return;
@@ -170,7 +177,15 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             </div>
             <div>
               <p className="text-[10px] uppercase text-muted-foreground mb-1">Asignado</p>
-              <Input value={data.assigned_name || ''} onChange={e => set('assigned_name', e.target.value)} className="h-8 text-xs" placeholder="Técnico" />
+              <Select value={data.assigned_name || '__none__'} onValueChange={v => set('assigned_name', v === '__none__' ? '' : v)}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Sin asignar —</SelectItem>
+                  {activeEmployees.map(e => (
+                    <SelectItem key={e.id} value={e.full_name} className="text-xs">{e.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <p className="text-[10px] uppercase text-muted-foreground mb-1">Fecha</p>

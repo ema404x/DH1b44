@@ -81,6 +81,7 @@ export default function Reportes() {
   const [comunaFilter, setComunaFilter] = useState('all');
   const [jefeFilter, setJefeFilter] = useState('all');
   const [projectFilter, setProjectFilter] = useState('all');
+  const [tecnicoFilter, setTecnicoFilter] = useState('all');
 
   // Fetch all data
   const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
@@ -93,6 +94,14 @@ export default function Reportes() {
   // Get unique filter options
   const comunasUnicas = ['8A', '8B', '10A'];
   const jefesUnicos = [...new Set(locations.map(l => l.jefe_sitio).filter(Boolean))];
+  const tecnicosUnicos = [...new Set(employees.map(e => e.full_name).filter(Boolean))].sort();
+
+  // Build location → jefe/comuna lookup for enriching orders
+  const locationLookup = useMemo(() => {
+    const map = {};
+    locations.forEach(l => { map[l.ubic_tecnica] = l; map[l.establecimiento] = l; });
+    return map;
+  }, [locations]);
 
   // Filter data
   const filteredOrders = useMemo(() => {
@@ -102,14 +111,16 @@ export default function Reportes() {
       const date = o.created_date ? new Date(o.created_date) : null;
       const inRange = !date || (date >= from && date <= to);
       const inProject = projectFilter === 'all' || o.project_name === projectFilter;
+      const matchTecnico = tecnicoFilter === 'all' || o.assigned_name === tecnicoFilter;
 
-      // Para OTs podemos usar comuna y jefe de sitio desde LocationQR o asignación
-      let matchComuna = comunaFilter === 'all' || true;
-      let matchJefe = jefeFilter === 'all' || true;
+      // Jefe: buscamos en la ubicación de la orden o en el nombre asignado
+      const loc = locationLookup[o.location_qr_name] || locationLookup[o.location] || {};
+      const matchJefe = jefeFilter === 'all' || loc.jefe_sitio === jefeFilter || o.assigned_name === jefeFilter;
+      const matchComuna = comunaFilter === 'all' || loc.comuna === comunaFilter;
 
-      return inRange && inProject && matchComuna && matchJefe;
+      return inRange && inProject && matchComuna && matchJefe && matchTecnico;
     });
-  }, [orders, dateFrom, dateTo, projectFilter, comunaFilter, jefeFilter]);
+  }, [orders, dateFrom, dateTo, projectFilter, comunaFilter, jefeFilter, tecnicoFilter, locationLookup]);
 
   // Gráficos por mes
   const months = eachMonthOfInterval({ start: new Date(dateFrom), end: new Date(dateTo) });
@@ -214,7 +225,7 @@ export default function Reportes() {
               <Filter className="h-4 w-4 text-teal-400" />
               <span className="text-sm font-semibold text-white">Filtros Avanzados</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Desde</label>
                 <Input
@@ -266,6 +277,18 @@ export default function Reportes() {
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     {projects.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Técnico</label>
+                <Select value={tecnicoFilter} onValueChange={setTecnicoFilter}>
+                  <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {tecnicosUnicos.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -366,24 +389,57 @@ export default function Reportes() {
 
           {/* Personal */}
           <TabsContent value="personal" className="mt-4 space-y-4">
-            <motion.div variants={container} initial="hidden" animate="show">
-              <motion.div variants={item}>
+            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <motion.div variants={item} className="lg:col-span-2">
                 <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Eficiencia por Técnico</CardTitle></CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Eficiencia por Técnico (OTs)</CardTitle></CardHeader>
                   <CardContent>
                     {eficienciaPorTecnico.length === 0 ? (
-                      <div className="text-center py-12 text-slate-500">Sin datos</div>
+                      <div className="text-center py-12 text-slate-500">Sin órdenes asignadas</div>
                     ) : (
                       <ResponsiveContainer width="100%" height={300}>
                         <BarChart data={eficienciaPorTecnico}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                           <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} angle={-45} textAnchor="end" height={80} />
-                          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} formatter={(v) => [`${v}%`, 'Eficiencia']} />
-                          <Bar dataKey="eficiencia" fill="#06b6d4" name="Eficiencia" radius={[4,4,0,0]} />
+                          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} domain={[0,100]} />
+                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} formatter={(v, n) => [n === 'eficiencia' ? `${v}%` : v, n === 'eficiencia' ? 'Eficiencia' : n === 'total' ? 'Total OTs' : 'Completadas']} />
+                          <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
+                          <Bar dataKey="total" fill="#334155" name="Total OTs" radius={[4,4,0,0]} />
+                          <Bar dataKey="completadas" fill="#10b981" name="Completadas" radius={[4,4,0,0]} />
+                          <Bar dataKey="eficiencia" fill="#06b6d4" name="Eficiencia %" radius={[4,4,0,0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              <motion.div variants={item} className="lg:col-span-2">
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Plantel de Empleados</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-1">
+                      {employees.length === 0 ? (
+                        <p className="text-sm text-slate-500 col-span-3 text-center py-6">Sin empleados registrados</p>
+                      ) : employees.map(e => {
+                        const otsEmp = orders.filter(o => o.assigned_name === e.full_name);
+                        const completadas = otsEmp.filter(o => o.status === 'completada').length;
+                        const statusColors = { activo: 'bg-emerald-500/20 text-emerald-300', licencia: 'bg-amber-500/20 text-amber-300', vacaciones: 'bg-blue-500/20 text-blue-300', inactivo: 'bg-slate-500/20 text-slate-400' };
+                        return (
+                          <div key={e.id} className="bg-slate-700/30 rounded-lg border border-slate-600/30 p-3 flex flex-col gap-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-semibold text-white truncate">{e.full_name}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full flex-shrink-0 ${statusColors[e.status] || 'bg-slate-500/20 text-slate-400'}`}>{e.status || 'activo'}</span>
+                            </div>
+                            <span className="text-xs text-slate-400 capitalize">{e.specialty || e.role || '—'}</span>
+                            <div className="text-[11px] text-slate-500 mt-1">
+                              {otsEmp.length} OTs · {completadas} completadas
+                              {otsEmp.length > 0 && <span className="ml-1 text-cyan-400">({Math.round(completadas/otsEmp.length*100)}%)</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
