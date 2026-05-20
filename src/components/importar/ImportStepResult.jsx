@@ -38,12 +38,12 @@ export default function ImportStepResult({ result, onReset }) {
 
   return (
     <div className="space-y-6">
-      {/* Hero result */}
-      <div className={`p-6 rounded-2xl border-2 ${
-        success ? 'bg-emerald-50 border-emerald-200' :
-        partial ? 'bg-amber-50 border-amber-200' :
-        'bg-red-50 border-red-200'
-      }`}>
+       {/* Hero result with gradient */}
+       <div className={`p-6 rounded-2xl border-2 relative overflow-hidden ${
+         success ? 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200' :
+         partial ? 'bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200' :
+         'bg-gradient-to-br from-red-50 to-red-100/50 border-red-200'
+       }`}>
         <div className="flex items-start gap-4">
           <div className={`h-14 w-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
             success ? 'bg-emerald-100' : partial ? 'bg-amber-100' : 'bg-red-100'
@@ -154,9 +154,19 @@ export default function ImportStepResult({ result, onReset }) {
         ))}
       </div>
 
-      <Button onClick={onReset} variant="outline" className="w-full gap-2">
-        <RefreshCw className="h-4 w-4" /> Nueva importación
-      </Button>
+      {/* Bottom CTA */}
+       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-slate-700/50">
+         <Button onClick={onReset} variant="outline" className="gap-2">
+           <RefreshCw className="h-4 w-4" /> Nueva importación
+         </Button>
+         {success && (
+           <Link to="/reportes">
+             <Button className="w-full gap-2 bg-primary hover:bg-primary/90">
+               <ArrowRight className="h-4 w-4" /> Ver reportes
+             </Button>
+           </Link>
+         )}
+       </div>
     </div>
   );
 }

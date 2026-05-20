@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Brain, ChevronDown, ChevronUp, CheckCircle2, Star, AlertTriangle, Info } from 'lucide-react';
+import { Brain, ChevronDown, ChevronUp, CheckCircle2, Star, AlertTriangle, Info, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 const ENTITY_OPTIONS = [
@@ -56,9 +56,10 @@ function SheetCard({ sheet, sheetIdx, isExpanded, onToggle, onUpdateEntity, onUp
   const mappedCount = Object.values(sheet.field_mapping || {}).filter(v => v).length;
   const totalCols = Object.keys(sheet.field_mapping || {}).length;
   const isSkipped = sheet.target_entity === 'skip' || !sheet.target_entity;
+  const mappingCompleteness = totalCols > 0 ? Math.round((mappedCount / totalCols) * 100) : 0;
 
   return (
-    <Card className={`overflow-hidden transition-all ${isSkipped ? 'opacity-50' : ''}`}>
+    <Card className={`overflow-hidden transition-all ${isSkipped ? 'opacity-50' : 'border-primary/20'}`}>
       <CardHeader
         className="cursor-pointer py-3 px-4 hover:bg-muted/20 transition-colors"
         onClick={onToggle}
@@ -74,9 +75,12 @@ function SheetCard({ sheet, sheetIdx, isExpanded, onToggle, onUpdateEntity, onUp
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-semibold text-sm">{sheet.sheet_name}</p>
                 <ConfidenceBadge confidence={sheet.confidence} />
+                {!isSkipped && mappingCompleteness >= 70 && (
+                  <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px]">✓ Listo</Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {sheet.row_count} filas · {mappedCount}/{totalCols} columnas mapeadas
+                {sheet.row_count} filas · {mappedCount}/{totalCols} columnas · {mappingCompleteness}% mapeado
               </p>
             </div>
           </div>
@@ -85,7 +89,7 @@ function SheetCard({ sheet, sheetIdx, isExpanded, onToggle, onUpdateEntity, onUp
               value={sheet.target_entity || 'skip'}
               onChange={(e) => { e.stopPropagation(); onUpdateEntity(e.target.value); }}
               onClick={(e) => e.stopPropagation()}
-              className="text-xs border border-border rounded-lg px-2.5 py-1.5 bg-background font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+              className="text-xs border border-border rounded-lg px-2.5 py-1.5 bg-background font-medium focus:outline-none focus:ring-1 focus:ring-primary hover:border-primary/50"
             >
               {ENTITY_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -182,17 +186,27 @@ export default function ImportStepMapping({ mappingResult, onConfirm, onBack }) 
 
   return (
     <div className="space-y-4">
-      {/* Summary banner */}
-      <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-        <Brain className="h-5 w-5 text-emerald-600 flex-shrink-0" />
-        <div className="flex-1">
-          <p className="font-semibold text-emerald-800 text-sm">Análisis completado</p>
-          <p className="text-xs text-emerald-700 mt-0.5">
-            Se detectaron <strong>{sheets.length} hojas</strong> con <strong>{totalRows.toLocaleString()} filas</strong> listas para importar en <strong>{validSheets.length} entidades</strong>.
-            {highConfidence > 0 && <> · <span className="text-emerald-800 font-semibold">{highConfidence} con alta confianza</span></>}
-          </p>
-        </div>
-      </div>
+       {/* Quick actions bar */}
+       <div className="flex flex-col sm:flex-row gap-3 p-4 bg-slate-800/50 border border-slate-700/50 rounded-xl">
+         <div className="flex-1">
+           <p className="font-semibold text-white text-sm mb-1">Mapeo automático listo</p>
+           <p className="text-xs text-slate-400">
+             Revisa los campos abajo. Ajusta si es necesario. Los <Star className="h-3 w-3 text-amber-500 inline" /> son campos clave.
+           </p>
+         </div>
+       </div>
+
+       {/* Summary banner */}
+       <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+         <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+         <div className="flex-1">
+           <p className="font-semibold text-emerald-800 text-sm">Resumen de importación</p>
+           <p className="text-xs text-emerald-700 mt-0.5">
+             <strong>{validSheets.length} entidade{validSheets.length !== 1 ? 's' : ''}</strong> con <strong>{totalRows.toLocaleString()} fila{totalRows !== 1 ? 's' : ''}</strong> 
+             {highConfidence > 0 && <> · <strong>{highConfidence} con alta confianza</strong></>}
+           </p>
+         </div>
+       </div>
 
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Info className="h-3.5 w-3.5 flex-shrink-0" />
@@ -214,14 +228,16 @@ export default function ImportStepMapping({ mappingResult, onConfirm, onBack }) 
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">
-        <Button variant="outline" onClick={onBack}>Volver</Button>
+        <Button variant="outline" onClick={onBack} className="gap-2">
+          ← Volver
+        </Button>
         <Button
           onClick={() => onConfirm({ ...mappingResult, sheets })}
           disabled={validSheets.length === 0}
           className="flex-1 gap-2"
         >
-          <CheckCircle2 className="h-4 w-4" />
-          Confirmar mapeo · {totalRows.toLocaleString()} registros en {validSheets.length} entidades
+          <Zap className="h-4 w-4" />
+          Continuar · {totalRows.toLocaleString()} fila{totalRows !== 1 ? 's' : ''} en {validSheets.length} entidade{validSheets.length !== 1 ? 's' : ''}
         </Button>
       </div>
     </div>

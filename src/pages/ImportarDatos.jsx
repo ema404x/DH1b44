@@ -46,6 +46,33 @@ const STEPS = [
   { id: 4, name: 'Resultado', icon: CheckCircle2, description: 'Importación completada' },
 ];
 
+// Progress bar indicator
+function StepIndicator({ currentStep, totalSteps }) {
+  return (
+    <div className="flex items-center gap-4 mb-6">
+      {STEPS.map((step) => {
+        const Icon = step.icon;
+        const isActive = step.id === currentStep;
+        const isCompleted = step.id < currentStep;
+        return (
+          <div key={step.id} className="flex items-center gap-2">
+            <div className={`h-10 w-10 rounded-full flex items-center justify-center font-semibold transition-all ${
+              isCompleted ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' :
+              isActive ? 'bg-primary/20 text-primary border border-primary/50 ring-2 ring-primary/30' :
+              'bg-slate-700/50 text-slate-400 border border-slate-600/50'
+            }`}>
+              <Icon className="h-5 w-5" />
+            </div>
+            {step.id < STEPS.length - 1 && (
+              <div className={`h-0.5 w-8 ${isCompleted ? 'bg-emerald-500/50' : 'bg-slate-700/30'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ImportarDatos() {
   const [activeTab, setActiveTab] = useState('general');
   const [step, setStep] = useState(0);
@@ -185,20 +212,25 @@ export default function ImportarDatos() {
         </div>
 
         {/* Tabs (Jefes / Escuelas especiales) */}
-        <div className="max-w-7xl mx-auto px-6 pt-6">
-          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); handleReset(); }} className="w-full">
-            <TabsList className="bg-slate-800/50 border border-slate-700/50 backdrop-blur-xl grid w-full grid-cols-3 mb-6">
-              <TabsTrigger value="general" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
-                <Brain className="h-4 w-4 mr-2" /> Importación IA
-              </TabsTrigger>
-              <TabsTrigger value="jefes" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
-                <Users className="h-4 w-4 mr-2" /> Jefes de Sitio
-              </TabsTrigger>
-              <TabsTrigger value="escuelas" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
-                <Building2 className="h-4 w-4 mr-2" /> Escuelas
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+         <div className="max-w-7xl mx-auto px-6 pt-6">
+           <div className="mb-8">
+             <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); handleReset(); }} className="w-full">
+               <TabsList className="bg-slate-800/50 border border-slate-700/50 backdrop-blur-xl grid w-full grid-cols-3 mb-6">
+                 <TabsTrigger value="general" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+                   <Brain className="h-4 w-4 mr-2" /> Importación IA
+                 </TabsTrigger>
+                 <TabsTrigger value="jefes" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+                   <Users className="h-4 w-4 mr-2" /> Jefes de Sitio
+                 </TabsTrigger>
+                 <TabsTrigger value="escuelas" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+                   <Building2 className="h-4 w-4 mr-2" /> Escuelas
+                 </TabsTrigger>
+               </TabsList>
+             </Tabs>
+           </div>
+
+           {/* Progress Indicator for IA tab */}
+           {activeTab === 'general' && <StepIndicator currentStep={step} totalSteps={STEPS.length} />}
 
           {/* ── TAB: Importación IA ── */}
           {activeTab === 'general' && (
@@ -209,7 +241,10 @@ export default function ImportarDatos() {
               {/* Step 0: Selección de módulo */}
               {step === 0 && (
                 <div className="space-y-4">
-                  <p className="text-sm text-slate-300 font-medium">¿Qué módulo querés importar?</p>
+                  <div className="flex items-center gap-2 p-3 bg-slate-700/30 border border-slate-600/50 rounded-lg">
+                    <Brain className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="text-sm text-slate-300">Elige el módulo de destino o usa <strong>Detección Automática</strong> para que la IA lo identifique.</span>
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                     {MODULES.map((mod) => {
                       const Icon = mod.icon;

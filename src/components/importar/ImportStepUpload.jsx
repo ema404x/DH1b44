@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Upload, FileSpreadsheet, FileText, AlertCircle, Loader2, File, X, Eye } from 'lucide-react';
+import { Upload, FileSpreadsheet, FileText, AlertCircle, Loader2, File, X, Eye, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -115,9 +115,13 @@ export default function ImportStepUpload({ onFileUploaded }) {
         </div>
 
         {/* Sheets preview */}
-        <div className="space-y-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Vista previa de hojas detectadas</p>
-          {Object.entries(preview.rawData).map(([sheetName, rows]) => {
+           <div className="space-y-3">
+             <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+               <Info className="h-4 w-4 text-blue-600 flex-shrink-0" />
+               <span className="text-xs text-blue-700"><strong>Tip:</strong> Revisá que las columnas y datos se vean correctos antes de continuar.</span>
+             </div>
+             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Vista previa de hojas detectadas</p>
+             {Object.entries(preview.rawData).map(([sheetName, rows]) => {
             const headers = rows[0] || [];
             const sampleRow = rows[1] || [];
             const rowCount = Math.max(0, rows.length - 1);
