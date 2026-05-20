@@ -46,6 +46,7 @@ const AprobacionCertificados = lazy(() => import('@/pages/AprobacionCertificados
 const ControlRiesgo = lazy(() => import('@/pages/ControlRiesgo'));
 const CertificacionObras = lazy(() => import('@/pages/CertificacionObras'));
 const InformePlaneacion = lazy(() => import('@/pages/InformePlaneacion'));
+const CalendarioInformes = lazy(() => import('@/pages/CalendarioInformes'));
 import ProtectedPage from '@/components/shared/ProtectedPage';
 
 // Spinner de carga mientras se descarga la página lazy
@@ -132,6 +133,7 @@ const AuthenticatedApp = () => {
         <Route path="/control-riesgo" element={<ProtectedPage moduleKey="ControlRiesgo"><ControlRiesgo /></ProtectedPage>} />
         <Route path="/certificacion-obras" element={<ProtectedPage moduleKey="CertificacionObras"><CertificacionObras /></ProtectedPage>} />
         <Route path="/informe-planeacion" element={<ProtectedPage moduleKey="InformePlaneacion"><InformePlaneacion /></ProtectedPage>} />
+        <Route path="/calendario-informes" element={<ProtectedPage moduleKey="Informes"><CalendarioInformes /></ProtectedPage>} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
