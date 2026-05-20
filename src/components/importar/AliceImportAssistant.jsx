@@ -136,23 +136,43 @@ export default function AliceImportAssistant({ step, mappingResult, importResult
   const [initDone, setInitDone] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const conversationInitRef = useRef(false);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  // Inicializar conversación con contexto del módulo de importación
-  useEffect(() => {
-    base44.agents.createConversation({
-      agent_name: 'soporte_app',
-      metadata: { name: 'Alice Importación' },
-    }).then(async conv => {
+  // Inicializa la conversación de forma lazy (solo cuando el usuario necesita respuesta del agente)
+  const ensureConversation = async () => {
+    if (conversation) return conversation;
+    if (conversationInitRef.current) {
+      // ya está en curso, esperar
+      return new Promise(resolve => {
+        const interval = setInterval(() => {
+          if (conversationInitRef.current === false) {
+            clearInterval(interval);
+            resolve(null); // se resolverá en el próximo render via state
+          }
+        }, 100);
+      });
+    }
+    conversationInitRef.current = true;
+    try {
+      const conv = await base44.agents.createConversation({
+        agent_name: 'soporte_app',
+        metadata: { name: 'Alice Importación' },
+      });
       const contexto = `[CONTEXTO INTERNO]
 El usuario está en el módulo de Importación de Datos del sistema DH1.
 Sos Alice, asistente especializada en importación. Ayudá al usuario a entender cómo preparar sus archivos, qué entidades puede importar, qué significa cada campo, y cómo resolver errores de importación.
 Sé concisa, práctica y amigable.`;
       await base44.agents.addMessage(conv, { role: 'user', content: contexto });
       setConversation(conv);
-    }).catch(() => {});
-  }, []);
+      conversationInitRef.current = false;
+      return conv;
+    } catch {
+      conversationInitRef.current = false;
+      return null;
+    }
+  };
 
   // Mensaje inicial y mensajes contextuales según el paso
   useEffect(() => {
@@ -180,7 +200,7 @@ Sé concisa, práctica y amigable.`;
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Suscribirse a la conversación del agente para recibir respuestas
+  // Suscribirse a la conversación del agente una vez creada
   useEffect(() => {
     if (!conversation?.id) return;
     const unsub = base44.agents.subscribeToConversation(conversation.id, (data) => {
@@ -204,7 +224,7 @@ Sé concisa, práctica y amigable.`;
   }, [conversation?.id]);
 
   const handleFileSelect = async (files) => {
-    if (!files.length || !conversation) return;
+    if (!files.length) return;
     setUploadingFile(true);
     try {
       const fileUrls = [];
@@ -224,29 +244,28 @@ Sé concisa, práctica y amigable.`;
 
   const handleSend = async (text) => {
     const msg = (text || input).trim();
-    if ((!msg && !selectedFiles.length) || sending || !conversation) return;
+    if ((!msg && !selectedFiles.length) || sending) return;
     setInput('');
-    
-    // Enviar mensaje con archivos adjuntos
-    const userMsg = { role: 'user', content: msg || '📎 Archivos adjuntos para analizar' };
-    if (selectedFiles.length > 0) {
-      userMsg.file_urls = selectedFiles.map(f => f.url);
-    }
-    
-    setMessages(prev => [...prev, userMsg]);
-    if (selectedFiles.length > 0) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `📂 Recibí ${selectedFiles.length} archivo${selectedFiles.length !== 1 ? 's' : ''}: ${selectedFiles.map(f => f.name).join(', ')}. Analizando...`,
-        _typing: true
-      }]);
-    } else {
-      setMessages(prev => [...prev, { role: 'assistant', content: '...', _typing: true }]);
-    }
     setSending(true);
+
+    const userMsg = { role: 'user', content: msg || '📎 Archivos adjuntos para analizar' };
+    if (selectedFiles.length > 0) userMsg.file_urls = selectedFiles.map(f => f.url);
+
+    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: selectedFiles.length > 0
+        ? `📂 Recibí ${selectedFiles.length} archivo${selectedFiles.length !== 1 ? 's' : ''}: ${selectedFiles.map(f => f.name).join(', ')}. Analizando...`
+        : '...',
+      _typing: true
+    }]);
     setSelectedFiles([]);
-    
-    await base44.agents.addMessage(conversation, userMsg);
+
+    // Crear conversación lazy si aún no existe
+    const conv = conversation || await ensureConversation();
+    if (!conv) { setSending(false); return; }
+
+    await base44.agents.addMessage(conv, userMsg);
   };
 
   const currentSuggestions = STEP_MESSAGES[step]?.suggestions || [];
@@ -355,7 +374,7 @@ Sé concisa, práctica y amigable.`;
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
                   placeholder="Preguntale a Alice sobre la importación..."
-                  disabled={sending || !conversation}
+                  disabled={sending}
                   className="flex-1 text-sm bg-background border border-input rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground disabled:opacity-50"
                 />
                 <input
@@ -368,7 +387,7 @@ Sé concisa, práctica y amigable.`;
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={sending || !conversation || uploadingFile}
+                  disabled={sending || uploadingFile}
                   className="h-9 w-9 rounded-xl border border-input hover:bg-muted flex items-center justify-center disabled:opacity-40 transition-colors flex-shrink-0"
                   title="Adjuntar archivos para que Alice analice"
                 >
@@ -376,7 +395,7 @@ Sé concisa, práctica y amigable.`;
                 </button>
                 <button
                   onClick={() => handleSend()}
-                  disabled={(!input.trim() && !selectedFiles.length) || sending || !conversation}
+                  disabled={(!input.trim() && !selectedFiles.length) || sending}
                   className="h-9 w-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0"
                 >
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
