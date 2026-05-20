@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Pencil, Trash2, FileText, CheckCircle2 } from 'lucide-react';
+import { Search, Pencil, Trash2, FileText, CheckCircle2, StickyNote } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
@@ -20,9 +20,7 @@ export default function InformesTabla({ informes, onEdit, onDelete, isLoading, h
 
   const filtered = informes.filter(i =>
     !search ||
-    i.titulo?.toLowerCase().includes(search.toLowerCase()) ||
-    i.proyecto_nombre?.toLowerCase().includes(search.toLowerCase()) ||
-    i.cliente_nombre?.toLowerCase().includes(search.toLowerCase())
+    i.titulo?.toLowerCase().includes(search.toLowerCase())
   );
 
   const today = new Date();
@@ -65,7 +63,6 @@ export default function InformesTabla({ informes, onEdit, onDelete, isLoading, h
                 <TableHead className="hidden md:table-cell">Tipo</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Prioridad</TableHead>
-                <TableHead className="hidden md:table-cell">Proyecto / Cliente</TableHead>
                 <TableHead className="hidden lg:table-cell">Responsable</TableHead>
                 <TableHead>Vencimiento</TableHead>
                 <TableHead className="hidden lg:table-cell">Entregado</TableHead>
@@ -78,7 +75,12 @@ export default function InformesTabla({ informes, onEdit, onDelete, isLoading, h
                   <TableCell>
                     <div className="flex items-start gap-2">
                       <div>
-                        <p className="font-medium text-sm">{informe.titulo}</p>
+                        <div className="flex items-center gap-1">
+                          <p className="font-medium text-sm">{informe.titulo}</p>
+                          {(informe.descripcion || informe.observaciones) && (
+                            <StickyNote className="h-3.5 w-3.5 text-amber-500" title="Tiene notas" />
+                          )}
+                        </div>
                         {informe.codigo && <p className="text-xs text-muted-foreground font-mono">{informe.codigo}</p>}
                         {informe.requiere_firma && (
                           <span className={`text-xs flex items-center gap-1 mt-0.5 ${informe.firma_obtenida ? 'text-emerald-600' : 'text-amber-600'}`}>
@@ -94,12 +96,7 @@ export default function InformesTabla({ informes, onEdit, onDelete, isLoading, h
                   </TableCell>
                   <TableCell><StatusBadge value={informe.estado} /></TableCell>
                   <TableCell><StatusBadge value={informe.prioridad} type="priority" /></TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div className="text-sm">
-                      {informe.proyecto_nombre && <p className="font-medium">{informe.proyecto_nombre}</p>}
-                      {informe.cliente_nombre && <p className="text-xs text-muted-foreground">{informe.cliente_nombre}</p>}
-                    </div>
-                  </TableCell>
+
                   <TableCell className="hidden lg:table-cell text-sm">{informe.responsable || '-'}</TableCell>
                   <TableCell>{getDaysChip(informe)}</TableCell>
                   <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
