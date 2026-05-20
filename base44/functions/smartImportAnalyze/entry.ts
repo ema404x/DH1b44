@@ -160,6 +160,10 @@ Deno.serve(async (req) => {
       // Detectar modelo de planilla (8A, 8B, 10A)
       const planillaModel = detectPlanillaModel(sheetName, actualHeaders);
 
+      // Debug: log detected entity
+      const headerStr = actualHeaders.slice(0, 5).join(' | ');
+      console.log(`[SHEET] ${sheetName}: headers="${headerStr}..." | detected=${topEntity?.[0] || 'none'} | score=${topEntity?.[1] || 0} | rows=${Math.max(0, rows.length - headerRowIdx - 1)}`);
+
       return {
         sheetName,
         headers: actualHeaders,
@@ -201,74 +205,119 @@ Deno.serve(async (req) => {
       };
     });
 
-    // Build LLM prompt for field mapping (not classification)
-    const prompt = `You are a data mapping expert. Map Excel headers to database fields.
+    // Helper: normalize header names for matching
+    const normalizeHeader = (h) => h.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
 
-Headers and detected entity types:
-${JSON.stringify(detectedSheets.map(s => ({
-  sheet_name: s.sheetName,
-  headers: s.headers,
-  detected_entity: s.detected_entity,
-  sample: s.sample
-})), null, 2)}
+    // Helper: heuristic field mapping based on header patterns
+    const buildHeuristicMapping = (entity, headers) => {
+      const mapping = {};
+      const headerMap = {};
+      headers.forEach((h, i) => {
+        headerMap[normalizeHeader(h)] = h;
+      });
 
-For EACH sheet, create field mappings. For InformePlaneacion, map to: mes, descripcion, proveedor_2025, contacto_2025, estado_contacto, etc.
-For WorkOrder, map to: code, title, location, assigned_name, status, scheduled_date, etc.
-
-Respond ONLY with valid JSON array:
-[{
-  "sheet_name": "exact name",
-  "target_entity": "InformePlaneacion" | "WorkOrder" | "skip",
-  "field_mapping": { "HEADER": "field_name", ... }
-}]`;
-
-    const response = await base44.integrations.Core.InvokeLLM({
-      prompt,
-      model: 'claude_sonnet_4_6',
-    });
-
-    let sheetsArray = [];
-    
-    // Parse LLM response
-    if (typeof response === 'string') {
-      try {
-        const jsonMatch = response.match(/\[[\s\S]*\]/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : response;
-        sheetsArray = JSON.parse(jsonStr);
-        if (!Array.isArray(sheetsArray)) {
-          sheetsArray = [sheetsArray];
+      const entityMappings = {
+        InformePlaneacion: {
+          'mes': ['mes'], 'descripcion': ['desc', 'descripcion', 'tarea'], 'proveedor_2025': ['proveedor', 'prov', 'empresa'],
+          'contacto_2025': ['contacto', 'contact'], 'estado_contacto': ['estado', 'status'], 'proveedor_invitado_2026': ['invitado'],
+          'proveedor_contratado_2026': ['contratado'], 'fecha_envio_contratar': ['fecha'], 'estado_actual': ['estado'],
+        },
+        WorkOrder: {
+          'code': ['orden', 'numero', 'nro'], 'title': ['titulo', 'tarea', 'descripcion'], 'location': ['ubicacion', 'sitio', 'locacion'],
+          'assigned_name': ['asignado', 'operario', 'inspector'], 'status': ['estado', 'status'], 'scheduled_date': ['fecha'],
         }
-      } catch (e) {
-        console.error('JSON parse failed:', e.message);
-      }
-    } else if (Array.isArray(response)) {
-      sheetsArray = response;
-    }
+      };
 
-    // Merge LLM mappings with pre-detected entity types
-    const finalSheets = sheetsArray.map(llmSheet => {
-      const detected = detectedSheets.find(d => d.sheetName === llmSheet.sheet_name);
+      const patterns = entityMappings[entity] || {};
+      for (const [field, patterns_list] of Object.entries(patterns)) {
+        for (const pattern of patterns_list) {
+          for (const [normalized, original] of Object.entries(headerMap)) {
+            if (normalized.includes(pattern)) {
+              mapping[original] = field;
+              delete headerMap[normalized];
+              break;
+            }
+          }
+        }
+      }
+      return mapping;
+    };
+
+    // Build heuristic mappings first, then refine with LLM
+    const heuristicResults = detectedSheets.map(sheet => {
+      const mapping = buildHeuristicMapping(sheet.detected_entity, sheet.headers);
       return {
-        sheet_name: llmSheet.sheet_name,
-        target_entity: llmSheet.target_entity || detected?.detected_entity || 'skip',
-        confidence: detected ? 0.85 : 0.7,
-        field_mapping: llmSheet.field_mapping || {},
-        detected_planilla_model: detected?.planilla_model || null,
+        sheet_name: sheet.sheetName,
+        target_entity: sheet.detected_entity,
+        field_mapping: mapping,
+        from_heuristic: true,
       };
     });
 
-    sheetsArray = finalSheets;
+    // Only call LLM for sheets where heuristic was incomplete
+    const needsLLM = heuristicResults.filter(r => Object.keys(r.field_mapping).length === 0 && r.target_entity !== 'skip');
+    
+    let llmResults = [];
+    if (needsLLM.length > 0) {
+      const prompt = `You are a data mapping expert. Complete field mappings for these sheets where heuristic mapping failed.
 
-    // Enrich with row counts
-    const processedSheets = sheetsArray.map(sheet => {
+Sheets needing mapping:
+${JSON.stringify(needsLLM.map(r => {
+  const sheet = sheetsInfo.find(s => s.sheetName === r.sheet_name);
+  return {
+    sheet_name: r.sheet_name,
+    headers: sheet?.headers || [],
+    sample: sheet?.sample || {},
+    target_entity: r.target_entity,
+  };
+}), null, 2)}
+
+For each sheet, respond with complete field_mapping. Respond ONLY with valid JSON array:
+[{
+  "sheet_name": "exact name",
+  "field_mapping": { "HEADER": "field_name", ... }
+}]`;
+
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt,
+        model: 'claude_sonnet_4_6',
+      });
+
+      if (typeof response === 'string') {
+        try {
+          const jsonMatch = response.match(/\[[\s\S]*\]/);
+          const jsonStr = jsonMatch ? jsonMatch[0] : response;
+          llmResults = JSON.parse(jsonStr);
+          if (!Array.isArray(llmResults)) llmResults = [llmResults];
+        } catch (e) {
+          console.log('LLM response not JSON, keeping heuristic results');
+          llmResults = [];
+        }
+      } else if (Array.isArray(response)) {
+        llmResults = response;
+      }
+    }
+
+    // Merge heuristic + LLM results
+    const sheetsArray = heuristicResults.map(hres => {
+      const llmSheet = llmResults.find(l => l.sheet_name === hres.sheet_name);
+      return {
+        ...hres,
+        field_mapping: { ...hres.field_mapping, ...(llmSheet?.field_mapping || {}) },
+      };
+    });
+
+    // Enrich with row counts and confidence
+    const finalSheets = sheetsArray.map(sheet => {
       const sheetInfo = sheetsInfo.find(s => s.sheetName === sheet.sheet_name);
       return {
         ...sheet,
         row_count: sheetInfo?.rowCount || 0,
+        confidence: sheetInfo?.pre_score || 0.7,
       };
     });
 
-    return Response.json({ sheets: processedSheets });
+    return Response.json({ sheets: finalSheets });
   } catch (err) {
     console.error('Error en smartImportAnalyze:', err);
     return Response.json({ error: String(err), sheets: [] }, { status: 500 });

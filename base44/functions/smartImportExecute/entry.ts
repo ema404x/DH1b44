@@ -111,9 +111,23 @@ Deno.serve(async (req) => {
     headers.forEach((h, i) => { colIndex[h] = i; });
 
     const activeMappings = Object.entries(fieldMapping).filter(([, v]) => v && typeof v === 'string' && v.trim());
+    
+    if (activeMappings.length === 0) {
+      results.push({
+        entity: ENTITY_LABELS[entityKey] || entityKey,
+        entity_key: entityKey,
+        imported: 0,
+        errors: 0,
+        error_details: ['No hay mappings activos de campos'],
+      });
+      continue;
+    }
 
     // Build all valid records first
     const records = [];
+    console.log(`[IMPORT] Sheet: ${sheet.sheet_name}, Entity: ${entityKey}, Headers: ${headers.join(' | ')}`);
+    console.log(`[IMPORT] Active mappings: ${activeMappings.length}, Data rows: ${dataRows.length}`);
+
     for (const row of dataRows) {
       if (row.every(cell => cell === null || cell === undefined || cell === '')) continue;
 
@@ -135,14 +149,18 @@ Deno.serve(async (req) => {
 
       if (hasData) records.push(record);
     }
+    console.log(`[IMPORT] Built ${records.length} valid records from ${dataRows.length} data rows`);
 
     // Insert in batches using bulkCreate
      for (let i = 0; i < records.length; i += BATCH_SIZE) {
        const batch = records.slice(i, i + BATCH_SIZE);
        try {
+         console.log(`[IMPORT] Attempting bulkCreate for ${batch.length} records`);
          await base44.asServiceRole.entities[entityKey].bulkCreate(batch);
          imported += batch.length;
+         console.log(`[IMPORT] Successfully imported ${batch.length} records`);
        } catch (batchErr) {
+         console.log(`[IMPORT] Bulk create failed, trying one by one: ${batchErr.message}`);
          // If bulk fails, try one by one to get individual errors
          for (const record of batch) {
            try {
@@ -150,7 +168,7 @@ Deno.serve(async (req) => {
              imported++;
            } catch (err) {
              const recordSummary = [
-               record.name || record.full_name || record.title || record.codigo,
+               record.name || record.full_name || record.title || record.codigo || record.descripcion,
                record.code || record.dni || record.email || ''
              ].filter(Boolean).join(' - ');
 
@@ -158,6 +176,7 @@ Deno.serve(async (req) => {
              const shortError = errorMsg.length > 120 ? errorMsg.substring(0, 120) + '...' : errorMsg;
 
              errorDetails.push(`${recordSummary || 'Registro desconocido'}: ${shortError}`);
+             console.log(`[IMPORT] Error importing ${recordSummary}: ${shortError}`);
            }
          }
        }

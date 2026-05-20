@@ -36,38 +36,60 @@ export default function ImportStepResult({ result, onReset }) {
     URL.revokeObjectURL(url);
   };
 
+  const noData = totalImported === 0 && totalErrors === 0;
+
   return (
-    <div className="space-y-6">
-       {/* Hero result with gradient */}
-       <div className={`p-6 rounded-2xl border-2 relative overflow-hidden ${
-         success ? 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200' :
-         partial ? 'bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200' :
-         'bg-gradient-to-br from-red-50 to-red-100/50 border-red-200'
-       }`}>
-        <div className="flex items-start gap-4">
-          <div className={`h-14 w-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-            success ? 'bg-emerald-100' : partial ? 'bg-amber-100' : 'bg-red-100'
-          }`}>
-            {success
-              ? <CheckCircle2 className="h-7 w-7 text-emerald-600" />
-              : <AlertCircle className={`h-7 w-7 ${partial ? 'text-amber-600' : 'text-red-600'}`} />
-            }
-          </div>
-          <div className="flex-1">
-            <p className={`font-bold text-xl ${
-              success ? 'text-emerald-800' : partial ? 'text-amber-800' : 'text-red-800'
-            }`}>
-              {success ? '¡Importación exitosa!' : partial ? 'Importación con advertencias' : 'Importación fallida'}
-            </p>
+     <div className="space-y-6">
+        {/* Hero result with gradient */}
+        <div className={`p-6 rounded-2xl border-2 relative overflow-hidden ${
+          success ? 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200' :
+          partial ? 'bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200' :
+          noData ? 'bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200' :
+          'bg-gradient-to-br from-red-50 to-red-100/50 border-red-200'
+        }`}>
+         <div className="flex items-start gap-4">
+           <div className={`h-14 w-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+             success ? 'bg-emerald-100' : partial ? 'bg-amber-100' : noData ? 'bg-slate-100' : 'bg-red-100'
+           }`}>
+             {success
+               ? <CheckCircle2 className="h-7 w-7 text-emerald-600" />
+               : noData ? <AlertCircle className="h-7 w-7 text-slate-600" />
+               : <AlertCircle className={`h-7 w-7 ${partial ? 'text-amber-600' : 'text-red-600'}`} />
+             }
+           </div>
+           <div className="flex-1">
+             <p className={`font-bold text-xl ${
+               success ? 'text-emerald-800' : partial ? 'text-amber-800' : noData ? 'text-slate-800' : 'text-red-800'
+             }`}>
+               {success ? '¡Importación exitosa!' : partial ? 'Importación con advertencias' : noData ? 'Sin datos para importar' : 'Importación fallida'}
+             </p>
             <div className="flex flex-wrap gap-4 mt-3">
-              <div className="text-center">
-                <div className={`text-3xl font-bold ${success ? 'text-emerald-700' : 'text-amber-700'}`}>{totalImported.toLocaleString()}</div>
-                <div className="text-xs text-muted-foreground">registros importados</div>
-              </div>
-              {totalErrors > 0 && (
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-red-600">{totalErrors.toLocaleString()}</div>
-                  <div className="text-xs text-muted-foreground">registros con error</div>
+              {!noData && (
+                <>
+                  <div className="text-center">
+                    <div className={`text-3xl font-bold ${success ? 'text-emerald-700' : 'text-amber-700'}`}>{totalImported.toLocaleString()}</div>
+                    <div className="text-xs text-muted-foreground">registros importados</div>
+                  </div>
+                  {totalErrors > 0 && (
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-red-600">{totalErrors.toLocaleString()}</div>
+                      <div className="text-xs text-muted-foreground">registros con error</div>
+                    </div>
+                  )}
+                </>
+              )}
+              {noData && (
+                <div className="text-center flex-1">
+                  <p className="text-sm font-medium text-slate-700 mb-2">No se encontraron registros válidos para importar</p>
+                  <p className="text-xs text-slate-600 mb-2">Causa posible: Los datos no coinciden con el mapeo de campos</p>
+                  <p className="text-xs text-slate-500 font-semibold mb-1">✓ Verifica:</p>
+                  <ul className="text-xs text-slate-600 space-y-0.5 max-w-sm mx-auto">
+                    <li>☐ El archivo tiene datos reales (no solo headers)</li>
+                    <li>☐ Los headers están en la primera fila válida sin espacios/vacíos</li>
+                    <li>☐ El mapeo de campos es correcto (headers coinciden con campos mapeados)</li>
+                    <li>☐ Los datos tienen valores en los campos críticos requeridos</li>
+                    <li>☐ No hay errores de validación en los valores de los datos</li>
+                  </ul>
                 </div>
               )}
             </div>

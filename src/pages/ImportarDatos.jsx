@@ -146,6 +146,14 @@ export default function ImportarDatos() {
       toast.error('No hay datos del archivo cargado.');
       return;
     }
+
+    // Validar que hay hojas para importar
+    const validSheets = (finalMapping.sheets || []).filter(s => s.target_entity && s.target_entity !== 'skip');
+    if (validSheets.length === 0) {
+      toast.error('No hay hojas configuradas para importar. Revisá el mapeo.');
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const response = await base44.functions.invoke('smartImportExecute', {
@@ -153,10 +161,27 @@ export default function ImportarDatos() {
         raw_data: uploadedFile.rawData,
       });
       const result = response.data?.results ? response.data : response.data?.response;
-      if (!result) {
-        toast.error('La importación no devolvió resultados. Intentá nuevamente.');
+      if (!result || !Array.isArray(result.results)) {
+        toast.error('La importación no devolvió resultados válidos. Intentá nuevamente.');
         return;
       }
+
+      // Validar que hay al menos un resultado
+      if (result.results.length === 0) {
+        toast.error('No se procesó ninguna entidad. Revisá el mapeo y los datos.');
+        return;
+      }
+
+      const totalImported = result.results.reduce((acc, r) => acc + (r.imported || 0), 0);
+      const totalErrors = result.results.reduce((acc, r) => acc + (r.errors || 0), 0);
+
+      if (totalImported === 0 && totalErrors === 0) {
+        console.warn('⚠️ Importación con 0 registros:', result);
+        toast.warning('⚠️ No se importó ningún registro. Revisa que:\n• Los datos estén después de los headers\n• El mapeo sea correcto\n• Los campos tengan valores válidos');
+      } else if (totalImported === 0 && totalErrors > 0) {
+        toast.error(`❌ Falló la importación: ${totalErrors} registros con errores. Revisa los detalles.`);
+      }
+
       setImportResult(result);
       setStep(4);
     } catch (error) {

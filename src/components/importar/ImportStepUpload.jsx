@@ -122,9 +122,19 @@ export default function ImportStepUpload({ onFileUploaded }) {
              </div>
              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Vista previa de hojas detectadas</p>
              {Object.entries(preview.rawData).map(([sheetName, rows]) => {
-            const headers = rows[0] || [];
-            const sampleRow = rows[1] || [];
-            const rowCount = Math.max(0, rows.length - 1);
+            // Find first non-empty row as headers
+            let headerRowIdx = 0;
+            for (let i = 0; i < Math.min(rows.length, 5); i++) {
+              const row = rows[i] || [];
+              const nonEmptyCells = row.filter(cell => cell && String(cell).trim());
+              if (nonEmptyCells.length > 0) {
+                headerRowIdx = i;
+                break;
+              }
+            }
+            const headers = rows[headerRowIdx] || [];
+            const sampleRow = rows[headerRowIdx + 1] || [];
+            const rowCount = Math.max(0, rows.length - headerRowIdx - 1);
             return (
               <Card key={sheetName} className="overflow-hidden">
                 <CardHeader className="py-3 px-4 bg-muted/30">
