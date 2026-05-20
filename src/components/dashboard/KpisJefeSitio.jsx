@@ -11,11 +11,14 @@ export default function KpisJefeSitio() {
   const { data: pendientes = [] } = useQuery({
     queryKey: ['pendientes-kpis'],
     queryFn: () => base44.entities.Pendiente.list('-created_date', 500),
+    staleTime: 1000 * 60 * 5,
   });
 
+  // Reutiliza la misma caché que el Dashboard — sin fetch duplicado
   const { data: orders = [] } = useQuery({
-    queryKey: ['workorders-kpis'],
-    queryFn: () => base44.entities.WorkOrder.list('-created_date', 500),
+    queryKey: ['workorders'],
+    queryFn: () => base44.entities.WorkOrder.list('-updated_date', 300),
+    staleTime: 1000 * 60 * 5,
   });
 
   const kpis = useMemo(() => {

@@ -96,7 +96,8 @@ export default function Dashboard() {
   // No-admins solo ven sus OTs
   const orders = useMemo(() =>
     filterByUser(allOrders, ['assigned_name', 'assigned_to', 'created_by'])
-  , [allOrders, isAdmin]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  , [allOrders, isAdmin, filterByUser]);
 
   const metrics = useMemo(() => {
     const thisMonth = startOfMonth(new Date());
