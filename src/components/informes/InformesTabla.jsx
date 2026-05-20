@@ -78,7 +78,7 @@ export default function InformesTabla({ informes, onEdit, onDelete, isLoading, h
                         <div className="flex items-center gap-1">
                           <p className="font-medium text-sm">{informe.titulo}</p>
                           {(informe.descripcion || informe.observaciones) && (
-                            <StickyNote className="h-3.5 w-3.5 text-amber-500" title="Tiene notas" />
+                            <StickyNote className="h-3.5 w-3.5 text-amber-500 animate-blink" title="Tiene notas" />
                           )}
                         </div>
                         {informe.codigo && <p className="text-xs text-muted-foreground font-mono">{informe.codigo}</p>}
