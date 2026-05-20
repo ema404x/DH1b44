@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileSpreadsheet, CheckCircle2, Loader2, User, X, Plus, ChevronDown } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2, Loader2, User, X, ArrowRight, Users, Building2 } from 'lucide-react';
+import { SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -33,7 +34,15 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
     queryFn: () => base44.entities.Employee.list(),
   });
 
-  const jefesSitio = employees.filter(e => e.role === 'jefe_sitio');
+  // Filtramos jefes de sitio por la comuna seleccionada
+  const jefesSitio = employees.filter(e => {
+    if (e.role !== 'jefe_sitio') return false;
+    if (!e.assigned_comuna) return true; // sin comuna asignada, aparece siempre
+    return String(e.assigned_comuna).includes(comuna) || String(comuna).includes(e.assigned_comuna);
+  });
+
+  // Todos los jefes de sitio (para la opción de "otros")
+  const todosJefes = employees.filter(e => e.role === 'jefe_sitio');
 
   // Detect format based on selected commune
   function getFormato(c) {
@@ -267,71 +276,143 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
 
         {/* Assign jefes per inspector */}
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Asignar Jefe de Sitio por Inspector
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Cada inspector puede tener un jefe de sitio. Un jefe puede tener múltiples inspectores asignados.
-            </p>
-            {sheetInspectors.length > 1 && (
-              <div className="flex items-center gap-2 mt-2 pt-2 border-t">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Asignar todos a:</span>
-                <Select onValueChange={assignJefeToAll}>
-                  <SelectTrigger className="flex-1 h-8 text-xs">
-                    <SelectValue placeholder="Seleccionar jefe para todos..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jefesSitio.map(e => (
-                      <SelectItem key={e.id} value={e.full_name}>{e.full_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          <CardHeader className="pb-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4 text-primary" />
+                  Asignar Jefe de Sitio
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Mostrando jefes de <span className="font-semibold text-foreground">Comuna {comuna}</span> primero. Un jefe puede tener múltiples inspectores.
+                </p>
               </div>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {sheetInspectors.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Esta planilla no tiene columna INSPECTOR. Los pendientes se importarán sin inspector asignado y podrás asignarlos manualmente luego.
-              </p>
-            )}
-            {sheetInspectors.map(({ inspector }) => (
-              <div key={inspector} className="flex items-center gap-3 p-3 border rounded-lg">
-                <div className="w-48 min-w-0">
-                  <p className="text-sm font-medium truncate">{inspector}</p>
-                  <p className="text-xs text-muted-foreground">Inspector</p>
-                </div>
-                <ChevronDown className="h-4 w-4 text-muted-foreground rotate-[-90deg] flex-shrink-0" />
-                <div className="flex-1">
-                  <Select
-                    value={jefesMap[inspector]?.nombre || '__none__'}
-                    onValueChange={v => assignJefe(inspector, v)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Sin jefe asignado" />
+              {/* Asignar todos */}
+              {sheetInspectors.length > 1 && (
+                <div className="flex-shrink-0 flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Todos a:</span>
+                  <Select onValueChange={assignJefeToAll}>
+                    <SelectTrigger className="w-48 h-8 text-xs">
+                      <SelectValue placeholder="Asignación masiva..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__none__">Sin asignar</SelectItem>
-                      {jefesSitio.map(e => (
-                        <SelectItem key={e.id} value={e.full_name}>
-                          {e.full_name}
-                        </SelectItem>
-                      ))}
+                      {jefesSitio.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel className="text-[10px] text-primary flex items-center gap-1">
+                            <Building2 className="h-3 w-3" /> Comuna {comuna}
+                          </SelectLabel>
+                          {jefesSitio.map(e => (
+                            <SelectItem key={e.id} value={e.full_name}>{e.full_name}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      {todosJefes.filter(e => !jefesSitio.find(j => j.id === e.id)).length > 0 && (
+                        <>
+                          <SelectSeparator />
+                          <SelectGroup>
+                            <SelectLabel className="text-[10px] text-muted-foreground">Otras comunas</SelectLabel>
+                            {todosJefes.filter(e => !jefesSitio.find(j => j.id === e.id)).map(e => (
+                              <SelectItem key={e.id} value={e.full_name}>{e.full_name}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
-                {jefesMap[inspector]?.nombre && (
-                  <button
-                    onClick={() => assignJefe(inspector, '__none__')}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2 pt-0">
+            {sheetInspectors.length === 0 && (
+              <div className="text-center py-6 text-muted-foreground text-sm border rounded-lg bg-muted/30">
+                Esta planilla no tiene columna INSPECTOR. Los pendientes se importarán sin inspector y podrás asignarlos manualmente.
               </div>
-            ))}
+            )}
+            {sheetInspectors.map(({ inspector }) => {
+              const assigned = jefesMap[inspector]?.nombre;
+              const isAssigned = !!assigned;
+              return (
+                <div
+                  key={inspector}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors ${isAssigned ? 'bg-primary/5 border-primary/20' : 'bg-muted/20 border-border'}`}
+                >
+                  {/* Inspector */}
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${isAssigned ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                    {inspector.charAt(0)}
+                  </div>
+                  <div className="w-40 min-w-0 flex-shrink-0">
+                    <p className="text-sm font-medium truncate leading-tight">{inspector}</p>
+                    <p className="text-[10px] text-muted-foreground">Inspector</p>
+                  </div>
+
+                  <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+
+                  {/* Select jefe */}
+                  <div className="flex-1">
+                    <Select
+                      value={jefesMap[inspector]?.nombre || '__none__'}
+                      onValueChange={v => assignJefe(inspector, v)}
+                    >
+                      <SelectTrigger className={`w-full ${isAssigned ? 'border-primary/30 bg-background' : ''}`}>
+                        <SelectValue placeholder="Sin jefe asignado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          <span className="text-muted-foreground">Sin asignar</span>
+                        </SelectItem>
+                        {jefesSitio.length > 0 && (
+                          <>
+                            <SelectSeparator />
+                            <SelectGroup>
+                              <SelectLabel className="text-[10px] text-primary flex items-center gap-1">
+                                <Building2 className="h-3 w-3" /> Comuna {comuna}
+                              </SelectLabel>
+                              {jefesSitio.map(e => (
+                                <SelectItem key={e.id} value={e.full_name}>{e.full_name}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </>
+                        )}
+                        {todosJefes.filter(e => !jefesSitio.find(j => j.id === e.id)).length > 0 && (
+                          <>
+                            <SelectSeparator />
+                            <SelectGroup>
+                              <SelectLabel className="text-[10px] text-muted-foreground">Otras comunas</SelectLabel>
+                              {todosJefes.filter(e => !jefesSitio.find(j => j.id === e.id)).map(e => (
+                                <SelectItem key={e.id} value={e.full_name}>{e.full_name}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Clear button */}
+                  {isAssigned && (
+                    <button
+                      onClick={() => assignJefe(inspector, '__none__')}
+                      className="flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Summary */}
+            {sheetInspectors.length > 0 && (
+              <div className="flex items-center justify-between pt-2 border-t text-xs text-muted-foreground">
+                <span>
+                  {Object.values(jefesMap).filter(v => v.nombre).length} de {sheetInspectors.length} inspectores asignados
+                </span>
+                <span className={Object.values(jefesMap).every(v => v.nombre) ? 'text-emerald-500 font-medium' : ''}>
+                  {Object.values(jefesMap).every(v => v.nombre) ? '✓ Todos asignados' : 'Podés importar sin asignar todos'}
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
