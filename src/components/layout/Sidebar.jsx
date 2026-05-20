@@ -202,12 +202,8 @@ export default function Sidebar() {
             <p
               className="font-semibold text-sm leading-tight tracking-wide"
               style={{
-                background: 'linear-gradient(90deg, #fff 0%, #7df9e8 40%, #5bc8ff 70%, #fff 100%)',
-                backgroundSize: '200% auto',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                animation: 'shimmerText 3.5s linear infinite',
+                color: '#e8f4ff',
+                animation: 'glowPulse 2.8s ease-in-out infinite',
               }}
             >DH1 Software</p>
             <p className="text-sidebar-foreground/40 text-[10px] tracking-widest uppercase">Platform</p>

@@ -86,10 +86,10 @@
     @apply bg-background text-foreground font-inter;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
-  /* Shimmer text animation */
-  @keyframes shimmerText {
-    0%   { background-position: 200% center; }
-    100% { background-position: -200% center; }
+  /* Glow pulse text animation */
+  @keyframes glowPulse {
+    0%, 100% { text-shadow: 0 0 4px rgba(100,200,255,0.4), 0 0 10px rgba(0,200,180,0.25); }
+    50%       { text-shadow: 0 0 10px rgba(100,220,255,0.95), 0 0 22px rgba(0,230,200,0.7), 0 0 40px rgba(80,180,255,0.4); }
   }
 
   /* Custom scrollbar */
