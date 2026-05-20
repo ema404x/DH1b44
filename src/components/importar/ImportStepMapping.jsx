@@ -15,6 +15,7 @@ const ENTITY_OPTIONS = [
   { value: 'Quote', label: 'Presupuestos' },
   { value: 'Invoice', label: 'Facturas' },
   { value: 'LocationData', label: 'Ubicaciones Técnicas' },
+  { value: 'Informe', label: 'Informes' },
   { value: 'skip', label: '— Ignorar esta hoja —' },
 ];
 
@@ -29,6 +30,7 @@ const ENTITY_FIELDS = {
   Quote: ['title', 'client_name', 'description', 'status', 'subtotal', 'tax_rate', 'total', 'valid_until', 'notes'],
   Invoice: ['client_name', 'project_name', 'status', 'subtotal', 'tax_rate', 'total', 'issue_date', 'due_date', 'notes'],
   LocationData: ['ubic_tecnica', 'establecimiento', 'elem_pep', 'm2', 'comuna', 'jefe_sitio', 'inspector', 'estado'],
+  Informe: ['titulo', 'establecimiento', 'direccion', 'jefe_sitio', 'estado', 'secciones', 'informe_generado', 'fecha_inspeccion'],
 };
 
 const KEY_FIELDS = {
@@ -42,6 +44,7 @@ const KEY_FIELDS = {
   Quote: ['title', 'client_name'],
   Invoice: ['client_name', 'issue_date'],
   LocationData: ['ubic_tecnica'],
+  Informe: ['establecimiento', 'titulo'],
 };
 
 function ConfidenceBadge({ confidence }) {
