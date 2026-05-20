@@ -4,17 +4,18 @@ import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, parseISO } from 'date-fns';
+import { ChevronLeft, ChevronRight, Filter, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, parseISO, isToday, isPast } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const ESTADO_COLORS = {
-  pendiente: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-800' },
-  en_preparacion: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-800' },
-  enviado: { bg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-800' },
+  pendiente: { bg: 'bg-amber-50', border: 'border-amber-300', badge: 'bg-amber-200 text-amber-900', icon: Clock },
+  en_preparacion: { bg: 'bg-blue-50', border: 'border-blue-300', badge: 'bg-blue-200 text-blue-900', icon: Clock },
+  enviado: { bg: 'bg-emerald-50', border: 'border-emerald-300', badge: 'bg-emerald-200 text-emerald-900', icon: CheckCircle2 },
+  aprobado: { bg: 'bg-green-50', border: 'border-green-300', badge: 'bg-green-200 text-green-900', icon: CheckCircle2 },
 };
 
-const ESTADOS = ['pendiente', 'en_preparacion', 'enviado'];
+const ESTADOS = ['pendiente', 'en_preparacion', 'enviado', 'aprobado'];
 
 export default function CalendarioInformes() {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 4, 1)); // Mayo 2026
@@ -44,6 +45,17 @@ export default function CalendarioInformes() {
     return map;
   }, [informes, selectedEstados]);
 
+  // Estadísticas del mes
+  const stats = useMemo(() => {
+    const monthInformes = informes.filter(inf => 
+      selectedEstados.includes(inf.estado) && 
+      inf.fecha_limite && 
+      isSameMonth(parseISO(inf.fecha_limite), currentDate)
+    );
+    const vencidos = monthInformes.filter(inf => isPast(parseISO(inf.fecha_limite)) && !isToday(parseISO(inf.fecha_limite)));
+    return { total: monthInformes.length, vencidos: vencidos.length };
+  }, [informes, selectedEstados, currentDate]);
+
   const toggleEstado = (estado) => {
     setSelectedEstados(prev =>
       prev.includes(estado)
@@ -64,16 +76,55 @@ export default function CalendarioInformes() {
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Calendario de Informes</h1>
-        <p className="text-sm text-muted-foreground mt-1">Visualiza los vencimientos de informes por mes</p>
+      <div className="space-y-2">
+        <h1 className="text-4xl font-bold">📅 Calendario de Informes</h1>
+        <p className="text-muted-foreground">Gestiona y visualiza todos los vencimientos de informes</p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-l-4 border-l-amber-500">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Informes este mes</p>
+                <p className="text-3xl font-bold">{stats.total}</p>
+              </div>
+              <Clock className="h-8 w-8 text-amber-500 opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-red-500">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Vencidos</p>
+                <p className="text-3xl font-bold text-red-600">{stats.vencidos}</p>
+              </div>
+              <AlertCircle className="h-8 w-8 text-red-500 opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-emerald-500">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Completados</p>
+                <p className="text-3xl font-bold text-emerald-600">
+                  {informes.filter(i => i.estado === 'enviado' || i.estado === 'aprobado').length}
+                </p>
+              </div>
+              <CheckCircle2 className="h-8 w-8 text-emerald-500 opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filtros */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Filter className="h-4 w-4" />
             <CardTitle className="text-sm">Filtrar por estado</CardTitle>
           </div>
         </CardHeader>
@@ -82,7 +133,7 @@ export default function CalendarioInformes() {
             <Badge
               key={estado}
               variant={selectedEstados.includes(estado) ? 'default' : 'outline'}
-              className="cursor-pointer"
+              className="cursor-pointer px-3 py-1.5"
               onClick={() => toggleEstado(estado)}
             >
               {estado.charAt(0).toUpperCase() + estado.slice(1).replace('_', ' ')}
@@ -126,34 +177,42 @@ export default function CalendarioInformes() {
               const dateStr = format(day, 'yyyy-MM-dd');
               const dayInformes = informesByDate[dateStr] || [];
               const isCurrentMonth = isSameMonth(day, currentDate);
+              const isDayToday = isToday(day);
+              const isVencido = isPast(day) && !isDayToday && dayInformes.length > 0;
 
               return (
                 <div
                   key={idx}
-                  className={`aspect-square p-1 border rounded-lg transition-all ${
-                    isCurrentMonth
+                  className={`aspect-square p-2 border-2 rounded-lg transition-all ${
+                    isDayToday
+                      ? 'bg-primary/10 border-primary shadow-md'
+                      : isVencido
+                      ? 'bg-red-50 border-red-300'
+                      : isCurrentMonth
                       ? 'bg-background border-border hover:border-primary hover:shadow-sm'
                       : 'bg-muted/30 border-transparent'
                   }`}
                 >
-                  <div className="text-xs font-semibold text-muted-foreground mb-0.5">
-                    {format(day, 'd')}
+                  <div className={`text-xs font-bold mb-1 flex items-center justify-between`}>
+                    <span className={isDayToday ? 'text-primary font-black' : isVencido ? 'text-red-600' : 'text-muted-foreground'}>
+                      {format(day, 'd')}
+                    </span>
+                    {dayInformes.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-semibold">
+                        {dayInformes.length}
+                      </span>
+                    )}
                   </div>
-                  <div className="space-y-0.5 min-h-0">
+                  <div className="space-y-0.5 min-h-0 text-[9px]">
                     {dayInformes.slice(0, 2).map((inf, i) => (
                       <div
                         key={i}
-                        className={`text-[10px] px-1.5 py-0.5 rounded truncate ${ESTADO_COLORS[inf.estado]?.badge || 'bg-gray-100'}`}
+                        className={`px-1 py-0.5 rounded truncate font-medium ${ESTADO_COLORS[inf.estado]?.badge || 'bg-gray-200 text-gray-700'}`}
                         title={inf.titulo}
                       >
-                        {inf.titulo.split('(')[0].substring(0, 12)}
+                        {inf.titulo.substring(0, 10)}
                       </div>
                     ))}
-                    {dayInformes.length > 2 && (
-                      <div className="text-[10px] text-muted-foreground px-1">
-                        +{dayInformes.length - 2} más
-                      </div>
-                    )}
                   </div>
                 </div>
               );
@@ -162,33 +221,72 @@ export default function CalendarioInformes() {
         </CardContent>
       </Card>
 
-      {/* Resumen de informes vencidos/próximos */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Próximos vencimientos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {informes
-              .filter(inf => selectedEstados.includes(inf.estado) && inf.fecha_limite)
-              .sort((a, b) => new Date(a.fecha_limite) - new Date(b.fecha_limite))
-              .slice(0, 10)
-              .map(inf => (
-                <div key={inf.id} className="flex items-center justify-between p-2 border rounded-lg hover:bg-muted/50">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{inf.titulo}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Vence: {format(parseISO(inf.fecha_limite), 'd MMM yyyy', { locale: es })}
-                    </p>
+      {/* Próximos vencimientos y vencidos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-red-500" />
+              Vencidos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {informes
+                .filter(inf => selectedEstados.includes(inf.estado) && inf.fecha_limite && isPast(parseISO(inf.fecha_limite)) && !isToday(parseISO(inf.fecha_limite)))
+                .sort((a, b) => new Date(b.fecha_limite) - new Date(a.fecha_limite))
+                .map(inf => (
+                  <div key={inf.id} className="flex items-center justify-between p-2.5 border border-red-200 rounded-lg bg-red-50/50">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-red-900">{inf.titulo}</p>
+                      <p className="text-xs text-red-700">
+                        Venció: {format(parseISO(inf.fecha_limite), 'd MMM', { locale: es })}
+                      </p>
+                    </div>
+                    <AlertCircle className="h-4 w-4 text-red-600 ml-2" />
                   </div>
-                  <Badge className={ESTADO_COLORS[inf.estado]?.badge || ''}>
-                    {inf.estado}
-                  </Badge>
-                </div>
-              ))}
-          </div>
-        </CardContent>
-      </Card>
+                ))}
+              {informes.filter(inf => selectedEstados.includes(inf.estado) && inf.fecha_limite && isPast(parseISO(inf.fecha_limite)) && !isToday(parseISO(inf.fecha_limite))).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">✓ Sin informes vencidos</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Clock className="h-4 w-4 text-amber-500" />
+              Próximos 10 días
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {informes
+                .filter(inf => selectedEstados.includes(inf.estado) && inf.fecha_limite)
+                .sort((a, b) => new Date(a.fecha_limite) - new Date(b.fecha_limite))
+                .slice(0, 10)
+                .map(inf => {
+                  const daysLeft = Math.ceil((new Date(inf.fecha_limite) - new Date()) / (1000 * 60 * 60 * 24));
+                  const isUrgent = daysLeft <= 3;
+                  return (
+                    <div key={inf.id} className={`flex items-center justify-between p-2.5 border rounded-lg ${isUrgent ? 'bg-red-50 border-red-200' : 'bg-background border-border'}`}>
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${isUrgent ? 'text-red-900' : ''}`}>{inf.titulo}</p>
+                        <p className={`text-xs ${isUrgent ? 'text-red-700' : 'text-muted-foreground'}`}>
+                          {daysLeft > 0 ? `En ${daysLeft} día${daysLeft > 1 ? 's' : ''}` : 'Hoy'} • {format(parseISO(inf.fecha_limite), 'd MMM', { locale: es })}
+                        </p>
+                      </div>
+                      <Badge variant={isUrgent ? 'default' : 'secondary'} className="ml-2">
+                        {daysLeft}d
+                      </Badge>
+                    </div>
+                  );
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
