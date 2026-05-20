@@ -14,6 +14,15 @@ import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// Convertir número serial de Excel a Date
+const excelSerialToDate = (serial) => {
+  if (!serial || typeof serial !== 'number') return null;
+  // Excel serial date starts from Jan 1, 1900
+  const excelEpoch = new Date(1900, 0, 1);
+  const date = new Date(excelEpoch.getTime() + (serial - 1) * 86400000);
+  return date;
+};
+
 export default function InformePlaneacion() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -40,7 +49,8 @@ export default function InformePlaneacion() {
   const filteredInformes = informes.filter(inf => {
     const searchMatch = inf.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                        inf.proveedor_2025?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       inf.proveedor_contratado_2026?.toLowerCase().includes(searchTerm.toLowerCase());
+                       inf.proveedor_contratado_2026?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       inf.contacto_2025?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const statusMatch = filterStatus === 'all' || inf.estado_contacto === filterStatus;
     const mesMatch = filterMes === 'all' || inf.mes === filterMes;
@@ -147,7 +157,7 @@ export default function InformePlaneacion() {
               <motion.div key={inf.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }}>
                 <Card className="border-0 bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-sm hover:from-slate-800/60 hover:to-slate-900/60 transition-all">
                   <CardContent className="pt-4 pb-4">
-                    <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-start">
+                    <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-start">
                       {/* Mes */}
                       <div>
                         <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Mes</p>
@@ -164,6 +174,23 @@ export default function InformePlaneacion() {
                       <div>
                         <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Proveedor 2025</p>
                         <p className="text-xs text-slate-300 line-clamp-2">{inf.proveedor_2025 || '—'}</p>
+                      </div>
+
+                      {/* Contacto 2025 */}
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Contacto 2025</p>
+                        <p className="text-xs text-slate-300 line-clamp-2">{inf.contacto_2025 || '—'}</p>
+                      </div>
+
+                      {/* Fecha de Envío a Contratar */}
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Fecha Envío</p>
+                        <p className="text-xs text-slate-300">
+                          {inf.fecha_envio_contratar ? 
+                            format(excelSerialToDate(parseInt(inf.fecha_envio_contratar)), 'dd/MM/yyyy', { locale: es })
+                            : '—'
+                          }
+                        </p>
                       </div>
 
                       {/* Proveedor 2026 */}
