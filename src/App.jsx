@@ -45,6 +45,7 @@ const InspeccionColegio = lazy(() => import('@/pages/InspeccionColegio'));
 const AprobacionCertificados = lazy(() => import('@/pages/AprobacionCertificados'));
 const ControlRiesgo = lazy(() => import('@/pages/ControlRiesgo'));
 const CertificacionObras = lazy(() => import('@/pages/CertificacionObras'));
+import ProtectedPage from '@/components/shared/ProtectedPage';
 
 // Spinner de carga mientras se descarga la página lazy
 const PageLoader = () => (
@@ -99,36 +100,36 @@ const AuthenticatedApp = () => {
     <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route element={<AppLayout />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/proyectos" element={<Projects />} />
-        <Route path="/ordenes" element={<WorkOrders />} />
-        <Route path="/clientes" element={<Clients />} />
-        <Route path="/empleados" element={<Employees />} />
-        <Route path="/inventario" element={<Inventory />} />
-        <Route path="/presupuestos" element={<Quotes />} />
-        <Route path="/presupuestos-obra" element={<Presupuestos />} />
-        <Route path="/facturacion" element={<Invoices />} />
-        <Route path="/finanzas" element={<Finanzas />} />
-        <Route path="/informes" element={<Informes />} />
-        <Route path="/activos" element={<Assets />} />
-        <Route path="/calendario" element={<Calendario />} />
-        <Route path="/reportes" element={<Reportes />} />
-        <Route path="/automatizaciones" element={<Automatizaciones />} />
-        <Route path="/certificados" element={<Certificados />} />
-        <Route path="/auditoria" element={<Auditoria />} />
-        <Route path="/permisos" element={<Permisos />} />
-        <Route path="/seguridad" element={<Seguridad />} />
-        <Route path="/mapa" element={<Mapa />} />
+        <Route path="/" element={<ProtectedPage moduleKey="Dashboard"><Dashboard /></ProtectedPage>} />
+        <Route path="/proyectos" element={<ProtectedPage moduleKey="Project"><Projects /></ProtectedPage>} />
+        <Route path="/ordenes" element={<ProtectedPage moduleKey="WorkOrder"><WorkOrders /></ProtectedPage>} />
+        <Route path="/clientes" element={<ProtectedPage moduleKey="Client"><Clients /></ProtectedPage>} />
+        <Route path="/empleados" element={<ProtectedPage moduleKey="Employee"><Employees /></ProtectedPage>} />
+        <Route path="/inventario" element={<ProtectedPage moduleKey="Inventory"><Inventory /></ProtectedPage>} />
+        <Route path="/presupuestos" element={<ProtectedPage moduleKey="Quote"><Quotes /></ProtectedPage>} />
+        <Route path="/presupuestos-obra" element={<ProtectedPage moduleKey="PresupuestosObra"><Presupuestos /></ProtectedPage>} />
+        <Route path="/facturacion" element={<ProtectedPage moduleKey="Invoice"><Invoices /></ProtectedPage>} />
+        <Route path="/finanzas" element={<ProtectedPage moduleKey="Finanzas"><Finanzas /></ProtectedPage>} />
+        <Route path="/informes" element={<ProtectedPage moduleKey="Informes"><Informes /></ProtectedPage>} />
+        <Route path="/activos" element={<ProtectedPage moduleKey="Asset"><Assets /></ProtectedPage>} />
+        <Route path="/calendario" element={<ProtectedPage moduleKey="Calendario"><Calendario /></ProtectedPage>} />
+        <Route path="/reportes" element={<ProtectedPage moduleKey="Reportes"><Reportes /></ProtectedPage>} />
+        <Route path="/automatizaciones" element={<ProtectedPage moduleKey="Automatizaciones"><Automatizaciones /></ProtectedPage>} />
+        <Route path="/certificados" element={<ProtectedPage moduleKey="Certificado"><Certificados /></ProtectedPage>} />
+        <Route path="/auditoria" element={<ProtectedPage moduleKey="AuditLog"><Auditoria /></ProtectedPage>} />
+        <Route path="/permisos" element={<ProtectedPage moduleKey="Permisos"><Permisos /></ProtectedPage>} />
+        <Route path="/seguridad" element={<ProtectedPage moduleKey="Seguridad"><Seguridad /></ProtectedPage>} />
+        <Route path="/mapa" element={<ProtectedPage moduleKey="Mapa"><Mapa /></ProtectedPage>} />
         <Route path="/tutorial" element={<Tutorial />} />
-        <Route path="/importar" element={<ImportarDatos />} />
-        <Route path="/alertas" element={<ConfigAlertas />} />
-        <Route path="/informacion-general" element={<InformacionGeneral />} />
-        <Route path="/emergencias" element={<Emergencias />} />
-        <Route path="/mapa-jefes" element={<MapaJefes />} />
-        <Route path="/inspeccion-colegio" element={<InspeccionColegio />} />
-        <Route path="/aprobacion-certificados" element={<AprobacionCertificados />} />
-        <Route path="/control-riesgo" element={<ControlRiesgo />} />
-        <Route path="/certificacion-obras" element={<CertificacionObras />} />
+        <Route path="/importar" element={<ProtectedPage moduleKey="ImportarDatos"><ImportarDatos /></ProtectedPage>} />
+        <Route path="/alertas" element={<ProtectedPage moduleKey="Alertas"><ConfigAlertas /></ProtectedPage>} />
+        <Route path="/informacion-general" element={<ProtectedPage moduleKey="InformacionGeneral"><InformacionGeneral /></ProtectedPage>} />
+        <Route path="/emergencias" element={<ProtectedPage moduleKey="Emergencias"><Emergencias /></ProtectedPage>} />
+        <Route path="/mapa-jefes" element={<ProtectedPage moduleKey="MapaJefes"><MapaJefes /></ProtectedPage>} />
+        <Route path="/inspeccion-colegio" element={<ProtectedPage moduleKey="InspeccionColegio"><InspeccionColegio /></ProtectedPage>} />
+        <Route path="/aprobacion-certificados" element={<ProtectedPage moduleKey="AprobacionCertificados"><AprobacionCertificados /></ProtectedPage>} />
+        <Route path="/control-riesgo" element={<ProtectedPage moduleKey="ControlRiesgo"><ControlRiesgo /></ProtectedPage>} />
+        <Route path="/certificacion-obras" element={<ProtectedPage moduleKey="CertificacionObras"><CertificacionObras /></ProtectedPage>} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
