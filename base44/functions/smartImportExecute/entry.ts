@@ -92,12 +92,19 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    // Detectar si headers son genéricos (col_0, col_1, etc.)
-    const firstRowHeaders = sheetRows[0].map(h => String(h || '').trim());
-    const hasGenericHeaders = firstRowHeaders.length > 0 && /^col_\d+$/.test(firstRowHeaders[0]);
+    // Find header row by skipping empty rows at the beginning
+    let headerRowIdx = 0;
+    for (let i = 0; i < Math.min(sheetRows.length, 5); i++) {
+      const row = sheetRows[i] || [];
+      const nonEmptyCells = row.filter(cell => cell && String(cell).trim());
+      if (nonEmptyCells.length > 0) {
+        headerRowIdx = i;
+        break;
+      }
+    }
 
-    const headers = hasGenericHeaders ? firstRowHeaders : sheetRows[0].map(h => String(h || '').trim());
-    const dataStartRow = hasGenericHeaders ? 1 : 1;
+    const headers = sheetRows[headerRowIdx].map(h => String(h || '').trim());
+    const dataStartRow = headerRowIdx + 1;
     const dataRows = sheetRows.slice(dataStartRow);
 
     const colIndex = {};
