@@ -14,26 +14,46 @@ export default function KpisJefeSitio() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Reutiliza la misma caché que el Dashboard — sin fetch duplicado
   const { data: orders = [] } = useQuery({
     queryKey: ['workorders'],
     queryFn: () => base44.entities.WorkOrder.list('-updated_date', 300),
     staleTime: 1000 * 60 * 5,
   });
 
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => base44.entities.Employee.list(),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Solo los empleados que son jefes de sitio
+  const jefesSitio = useMemo(() => {
+    const set = new Set(
+      employees
+        .filter(e => e.role && e.role.toLowerCase().includes('jefe'))
+        .map(e => e.full_name)
+    );
+    return set;
+  }, [employees]);
+
   const kpis = useMemo(() => {
+    if (jefesSitio.size === 0) return [];
     const jefesMap = {};
 
     pendientes.forEach(p => {
-      if (!p.jefe_sitio) return;
+      if (!p.jefe_sitio || !jefesSitio.has(p.jefe_sitio)) return;
       if (!jefesMap[p.jefe_sitio]) jefesMap[p.jefe_sitio] = { pendientes: [], orders: [] };
       jefesMap[p.jefe_sitio].pendientes.push(p);
     });
 
+    // Inicializar jefes sin pendientes también
+    jefesSitio.forEach(nombre => {
+      if (!jefesMap[nombre]) jefesMap[nombre] = { pendientes: [], orders: [] };
+    });
+
     orders.forEach(o => {
       const nombre = o.assigned_name;
-      if (!nombre) return;
-      if (!jefesMap[nombre]) jefesMap[nombre] = { pendientes: [], orders: [] };
+      if (!nombre || !jefesSitio.has(nombre)) return;
       jefesMap[nombre].orders.push(o);
     });
 
@@ -61,8 +81,8 @@ export default function KpisJefeSitio() {
       const score = Math.round((eficienciaPend * 0.5) + (eficienciaOTs * 0.3) + (vencidos === 0 ? 20 : Math.max(0, 20 - vencidos * 4)));
 
       return { nombre, totalPend, vencidos, resueltos, eficienciaPend, otsTotales, otsCompletadas, eficienciaOTs, promedioResolucion, score };
-    }).sort((a, b) => b.score - a.score);
-  }, [pendientes, orders]);
+    }).sort((a, b) => b.score - a.score).slice(0, 10);
+  }, [pendientes, orders, jefesSitio]);
 
   if (kpis.length === 0) return null;
 
@@ -88,7 +108,7 @@ export default function KpisJefeSitio() {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {kpis.slice(0, 8).map((kpi, i) => (
+          {kpis.map((kpi, i) => (
             <div key={kpi.nombre} className={`rounded-xl border p-3 ${getScoreBg(kpi.score)}`}>
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2">

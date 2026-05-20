@@ -93,7 +93,12 @@ export default function Reportes() {
 
   // Get unique filter options
   const comunasUnicas = ['8A', '8B', '10A'];
-  const jefesUnicos = [...new Set(locations.map(l => l.jefe_sitio).filter(Boolean))];
+  // Solo empleados cuyo rol incluye "jefe"
+  const jefesUnicos = employees
+    .filter(e => e.role && e.role.toLowerCase().includes('jefe'))
+    .map(e => e.full_name)
+    .filter(Boolean)
+    .sort();
   const tecnicosUnicos = [...new Set(employees.map(e => e.full_name).filter(Boolean))].sort();
 
   // Build location → jefe/comuna lookup for enriching orders
@@ -113,9 +118,9 @@ export default function Reportes() {
       const inProject = projectFilter === 'all' || o.project_name === projectFilter;
       const matchTecnico = tecnicoFilter === 'all' || o.assigned_name === tecnicoFilter;
 
-      // Jefe: buscamos en la ubicación de la orden o en el nombre asignado
+      // Jefe: buscamos en la ubicación de la orden
       const loc = locationLookup[o.location_qr_name] || locationLookup[o.location] || {};
-      const matchJefe = jefeFilter === 'all' || loc.jefe_sitio === jefeFilter || o.assigned_name === jefeFilter;
+      const matchJefe = jefeFilter === 'all' || loc.jefe_sitio === jefeFilter;
       const matchComuna = comunaFilter === 'all' || loc.comuna === comunaFilter;
 
       return inRange && inProject && matchComuna && matchJefe && matchTecnico;
