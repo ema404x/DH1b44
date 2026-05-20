@@ -1,24 +1,25 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const ENTITY_DEFAULTS = {
-  Client: { status: 'activo', type: 'empresa' },
-  Employee: { status: 'activo', role: 'operario' },
-  Material: { category: 'construccion', unit: 'unidad', stock: 0, min_stock: 0, unit_cost: 0 },
-  Project: { status: 'pendiente', priority: 'media', type: 'mantenimiento_correctivo', progress: 0 },
-  WorkOrder: { status: 'pendiente', priority: 'media', type: 'mantenimiento_correctivo' },
-  Asset: { status: 'operativo', type: 'equipo_mecanico', criticality: 'media' },
-  PrecarioMinisterio: { activo: true, pu_mat: 0, pu_mo: 0, coef_pase: 1.6504, coef_oferta: 1.38 },
-  Quote: { status: 'borrador', tax_rate: 21, subtotal: 0, total: 0 },
-  Invoice: { status: 'pendiente', tax_rate: 21, subtotal: 0, total: 0 },
-  LocationData: { estado: 'activo', m2: 0 },
-};
+   InformePlaneacion: { estado_contacto: 'PENDIENTE' },
+   Client: { status: 'activo', type: 'empresa' },
+   Employee: { status: 'activo', role: 'operario' },
+   Material: { category: 'construccion', unit: 'unidad', stock: 0, min_stock: 0, unit_cost: 0 },
+   Project: { status: 'pendiente', priority: 'media', type: 'mantenimiento_correctivo', progress: 0 },
+   WorkOrder: { status: 'pendiente', priority: 'media', type: 'mantenimiento_correctivo' },
+   Asset: { status: 'operativo', type: 'equipo_mecanico', criticality: 'media' },
+   PrecarioMinisterio: { activo: true, pu_mat: 0, pu_mo: 0, coef_pase: 1.6504, coef_oferta: 1.38 },
+   Quote: { status: 'borrador', tax_rate: 21, subtotal: 0, total: 0 },
+   Invoice: { status: 'pendiente', tax_rate: 21, subtotal: 0, total: 0 },
+   LocationData: { estado: 'activo', m2: 0 },
+ };
 
-const ENTITY_LABELS = {
-  Client: 'Clientes', Employee: 'Empleados', Material: 'Materiales',
-  Project: 'Proyectos', WorkOrder: 'Órdenes de Trabajo', Asset: 'Activos',
-  PrecarioMinisterio: 'Preciario Ministerial', Quote: 'Presupuestos', Invoice: 'Facturas',
-  LocationData: 'Ubicaciones Técnicas',
-};
+ const ENTITY_LABELS = {
+   InformePlaneacion: 'Informes de Planificación', Client: 'Clientes', Employee: 'Empleados', Material: 'Materiales',
+   Project: 'Proyectos', WorkOrder: 'Órdenes de Trabajo', Asset: 'Activos',
+   PrecarioMinisterio: 'Preciario Ministerial', Quote: 'Presupuestos', Invoice: 'Facturas',
+   LocationData: 'Ubicaciones Técnicas',
+ };
 
 function parseValue(value, field) {
   if (value === null || value === undefined || value === '') return undefined;
@@ -91,8 +92,13 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    const headers = sheetRows[0].map(h => String(h || '').trim());
-    const dataRows = sheetRows.slice(1);
+    // Detectar si headers son genéricos (col_0, col_1, etc.)
+    const firstRowHeaders = sheetRows[0].map(h => String(h || '').trim());
+    const hasGenericHeaders = firstRowHeaders.length > 0 && /^col_\d+$/.test(firstRowHeaders[0]);
+
+    const headers = hasGenericHeaders ? firstRowHeaders : sheetRows[0].map(h => String(h || '').trim());
+    const dataStartRow = hasGenericHeaders ? 1 : 1;
+    const dataRows = sheetRows.slice(dataStartRow);
 
     const colIndex = {};
     headers.forEach((h, i) => { colIndex[h] = i; });

@@ -1,0 +1,60 @@
+{
+  "name": "InformePlaneacion",
+  "type": "object",
+  "properties": {
+    "mes": {
+      "type": "string",
+      "description": "Mes de la planificaci\u00f3n"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripci\u00f3n de la tarea/trabajo"
+    },
+    "proveedor_2025": {
+      "type": "string",
+      "description": "Proveedor(es) 2025"
+    },
+    "contacto_2025": {
+      "type": "string",
+      "description": "Contacto del proveedor 2025"
+    },
+    "proveedor_invitado_2026": {
+      "type": "string",
+      "description": "Proveedor invitado a cotizar 2026"
+    },
+    "estado_contacto": {
+      "type": "string",
+      "enum": [
+        "CONTRATADO",
+        "SE SOLICITO INFORME",
+        "se sinvito a cotizar",
+        "EN PROCESO",
+        "PENDIENTE",
+        "CANCELADO"
+      ],
+      "default": "PENDIENTE",
+      "description": "Estado de la solicitud de contacto"
+    },
+    "proveedor_contratado_2026": {
+      "type": "string",
+      "description": "Proveedor finalmente contratado 2026"
+    },
+    "fecha_envio_contratar": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha de env\u00edo a contratar"
+    },
+    "estado_actual": {
+      "type": "string",
+      "description": "Estado actual de la ejecuci\u00f3n/presentaci\u00f3n"
+    },
+    "notas": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "descripcion",
+    "estado_contacto"
+  ]
+}

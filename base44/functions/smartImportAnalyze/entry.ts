@@ -2,11 +2,18 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // Full schemas with field types for richer LLM context
 const ENTITY_SCHEMAS = {
-  Client: {
-    fields: ['name', 'type', 'cuit', 'contact_name', 'email', 'phone', 'address', 'city', 'status', 'notes'],
-    key_fields: ['cuit', 'name', 'email'],
-    description: 'Empresas o personas que son clientes del negocio',
-    aliases: ['cliente', 'clientes', 'empresa', 'empresas', 'proveedor', 'proveedores', 'client', 'customers'],
+   InformePlaneacion: {
+     fields: ['mes', 'descripcion', 'proveedor_2025', 'contacto_2025', 'proveedor_invitado_2026', 'estado_contacto', 'proveedor_contratado_2026', 'fecha_envio_contratar', 'estado_actual', 'notas'],
+     key_fields: ['descripcion'],
+     description: 'Informes de planificación de contrataciones y proveedores',
+     aliases: ['planificacion', 'informes', 'contratacion', 'proveedor', 'planning', 'planning informes'],
+     patterns: ['MES', 'DESCRIPCION', 'PROVEEDOR', 'CONTACTO', 'ESTADO']
+   },
+   Client: {
+     fields: ['name', 'type', 'cuit', 'contact_name', 'email', 'phone', 'address', 'city', 'status', 'notes'],
+     key_fields: ['cuit', 'name', 'email'],
+     description: 'Empresas o personas que son clientes del negocio',
+     aliases: ['cliente', 'clientes', 'empresa', 'empresas', 'proveedor', 'proveedores', 'client', 'customers'],
     key_patterns: {
       cuit: ['cuit', 'cuil', 'rut', 'nif', 'tax_id', 'numero fiscal', 'identificacion fiscal'],
       name: ['razon social', 'razon_social', 'nombre empresa', 'nombre_empresa', 'company', 'company name', 'nombre'],
@@ -217,12 +224,13 @@ function preScoreSheet(sheetName, headers) {
 }
 
 Deno.serve(async (req) => {
-  const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+   try {
+     const base44 = createClientFromRequest(req);
+     const user = await base44.auth.me();
+     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  let raw_data = null;
-  const body = await req.json();
+     let raw_data = null;
+     const body = await req.json();
   
   // Si viene raw_data desde frontend (caso manual), usar eso
   if (body.raw_data && Object.keys(body.raw_data).length > 0) {
@@ -251,32 +259,50 @@ Deno.serve(async (req) => {
   }
 
   // Build enriched sheet info with pre-scores
-  const sheetsInfo = Object.entries(raw_data).map(([sheetName, rows]) => {
-    const headers = (rows[0] || []).map(h => String(h || '').trim()).filter(Boolean);
-    const sampleRows = rows.slice(1, 4);
-    const sample = {};
-    headers.forEach((h, i) => {
-      sample[h] = sampleRows.map(r => r[i]).filter(v => v !== '' && v !== null && v !== undefined).join(', ');
-    });
-    
-    const preScores = preScoreSheet(sheetName, headers);
-    const topEntity = Object.entries(preScores).sort(([, a], [, b]) => b - a)[0];
-    
-    // Detectar modelo de planilla (8A, 8B, 10A)
-    const planillaModel = detectPlanillaModel(sheetName, headers);
-    const modelInfo = planillaModel ? `[${planillaModel.model} - ${planillaModel.pattern}]` : null;
-    
-    return {
-      sheetName,
-      headers,
-      sample,
-      rowCount: Math.max(0, rows.length - 1),
-      pre_suggested_entity: topEntity[1] > 0 ? topEntity[0] : null,
-      pre_score: topEntity[1],
-      planilla_model: planillaModel?.model || null,
-      planilla_pattern: planillaModel?.pattern || null,
-    };
-  });
+   const sheetsInfo = Object.entries(raw_data).map(([sheetName, rows]) => {
+     // Los headers están siempre en la fila 0
+     const firstRowRaw = rows[0] || [];
+     const headers = firstRowRaw.map(h => String(h || '').trim());
+     const validHeaders = headers.filter(h => h.length > 0);
+     const actualHeaders = validHeaders.length > 0 ? validHeaders : headers;
+
+     if (!actualHeaders || actualHeaders.length === 0) {
+       return {
+         sheetName,
+         headers: [],
+         sample: {},
+         rowCount: Math.max(0, rows.length - 1),
+         pre_suggested_entity: null,
+         pre_score: 0,
+         planilla_model: null,
+         planilla_pattern: null,
+       };
+     }
+
+     const sampleRows = rows.slice(1, 4);
+     const sample = {};
+     actualHeaders.forEach((h, i) => {
+       if (h) sample[h] = sampleRows.map(r => r[i]).filter(v => v !== '' && v !== null && v !== undefined).join(', ');
+     });
+
+     const preScores = preScoreSheet(sheetName, actualHeaders) || {};
+     const topEntity = Object.entries(preScores).length > 0 ? Object.entries(preScores).sort(([, a], [, b]) => b - a)[0] : null;
+
+     // Detectar modelo de planilla (8A, 8B, 10A)
+     const planillaModel = detectPlanillaModel(sheetName, actualHeaders);
+     const modelInfo = planillaModel ? `[${planillaModel.model} - ${planillaModel.pattern}]` : null;
+
+     return {
+       sheetName,
+       headers: actualHeaders,
+       sample,
+       rowCount: Math.max(0, rows.length - 1),
+       pre_suggested_entity: topEntity && topEntity[1] > 0 ? topEntity[0] : null,
+       pre_score: topEntity ? topEntity[1] : 0,
+       planilla_model: planillaModel?.model || null,
+       planilla_pattern: planillaModel?.pattern || null,
+     };
+   });
 
   // Build a concise schema summary with patterns for the LLM
   const schemaSummary = Object.entries(ENTITY_SCHEMAS).map(([entity, schema]) => ({
@@ -431,5 +457,9 @@ Responde con JSON. Para cada hoja:
     });
   }
 
-  return Response.json(result);
-});
+  return Response.json({ sheets: result?.sheets || [] });
+   } catch (err) {
+     console.error('Error en smartImportAnalyze:', err);
+     return Response.json({ error: String(err), sheets: [] }, { status: 500 });
+   }
+ });

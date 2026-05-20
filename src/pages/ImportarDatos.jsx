@@ -20,23 +20,24 @@ import ImportadorJefesSitio from '@/components/informacion-general/ImportadorJef
 import AliceImportAssistant from '@/components/importar/AliceImportAssistant';
 
 const MODULES = [
-  { key: 'Client',              label: 'Proveedores / Clientes', icon: Users,        color: 'from-blue-500',   hint: 'CUIT, razón social, contacto...' },
-  { key: 'Employee',            label: 'Empleados',              icon: HardHat,       color: 'from-emerald-500', hint: 'DNI, nombre, cargo, especialidad...' },
-  { key: 'Material',            label: 'Materiales / Inventario',icon: Package,       color: 'from-amber-500',  hint: 'Código, descripción, stock, precio...' },
-  { key: 'Project',             label: 'Proyectos / Obras',      icon: Briefcase,     color: 'from-violet-500', hint: 'Nombre, código, cliente, fechas...' },
-  { key: 'WorkOrder',           label: 'Órdenes de Trabajo',     icon: ClipboardList, color: 'from-orange-500', hint: 'N° OT, tareas, ubicación, estado...' },
-  { key: 'Asset',               label: 'Activos / Equipos',      icon: TrendingUp,    color: 'from-cyan-500',   hint: 'Nombre, serie, marca, modelo...' },
-  { key: 'LocationData',        label: 'Ubicaciones Técnicas',   icon: MapPin,        color: 'from-pink-500',   hint: 'Ubic. técnica, establecimiento, m2...' },
-  { key: 'PrecarioMinisterio',  label: 'Preciario Ministerial',  icon: DollarSign,    color: 'from-lime-500',   hint: 'Código, descripción, PU mat, PU mo...' },
-  { key: 'Quote',               label: 'Presupuestos',           icon: FileText,      color: 'from-teal-500',   hint: 'Título, cliente, subtotal, total...' },
-  { key: 'Invoice',             label: 'Facturas',               icon: DollarSign,    color: 'from-red-500',    hint: 'Cliente, importe, fecha, estado...' },
-  { key: 'Informe',             label: 'Informes',               icon: ScrollText,    color: 'from-indigo-500', hint: 'Título, establecimiento, jefe de sitio...' },
-  { key: 'Emergencia',          label: 'Emergencias',            icon: AlertTriangle, color: 'from-rose-500',   hint: 'Tipo, establecimiento, estado, descripción...' },
-  { key: 'RiesgoControl',       label: 'Control de Riesgos',     icon: ShieldAlert,   color: 'from-yellow-500', hint: 'Evento, probabilidad, consecuencia, sector...' },
-  { key: 'ObraCertificacion',   label: 'Certificación de Obras', icon: Star,          color: 'from-orange-400', hint: 'Título SAP, MTOM, MEIN, monto, avance...' },
-  { key: 'Direccion',           label: 'Direcciones',            icon: Building2,     color: 'from-slate-500',  hint: 'Dirección, comuna, jefe de sitio, m2...' },
-  { key: null,                  label: 'Detección Automática',   icon: Brain,         color: 'from-primary',    hint: 'La IA detecta automáticamente el módulo' },
-];
+   { key: 'InformePlaneacion',   label: 'Informes de Planificación', icon: ScrollText, color: 'from-cyan-500', hint: 'Mes, descripción, proveedor, estado...' },
+   { key: 'Client',              label: 'Proveedores / Clientes', icon: Users,        color: 'from-blue-500',   hint: 'CUIT, razón social, contacto...' },
+   { key: 'Employee',            label: 'Empleados',              icon: HardHat,       color: 'from-emerald-500', hint: 'DNI, nombre, cargo, especialidad...' },
+   { key: 'Material',            label: 'Materiales / Inventario',icon: Package,       color: 'from-amber-500',  hint: 'Código, descripción, stock, precio...' },
+   { key: 'Project',             label: 'Proyectos / Obras',      icon: Briefcase,     color: 'from-violet-500', hint: 'Nombre, código, cliente, fechas...' },
+   { key: 'WorkOrder',           label: 'Órdenes de Trabajo',     icon: ClipboardList, color: 'from-orange-500', hint: 'N° OT, tareas, ubicación, estado...' },
+   { key: 'Asset',               label: 'Activos / Equipos',      icon: TrendingUp,    color: 'from-cyan-500',   hint: 'Nombre, serie, marca, modelo...' },
+   { key: 'LocationData',        label: 'Ubicaciones Técnicas',   icon: MapPin,        color: 'from-pink-500',   hint: 'Ubic. técnica, establecimiento, m2...' },
+   { key: 'PrecarioMinisterio',  label: 'Preciario Ministerial',  icon: DollarSign,    color: 'from-lime-500',   hint: 'Código, descripción, PU mat, PU mo...' },
+   { key: 'Quote',               label: 'Presupuestos',           icon: FileText,      color: 'from-teal-500',   hint: 'Título, cliente, subtotal, total...' },
+   { key: 'Invoice',             label: 'Facturas',               icon: DollarSign,    color: 'from-red-500',    hint: 'Cliente, importe, fecha, estado...' },
+   { key: 'Informe',             label: 'Informes',               icon: ScrollText,    color: 'from-indigo-500', hint: 'Título, establecimiento, jefe de sitio...' },
+   { key: 'Emergencia',          label: 'Emergencias',            icon: AlertTriangle, color: 'from-rose-500',   hint: 'Tipo, establecimiento, estado, descripción...' },
+   { key: 'RiesgoControl',       label: 'Control de Riesgos',     icon: ShieldAlert,   color: 'from-yellow-500', hint: 'Evento, probabilidad, consecuencia, sector...' },
+   { key: 'ObraCertificacion',   label: 'Certificación de Obras', icon: Star,          color: 'from-orange-400', hint: 'Título SAP, MTOM, MEIN, monto, avance...' },
+   { key: 'Direccion',           label: 'Direcciones',            icon: Building2,     color: 'from-slate-500',  hint: 'Dirección, comuna, jefe de sitio, m2...' },
+   { key: null,                  label: 'Detección Automática',   icon: Brain,         color: 'from-primary',    hint: 'La IA detecta automáticamente el módulo' },
+ ];
 
 const STEPS = [
   { id: 0, name: 'Módulo', icon: Sparkles, description: 'Elegí el módulo destino' },
