@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, User, X, Plus } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2, Loader2, User, X, Plus, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -69,6 +69,10 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
         const tareas = r['TAREAS A REALIZAR'] || r['TAREAS A REALIZAR '];
         if (!orden || !tareas || String(tareas).trim() === '') continue;
         count++;
+        const inspector = r['INSPECTOR'] || r['INSPECTOR '];
+        if (inspector && String(inspector).trim() !== '' && inspector !== '#N/A') {
+          inspSet.add(String(inspector).trim().toUpperCase());
+        }
       }
     } else {
       // formato_8a
@@ -131,11 +135,26 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
   }
 
   function assignJefe(inspector, empName) {
+    if (!empName || empName === '__none__') {
+      setJefesMap(prev => ({ ...prev, [inspector]: { nombre: '', email: '' } }));
+      return;
+    }
     const emp = employees.find(e => e.full_name === empName);
     setJefesMap(prev => ({
       ...prev,
       [inspector]: { nombre: empName, email: emp?.email || '' },
     }));
+  }
+
+  // Assign all inspectors at once to a single jefe
+  function assignJefeToAll(empName) {
+    if (!empName || empName === '__none__') return;
+    const emp = employees.find(e => e.full_name === empName);
+    const newMap = {};
+    sheetInspectors.forEach(({ inspector }) => {
+      newMap[inspector] = { nombre: empName, email: emp?.email || '' };
+    });
+    setJefesMap(prev => ({ ...prev, ...newMap }));
   }
 
   async function handleImport() {
@@ -254,27 +273,47 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
               Asignar Jefe de Sitio por Inspector
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Cada inspector tiene asignado un jefe de sitio según la comuna. Podés dejarlo vacío para asignar luego.
+              Cada inspector puede tener un jefe de sitio. Un jefe puede tener múltiples inspectores asignados.
             </p>
+            {sheetInspectors.length > 1 && (
+              <div className="flex items-center gap-2 mt-2 pt-2 border-t">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Asignar todos a:</span>
+                <Select onValueChange={assignJefeToAll}>
+                  <SelectTrigger className="flex-1 h-8 text-xs">
+                    <SelectValue placeholder="Seleccionar jefe para todos..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jefesSitio.map(e => (
+                      <SelectItem key={e.id} value={e.full_name}>{e.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2">
+            {sheetInspectors.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Esta planilla no tiene columna INSPECTOR. Los pendientes se importarán sin inspector asignado y podrás asignarlos manualmente luego.
+              </p>
+            )}
             {sheetInspectors.map(({ inspector }) => (
               <div key={inspector} className="flex items-center gap-3 p-3 border rounded-lg">
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{inspector}</p>
+                <div className="w-48 min-w-0">
+                  <p className="text-sm font-medium truncate">{inspector}</p>
                   <p className="text-xs text-muted-foreground">Inspector</p>
                 </div>
-                <div className="text-muted-foreground">→</div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground rotate-[-90deg] flex-shrink-0" />
                 <div className="flex-1">
                   <Select
-                    value={jefesMap[inspector]?.nombre || ''}
+                    value={jefesMap[inspector]?.nombre || '__none__'}
                     onValueChange={v => assignJefe(inspector, v)}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Sin jefe asignado" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={null}>Sin asignar</SelectItem>
+                      <SelectItem value="__none__">Sin asignar</SelectItem>
                       {jefesSitio.map(e => (
                         <SelectItem key={e.id} value={e.full_name}>
                           {e.full_name}
@@ -283,6 +322,14 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
                     </SelectContent>
                   </Select>
                 </div>
+                {jefesMap[inspector]?.nombre && (
+                  <button
+                    onClick={() => assignJefe(inspector, '__none__')}
+                    className="text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
           </CardContent>
