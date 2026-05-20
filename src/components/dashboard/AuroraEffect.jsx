@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 export default function AuroraEffect() {
   return (
-    <div className="fixed inset-x-0 top-0 h-72 pointer-events-none overflow-hidden hidden md:block" style={{ zIndex: 0 }}>
+    <div className="fixed inset-x-0 top-0 h-72 pointer-events-none overflow-hidden hidden md:block" style={{ zIndex: 0, maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)' }}>
 
       {/* Banda verde principal — ondulación amplia */}
       <motion.div
@@ -73,11 +73,7 @@ export default function AuroraEffect() {
         transition={{ duration: 10, ease: 'easeInOut', repeat: Infinity, repeatType: 'mirror' }}
       />
 
-      {/* Fade hacia el contenido */}
-      <div
-        className="absolute bottom-0 inset-x-0 h-24"
-        style={{ background: 'linear-gradient(to bottom, transparent, hsl(var(--background)))' }}
-      />
+
     </div>
   );
 }
