@@ -66,23 +66,6 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
       plazo_dias:        parseFloat(form.plazo_dias) || 0,
     };
 
-    // Si es una nueva obra o si cambió el período, agregar entrada al historial
-    if (!obra || (obra && form.periodo !== obra.periodo)) {
-      const historialEntry = {
-        fecha: new Date().toISOString(),
-        periodo: form.periodo,
-        estado: form.estado_cobro,
-        porcentaje_avance: parseFloat(form.porcentaje_avance) || 0,
-        monto_a_cobrar: parseFloat(form.monto_a_cobrar) || 0,
-        monto_contrato: parseFloat(form.monto_contrato) || 0,
-        usuario: 'sistema',
-        descripcion: `Ciclo ${form.periodo} agregado - Avance: ${form.porcentaje_avance}% | Monto: $${parseFloat(form.monto_a_cobrar) || 0}`,
-      };
-      
-      const historialActual = Array.isArray(obra?.historial) ? [...obra.historial] : [];
-      parsedForm.historial = [...historialActual, historialEntry];
-    }
-
     onSave(parsedForm);
   };
 

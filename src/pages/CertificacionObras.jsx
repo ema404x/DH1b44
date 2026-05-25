@@ -62,17 +62,33 @@ export default function CertificacionObras() {
   const handleNew = () => { setSelected(null); setDialogOpen(true); };
   const handleEdit = (obra) => { setSelected(obra); setDialogOpen(true); };
   const handleNewCiclo = (obra) => {
-    // Crear nuevo ciclo con la misma obra pero período limpio
-    setSelected({
-      ...obra,
-      periodo: '', // Dejar vacío para que el usuario ingrese el nuevo período
+    // Guardar todo el ciclo actual en el historial y comenzar uno nuevo
+    const historialEntry = {
+      fecha: new Date().toISOString(),
+      periodo: obra.periodo,
+      estado: obra.estado_cobro,
+      porcentaje_avance: obra.porcentaje_avance || 0,
+      monto_contrato: obra.monto_contrato || 0,
+      monto_a_cobrar: obra.monto_a_cobrar || 0,
+      tramo_certificacion: obra.tramo_certificacion,
+      descripcion: `Ciclo ${obra.periodo} finalizado - Avance: ${obra.porcentaje_avance}% | Monto: $${obra.monto_a_cobrar || 0}`,
+    };
+
+    const historialActual = Array.isArray(obra.historial) ? [...obra.historial] : [];
+
+    // Actualizar inmediatamente con el nuevo ciclo limpio
+    saveMutation.mutate({
+      id: obra.id,
+      periodo: '', // Nuevo período vacío
       estado_cobro: 'pendiente',
       porcentaje_avance: 0,
       monto_a_cobrar: 0,
+      monto_contrato: obra.monto_contrato,
       tramo_certificacion: undefined,
       color_avance: 'auto',
+      motivo_observacion: '',
+      historial: [...historialActual, historialEntry],
     });
-    setDialogOpen(true);
   };
 
   // Calcula automáticamente tramo y color según % de avance
