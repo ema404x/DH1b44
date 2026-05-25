@@ -47,10 +47,13 @@ export function useCurrentUser() {
     if (!FIELD_ROLES.includes(employeeRole?.toLowerCase?.())) return list;
     const name  = currentUser.full_name?.toLowerCase() || '';
     const email = currentUser.email?.toLowerCase() || '';
+    const userId = currentUser.id || '';
     return list.filter(item => {
-      // Ver registros propios (creados por él)
-      if (item.created_by && email && item.created_by.toLowerCase() === email) return true;
-      // Ver registros asignados a él
+      // Ver registros creados por él (por ID de usuario de plataforma)
+      if (userId && item.created_by_id && item.created_by_id === userId) return true;
+      // Ver registros creados por él (por email legacy)
+      if (email && item.created_by && item.created_by.toLowerCase() === email) return true;
+      // Ver registros donde aparece su nombre o email en los campos indicados
       return fields.some(field => {
         const val = (item[field] || '').toLowerCase();
         return (name && val.includes(name)) || (email && val === email);
