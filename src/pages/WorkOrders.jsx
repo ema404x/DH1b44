@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Search, Plus, ClipboardList, User, Calendar, MapPin,
   AlertTriangle, CheckCircle2, Clock, Zap, Wrench, Eye, Trash2, FileText, QrCode, Sparkles, TrendingUp,
-  Layers, History, Smartphone, PlusCircle
+  Layers, History, Smartphone, PlusCircle, LayoutGrid, Kanban
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import KanbanBoard from '@/components/workorders/KanbanBoard';
 import WorkOrderQRButton from '@/components/workorders/WorkOrderQRButton';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { exportOTsPDF } from '@/utils/exportPDF';
@@ -182,6 +183,7 @@ function WorkOrderCard({ order, onOpen, onShowQR }) {
 export default function WorkOrders() {
   const [search, setSearch] = useState('');
   const [statusTab, setStatusTab] = useState('all');
+  const [viewMode, setViewMode] = useState('kanban'); // 'kanban' | 'grid'
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [qrOrder, setQrOrder] = useState(null);
@@ -227,6 +229,12 @@ export default function WorkOrders() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['workorders'] }); setSelectedOrder(null); }
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }) => base44.entities.WorkOrder.update(id, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workorders'] }),
+    onError: () => toast.error('Error al cambiar el estado'),
+  });
+
   const visibleOrders = useMemo(() =>
     filterByUser(orders, ['assigned_name', 'assigned_to', 'created_by'])
   , [orders, currentUser]);
@@ -270,6 +278,21 @@ export default function WorkOrders() {
             </div>
           </div>
           <div className="flex gap-1 shrink-0">
+            {/* Toggle Kanban / Grilla */}
+            <div className="flex items-center bg-slate-800/50 border border-slate-700/50 rounded-lg p-0.5">
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'kanban' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                <Kanban className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Kanban</span>
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'grid' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Grilla</span>
+              </button>
+            </div>
             <Button variant="outline" size="sm" onClick={() => setModoCampo(v => !v)} className={`gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2 ${modoCampo ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300' : ''}`}>
               <Smartphone className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{modoCampo ? 'Escritorio' : 'Campo'}</span>
             </Button>
@@ -319,8 +342,8 @@ export default function WorkOrders() {
         </motion.div>
       )}
 
-      {/* Filters */}
-      {!modoCampo && (
+      {/* Search (solo en vista grilla) */}
+      {!modoCampo && viewMode === 'grid' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
@@ -345,8 +368,24 @@ export default function WorkOrders() {
         </motion.div>
       )}
 
+      {/* Kanban */}
+      {!modoCampo && viewMode === 'kanban' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          {visibleOrders.length === 0 && !isLoading ? (
+            <EmptyState icon={ClipboardList} title="No hay órdenes" description="Creá una nueva orden de trabajo" actionLabel="Nueva OT" onAction={() => setNewDialogOpen(true)} />
+          ) : (
+            <KanbanBoard
+              orders={visibleOrders}
+              onOpen={setSelectedOrder}
+              onShowQR={setQrOrder}
+              onStatusChange={(id, newStatus) => updateStatusMutation.mutate({ id, status: newStatus })}
+            />
+          )}
+        </motion.div>
+      )}
+
       {/* Grid */}
-      {!modoCampo && (filtered.length === 0 && !isLoading ? (
+      {!modoCampo && viewMode === 'grid' && (filtered.length === 0 && !isLoading ? (
         <EmptyState icon={ClipboardList} title="No hay órdenes" description="Creá una nueva orden de trabajo" actionLabel="Nueva OT" onAction={() => setNewDialogOpen(true)} />
       ) : (
         <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
