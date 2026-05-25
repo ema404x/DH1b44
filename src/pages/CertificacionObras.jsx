@@ -94,10 +94,12 @@ export default function CertificacionObras() {
     mutationFn: async (periodo) => {
       const hoy = format(new Date(), 'yyyy-MM-dd');
 
-      // 1. Cerrar ciclo activo
+      // 1. Cerrar ciclo activo y guardar historial
       if (cicloActivo) {
         const listoCert = obras.filter(o => o.estado_cobro === 'listo_certificar').length;
         const montoTotal = obras.reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
+        
+        // Actualizar ciclo (activo: false marca como histórico)
         await base44.entities.CicloCertificacion.update(cicloActivo.id, {
           activo: false,
           fecha_cierre: hoy,
@@ -123,7 +125,8 @@ export default function CertificacionObras() {
       qc.invalidateQueries({ queryKey: ['ciclos-certificacion'] });
       qc.invalidateQueries({ queryKey: ['obras-certificacion'] });
       qc.invalidateQueries({ queryKey: ['ciclos-certificacion-historico'] });
-      toast.success('Nuevo ciclo iniciado correctamente');
+      setNuevoPeriodo(periodoActual());
+      toast.success('Nuevo ciclo iniciado. Datos del mes anterior guardados en historial.');
     },
   });
 
