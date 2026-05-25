@@ -2,13 +2,14 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Activity, List, Users, Globe, School } from 'lucide-react';
+import { MapPin, Activity, List, Users, Globe, School, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import MapaFichajes from '@/components/mapa/MapaFichajes';
 import LocationsManager from '@/components/mapa/LocationsManager';
 import AsignacionesUbicacion from '@/components/mapa/AsignacionesUbicacion';
 import MapaProyectosOTs from '@/components/mapa/MapaProyectosOTs';
 import MapaColegios from '@/components/mapa/MapaColegios';
+import MapaOTsCompletadas from '@/components/mapa/MapaOTsCompletadas';
 
 export default function Mapa() {
   const [tab, setTab] = useState('mapa');
@@ -95,6 +96,9 @@ export default function Mapa() {
           <TabsTrigger value="asignaciones" className="gap-2">
             <Users className="h-4 w-4" /> Asignaciones
           </TabsTrigger>
+          <TabsTrigger value="ots-completadas" className="gap-2">
+            <CheckCircle2 className="h-4 w-4" /> OTs Completadas
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="proyectos-ots" className="mt-5">
@@ -127,6 +131,10 @@ export default function Mapa() {
 
         <TabsContent value="colegios" className="mt-5">
           <MapaColegios />
+        </TabsContent>
+
+        <TabsContent value="ots-completadas" className="mt-5">
+          <MapaOTsCompletadas />
         </TabsContent>
 
         <TabsContent value="asignaciones" className="mt-5">
