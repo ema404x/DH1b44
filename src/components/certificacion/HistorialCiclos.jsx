@@ -117,7 +117,8 @@ export default function HistorialCiclos() {
     staleTime: 0,
   });
 
-  const ciclos = todosCiclos.filter(c => !c.activo);
+  // Mostrar ciclos que no son activos (inactivos) o que tengan fecha_cierre (significa que fueron cerrados)
+  const ciclos = todosCiclos.filter(c => c.fecha_cierre || !c.activo);
 
   if (isLoading) return (
     <div className="flex justify-center py-12">
