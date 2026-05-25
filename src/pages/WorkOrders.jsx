@@ -219,10 +219,7 @@ export default function WorkOrders() {
     },
   });
 
-  const handleUseTemplate = (template) => {
-    // Abrir el diálogo con datos pre-cargados de la plantilla
-    setNewDialogOpen(true);
-  };
+  // handleUseTemplate is handled directly in OTTemplateSelector onSelect — no separate dialog needed
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.WorkOrder.delete(id),
@@ -237,7 +234,8 @@ export default function WorkOrders() {
 
   const visibleOrders = useMemo(() =>
     filterByUser(orders, ['assigned_name', 'assigned_to', 'created_by'])
-  , [orders, currentUser]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  , [orders, currentUser, isAdmin]);
 
   const filtered = useMemo(() => visibleOrders.filter(o => {
     const matchSearch = !search || o.title?.toLowerCase().includes(search.toLowerCase());

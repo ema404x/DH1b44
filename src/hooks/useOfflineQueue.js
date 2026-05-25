@@ -120,6 +120,7 @@ export function useOfflineQueue(onSyncSuccess) {
       if (event.data?.type === 'SYNC_SUCCESS') {
         refreshCount();
         setLastSynced(new Date());
+        onSyncSuccess?.(1);
       }
     };
     navigator.serviceWorker?.addEventListener('message', handleSWMessage);
@@ -129,6 +130,8 @@ export function useOfflineQueue(onSyncSuccess) {
       window.removeEventListener('offline', handleOffline);
       navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
     };
+  // onSyncSuccess is intentionally excluded to avoid re-registering listeners on every render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncPending, refreshCount]);
 
   // Guardar OT en cola offline

@@ -120,7 +120,21 @@ export default function ModoCampo({ currentUser, onOpenOrder }) {
                         )}
                         {order.status === 'en_progreso' && (
                           <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700"
-                            onClick={e => { e.stopPropagation(); updateMutation.mutate({ id: order.id, status: 'completada' }); }}>
+                            onClick={e => {
+                              e.stopPropagation();
+                              const pendingChecklist = (order.checklist || []).filter(t => !t.completed);
+                              if (pendingChecklist.length > 0) {
+                                toast.warning(`Faltan ${pendingChecklist.length} tarea(s) del checklist`);
+                                onOpenOrder(order);
+                                return;
+                              }
+                              if (order.require_photos && !(order.photos || []).length) {
+                                toast.warning('Esta OT requiere al menos una foto');
+                                onOpenOrder(order);
+                                return;
+                              }
+                              updateMutation.mutate({ id: order.id, status: 'completada' });
+                            }}>
                             Completar
                           </Button>
                         )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,15 @@ const typeLabels = {
 
 export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [data, setData] = useState({ ...order });
+
+  // Sync local state when parent order prop changes (e.g. after external invalidation)
+  const prevOrderId = React.useRef(order.id);
+  React.useEffect(() => {
+    if (order.id !== prevOrderId.current) {
+      prevOrderId.current = order.id;
+      setData({ ...order });
+    }
+  }, [order]);
   const [qrOpen, setQrOpen] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const queryClient = useQueryClient();
@@ -82,22 +91,38 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
 
   const set = (key, val) => setData(prev => ({ ...prev, [key]: val }));
 
-  // Guarda inmediatamente — usa callback para tener el estado más reciente
-  const saveField = (key, val) => {
+  // Debounced auto-save ref — prevents race conditions from rapid field updates
+  const saveTimerRef = useRef(null);
+  const latestDataRef = useRef(data);
+  useEffect(() => { latestDataRef.current = data; }, [data]);
+
+  // Guarda con debounce — usa ref para tener el estado más reciente
+  const saveField = useCallback((key, val) => {
     setData(prev => {
       const next = { ...prev, [key]: val };
-      saveMutation.mutate(next);
+      latestDataRef.current = next;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        saveMutation.mutate(next);
+      }, 300);
       return next;
     });
-  };
+  }, [saveMutation]);
 
-  const saveFields = (fields) => {
+  const saveFields = useCallback((fields) => {
     setData(prev => {
       const next = { ...prev, ...fields };
-      saveMutation.mutate(next);
+      latestDataRef.current = next;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        saveMutation.mutate(next);
+      }, 300);
       return next;
     });
-  };
+  }, [saveMutation]);
+
+  // Cleanup timer on unmount
+  useEffect(() => () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); }, []);
 
   // Checklist completion check
   const checklist = data.checklist || [];
