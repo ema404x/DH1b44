@@ -2,6 +2,14 @@
   "name": "ObraCertificacion",
   "type": "object",
   "properties": {
+    "ciclo_id": {
+      "type": "string",
+      "description": "ID del CicloCertificacion al que pertenece esta obra"
+    },
+    "ciclo_periodo": {
+      "type": "string",
+      "description": "Per\u00edodo del ciclo (denormalizado para consultas r\u00e1pidas)"
+    },
     "titulo": {
       "type": "string",
       "description": "T\u00edtulo de la obra en SAP"

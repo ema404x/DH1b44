@@ -58,15 +58,13 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const parsedForm = {
+    onSave({
       ...form,
       monto_contrato:    parseFloat(form.monto_contrato) || 0,
       monto_a_cobrar:    parseFloat(form.monto_a_cobrar) || 0,
       porcentaje_avance: parseFloat(form.porcentaje_avance) || 0,
       plazo_dias:        parseFloat(form.plazo_dias) || 0,
-    };
-
-    onSave(parsedForm);
+    });
   };
 
   return (

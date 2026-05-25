@@ -1,0 +1,43 @@
+{
+  "name": "CicloCertificacion",
+  "type": "object",
+  "properties": {
+    "periodo": {
+      "type": "string",
+      "description": "Per\u00edodo del ciclo (ej: Mayo 2026)"
+    },
+    "fecha_inicio": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de inicio del ciclo"
+    },
+    "fecha_cierre": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de cierre del ciclo (cuando se inici\u00f3 uno nuevo)"
+    },
+    "activo": {
+      "type": "boolean",
+      "default": true,
+      "description": "true = ciclo en curso, false = ciclo hist\u00f3rico"
+    },
+    "total_obras": {
+      "type": "number",
+      "default": 0
+    },
+    "monto_total": {
+      "type": "number",
+      "default": 0
+    },
+    "listo_certificar": {
+      "type": "number",
+      "default": 0
+    },
+    "notas": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "periodo"
+  ]
+}

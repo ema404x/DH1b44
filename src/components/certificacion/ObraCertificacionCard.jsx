@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Pencil, Trash2, Building2, User, DollarSign, Calendar, Hash, ChevronDown, ChevronUp,
-  MapPin, UserCheck, Clock, Eye, MessageSquare, Plus
+  MapPin, UserCheck, Clock, Eye, MessageSquare
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-export default function ObraCertificacionCard({ obra, estadoConfig, prioridadConfig, onEdit, onDelete, onEstadoChange, onTramoChange, onNotasChange, fmt, onNewCiclo }) {
+export default function ObraCertificacionCard({ obra, estadoConfig, prioridadConfig, onEdit, onDelete, onEstadoChange, onTramoChange, onNotasChange, fmt }) {
   const [expanded, setExpanded] = useState(false);
   const [editingNotas, setEditingNotas] = useState(false);
   const [notasValue, setNotasValue] = useState(obra.notas || '');
@@ -180,9 +180,6 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
                 <SelectItem value="falta_aprobar_mein">🟣 Falta Aprobar Orden MEIN</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-400 hover:text-emerald-500 hover:bg-emerald-500/10 title='Nuevo ciclo'" onClick={() => onNewCiclo?.(obra)}>
-              <Plus className="h-4 w-4" />
-            </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpanded(!expanded)}>
               {expanded ? <ChevronUp className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
