@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -105,9 +105,16 @@ function CicloHistoricoCard({ ciclo }) {
 
 
 export default function HistorialCiclos() {
+  const qc = useQueryClient();
+  
+  useEffect(() => {
+    qc.invalidateQueries({ queryKey: ['ciclos-certificacion-historico'] });
+  }, [qc]);
+
   const { data: todosCiclos = [], isLoading } = useQuery({
     queryKey: ['ciclos-certificacion-historico'],
     queryFn: () => base44.entities.CicloCertificacion.list('-created_date', 100),
+    staleTime: 0,
   });
 
   const ciclos = todosCiclos.filter(c => !c.activo);
