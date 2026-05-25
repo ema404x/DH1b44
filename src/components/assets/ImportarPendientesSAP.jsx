@@ -34,6 +34,12 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
     queryFn: () => base44.entities.Employee.list(),
   });
 
+  // Load direcciones to auto-detect jefe por inspector
+  const { data: direcciones = [] } = useQuery({
+    queryKey: ['direcciones-list'],
+    queryFn: () => base44.entities.Direccion.list(),
+  });
+
   // Filtramos jefes de sitio por la comuna seleccionada
   const jefesSitio = employees.filter(e => {
     if (e.role !== 'jefe_sitio') return false;
@@ -130,9 +136,20 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
     const inspList = [...inspectors].map(name => ({ inspector: name }));
     setSheetInspectors(inspList);
 
-    // Init jefes map empty
+    // Auto-detect jefe de sitio desde la entidad Direccion (inspector → jefe_sitio)
     const jMap = {};
-    inspList.forEach(i => { jMap[i.inspector] = { nombre: '', email: '' }; });
+    for (const { inspector } of inspList) {
+      // Buscar por nombre de inspector (comparación insensible a mayúsculas)
+      const dir = direcciones.find(d =>
+        d.inspector && d.inspector.trim().toUpperCase() === inspector
+      );
+      if (dir && dir.jefe_sitio) {
+        const emp = employees.find(e => e.full_name?.trim().toUpperCase() === dir.jefe_sitio.trim().toUpperCase());
+        jMap[inspector] = { nombre: dir.jefe_sitio, email: emp?.email || '' };
+      } else {
+        jMap[inspector] = { nombre: '', email: '' };
+      }
+    }
     setJefesMap(jMap);
 
     // Upload file
