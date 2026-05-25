@@ -1,20 +1,18 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  Search, Plus, ClipboardList, User, Calendar, MapPin,
-  AlertTriangle, CheckCircle2, Clock, Zap, Wrench, Eye, Trash2, FileText, QrCode, Sparkles, TrendingUp,
-  Layers, History, Smartphone, PlusCircle, LayoutGrid, Kanban
+  Search, Plus, ClipboardList, MapPin,
+  Zap, Wrench, TrendingUp,
+  Layers, History, Smartphone, LayoutGrid, Kanban, User
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import KanbanBoard from '@/components/workorders/KanbanBoard';
 import WorkOrderQRButton from '@/components/workorders/WorkOrderQRButton';
 import QRCodeModal from '@/components/shared/QRCodeModal';
@@ -28,119 +26,8 @@ import HistorialEstablecimiento from '@/components/workorders/HistorialEstableci
 import ModoCampo from '@/components/workorders/ModosCampo';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
-const typeLabels = {
-  mantenimiento_preventivo: 'Preventivo', mantenimiento_correctivo: 'Correctivo',
-  instalacion: 'Instalación', inspeccion: 'Inspección', reparacion: 'Reparación', emergencia: 'Emergencia'
-};
 
-function NewOrderDialog({ open, onOpenChange, onSave, saving, employees = [] }) {
-  const [form, setForm] = useState({ title: '', type: 'mantenimiento_correctivo', priority: 'media', status: 'pendiente' });
-  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  const { data: locationQRs = [] } = useQuery({
-    queryKey: ['locations'],
-    queryFn: () => base44.entities.LocationQR.list('name', 200),
-    enabled: open,
-    staleTime: 60000,
-  });
-
-  const activeLocations = locationQRs.filter(l => l.is_active);
-
-  const handleSelectLocation = (locId) => {
-    if (locId === '__manual__') {
-      set('location_qr_id', '');
-      set('location_qr_name', '');
-      return;
-    }
-    const loc = activeLocations.find(l => l.id === locId);
-    if (loc) {
-      set('location_qr_id', loc.id);
-      set('location_qr_name', loc.name);
-      set('location', loc.address || loc.name);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-slate-800 border-slate-700">
-        <DialogHeader><DialogTitle className="text-white">Nueva Orden de Trabajo</DialogTitle></DialogHeader>
-        <div className="space-y-3 py-2">
-          <div>
-            <label className="text-xs font-medium text-slate-300 uppercase">Título *</label>
-            <Input className="mt-1 bg-slate-700 border-slate-600 text-white" placeholder="Ej: Revisión sistema eléctrico" value={form.title} onChange={e => set('title', e.target.value)} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-slate-300 uppercase">Tipo</label>
-              <Select value={form.type} onValueChange={v => set('type', v)}>
-                <SelectTrigger className="mt-1 bg-slate-700 border-slate-600"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(typeLabels).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-300 uppercase">Prioridad</label>
-              <Select value={form.priority} onValueChange={v => set('priority', v)}>
-                <SelectTrigger className="mt-1 bg-slate-700 border-slate-600"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {['baja','media','alta','urgente'].map(p => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-slate-300 uppercase flex items-center gap-1.5">
-              <QrCode className="h-3 w-3 text-emerald-400" /> Ubicación QR
-            </label>
-            <Select value={form.location_qr_id || '__manual__'} onValueChange={handleSelectLocation}>
-              <SelectTrigger className="mt-1 bg-slate-700 border-slate-600">
-                <SelectValue placeholder="Seleccionar ubicación..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__manual__">— Sin vincular —</SelectItem>
-                {activeLocations.map(loc => (
-                  <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-slate-300 uppercase">Activo</label>
-              <Input className="mt-1 bg-slate-700 border-slate-600 text-white" placeholder="Equipo" value={form.asset_name || ''} onChange={e => set('asset_name', e.target.value)} />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-300 uppercase">Dirección</label>
-              <Input className="mt-1 bg-slate-700 border-slate-600 text-white" placeholder="Planta" value={form.location || ''} onChange={e => set('location', e.target.value)} />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-slate-300 uppercase">Asignado a</label>
-            <Select value={form.assigned_name || '__none__'} onValueChange={v => set('assigned_name', v === '__none__' ? '' : v)}>
-              <SelectTrigger className="mt-1 bg-slate-700 border-slate-600 text-white">
-                <SelectValue placeholder="Seleccionar técnico..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">— Sin asignar —</SelectItem>
-                {employees.map(e => (
-                  <SelectItem key={e.id} value={e.full_name}>{e.full_name}{e.specialty ? ` · ${e.specialty}` : ''}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button className="w-full bg-gradient-to-r from-primary to-purple-600" onClick={() => onSave(form)} disabled={!form.title.trim() || saving}>
-            {saving ? 'Guardando...' : 'Crear Orden'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function WorkOrderCard({ order, onOpen, onShowQR }) {
   const isOverdue = order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status);
@@ -184,13 +71,13 @@ export default function WorkOrders() {
   const [search, setSearch] = useState('');
   const [statusTab, setStatusTab] = useState('all');
   const [viewMode, setViewMode] = useState('kanban'); // 'kanban' | 'grid'
-  const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [qrOrder, setQrOrder] = useState(null);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [historialOpen, setHistorialOpen] = useState(false);
   const [modoCampo, setModoCampo] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { currentUser, isAdmin, filterByUser } = useCurrentUser();
 
   const { isOnline, pendingCount } = useOfflineQueue((count) => {
@@ -203,23 +90,13 @@ export default function WorkOrders() {
     queryFn: () => base44.entities.WorkOrder.list('-created_date')
   });
 
-  const { data: employees = [] } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => base44.entities.Employee.list('full_name', 200),
-    staleTime: 1000 * 60 * 10,
-  });
-  const activeEmployees = employees.filter(e => e.status === 'activo' || !e.status);
-
   const createMutation = useMutation({
     mutationFn: async (data) => base44.entities.WorkOrder.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       queryClient.invalidateQueries({ queryKey: ['workorders-campo'] });
-      setNewDialogOpen(false);
     },
   });
-
-  // handleUseTemplate is handled directly in OTTemplateSelector onSelect — no separate dialog needed
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.WorkOrder.delete(id),
@@ -276,38 +153,35 @@ export default function WorkOrders() {
             </div>
           </div>
           <div className="flex gap-1 shrink-0">
-            {/* Toggle Kanban / Grilla */}
-            <div className="flex items-center bg-slate-800/50 border border-slate-700/50 rounded-lg p-0.5">
-              <button
-                onClick={() => setViewMode('kanban')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'kanban' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                <Kanban className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Kanban</span>
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'grid' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Grilla</span>
-              </button>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => setModoCampo(v => !v)} className={`gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2 ${modoCampo ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300' : ''}`}>
-              <Smartphone className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{modoCampo ? 'Escritorio' : 'Campo'}</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setHistorialOpen(true)} className="gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2">
-              <History className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Historial</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setTemplateOpen(true)} className="gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2">
-              <Layers className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Plantillas</span>
-            </Button>
-            <Link to="/crear-ot">
-              <Button size="sm" className="gap-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg shadow-emerald-500/50 transition-all text-xs px-2">
-                <PlusCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Crear rápido</span><span className="sm:hidden">Rápido</span>
-              </Button>
-            </Link>
-            <Button size="sm" onClick={() => setNewDialogOpen(true)} className="gap-1 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/50 transition-all text-xs px-2">
+          {/* Toggle Kanban / Grilla */}
+          <div className="flex items-center bg-slate-800/50 border border-slate-700/50 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'kanban' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              <Kanban className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Kanban</span>
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'grid' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Grilla</span>
+            </button>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setModoCampo(v => !v)} className={`gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2 ${modoCampo ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300' : ''}`}>
+            <Smartphone className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{modoCampo ? 'Escritorio' : 'Campo'}</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setHistorialOpen(true)} className="gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2">
+            <History className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Historial</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setTemplateOpen(true)} className="gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2">
+            <Layers className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Plantillas</span>
+          </Button>
+          <Link to="/crear-ot">
+            <Button size="sm" className="gap-1 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/50 transition-all text-xs px-2">
               <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Nueva OT</span><span className="sm:hidden">Nueva</span>
             </Button>
+          </Link>
           </div>
         </div>
 
@@ -370,7 +244,7 @@ export default function WorkOrders() {
       {!modoCampo && viewMode === 'kanban' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           {visibleOrders.length === 0 && !isLoading ? (
-            <EmptyState icon={ClipboardList} title="No hay órdenes" description="Creá una nueva orden de trabajo" actionLabel="Nueva OT" onAction={() => setNewDialogOpen(true)} />
+            <EmptyState icon={ClipboardList} title="No hay órdenes" description="Creá una nueva orden de trabajo" actionLabel="Nueva OT" onAction={() => navigate('/crear-ot')} />
           ) : (
             <KanbanBoard
               orders={visibleOrders}
@@ -384,7 +258,7 @@ export default function WorkOrders() {
 
       {/* Grid */}
       {!modoCampo && viewMode === 'grid' && (filtered.length === 0 && !isLoading ? (
-        <EmptyState icon={ClipboardList} title="No hay órdenes" description="Creá una nueva orden de trabajo" actionLabel="Nueva OT" onAction={() => setNewDialogOpen(true)} />
+        <EmptyState icon={ClipboardList} title="No hay órdenes" description="Creá una nueva orden de trabajo" actionLabel="Nueva OT" onAction={() => navigate('/crear-ot')} />
       ) : (
         <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {filtered.map(order => (
@@ -392,14 +266,6 @@ export default function WorkOrders() {
           ))}
         </motion.div>
       ))}
-
-      <NewOrderDialog
-        open={newDialogOpen}
-        onOpenChange={setNewDialogOpen}
-        onSave={createMutation.mutate}
-        saving={createMutation.isPending}
-        employees={activeEmployees}
-      />
 
       <OTTemplateSelector
         open={templateOpen}

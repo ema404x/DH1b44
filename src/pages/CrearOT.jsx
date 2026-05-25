@@ -1,8 +1,8 @@
 /**
- * Página para que el Jefe de Sitio cree OTs rápidamente
- * Flujo: Seleccionar establecimiento → Título + Prioridad → Instrucciones (texto/voz) → Fotos → Crear
+ * CrearOT — Formulario profesional de alta de Órdenes de Trabajo
+ * Flujo guiado por pasos: Ubicación → Detalle → Tareas & Materiales → Asignación → Confirmación
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -10,32 +10,116 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  Mic, MicOff, Camera, CheckCircle2, Loader2, ArrowLeft,
-  MapPin, ClipboardList, Zap, X, QrCode
+  Mic, MicOff, Camera, CheckCircle2, Loader2, MapPin,
+  ClipboardList, Zap, X, QrCode, Plus, Trash2, ChevronRight,
+  ChevronLeft, User, Calendar, Clock, Package, Wrench, AlertTriangle,
+  Layers, ArrowLeft
 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import QRCodeModal from '@/components/shared/QRCodeModal';
+import OTTemplateSelector from '@/components/workorders/OTTemplateSelector';
+
+// ── Constantes ─────────────────────────────────────────────────────────────────
 
 const PRIORITIES = [
-  { value: 'baja', label: 'Baja', color: 'bg-slate-100 text-slate-700' },
-  { value: 'media', label: 'Media', color: 'bg-blue-100 text-blue-700' },
-  { value: 'alta', label: 'Alta', color: 'bg-orange-100 text-orange-700' },
-  { value: 'urgente', label: '🚨 Urgente', color: 'bg-red-100 text-red-700' },
+  { value: 'baja',    label: 'Baja',      color: 'bg-slate-500/20 text-slate-300 border-slate-500/40' },
+  { value: 'media',   label: 'Media',     color: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
+  { value: 'alta',    label: 'Alta',      color: 'bg-orange-500/20 text-orange-300 border-orange-500/40' },
+  { value: 'urgente', label: '🚨 Urgente', color: 'bg-red-500/20 text-red-300 border-red-500/40' },
 ];
+
+const TYPES = [
+  { value: 'mantenimiento_correctivo',  label: 'Correctivo',  icon: Wrench },
+  { value: 'mantenimiento_preventivo',  label: 'Preventivo',  icon: Clock },
+  { value: 'instalacion',               label: 'Instalación', icon: Zap },
+  { value: 'inspeccion',                label: 'Inspección',  icon: ClipboardList },
+  { value: 'reparacion',                label: 'Reparación',  icon: AlertTriangle },
+  { value: 'emergencia',                label: 'Emergencia',  icon: AlertTriangle },
+];
+
+const STEPS = [
+  { id: 1, label: 'Ubicación' },
+  { id: 2, label: 'Detalle' },
+  { id: 3, label: 'Tareas' },
+  { id: 4, label: 'Asignación' },
+];
+
+// ── Componente auxiliar: item de checklist ─────────────────────────────────────
+
+function ChecklistItem({ item, onUpdate, onRemove }) {
+  return (
+    <div className="flex items-center gap-2 group">
+      <Input
+        value={item.task}
+        onChange={e => onUpdate({ ...item, task: e.target.value })}
+        placeholder="Descripción de la tarea..."
+        className="flex-1 bg-slate-800 border-slate-700 text-white text-sm h-9"
+      />
+      <button
+        onClick={onRemove}
+        className="h-9 w-9 rounded-lg border border-slate-700 bg-slate-800 text-slate-500 hover:text-red-400 hover:border-red-500/50 flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// ── Componente auxiliar: item de material ─────────────────────────────────────
+
+function MaterialItem({ item, onUpdate, onRemove }) {
+  return (
+    <div className="flex items-center gap-2 group">
+      <Input
+        value={item.material_name}
+        onChange={e => onUpdate({ ...item, material_name: e.target.value })}
+        placeholder="Material / insumo..."
+        className="flex-1 bg-slate-800 border-slate-700 text-white text-sm h-9"
+      />
+      <Input
+        type="number"
+        value={item.quantity || ''}
+        onChange={e => onUpdate({ ...item, quantity: parseFloat(e.target.value) || 0 })}
+        placeholder="Cant."
+        className="w-20 bg-slate-800 border-slate-700 text-white text-sm h-9"
+      />
+      <button
+        onClick={onRemove}
+        className="h-9 w-9 rounded-lg border border-slate-700 bg-slate-800 text-slate-500 hover:text-red-400 hover:border-red-500/50 flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// ── Componente principal ───────────────────────────────────────────────────────
 
 export default function CrearOT() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
-  // Form state
-  const [step, setStep] = useState(1); // 1: establecimiento, 2: detalle, 3: creada
-  const [selectedLocation, setSelectedLocation] = useState(null);
-  const [title, setTitle] = useState('');
-  const [priority, setPriority] = useState('media');
-  const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState([]);
+  // Wizard state
+  const [step, setStep] = useState(1);
   const [createdOT, setCreatedOT] = useState(null);
   const [showQR, setShowQR] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
 
-  // Audio recording
+  // Form fields
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [title, setTitle] = useState('');
+  const [type, setType] = useState('mantenimiento_correctivo');
+  const [priority, setPriority] = useState('media');
+  const [description, setDescription] = useState('');
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [estimatedHours, setEstimatedHours] = useState('');
+  const [checklist, setChecklist] = useState([]);
+  const [materials, setMaterials] = useState([]);
+  const [assignedEmployee, setAssignedEmployee] = useState(null); // { id, full_name }
+  const [photos, setPhotos] = useState([]);
+  const [requirePhotos, setRequirePhotos] = useState(false);
+
+  // Audio
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const mediaRecorderRef = useRef(null);
@@ -45,38 +129,99 @@ export default function CrearOT() {
   const fileRef = useRef();
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  // ── Queries ─────────────────────────────────────────────────────────────────
+
   const { data: locations = [], isLoading: loadingLocations } = useQuery({
     queryKey: ['locations-crear-ot'],
     queryFn: () => base44.entities.LocationQR.list('name', 200),
     staleTime: 60000,
   });
-
   const activeLocations = locations.filter(l => l.is_active !== false);
+
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees-activos'],
+    queryFn: () => base44.entities.Employee.list('full_name', 200),
+    staleTime: 60000,
+  });
+  const activeEmployees = employees.filter(e => !e.status || e.status === 'activo');
+
+  // ── Mutation ─────────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.WorkOrder.create(data),
     onSuccess: (ot) => {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-campo'] });
       setCreatedOT(ot);
-      setStep(3);
+      setStep(5); // pantalla de éxito
+      toast.success('¡Orden de trabajo creada exitosamente!');
     },
-    onError: () => toast.error('Error al crear la OT'),
+    onError: () => toast.error('Error al crear la OT. Intente nuevamente.'),
   });
 
-  // ── Grabación de audio ──────────────────────────────────────────────────────
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+
+  const handleSelectLocation = useCallback((locId) => {
+    const loc = activeLocations.find(l => l.id === locId);
+    setSelectedLocation(loc || null);
+  }, [activeLocations]);
+
+  // Plantilla → pre-llena campos
+  const handleApplyTemplate = useCallback((template) => {
+    setTitle(template.title || '');
+    setType(template.type || 'mantenimiento_correctivo');
+    setPriority(template.priority || 'media');
+    setDescription(template.description || '');
+    setEstimatedHours(template.estimated_hours ? String(template.estimated_hours) : '');
+    setChecklist((template.checklist || []).map(t => ({ ...t, id: crypto.randomUUID(), completed: false })));
+    setRequirePhotos(!!template.require_photos);
+    setTemplateOpen(false);
+    toast.success(`Plantilla "${template.nombre}" aplicada`);
+  }, []);
+
+  // Checklist
+  const addChecklistItem = () =>
+    setChecklist(prev => [...prev, { id: crypto.randomUUID(), task: '', completed: false }]);
+  const updateChecklistItem = (id, updated) =>
+    setChecklist(prev => prev.map(i => i.id === id ? updated : i));
+  const removeChecklistItem = (id) =>
+    setChecklist(prev => prev.filter(i => i.id !== id));
+
+  // Materiales
+  const addMaterial = () =>
+    setMaterials(prev => [...prev, { material_name: '', quantity: 1, unit_cost: 0 }]);
+  const updateMaterial = (idx, updated) =>
+    setMaterials(prev => prev.map((m, i) => i === idx ? updated : m));
+  const removeMaterial = (idx) =>
+    setMaterials(prev => prev.filter((_, i) => i !== idx));
+
+  // Audio
   const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mr = new MediaRecorder(stream);
-    chunksRef.current = [];
-    mr.ondataavailable = e => chunksRef.current.push(e.data);
-    mr.onstop = async () => {
-      stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      await transcribeAudio(blob);
-    };
-    mr.start();
-    mediaRecorderRef.current = mr;
-    setRecording(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mr.ondataavailable = e => chunksRef.current.push(e.data);
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        setTranscribing(true);
+        try {
+          const { file_url } = await base44.integrations.Core.UploadFile({ file: blob });
+          const text = await base44.integrations.Core.TranscribeAudio({ audio_url: file_url });
+          setDescription(prev => prev ? prev + ' ' + text : text);
+          toast.success('Audio transcripto correctamente');
+        } catch {
+          toast.error('No se pudo transcribir el audio');
+        }
+        setTranscribing(false);
+      };
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setRecording(true);
+    } catch {
+      toast.error('No se pudo acceder al micrófono');
+    }
   };
 
   const stopRecording = () => {
@@ -84,40 +229,37 @@ export default function CrearOT() {
     setRecording(false);
   };
 
-  const transcribeAudio = async (blob) => {
-    setTranscribing(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: blob });
-      const text = await base44.integrations.Core.TranscribeAudio({ audio_url: file_url });
-      setDescription(prev => prev ? prev + ' ' + text : text);
-      toast.success('Audio transcripto correctamente');
-    } catch {
-      toast.error('No se pudo transcribir el audio');
-    }
-    setTranscribing(false);
-  };
-
-  // ── Fotos ──────────────────────────────────────────────────────────────────
+  // Fotos
   const handlePhotos = async (files) => {
     if (!files?.length) return;
     setUploadingPhoto(true);
     for (const file of Array.from(files)) {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setPhotos(prev => [...prev, file_url]);
+      try {
+        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        setPhotos(prev => [...prev, file_url]);
+      } catch {
+        toast.error(`Error subiendo ${file.name}`);
+      }
     }
     setUploadingPhoto(false);
   };
 
-  // ── Crear OT ───────────────────────────────────────────────────────────────
+  // Crear
   const handleCreate = () => {
-    if (!title.trim()) { toast.error('El título es obligatorio'); return; }
     createMutation.mutate({
       title: title.trim(),
+      type,
       priority,
       description,
-      photos,
       status: 'pendiente',
-      type: 'mantenimiento_correctivo',
+      scheduled_date: scheduledDate || undefined,
+      estimated_hours: estimatedHours ? parseFloat(estimatedHours) : undefined,
+      checklist: checklist.filter(i => i.task.trim()),
+      materials_used: materials.filter(m => m.material_name.trim()),
+      require_photos: requirePhotos,
+      photos,
+      assigned_to: assignedEmployee?.id || '',
+      assigned_name: assignedEmployee?.full_name || '',
       location_qr_id: selectedLocation?.id || '',
       location_qr_name: selectedLocation?.name || '',
       location: selectedLocation?.address || selectedLocation?.name || '',
@@ -125,44 +267,74 @@ export default function CrearOT() {
     });
   };
 
+  // Reset
   const resetForm = () => {
     setStep(1);
-    setSelectedLocation(null);
-    setTitle('');
-    setPriority('media');
-    setDescription('');
-    setPhotos([]);
     setCreatedOT(null);
     setShowQR(false);
+    setSelectedLocation(null);
+    setTitle('');
+    setType('mantenimiento_correctivo');
+    setPriority('media');
+    setDescription('');
+    setScheduledDate('');
+    setEstimatedHours('');
+    setChecklist([]);
+    setMaterials([]);
+    setAssignedEmployee(null);
+    setPhotos([]);
+    setRequirePhotos(false);
   };
 
-  // ── PASO 3: OT Creada ──────────────────────────────────────────────────────
-  if (step === 3 && createdOT) {
+  // ── Validaciones por paso ────────────────────────────────────────────────────
+
+  const canProceed = () => {
+    if (step === 1) return true; // ubicación es opcional
+    if (step === 2) return title.trim().length > 0;
+    if (step === 3) return true; // tareas/materiales opcionales
+    if (step === 4) return true; // asignación opcional
+    return false;
+  };
+
+  // ── PASO 5: Éxito ──────────────────────────────────────────────────────────
+
+  if (step === 5 && createdOT) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-        <div className="bg-card border border-border rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl space-y-5">
+        <div className="bg-card border border-border rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl space-y-6">
           <div className="h-20 w-20 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto">
             <CheckCircle2 className="h-10 w-10 text-emerald-400" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-foreground">¡OT Creada!</h2>
-            <p className="text-muted-foreground text-sm mt-1">{createdOT.title}</p>
-            {selectedLocation && (
-              <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
-                <MapPin className="h-3 w-3" /> {selectedLocation.name}
-              </p>
-            )}
+            <h2 className="text-2xl font-bold text-foreground">¡OT Creada!</h2>
+            <p className="text-muted-foreground text-sm mt-1 font-medium">{createdOT.title}</p>
+            <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+              {selectedLocation && (
+                <p className="flex items-center justify-center gap-1">
+                  <MapPin className="h-3 w-3" /> {selectedLocation.name}
+                </p>
+              )}
+              {assignedEmployee && (
+                <p className="flex items-center justify-center gap-1">
+                  <User className="h-3 w-3" /> {assignedEmployee.full_name}
+                </p>
+              )}
+              {checklist.length > 0 && (
+                <p className="flex items-center justify-center gap-1">
+                  <ClipboardList className="h-3 w-3" /> {checklist.filter(i => i.task.trim()).length} tarea(s) en checklist
+                </p>
+              )}
+            </div>
           </div>
-
-          <div className="space-y-3">
-            <Button
-              className="w-full gap-2 bg-primary hover:bg-primary/90"
-              onClick={() => setShowQR(true)}
-            >
+          <div className="space-y-2">
+            <Button className="w-full gap-2" onClick={() => setShowQR(true)}>
               <QrCode className="h-4 w-4" /> Ver QR de la OT
             </Button>
             <Button variant="outline" className="w-full" onClick={resetForm}>
               Crear otra OT
+            </Button>
+            <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => navigate('/ordenes')}>
+              Ir a Órdenes de Trabajo
             </Button>
           </div>
         </div>
@@ -180,183 +352,469 @@ export default function CrearOT() {
     );
   }
 
+  // ── Layout principal ───────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-6 pb-4 border-b border-border">
-        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
-          <ClipboardList className="h-5 w-5 text-white" />
-        </div>
-        <div>
-          <h1 className="text-lg font-bold text-foreground">Crear Orden de Trabajo</h1>
-          <p className="text-xs text-muted-foreground">Rápido y sencillo</p>
-        </div>
-      </div>
-
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
-
-        {/* ── PASO 1: Establecimiento ───────────────────────────────────────── */}
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 text-primary" /> Establecimiento
-          </label>
-          {loadingLocations ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
-              <Loader2 className="h-4 w-4 animate-spin" /> Cargando...
+      <div className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur border-b border-border px-4 pt-4 pb-3">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3">
+              <Link to="/ordenes">
+                <button className="h-9 w-9 rounded-lg border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+              </Link>
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                <ClipboardList className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <h1 className="text-base font-bold text-foreground">Crear Orden de Trabajo</h1>
+                <p className="text-xs text-muted-foreground">Paso {step} de 4</p>
+              </div>
             </div>
-          ) : (
-            <Select
-              value={selectedLocation?.id || ''}
-              onValueChange={(id) => {
-                const loc = activeLocations.find(l => l.id === id);
-                setSelectedLocation(loc || null);
-              }}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setTemplateOpen(true)}
+              className="gap-1.5 border-border text-muted-foreground hover:text-foreground text-xs"
             >
-              <SelectTrigger className="bg-card border-border text-foreground h-12">
-                <SelectValue placeholder="Seleccionar establecimiento..." />
-              </SelectTrigger>
-              <SelectContent>
-                {activeLocations.map(loc => (
-                  <SelectItem key={loc.id} value={loc.id}>
-                    {loc.name}
-                    {loc.address ? ` — ${loc.address}` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+              <Layers className="h-3.5 w-3.5" /> Plantilla
+            </Button>
+          </div>
 
-        {/* ── Título ─────────────────────────────────────────────────────────── */}
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Título de la tarea *
-          </label>
-          <Input
-            placeholder="Ej: Revisar filtraciones en techo"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            className="bg-card border-border text-foreground h-12 text-base"
-          />
-        </div>
-
-        {/* ── Prioridad ──────────────────────────────────────────────────────── */}
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Prioridad
-          </label>
-          <div className="grid grid-cols-4 gap-2">
-            {PRIORITIES.map(p => (
-              <button
-                key={p.value}
-                onClick={() => setPriority(p.value)}
-                className={`py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${
-                  priority === p.value
-                    ? 'border-primary ring-1 ring-primary ' + p.color
-                    : 'border-border bg-card text-muted-foreground hover:border-muted-foreground'
-                }`}
-              >
-                {p.label}
-              </button>
+          {/* Progress bar */}
+          <div className="flex gap-1">
+            {STEPS.map(s => (
+              <div key={s.id} className="flex-1">
+                <div className={`h-1 rounded-full transition-colors ${step >= s.id ? 'bg-primary' : 'bg-border'}`} />
+                <p className={`text-[10px] mt-1 text-center font-medium transition-colors ${step === s.id ? 'text-primary' : step > s.id ? 'text-muted-foreground' : 'text-border'}`}>
+                  {s.label}
+                </p>
+              </div>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* ── Instrucciones (texto + voz) ────────────────────────────────────── */}
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Instrucciones para el operario
-          </label>
-          <textarea
-            placeholder="Escribí las instrucciones o usá el micrófono para dictarlas..."
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            rows={4}
-            className="w-full rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground text-sm px-3 py-3 resize-none focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-          {/* Botón de grabación */}
-          <div className="flex items-center gap-2">
-            {recording ? (
-              <button
-                onClick={stopRecording}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/20 border border-red-500/50 text-red-400 font-semibold text-sm animate-pulse"
-              >
-                <MicOff className="h-4 w-4" /> Detener grabación
-              </button>
+      {/* Body */}
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+
+        {/* ── PASO 1: Ubicación ──────────────────────────────────────────────── */}
+        {step === 1 && (
+          <div className="space-y-5">
+            <SectionTitle icon={MapPin} label="¿En qué establecimiento?" sub="Seleccioná la ubicación donde se realizará el trabajo" />
+
+            {loadingLocations ? (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
+                <Loader2 className="h-4 w-4 animate-spin" /> Cargando establecimientos...
+              </div>
             ) : (
-              <button
-                onClick={startRecording}
-                disabled={transcribing}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 border border-primary/30 text-primary font-semibold text-sm hover:bg-primary/20 transition-colors disabled:opacity-50"
-              >
-                {transcribing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
-                {transcribing ? 'Transcribiendo...' : 'Dictar instrucciones'}
-              </button>
-            )}
-            {recording && (
-              <span className="text-xs text-red-400 flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" /> Grabando...
-              </span>
+              <div className="space-y-2">
+                <Select
+                  value={selectedLocation?.id || ''}
+                  onValueChange={handleSelectLocation}
+                >
+                  <SelectTrigger className="bg-card border-border text-foreground h-12">
+                    <SelectValue placeholder="Seleccionar establecimiento..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeLocations.map(loc => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        <span className="font-medium">{loc.name}</span>
+                        {loc.address ? <span className="text-muted-foreground ml-1 text-xs">— {loc.address}</span> : null}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {selectedLocation && (
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm space-y-1">
+                    <p className="font-semibold text-foreground">{selectedLocation.name}</p>
+                    {selectedLocation.address && <p className="text-muted-foreground text-xs flex items-center gap-1"><MapPin className="h-3 w-3" />{selectedLocation.address}</p>}
+                    {selectedLocation.project_name && <p className="text-muted-foreground text-xs">Proyecto: {selectedLocation.project_name}</p>}
+                  </div>
+                )}
+
+                {!selectedLocation && (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    La ubicación es opcional — podés continuar sin seleccionarla
+                  </p>
+                )}
+              </div>
             )}
           </div>
-        </div>
+        )}
 
-        {/* ── Fotos ─────────────────────────────────────────────────────────── */}
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-            <Camera className="h-3.5 w-3.5" /> Fotos de referencia
-          </label>
+        {/* ── PASO 2: Detalle ────────────────────────────────────────────────── */}
+        {step === 2 && (
+          <div className="space-y-5">
+            <SectionTitle icon={ClipboardList} label="Detalle de la orden" sub="Completá los datos principales de la tarea" />
 
-          {photos.length > 0 && (
-            <div className="grid grid-cols-3 gap-2">
-              {photos.map((url, idx) => (
-                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-border">
-                  <img src={url} alt="" className="w-full h-full object-cover" />
+            {/* Título */}
+            <FieldGroup label="Título *">
+              <Input
+                placeholder="Ej: Revisar filtraciones en techo del aula 3"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                className="bg-card border-border text-foreground h-12 text-base"
+                autoFocus
+              />
+            </FieldGroup>
+
+            {/* Tipo */}
+            <FieldGroup label="Tipo de trabajo">
+              <div className="grid grid-cols-3 gap-2">
+                {TYPES.map(t => {
+                  const Icon = t.icon;
+                  return (
+                    <button
+                      key={t.value}
+                      onClick={() => setType(t.value)}
+                      className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 text-xs font-medium transition-all ${
+                        type === t.value
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-card text-muted-foreground hover:border-muted-foreground'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </FieldGroup>
+
+            {/* Prioridad */}
+            <FieldGroup label="Prioridad">
+              <div className="grid grid-cols-4 gap-2">
+                {PRIORITIES.map(p => (
                   <button
-                    onClick={() => setPhotos(prev => prev.filter((_, i) => i !== idx))}
-                    className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                    key={p.value}
+                    onClick={() => setPriority(p.value)}
+                    className={`py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${
+                      priority === p.value
+                        ? `${p.color} border-current ring-1 ring-current`
+                        : 'border-border bg-card text-muted-foreground hover:border-muted-foreground'
+                    }`}
                   >
-                    <X className="h-3.5 w-3.5" />
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </FieldGroup>
+
+            {/* Instrucciones */}
+            <FieldGroup label="Instrucciones para el operario">
+              <textarea
+                placeholder="Describí detalladamente el trabajo a realizar, o usá el micrófono para dictarlo..."
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                rows={4}
+                className="w-full rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground text-sm px-3 py-3 resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <div className="flex items-center gap-2 mt-1">
+                {recording ? (
+                  <button
+                    onClick={stopRecording}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/20 border border-red-500/50 text-red-400 font-semibold text-xs animate-pulse"
+                  >
+                    <MicOff className="h-3.5 w-3.5" /> Detener
+                    <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={startRecording}
+                    disabled={transcribing}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/30 text-primary font-semibold text-xs hover:bg-primary/20 transition-colors disabled:opacity-50"
+                  >
+                    {transcribing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mic className="h-3.5 w-3.5" />}
+                    {transcribing ? 'Transcribiendo...' : 'Dictar instrucciones'}
+                  </button>
+                )}
+              </div>
+            </FieldGroup>
+
+            {/* Fotos de referencia */}
+            <FieldGroup label="Fotos de referencia">
+              {photos.length > 0 && (
+                <div className="grid grid-cols-4 gap-2 mb-2">
+                  {photos.map((url, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-border">
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => setPhotos(prev => prev.filter((_, i) => i !== idx))}
+                        className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={e => handlePhotos(e.target.files)} />
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="w-full h-11 rounded-xl border-2 border-dashed border-border bg-card hover:border-primary/50 flex items-center justify-center gap-2 text-muted-foreground text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {uploadingPhoto
+                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Subiendo...</>
+                  : <><Camera className="h-4 w-4" /> Agregar foto(s) de referencia</>
+                }
+              </button>
+            </FieldGroup>
+          </div>
+        )}
+
+        {/* ── PASO 3: Tareas & Materiales ────────────────────────────────────── */}
+        {step === 3 && (
+          <div className="space-y-6">
+            <SectionTitle icon={ClipboardList} label="Checklist y materiales" sub="Definí las tareas y los insumos necesarios" />
+
+            {/* Fechas y horas */}
+            <div className="grid grid-cols-2 gap-3">
+              <FieldGroup label="Fecha programada">
+                <Input
+                  type="date"
+                  value={scheduledDate}
+                  onChange={e => setScheduledDate(e.target.value)}
+                  className="bg-card border-border text-foreground h-11"
+                />
+              </FieldGroup>
+              <FieldGroup label="Horas estimadas">
+                <Input
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  value={estimatedHours}
+                  onChange={e => setEstimatedHours(e.target.value)}
+                  placeholder="Ej: 2.5"
+                  className="bg-card border-border text-foreground h-11"
+                />
+              </FieldGroup>
+            </div>
+
+            {/* Checklist */}
+            <FieldGroup
+              label="Checklist de tareas"
+              action={
+                <button onClick={addChecklistItem} className="text-xs text-primary flex items-center gap-1 hover:underline">
+                  <Plus className="h-3 w-3" /> Agregar tarea
+                </button>
+              }
+            >
+              {checklist.length === 0 ? (
+                <div
+                  onClick={addChecklistItem}
+                  className="w-full h-16 rounded-xl border-2 border-dashed border-border bg-card hover:border-primary/50 flex items-center justify-center gap-2 text-muted-foreground text-sm cursor-pointer transition-colors"
+                >
+                  <Plus className="h-4 w-4" /> Agregar primera tarea
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {checklist.map(item => (
+                    <ChecklistItem
+                      key={item.id}
+                      item={item}
+                      onUpdate={updated => updateChecklistItem(item.id, updated)}
+                      onRemove={() => removeChecklistItem(item.id)}
+                    />
+                  ))}
+                  <button onClick={addChecklistItem} className="w-full h-9 rounded-lg border border-dashed border-border bg-card hover:border-primary/50 text-xs text-muted-foreground flex items-center justify-center gap-1.5 transition-colors">
+                    <Plus className="h-3 w-3" /> Agregar tarea
                   </button>
                 </div>
-              ))}
+              )}
+            </FieldGroup>
+
+            {/* Materiales */}
+            <FieldGroup
+              label="Materiales necesarios"
+              action={
+                <button onClick={addMaterial} className="text-xs text-primary flex items-center gap-1 hover:underline">
+                  <Plus className="h-3 w-3" /> Agregar material
+                </button>
+              }
+            >
+              {materials.length === 0 ? (
+                <div
+                  onClick={addMaterial}
+                  className="w-full h-16 rounded-xl border-2 border-dashed border-border bg-card hover:border-primary/50 flex items-center justify-center gap-2 text-muted-foreground text-sm cursor-pointer transition-colors"
+                >
+                  <Package className="h-4 w-4" /> Agregar materiales / insumos
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-[1fr_80px_36px] gap-2 px-1">
+                    <span className="text-xs text-muted-foreground uppercase font-medium">Material</span>
+                    <span className="text-xs text-muted-foreground uppercase font-medium">Cant.</span>
+                    <span />
+                  </div>
+                  {materials.map((m, idx) => (
+                    <MaterialItem
+                      key={idx}
+                      item={m}
+                      onUpdate={updated => updateMaterial(idx, updated)}
+                      onRemove={() => removeMaterial(idx)}
+                    />
+                  ))}
+                  <button onClick={addMaterial} className="w-full h-9 rounded-lg border border-dashed border-border bg-card hover:border-primary/50 text-xs text-muted-foreground flex items-center justify-center gap-1.5 transition-colors">
+                    <Plus className="h-3 w-3" /> Agregar material
+                  </button>
+                </div>
+              )}
+            </FieldGroup>
+
+            {/* Requiere fotos */}
+            <label className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card cursor-pointer hover:border-primary/50 transition-colors">
+              <input
+                type="checkbox"
+                checked={requirePhotos}
+                onChange={e => setRequirePhotos(e.target.checked)}
+                className="h-4 w-4 rounded accent-primary"
+              />
+              <div>
+                <p className="text-sm font-medium text-foreground">Requiere fotos para completar</p>
+                <p className="text-xs text-muted-foreground">El operario deberá adjuntar fotos antes de marcar la OT como completada</p>
+              </div>
+            </label>
+          </div>
+        )}
+
+        {/* ── PASO 4: Asignación + Resumen ───────────────────────────────────── */}
+        {step === 4 && (
+          <div className="space-y-5">
+            <SectionTitle icon={User} label="Asignación y confirmación" sub="Asigná un técnico y revisá el resumen antes de crear la OT" />
+
+            {/* Asignar técnico */}
+            <FieldGroup label="Técnico asignado">
+              <Select
+                value={assignedEmployee?.id || '__none__'}
+                onValueChange={v => {
+                  if (v === '__none__') { setAssignedEmployee(null); return; }
+                  const emp = activeEmployees.find(e => e.id === v);
+                  setAssignedEmployee(emp ? { id: emp.id, full_name: emp.full_name } : null);
+                }}
+              >
+                <SelectTrigger className="bg-card border-border text-foreground h-12">
+                  <SelectValue placeholder="Sin asignar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Sin asignar —</SelectItem>
+                  {activeEmployees.map(e => (
+                    <SelectItem key={e.id} value={e.id}>
+                      <span className="font-medium">{e.full_name}</span>
+                      {e.specialty ? <span className="text-muted-foreground ml-1 text-xs">· {e.specialty}</span> : null}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FieldGroup>
+
+            {/* Resumen */}
+            <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Resumen de la OT</p>
+              <SummaryRow label="Título" value={title} />
+              <SummaryRow label="Tipo" value={TYPES.find(t => t.value === type)?.label} />
+              <SummaryRow label="Prioridad" value={priority.charAt(0).toUpperCase() + priority.slice(1)} />
+              {selectedLocation && <SummaryRow label="Establecimiento" value={selectedLocation.name} />}
+              {scheduledDate && <SummaryRow label="Fecha programada" value={scheduledDate} />}
+              {estimatedHours && <SummaryRow label="Horas estimadas" value={`${estimatedHours} h`} />}
+              {checklist.filter(i => i.task.trim()).length > 0 && (
+                <SummaryRow label="Checklist" value={`${checklist.filter(i => i.task.trim()).length} tarea(s)`} />
+              )}
+              {materials.filter(m => m.material_name.trim()).length > 0 && (
+                <SummaryRow label="Materiales" value={`${materials.filter(m => m.material_name.trim()).length} ítem(s)`} />
+              )}
+              {photos.length > 0 && <SummaryRow label="Fotos adjuntas" value={`${photos.length} foto(s)`} />}
+              {requirePhotos && <SummaryRow label="Requiere fotos" value="Sí" />}
+              {assignedEmployee && <SummaryRow label="Asignado a" value={assignedEmployee.full_name} />}
             </div>
+          </div>
+        )}
+
+        {/* ── Navegación de pasos ────────────────────────────────────────────── */}
+        <div className="flex gap-3 pt-2 pb-8">
+          {step > 1 && (
+            <Button variant="outline" className="flex-1 h-12 gap-2 border-border" onClick={() => setStep(s => s - 1)}>
+              <ChevronLeft className="h-4 w-4" /> Atrás
+            </Button>
           )}
-
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            multiple
-            capture="environment"
-            className="hidden"
-            onChange={e => handlePhotos(e.target.files)}
-          />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploadingPhoto}
-            className="w-full h-12 rounded-xl border-2 border-dashed border-border bg-card hover:border-primary/50 flex items-center justify-center gap-2 text-muted-foreground text-sm font-medium transition-colors disabled:opacity-50"
-          >
-            {uploadingPhoto
-              ? <><Loader2 className="h-4 w-4 animate-spin" /> Subiendo...</>
-              : <><Camera className="h-4 w-4" /> Sacar / Subir Foto</>
-            }
-          </button>
+          {step < 4 ? (
+            <Button
+              className="flex-1 h-12 gap-2 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/30"
+              onClick={() => {
+                if (!canProceed()) {
+                  toast.error('Completá el título para continuar');
+                  return;
+                }
+                setStep(s => s + 1);
+              }}
+            >
+              Continuar <ChevronRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              className="flex-1 h-12 gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg shadow-emerald-500/30 font-bold text-base"
+              onClick={handleCreate}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending
+                ? <><Loader2 className="h-5 w-5 animate-spin" /> Creando OT...</>
+                : <><CheckCircle2 className="h-5 w-5" /> Crear Orden de Trabajo</>
+              }
+            </Button>
+          )}
         </div>
-
-        {/* ── Botón Crear ────────────────────────────────────────────────────── */}
-        <Button
-          className="w-full h-14 text-base font-bold gap-2 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/30 transition-all"
-          onClick={handleCreate}
-          disabled={!title.trim() || createMutation.isPending}
-        >
-          {createMutation.isPending
-            ? <><Loader2 className="h-5 w-5 animate-spin" /> Creando OT...</>
-            : <><Zap className="h-5 w-5" /> Crear Orden de Trabajo</>
-          }
-        </Button>
-
       </div>
+
+      {/* Selector de plantillas */}
+      <OTTemplateSelector
+        open={templateOpen}
+        onOpenChange={setTemplateOpen}
+        onSelect={handleApplyTemplate}
+      />
+    </div>
+  );
+}
+
+// ── Helpers de UI ──────────────────────────────────────────────────────────────
+
+function SectionTitle({ icon: Icon, label, sub }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+        <Icon className="h-5 w-5 text-primary" />
+      </div>
+      <div>
+        <h2 className="text-lg font-bold text-foreground">{label}</h2>
+        {sub && <p className="text-sm text-muted-foreground">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+function FieldGroup({ label, children, action }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</label>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-foreground text-right max-w-[60%] truncate">{value}</span>
     </div>
   );
 }
