@@ -61,6 +61,19 @@ export default function CertificacionObras() {
 
   const handleNew = () => { setSelected(null); setDialogOpen(true); };
   const handleEdit = (obra) => { setSelected(obra); setDialogOpen(true); };
+  const handleNewCiclo = (obra) => {
+    // Crear nuevo ciclo con la misma obra pero período limpio
+    setSelected({
+      ...obra,
+      periodo: '', // Dejar vacío para que el usuario ingrese el nuevo período
+      estado_cobro: 'pendiente',
+      porcentaje_avance: 0,
+      monto_a_cobrar: 0,
+      tramo_certificacion: undefined,
+      color_avance: 'auto',
+    });
+    setDialogOpen(true);
+  };
 
   // Calcula automáticamente tramo y color según % de avance
   const enriquecerObra = (data) => {
@@ -332,6 +345,7 @@ export default function CertificacionObras() {
               estadoConfig={ESTADO_CONFIG}
               prioridadConfig={PRIORIDAD_CONFIG}
               onEdit={handleEdit}
+              onNewCiclo={handleNewCiclo}
               onDelete={() => deleteMutation.mutate(obra.id)}
               onEstadoChange={(id, estado) => saveMutation.mutate({ id, estado_cobro: estado })}
               onTramoChange={(id, tramo) => saveMutation.mutate({
