@@ -296,18 +296,6 @@ export default function Permisos() {
   const [newRoleName, setNewRoleName] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const handleSaveAll = async () => {
-    setSaving(true);
-    try {
-      const res = await base44.functions.invoke('saveAccessConfig', { roles });
-      toast.success(res.data?.message || 'Configuración guardada correctamente');
-    } catch (err) {
-      toast.error('Error al guardar: ' + err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const { data: roles = [], isLoading } = useQuery({
     queryKey: ['rolePermissions'],
     queryFn: () => base44.entities.RolePermission.list()
@@ -344,6 +332,18 @@ export default function Permisos() {
     });
   };
 
+  const handleSaveAll = async () => {
+    setSaving(true);
+    try {
+      const res = await base44.functions.invoke('saveAccessConfig', { roles: visibleRoles });
+      toast.success(res.data?.message || 'Configuración guardada correctamente');
+    } catch (err) {
+      toast.error('Error al guardar: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const visibleRoles = roles.filter(r => r.role_name !== 'operario_portal');
 
   if (isLoading) return (
@@ -366,7 +366,7 @@ export default function Permisos() {
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={handleSaveAll} disabled={saving || visibleRoles.length === 0} className="gap-2">
+          <Button variant="outline" size="sm" onClick={handleSaveAll} disabled={saving || roles.length === 0} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Sincronizar
           </Button>
