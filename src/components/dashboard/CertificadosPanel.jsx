@@ -17,7 +17,7 @@ const ESTADO_CONFIG = {
   aprobado: { label: 'Aprobado', color: '#10B981', bg: 'bg-green-100 text-green-700' },
 };
 
-export default function CertificadosPanel() {
+export default function CertificadosPanel({ filterCutoff = null }) {
   const { data: certs = [] } = useQuery({
     queryKey: ['certificados-dash'],
     queryFn: () => base44.entities.Certificado.list('-created_date', 200),
@@ -26,7 +26,9 @@ export default function CertificadosPanel() {
 
   const thisMonth = startOfMonth(new Date());
 
-  const thisMonthCerts = certs.filter(c => c.created_date && parseISO(c.created_date) >= thisMonth);
+  // Aplicar filtro de rango de fechas externo si existe, si no usar el mes actual
+  const cutoff = filterCutoff || thisMonth;
+  const thisMonthCerts = certs.filter(c => c.created_date && parseISO(c.created_date) >= cutoff);
   const emitidos = certs.filter(c => c.estado === 'emitido');
   const aprobados = certs.filter(c => c.estado === 'aprobado');
   const totalMes = thisMonthCerts.reduce((s, c) => s + (c.subtotal || 0), 0);

@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { TrendingUp, AlertTriangle, CheckCircle2, Clock, User } from 'lucide-react';
 import { isPast, parseISO, differenceInDays } from 'date-fns';
 
-export default function KpisJefeSitio() {
+export default function KpisJefeSitio({ filterJefe = '', filterCutoff = null }) {
   const { data: pendientes = [] } = useQuery({
     queryKey: ['pendientes-kpis'],
     queryFn: () => base44.entities.Pendiente.list('-created_date', 500),
@@ -40,24 +40,44 @@ export default function KpisJefeSitio() {
     if (jefesSitio.size === 0) return [];
     const jefesMap = {};
 
-    pendientes.forEach(p => {
+    // Aplicar filtros externos
+    const filteredPendientes = pendientes.filter(p => {
+      if (filterJefe && p.jefe_sitio !== filterJefe) return false;
+      if (filterCutoff) {
+        const d = p.updated_date || p.created_date;
+        if (!d || new Date(d) < filterCutoff) return false;
+      }
+      return true;
+    });
+    const filteredOrders = orders.filter(o => {
+      if (filterJefe && o.assigned_name !== filterJefe) return false;
+      if (filterCutoff) {
+        const d = o.updated_date || o.created_date;
+        if (!d || new Date(d) < filterCutoff) return false;
+      }
+      return true;
+    });
+
+    filteredPendientes.forEach(p => {
       if (!p.jefe_sitio || !jefesSitio.has(p.jefe_sitio)) return;
       if (!jefesMap[p.jefe_sitio]) jefesMap[p.jefe_sitio] = { pendientes: [], orders: [] };
       jefesMap[p.jefe_sitio].pendientes.push(p);
     });
 
-    // Inicializar jefes sin pendientes también
-    jefesSitio.forEach(nombre => {
-      if (!jefesMap[nombre]) jefesMap[nombre] = { pendientes: [], orders: [] };
-    });
+    // Inicializar jefes sin pendientes también (solo los relevantes al filtro)
+    if (!filterJefe) {
+      jefesSitio.forEach(nombre => {
+        if (!jefesMap[nombre]) jefesMap[nombre] = { pendientes: [], orders: [] };
+      });
+    }
 
-    orders.forEach(o => {
+    filteredOrders.forEach(o => {
       const nombre = o.assigned_name;
       if (!nombre || !jefesSitio.has(nombre)) return;
       jefesMap[nombre].orders.push(o);
     });
 
-    return Object.entries(jefesMap).map(([nombre, data]) => {
+    return Object.entries(jefesMap).filter(([, d]) => d.pendientes.length > 0 || d.orders.length > 0).map(([nombre, data]) => {
       const totalPend = data.pendientes.length;
       const vencidos = data.pendientes.filter(p =>
         p.fecha_limite && isPast(parseISO(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado'
@@ -82,7 +102,7 @@ export default function KpisJefeSitio() {
 
       return { nombre, totalPend, vencidos, resueltos, eficienciaPend, otsTotales, otsCompletadas, eficienciaOTs, promedioResolucion, score };
     }).sort((a, b) => b.score - a.score).slice(0, 10);
-  }, [pendientes, orders, jefesSitio]);
+  }, [pendientes, orders, jefesSitio, filterJefe, filterCutoff]);
 
   if (kpis.length === 0) return null;
 

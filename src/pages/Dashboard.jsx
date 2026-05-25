@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -21,7 +21,8 @@ import AlertasBanner from '@/components/dashboard/AlertasBanner';
 import EmergenciasWidget from '@/components/dashboard/EmergenciasWidget';
 import KpisJefeSitio from '@/components/dashboard/KpisJefeSitio';
 import AuroraEffect from '@/components/dashboard/AuroraEffect';
-import { format, isPast, parseISO, startOfMonth, subMonths, formatDistanceToNow } from 'date-fns';
+import DashboardFilters from '@/components/dashboard/DashboardFilters';
+import { format, isPast, parseISO, startOfMonth, subMonths, formatDistanceToNow, subDays } from 'date-fns';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { es } from 'date-fns/locale';
 
@@ -160,6 +161,7 @@ function QuickActionCard({ icon: Icon, label, desc, href, color }) {
 
 export default function Dashboard() {
   const { isAdmin, filterByUser, userPermissions, user } = useCurrentUser();
+  const [dashFilters, setDashFilters] = React.useState({ dateRange: 'all', jefeSitio: '', priority: '' });
 
   const canRead = useCallback((moduleKey) => {
     if (user?.role === 'admin') return true;
@@ -176,15 +178,59 @@ export default function Dashboard() {
   const { data: assets = [] }    = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 200),      staleTime: 60000, refetchInterval: 60000, enabled: canRead('Asset') });
   const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 100),   staleTime: 60000, refetchInterval: 60000, enabled: canRead('Employee') });
 
-  const orders = useMemo(() =>
+  const allUserOrders = useMemo(() =>
     filterByUser(allOrders, ['assigned_name', 'assigned_to', 'created_by'])
   , [allOrders, isAdmin, filterByUser]);
+
+  // Fecha de corte según el rango seleccionado
+  const filterCutoff = useMemo(() => {
+    if (dashFilters.dateRange === '7d')  return subDays(new Date(), 7);
+    if (dashFilters.dateRange === '30d') return subDays(new Date(), 30);
+    if (dashFilters.dateRange === '3m')  return subDays(new Date(), 90);
+    return null;
+  }, [dashFilters.dateRange]);
+
+  // Aplicar filtros globales sobre órdenes de trabajo
+  const orders = useMemo(() => {
+    let result = allUserOrders;
+    if (filterCutoff) {
+      result = result.filter(o => {
+        const d = o.updated_date || o.created_date;
+        return d && new Date(d) >= filterCutoff;
+      });
+    }
+    if (dashFilters.jefeSitio) {
+      result = result.filter(o => o.assigned_name === dashFilters.jefeSitio);
+    }
+    if (dashFilters.priority) {
+      result = result.filter(o => o.priority === dashFilters.priority);
+    }
+    return result;
+  }, [allUserOrders, filterCutoff, dashFilters.jefeSitio, dashFilters.priority]);
+
+  // Proyectos filtrados por rango de fecha
+  const filteredProjects = useMemo(() => {
+    if (!filterCutoff) return projects;
+    return projects.filter(p => {
+      const d = p.updated_date || p.created_date;
+      return d && new Date(d) >= filterCutoff;
+    });
+  }, [projects, filterCutoff]);
+
+  // Lista de jefes de sitio para el selector (tomada de employees con rol jefe)
+  const jefesOptions = useMemo(() => {
+    const names = employees
+      .filter(e => e.role && e.role.toLowerCase().includes('jefe'))
+      .map(e => e.full_name)
+      .filter(Boolean);
+    return [...new Set(names)].sort();
+  }, [employees]);
 
   const metrics = useMemo(() => {
     const thisMonth = startOfMonth(new Date());
     const lastMonth = startOfMonth(subMonths(new Date(), 1));
 
-    const activeProjects   = projects.filter(p => p.status === 'en_progreso').length;
+    const activeProjects   = filteredProjects.filter(p => p.status === 'en_progreso').length;
     const pendingOrders    = orders.filter(o => ['pendiente', 'asignada'].includes(o.status)).length;
     const inProgressOrders = orders.filter(o => o.status === 'en_progreso').length;
     const overdueOrders    = orders.filter(o => o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada', 'cancelada'].includes(o.status)).length;
@@ -201,7 +247,7 @@ export default function Dashboard() {
     const completedThisMonth = orders.filter(o => o.completed_date && parseISO(o.completed_date) >= thisMonth && o.status === 'completada').length;
     const efficiency     = orders.length > 0 ? Math.round((orders.filter(o => o.status === 'completada').length / orders.length) * 100) : 0;
     const urgentOrders   = orders.filter(o => ['pendiente', 'asignada', 'en_progreso'].includes(o.status) && ['urgente', 'alta'].includes(o.priority));
-    const recentProjects = projects.filter(p => p.status === 'en_progreso').slice(0, 5);
+    const recentProjects = filteredProjects.filter(p => p.status === 'en_progreso').slice(0, 5);
     const hasAlerts      = overdueOrders > 0 || lowStockItems.length > 0 || overdueAssets.length > 0;
 
     return {
@@ -210,7 +256,7 @@ export default function Dashboard() {
       lowStockItems, overdueAssets, completedThisMonth, efficiency,
       recentProjects, urgentOrders, hasAlerts,
     };
-  }, [projects, orders, clients, invoices, materials, assets, employees]);
+  }, [projects, orders, clients, invoices, materials, assets, employees, filteredProjects]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
@@ -258,6 +304,11 @@ export default function Dashboard() {
 
       {/* ── ALERTAS ── */}
       <AlertasBanner />
+
+      {/* ── FILTROS GLOBALES ── */}
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+        <DashboardFilters filters={dashFilters} onChange={setDashFilters} jefes={jefesOptions} />
+      </motion.div>
 
       {/* ── CRITICAL ALERTS ── */}
       {metrics.hasAlerts && (
@@ -380,7 +431,7 @@ export default function Dashboard() {
         )}
         {canRead('Certificado') && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
-            <CertificadosPanel />
+            <CertificadosPanel filterCutoff={filterCutoff} />
           </motion.div>
         )}
       </div>
@@ -413,7 +464,7 @@ export default function Dashboard() {
 
       {/* ── KPIs JEFE SITIO ── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.62 }}>
-        <KpisJefeSitio />
+        <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} />
       </motion.div>
 
       {/* ── MÉTRICAS OPERACIÓN ── */}
