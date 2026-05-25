@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -161,19 +161,20 @@ function QuickActionCard({ icon: Icon, label, desc, href, color }) {
 export default function Dashboard() {
   const { isAdmin, filterByUser, userPermissions, user } = useCurrentUser();
 
-  const canRead = (moduleKey) => {
+  const canRead = useCallback((moduleKey) => {
     if (user?.role === 'admin') return true;
     if (!userPermissions) return false;
     return userPermissions[moduleKey]?.read === true;
-  };
+  }, [user, userPermissions]);
 
-  const { data: projects = [] }  = useQuery({ queryKey: ['projects'],   queryFn: () => base44.entities.Project.list('-updated_date', 200),   staleTime: 60000 * 5 });
-  const { data: allOrders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 300),  staleTime: 60000 * 5 });
-  const { data: clients = [] }   = useQuery({ queryKey: ['clients'],    queryFn: () => base44.entities.Client.list('-updated_date', 200),     staleTime: 60000 * 10 });
-  const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 200),    staleTime: 60000 * 5 });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 200),   staleTime: 60000 * 10 });
-  const { data: assets = [] }    = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 200),      staleTime: 60000 * 10 });
-  const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 100),   staleTime: 60000 * 10 });
+  // Solo fetchar si el usuario tiene acceso al módulo + refresco cada 30s
+  const { data: projects = [] }  = useQuery({ queryKey: ['projects'],   queryFn: () => base44.entities.Project.list('-updated_date', 200),   staleTime: 30000, refetchInterval: 30000, enabled: canRead('Project') });
+  const { data: allOrders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 300),  staleTime: 30000, refetchInterval: 30000, enabled: canRead('WorkOrder') });
+  const { data: clients = [] }   = useQuery({ queryKey: ['clients'],    queryFn: () => base44.entities.Client.list('-updated_date', 200),     staleTime: 60000, refetchInterval: 60000, enabled: canRead('Client') });
+  const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 200),    staleTime: 30000, refetchInterval: 30000, enabled: canRead('Invoice') });
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 200),   staleTime: 60000, refetchInterval: 60000, enabled: canRead('Inventory') });
+  const { data: assets = [] }    = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 200),      staleTime: 60000, refetchInterval: 60000, enabled: canRead('Asset') });
+  const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 100),   staleTime: 60000, refetchInterval: 60000, enabled: canRead('Employee') });
 
   const orders = useMemo(() =>
     filterByUser(allOrders, ['assigned_name', 'assigned_to', 'created_by'])
@@ -235,22 +236,24 @@ export default function Dashboard() {
             {greeting}{firstName ? `, ${firstName}` : ''} <span className="text-2xl">👋</span>
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            {metrics.pendingOrders} OTs pendientes · {metrics.inProgressOrders} en progreso
-            {metrics.overdueOrders > 0 && <span className="text-red-400 font-semibold"> · ⚠ {metrics.overdueOrders} vencidas</span>}
+            {canRead('WorkOrder') && <>{metrics.pendingOrders} OTs pendientes · {metrics.inProgressOrders} en progreso</>}
+            {canRead('WorkOrder') && metrics.overdueOrders > 0 && <span className="text-red-400 font-semibold"> · ⚠ {metrics.overdueOrders} vencidas</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Link to="/crear-ot">
-            <Button size="sm" className="gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25 border-0">
-              <Zap className="h-3.5 w-3.5" /> Crear OT
-            </Button>
-          </Link>
-          <Link to="/ordenes">
-            <Button size="sm" variant="outline" className="gap-1.5 border-white/10 text-slate-300 hover:text-white">
-              <ClipboardList className="h-3.5 w-3.5" /> Ver OTs
-            </Button>
-          </Link>
-        </div>
+        {canRead('WorkOrder') && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Link to="/crear-ot">
+              <Button size="sm" className="gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25 border-0">
+                <Zap className="h-3.5 w-3.5" /> Crear OT
+              </Button>
+            </Link>
+            <Link to="/ordenes">
+              <Button size="sm" variant="outline" className="gap-1.5 border-white/10 text-slate-300 hover:text-white">
+                <ClipboardList className="h-3.5 w-3.5" /> Ver OTs
+              </Button>
+            </Link>
+          </div>
+        )}
       </motion.div>
 
       {/* ── ALERTAS ── */}
@@ -382,23 +385,31 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ── QUICK ACTIONS ── */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.58 }}>
-        <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="h-4 w-4 text-amber-400" />
-            <h3 className="text-sm font-semibold text-white">Acciones Rápidas</h3>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-            <QuickActionCard href="/crear-ot"           icon={Zap}          label="Crear OT"       desc="Orden rápida"    color="bg-emerald-500/20 text-emerald-300" />
-            <QuickActionCard href="/ordenes"            icon={ClipboardList} label="OTs"            desc="Gestionar"       color="bg-amber-500/20 text-amber-300" />
-            <QuickActionCard href="/inspeccion-colegio" icon={Target}        label="Inspección"     desc="Nuevo recorrido" color="bg-blue-500/20 text-blue-300" />
-            <QuickActionCard href="/activos"            icon={ClipboardList} label="Pendientes"     desc="SAP"             color="bg-purple-500/20 text-purple-300" />
-            <QuickActionCard href="/certificados"       icon={FileCheck}     label="Certificados"   desc="Emitir"          color="bg-teal-500/20 text-teal-300" />
-            <QuickActionCard href="/reportes"           icon={BarChart3}     label="Reportes"       desc="Ver métricas"    color="bg-pink-500/20 text-pink-300" />
-          </div>
-        </div>
-      </motion.div>
+      {/* ── QUICK ACTIONS (solo módulos accesibles) ── */}
+      {(() => {
+        const actions = [
+          canRead('WorkOrder')         && { href: '/crear-ot',           icon: Zap,          label: 'Crear OT',     desc: 'Orden rápida',    color: 'bg-emerald-500/20 text-emerald-300' },
+          canRead('WorkOrder')         && { href: '/ordenes',            icon: ClipboardList, label: 'OTs',          desc: 'Gestionar',       color: 'bg-amber-500/20 text-amber-300' },
+          canRead('InspeccionColegio') && { href: '/inspeccion-colegio', icon: Target,        label: 'Inspección',   desc: 'Recorrido',       color: 'bg-blue-500/20 text-blue-300' },
+          canRead('Asset')             && { href: '/activos',            icon: ClipboardList, label: 'Pendientes',   desc: 'SAP',             color: 'bg-purple-500/20 text-purple-300' },
+          canRead('Certificado')       && { href: '/certificados',       icon: FileCheck,     label: 'Certificados', desc: 'Emitir',          color: 'bg-teal-500/20 text-teal-300' },
+          canRead('Reportes')          && { href: '/reportes',           icon: BarChart3,     label: 'Reportes',     desc: 'Ver métricas',    color: 'bg-pink-500/20 text-pink-300' },
+        ].filter(Boolean);
+        if (actions.length === 0) return null;
+        return (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.58 }}>
+            <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="h-4 w-4 text-amber-400" />
+                <h3 className="text-sm font-semibold text-white">Acciones Rápidas</h3>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                {actions.map((a, i) => <QuickActionCard key={i} {...a} />)}
+              </div>
+            </div>
+          </motion.div>
+        );
+      })()}
 
       {/* ── KPIs JEFE SITIO ── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.62 }}>
