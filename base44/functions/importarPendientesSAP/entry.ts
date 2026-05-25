@@ -9,8 +9,8 @@ function parseDate(val) {
   // Si es número serial de Excel (ej: 45123)
   if (typeof val === 'number' || /^\d{5}$/.test(String(val).trim())) {
     const serial = typeof val === 'number' ? val : parseInt(val);
-    // Excel epoch: 1 enero 1900 = serial 1 (con bug del año bisiesto 1900)
-    const date = new Date(Date.UTC(1900, 0, serial - 1));
+    // Excel epoch real: 30 dic 1899 = serial 0 (incluye bug del 29/feb/1900 ficticio)
+    const date = new Date(Date.UTC(1899, 11, 30 + serial));
     const y = date.getUTCFullYear();
     const m = String(date.getUTCMonth() + 1).padStart(2, '0');
     const d = String(date.getUTCDate()).padStart(2, '0');
