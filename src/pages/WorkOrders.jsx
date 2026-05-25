@@ -12,8 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Search, Plus, ClipboardList, User, Calendar, MapPin,
   AlertTriangle, CheckCircle2, Clock, Zap, Wrench, Eye, Trash2, FileText, QrCode, Sparkles, TrendingUp,
-  Layers, History, Smartphone
+  Layers, History, Smartphone, PlusCircle
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import WorkOrderQRButton from '@/components/workorders/WorkOrderQRButton';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { exportOTsPDF } from '@/utils/exportPDF';
@@ -278,6 +279,11 @@ export default function WorkOrders() {
             <Button variant="outline" size="sm" onClick={() => setTemplateOpen(true)} className="gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2">
               <Layers className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Plantillas</span>
             </Button>
+            <Link to="/crear-ot">
+              <Button size="sm" className="gap-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg shadow-emerald-500/50 transition-all text-xs px-2">
+                <PlusCircle className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Crear rápido</span><span className="sm:hidden">Rápido</span>
+              </Button>
+            </Link>
             <Button size="sm" onClick={() => setNewDialogOpen(true)} className="gap-1 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/50 transition-all text-xs px-2">
               <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Nueva OT</span><span className="sm:hidden">Nueva</span>
             </Button>

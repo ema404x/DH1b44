@@ -13,6 +13,7 @@ import Fichar from '@/pages/Fichar';
 import FicharUbicacion from '@/pages/FicharUbicacion';
 import OrdenTrabajoPublica from '@/pages/OrdenTrabajoPublica';
 import EjecutarOrdenPublica from '@/pages/EjecutarOrdenPublica';
+import EjecutarOTSimplePublic from '@/pages/EjecutarOTSimple';
 
 // Páginas autenticadas — lazy loading (se cargan solo cuando el usuario navega a ellas)
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
@@ -47,6 +48,7 @@ const ControlRiesgo = lazy(() => import('@/pages/ControlRiesgo'));
 const CertificacionObras = lazy(() => import('@/pages/CertificacionObras'));
 const InformePlaneacion = lazy(() => import('@/pages/InformePlaneacion'));
 const CalendarioInformes = lazy(() => import('@/pages/CalendarioInformes'));
+const CrearOT = lazy(() => import('@/pages/CrearOT'));
 import ProtectedPage from '@/components/shared/ProtectedPage';
 
 // Spinner de carga mientras se descarga la página lazy
@@ -134,6 +136,7 @@ const AuthenticatedApp = () => {
         <Route path="/certificacion-obras" element={<ProtectedPage moduleKey="CertificacionObras"><CertificacionObras /></ProtectedPage>} />
         <Route path="/informe-planeacion" element={<ProtectedPage moduleKey="InformePlaneacion"><InformePlaneacion /></ProtectedPage>} />
         <Route path="/calendario-informes" element={<ProtectedPage moduleKey="Informes"><CalendarioInformes /></ProtectedPage>} />
+        <Route path="/crear-ot" element={<ProtectedPage moduleKey="WorkOrder"><CrearOT /></ProtectedPage>} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
@@ -152,6 +155,7 @@ function App() {
             <Route path="/fichar-ubicacion" element={<FicharUbicacion />} />
             <Route path="/orden-trabajo" element={<OrdenTrabajoPublica />} />
             <Route path="/ejecutar-ot" element={<EjecutarOrdenPublica />} />
+            <Route path="/ejecutar-ot-simple" element={<EjecutarOTSimplePublic />} />
             {/* Rutas autenticadas */}
             <Route path="/*" element={
               <AuthProvider>
