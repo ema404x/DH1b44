@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import DiagnosticoVinculacion from '@/components/permisos/DiagnosticoVinculacion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -80,14 +80,13 @@ function ClaveOperarioPanel() {
   const { data: configs = [] } = useQuery({
     queryKey: ['operario_portal_config'],
     queryFn: () => base44.entities.RolePermission.list(),
-    select: (data) => {
-      const cfg = data.find(r => r.role_name === 'operario_portal');
-      if (cfg) setClave(cfg.description || '');
-      return data;
-    }
   });
 
   const existingConfig = configs.find(r => r.role_name === 'operario_portal');
+
+  useEffect(() => {
+    if (existingConfig) setClave(existingConfig.description || '');
+  }, [existingConfig?.id]);
 
   const handleSave = async () => {
     if (!clave.trim()) return;
