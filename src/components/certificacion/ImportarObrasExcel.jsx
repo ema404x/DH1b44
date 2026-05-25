@@ -99,7 +99,7 @@ function detectarComuna(sheetName) {
   return null;
 }
 
-export default function ImportarObrasExcel({ open, onClose, onImported, cicloId, cicloPeriodo }) {
+export default function ImportarObrasExcel({ open, onClose, onImported }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState([]);   // [{obra, sheetName, rowIndex}]
   const [errors, setErrors] = useState([]);
@@ -152,10 +152,7 @@ export default function ImportarObrasExcel({ open, onClose, onImported, cicloId,
     let ok = 0, fail = 0;
     for (const { obra } of preview) {
       try {
-        await base44.entities.ObraCertificacion.create({
-          ...obra,
-          ...(cicloId ? { ciclo_id: cicloId, ciclo_periodo: cicloPeriodo } : {}),
-        });
+        await base44.entities.ObraCertificacion.create(obra);
         ok++;
       } catch { fail++; }
     }
