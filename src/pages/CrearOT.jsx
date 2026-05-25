@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Mic, MicOff, Camera, CheckCircle2, Loader2, MapPin,
   ClipboardList, Zap, X, QrCode, Plus, Trash2, ChevronRight,
-  ChevronLeft, User, Calendar, Clock, Package, Wrench, AlertTriangle,
+  ChevronLeft, Clock, Package, Wrench, AlertTriangle,
   Layers, ArrowLeft
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -40,8 +40,7 @@ const TYPES = [
 const STEPS = [
   { id: 1, label: 'Ubicación' },
   { id: 2, label: 'Detalle' },
-  { id: 3, label: 'Tareas' },
-  { id: 4, label: 'Asignación' },
+  { id: 3, label: 'Materiales' },
 ];
 
 // ── Componente auxiliar: item de checklist ─────────────────────────────────────
@@ -112,10 +111,7 @@ export default function CrearOT() {
   const [priority, setPriority] = useState('media');
   const [description, setDescription] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
-  const [estimatedHours, setEstimatedHours] = useState('');
-  const [checklist, setChecklist] = useState([]);
   const [materials, setMaterials] = useState([]);
-  const [assignedEmployee, setAssignedEmployee] = useState(null); // { id, full_name }
   const [photos, setPhotos] = useState([]);
   const [requirePhotos, setRequirePhotos] = useState(false);
 
@@ -137,13 +133,6 @@ export default function CrearOT() {
     staleTime: 60000,
   });
   const activeLocations = locations.filter(l => l.is_active !== false);
-
-  const { data: employees = [] } = useQuery({
-    queryKey: ['employees-activos'],
-    queryFn: () => base44.entities.Employee.list('full_name', 200),
-    staleTime: 60000,
-  });
-  const activeEmployees = employees.filter(e => !e.status || e.status === 'activo');
 
   // ── Mutation ─────────────────────────────────────────────────────────────────
 
@@ -172,20 +161,10 @@ export default function CrearOT() {
     setType(template.type || 'mantenimiento_correctivo');
     setPriority(template.priority || 'media');
     setDescription(template.description || '');
-    setEstimatedHours(template.estimated_hours ? String(template.estimated_hours) : '');
-    setChecklist((template.checklist || []).map(t => ({ ...t, id: crypto.randomUUID(), completed: false })));
     setRequirePhotos(!!template.require_photos);
     setTemplateOpen(false);
     toast.success(`Plantilla "${template.nombre}" aplicada`);
   }, []);
-
-  // Checklist
-  const addChecklistItem = () =>
-    setChecklist(prev => [...prev, { id: crypto.randomUUID(), task: '', completed: false }]);
-  const updateChecklistItem = (id, updated) =>
-    setChecklist(prev => prev.map(i => i.id === id ? updated : i));
-  const removeChecklistItem = (id) =>
-    setChecklist(prev => prev.filter(i => i.id !== id));
 
   // Materiales
   const addMaterial = () =>
@@ -253,13 +232,9 @@ export default function CrearOT() {
       description,
       status: 'pendiente',
       scheduled_date: scheduledDate || undefined,
-      estimated_hours: estimatedHours ? parseFloat(estimatedHours) : undefined,
-      checklist: checklist.filter(i => i.task.trim()),
       materials_used: materials.filter(m => m.material_name.trim()),
       require_photos: requirePhotos,
       photos,
-      assigned_to: assignedEmployee?.id || '',
-      assigned_name: assignedEmployee?.full_name || '',
       location_qr_id: selectedLocation?.id || '',
       location_qr_name: selectedLocation?.name || '',
       location: selectedLocation?.address || selectedLocation?.name || '',
@@ -278,10 +253,7 @@ export default function CrearOT() {
     setPriority('media');
     setDescription('');
     setScheduledDate('');
-    setEstimatedHours('');
-    setChecklist([]);
     setMaterials([]);
-    setAssignedEmployee(null);
     setPhotos([]);
     setRequirePhotos(false);
   };
@@ -291,8 +263,7 @@ export default function CrearOT() {
   const canProceed = () => {
     if (step === 1) return true; // ubicación es opcional
     if (step === 2) return title.trim().length > 0;
-    if (step === 3) return true; // tareas/materiales opcionales
-    if (step === 4) return true; // asignación opcional
+    if (step === 3) return true; // materiales opcionales
     return false;
   };
 
@@ -314,16 +285,7 @@ export default function CrearOT() {
                   <MapPin className="h-3 w-3" /> {selectedLocation.name}
                 </p>
               )}
-              {assignedEmployee && (
-                <p className="flex items-center justify-center gap-1">
-                  <User className="h-3 w-3" /> {assignedEmployee.full_name}
-                </p>
-              )}
-              {checklist.length > 0 && (
-                <p className="flex items-center justify-center gap-1">
-                  <ClipboardList className="h-3 w-3" /> {checklist.filter(i => i.task.trim()).length} tarea(s) en checklist
-                </p>
-              )}
+
             </div>
           </div>
           <div className="space-y-2">
@@ -372,7 +334,7 @@ export default function CrearOT() {
               </div>
               <div>
                 <h1 className="text-base font-bold text-foreground">Crear Orden de Trabajo</h1>
-                <p className="text-xs text-muted-foreground">Paso {step} de 4</p>
+                <p className="text-xs text-muted-foreground">Paso {step} de 3</p>
               </div>
             </div>
             <Button
@@ -569,65 +531,19 @@ export default function CrearOT() {
           </div>
         )}
 
-        {/* ── PASO 3: Tareas & Materiales ────────────────────────────────────── */}
+        {/* ── PASO 3: Materiales + Resumen ───────────────────────────────────── */}
         {step === 3 && (
-          <div className="space-y-6">
-            <SectionTitle icon={ClipboardList} label="Checklist y materiales" sub="Definí las tareas y los insumos necesarios" />
+          <div className="space-y-5">
+            <SectionTitle icon={Package} label="Materiales y confirmación" sub="Agregá los insumos necesarios y revisá el resumen antes de crear la OT" />
 
-            {/* Fechas y horas */}
-            <div className="grid grid-cols-2 gap-3">
-              <FieldGroup label="Fecha programada">
-                <Input
-                  type="date"
-                  value={scheduledDate}
-                  onChange={e => setScheduledDate(e.target.value)}
-                  className="bg-card border-border text-foreground h-11"
-                />
-              </FieldGroup>
-              <FieldGroup label="Horas estimadas">
-                <Input
-                  type="number"
-                  min="0.5"
-                  step="0.5"
-                  value={estimatedHours}
-                  onChange={e => setEstimatedHours(e.target.value)}
-                  placeholder="Ej: 2.5"
-                  className="bg-card border-border text-foreground h-11"
-                />
-              </FieldGroup>
-            </div>
-
-            {/* Checklist */}
-            <FieldGroup
-              label="Checklist de tareas"
-              action={
-                <button onClick={addChecklistItem} className="text-xs text-primary flex items-center gap-1 hover:underline">
-                  <Plus className="h-3 w-3" /> Agregar tarea
-                </button>
-              }
-            >
-              {checklist.length === 0 ? (
-                <div
-                  onClick={addChecklistItem}
-                  className="w-full h-16 rounded-xl border-2 border-dashed border-border bg-card hover:border-primary/50 flex items-center justify-center gap-2 text-muted-foreground text-sm cursor-pointer transition-colors"
-                >
-                  <Plus className="h-4 w-4" /> Agregar primera tarea
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {checklist.map(item => (
-                    <ChecklistItem
-                      key={item.id}
-                      item={item}
-                      onUpdate={updated => updateChecklistItem(item.id, updated)}
-                      onRemove={() => removeChecklistItem(item.id)}
-                    />
-                  ))}
-                  <button onClick={addChecklistItem} className="w-full h-9 rounded-lg border border-dashed border-border bg-card hover:border-primary/50 text-xs text-muted-foreground flex items-center justify-center gap-1.5 transition-colors">
-                    <Plus className="h-3 w-3" /> Agregar tarea
-                  </button>
-                </div>
-              )}
+            {/* Fecha programada */}
+            <FieldGroup label="Fecha programada">
+              <Input
+                type="date"
+                value={scheduledDate}
+                onChange={e => setScheduledDate(e.target.value)}
+                className="bg-card border-border text-foreground h-11"
+              />
             </FieldGroup>
 
             {/* Materiales */}
@@ -681,38 +597,6 @@ export default function CrearOT() {
                 <p className="text-xs text-muted-foreground">El operario deberá adjuntar fotos antes de marcar la OT como completada</p>
               </div>
             </label>
-          </div>
-        )}
-
-        {/* ── PASO 4: Asignación + Resumen ───────────────────────────────────── */}
-        {step === 4 && (
-          <div className="space-y-5">
-            <SectionTitle icon={User} label="Asignación y confirmación" sub="Asigná un técnico y revisá el resumen antes de crear la OT" />
-
-            {/* Asignar técnico */}
-            <FieldGroup label="Técnico asignado">
-              <Select
-                value={assignedEmployee?.id || '__none__'}
-                onValueChange={v => {
-                  if (v === '__none__') { setAssignedEmployee(null); return; }
-                  const emp = activeEmployees.find(e => e.id === v);
-                  setAssignedEmployee(emp ? { id: emp.id, full_name: emp.full_name } : null);
-                }}
-              >
-                <SelectTrigger className="bg-card border-border text-foreground h-12">
-                  <SelectValue placeholder="Sin asignar..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— Sin asignar —</SelectItem>
-                  {activeEmployees.map(e => (
-                    <SelectItem key={e.id} value={e.id}>
-                      <span className="font-medium">{e.full_name}</span>
-                      {e.specialty ? <span className="text-muted-foreground ml-1 text-xs">· {e.specialty}</span> : null}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldGroup>
 
             {/* Resumen */}
             <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -722,16 +606,11 @@ export default function CrearOT() {
               <SummaryRow label="Prioridad" value={priority.charAt(0).toUpperCase() + priority.slice(1)} />
               {selectedLocation && <SummaryRow label="Establecimiento" value={selectedLocation.name} />}
               {scheduledDate && <SummaryRow label="Fecha programada" value={scheduledDate} />}
-              {estimatedHours && <SummaryRow label="Horas estimadas" value={`${estimatedHours} h`} />}
-              {checklist.filter(i => i.task.trim()).length > 0 && (
-                <SummaryRow label="Checklist" value={`${checklist.filter(i => i.task.trim()).length} tarea(s)`} />
-              )}
               {materials.filter(m => m.material_name.trim()).length > 0 && (
                 <SummaryRow label="Materiales" value={`${materials.filter(m => m.material_name.trim()).length} ítem(s)`} />
               )}
               {photos.length > 0 && <SummaryRow label="Fotos adjuntas" value={`${photos.length} foto(s)`} />}
               {requirePhotos && <SummaryRow label="Requiere fotos" value="Sí" />}
-              {assignedEmployee && <SummaryRow label="Asignado a" value={assignedEmployee.full_name} />}
             </div>
           </div>
         )}
@@ -743,7 +622,7 @@ export default function CrearOT() {
               <ChevronLeft className="h-4 w-4" /> Atrás
             </Button>
           )}
-          {step < 4 ? (
+          {step < 3 ? (
             <Button
               className="flex-1 h-12 gap-2 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/30"
               onClick={() => {
