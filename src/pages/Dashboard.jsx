@@ -176,7 +176,15 @@ export default function Dashboard() {
   const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 200),    staleTime: 30000, refetchInterval: 30000, enabled: canRead('Invoice') });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 200),   staleTime: 60000, refetchInterval: 60000, enabled: canRead('Inventory') });
   const { data: assets = [] }    = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 200),      staleTime: 60000, refetchInterval: 60000, enabled: canRead('Asset') });
+  const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: () => base44.entities.Pendiente.list('-updated_date', 500), staleTime: 30000, refetchInterval: 30000, enabled: canRead('Asset') });
   const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 100),   staleTime: 60000, refetchInterval: 60000, enabled: canRead('Employee') });
+
+  // Pendientes filtrados: admin ve todos, jefe de sitio solo los suyos
+  const pendientes = useMemo(() => {
+    if (isAdmin) return allPendientes;
+    const nombreJefe = user?.full_name || '';
+    return allPendientes.filter(p => p.jefe_sitio === nombreJefe);
+  }, [allPendientes, isAdmin, user]);
 
   const allUserOrders = useMemo(() =>
     filterByUser(allOrders, ['assigned_name', 'assigned_to', 'created_by'])
@@ -342,7 +350,7 @@ export default function Dashboard() {
       <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"  value={metrics.activeClients}            subtitle={`${clients.length} en total`}                        icon={Users}         color="primary" />}
         {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"     value={metrics.urgentOrders.length}      subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={metrics.urgentOrders.length > 0 ? 'red' : 'green'} />}
-        {canRead('Asset')     && <KpiCard href="/activos"    title="Activos"      value={assets.length}                    subtitle={`${metrics.overdueAssets.length} mant. vencido`}    icon={Wrench}        color="amber"  />}
+        {canRead('Asset')     && <KpiCard href="/activos"    title="Pendientes SAP" value={pendientes.filter(p => ['pendiente','asignado','en_progreso'].includes(p.estado)).length} subtitle={`${pendientes.filter(p => p.estado === 'resuelto').length} resueltos`} icon={Wrench} color="amber" alert={pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto').length > 0 ? pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto').length : undefined} />}
         {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"   value={materials.length}                 subtitle={`${metrics.lowStockItems.length} bajo mínimo`}      icon={Package}       color={metrics.lowStockItems.length > 0 ? 'red' : 'green'} />}
       </motion.div>
 
