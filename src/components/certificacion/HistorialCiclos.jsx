@@ -25,10 +25,11 @@ const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency:
 function CicloHistoricoCard({ ciclo }) {
   const [expanded, setExpanded] = useState(false);
 
-  const { data: obras = [] } = useQuery({
+  const { data: obras = [], isFetching } = useQuery({
     queryKey: ['obras-ciclo', ciclo.id],
     queryFn: () => base44.entities.ObraCertificacion.filter({ ciclo_id: ciclo.id }, '-created_date', 500),
     enabled: expanded,
+    staleTime: 0,
   });
 
   return (
@@ -73,7 +74,11 @@ function CicloHistoricoCard({ ciclo }) {
 
         {expanded && (
           <div className="mt-4 space-y-2">
-            {obras.length === 0 ? (
+            {isFetching ? (
+              <div className="flex justify-center py-6">
+                <div className="h-5 w-5 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+              </div>
+            ) : obras.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No hay obras registradas en este ciclo.</p>
             ) : (
               obras.map(obra => (
@@ -98,11 +103,14 @@ function CicloHistoricoCard({ ciclo }) {
   );
 }
 
+
 export default function HistorialCiclos() {
-  const { data: ciclos = [], isLoading } = useQuery({
+  const { data: todosCiclos = [], isLoading } = useQuery({
     queryKey: ['ciclos-certificacion-historico'],
-    queryFn: () => base44.entities.CicloCertificacion.filter({ activo: false }, '-created_date', 100),
+    queryFn: () => base44.entities.CicloCertificacion.list('-created_date', 100),
   });
+
+  const ciclos = todosCiclos.filter(c => !c.activo);
 
   if (isLoading) return (
     <div className="flex justify-center py-12">
