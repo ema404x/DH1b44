@@ -5,8 +5,9 @@
 import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
-  CheckCircle2, Loader2, Camera, X, ChevronDown, ChevronUp, ArrowLeft
+  CheckCircle2, Loader2, Camera, X, ChevronDown, ChevronUp, ArrowLeft, MapPin
 } from 'lucide-react';
+import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
 
 const callFn = async (payload) => {
   const res = await base44.functions.invoke('publicFichar', payload);
@@ -78,9 +79,14 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
   const [photos, setPhotos] = useState([]);
   const [saving, setSaving] = useState(false);
   const [showDesc, setShowDesc] = useState(true);
+  const [gpsStatus, setGpsStatus] = useState(null);
+  const { capturar } = useGeolocalizacion();
 
   const handleCompletar = async () => {
     setSaving(true);
+    setGpsStatus('capturando');
+    const gpsData = await capturar();
+    setGpsStatus(gpsData.gps_status);
     const res = await callFn({
       action: 'updateWorkOrder',
       workOrderId: order.id,
@@ -88,6 +94,7 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
         status: 'completada',
         completed_date: new Date().toISOString().split('T')[0],
         ...(photos.length > 0 && { photos: [...(order.photos || []), ...photos] }),
+        ...gpsData,
       },
     });
     setSaving(false);
@@ -166,13 +173,26 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
               ⚠️ Esta OT requiere al menos una foto
             </p>
           )}
+          {gpsStatus === 'capturando' && (
+            <p className="text-center text-sm text-blue-600 font-medium mb-3 flex items-center justify-center gap-1.5">
+              <MapPin className="h-4 w-4 animate-pulse" /> Obteniendo ubicación GPS...
+            </p>
+          )}
+          {gpsStatus === 'denegado' && (
+            <p className="text-center text-xs text-slate-400 mb-2">📍 Sin GPS — se guardará sin ubicación</p>
+          )}
+          {gpsStatus === 'capturado' && (
+            <p className="text-center text-xs text-emerald-600 mb-2 flex items-center justify-center gap-1">
+              <MapPin className="h-3.5 w-3.5" /> Ubicación capturada
+            </p>
+          )}
           <button
             onClick={handleCompletar}
             disabled={saving || needsPhoto}
             className="w-full h-16 rounded-2xl bg-emerald-500 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xl flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/30 active:scale-[0.98] transition-all"
           >
             {saving
-              ? <><Loader2 className="h-6 w-6 animate-spin" /> Guardando...</>
+              ? <><Loader2 className="h-6 w-6 animate-spin" /> {gpsStatus === 'capturando' ? 'Localizando...' : 'Guardando...'}</>
               : <><CheckCircle2 className="h-7 w-7" /> Marcar como Completada</>
             }
           </button>
