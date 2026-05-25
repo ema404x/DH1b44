@@ -99,6 +99,17 @@ Deno.serve(async (req) => {
       return Response.json({ file_url: result.file_url });
     }
 
+    // VERIFY operario password (global PIN stored in app config)
+    if (action === 'verifyOperarioPassword') {
+      const { password } = body;
+      if (!password) return Response.json({ valid: false }, { status: 400 });
+      // Buscar la clave global en la entidad RolePermission con role_name='operario_portal'
+      const configs = await base44.asServiceRole.entities.RolePermission.list('role_name', 100);
+      const config = configs.find(c => c.role_name === 'operario_portal');
+      const storedPassword = config?.description || 'operario123'; // default si no está configurado
+      return Response.json({ valid: password === storedPassword });
+    }
+
     // UPDATE work order (public — operario saves checklist, photos, signature)
     if (action === 'updateWorkOrder') {
       const { workOrderId, updates } = body;

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Plus, Save, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
+import { Plus, Save, Trash2, Loader2, CheckCircle2, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
@@ -55,6 +55,72 @@ const ACTION_LABELS = {
   export: 'Exportar',
   approve: 'Aprobar',
 };
+
+function ClaveOperarioPanel() {
+  const queryClient = useQueryClient();
+  const [clave, setClave] = useState('');
+  const [showClave, setShowClave] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const { data: configs = [] } = useQuery({
+    queryKey: ['operario_portal_config'],
+    queryFn: () => base44.entities.RolePermission.list(),
+    select: (data) => {
+      const cfg = data.find(r => r.role_name === 'operario_portal');
+      if (cfg) setClave(cfg.description || '');
+      return data;
+    }
+  });
+
+  const existingConfig = configs.find(r => r.role_name === 'operario_portal');
+
+  const handleSave = async () => {
+    if (!clave.trim()) return;
+    setSaving(true);
+    if (existingConfig) {
+      await base44.entities.RolePermission.update(existingConfig.id, { description: clave.trim() });
+    } else {
+      await base44.entities.RolePermission.create({ role_name: 'operario_portal', description: clave.trim(), permissions: {}, is_active: true });
+    }
+    queryClient.invalidateQueries({ queryKey: ['operario_portal_config'] });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <Card className="p-5 border-blue-200 bg-blue-50/30">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="h-9 w-9 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+          <KeyRound className="h-5 w-5 text-blue-600" />
+        </div>
+        <div>
+          <h3 className="font-bold text-base">Clave Global del Portal Operarios</h3>
+          <p className="text-sm text-muted-foreground">Clave que ingresan los operarios al escanear el QR del establecimiento. Sin esta clave no pueden acceder.</p>
+        </div>
+      </div>
+      <div className="flex gap-2 max-w-sm">
+        <div className="relative flex-1">
+          <Input
+            type={showClave ? 'text' : 'password'}
+            value={clave}
+            onChange={e => setClave(e.target.value)}
+            placeholder="Ingresá la clave..."
+            className="pr-10"
+          />
+          <button onClick={() => setShowClave(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+            {showClave ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+        <Button onClick={handleSave} disabled={saving || !clave.trim()} className="gap-1.5 min-w-[100px]">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <><CheckCircle2 className="h-4 w-4" /> Guardado</> : <><Save className="h-4 w-4" /> Guardar</>}
+        </Button>
+      </div>
+      {!existingConfig && <p className="text-xs text-orange-600 mt-2 font-medium">⚠️ No hay clave configurada. El portal usa "operario123" por defecto.</p>}
+    </Card>
+  );
+}
 
 export default function Permisos() {
   const queryClient = useQueryClient();
@@ -160,6 +226,8 @@ export default function Permisos() {
           </div>
         </Card>
       )}
+
+      <ClaveOperarioPanel />
 
       <DiagnosticoVinculacion />
 

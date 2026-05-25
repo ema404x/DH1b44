@@ -300,7 +300,10 @@ export default function WorkOrders() {
           onClose={() => setQrOrder(null)}
           title={qrOrder.title}
           subtitle={qrOrder.location || `OT ${qrOrder.code || ''}`}
-          value={`${window.location.origin}/ejecutar-ot-simple?ot=${qrOrder.id}`}
+          value={qrOrder.location_qr_id
+            ? `${window.location.origin}/portal-operario?loc=${qrOrder.location_qr_id}`
+            : `${window.location.origin}/ejecutar-ot-simple?ot=${qrOrder.id}`
+          }
         />
       )}
     </div>

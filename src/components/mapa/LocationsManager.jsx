@@ -68,7 +68,7 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
   const openEdit = (loc) => { setEditing(loc); setForm({ ...loc }); setDialogOpen(true); };
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  const getQROTUrl = (loc) => `${window.location.origin}/ejecutar-ot?loc=${loc.id}`;
+  const getQROTUrl = (loc) => `${window.location.origin}/portal-operario?loc=${loc.id}`;
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('El nombre es requerido'); return; }
@@ -255,7 +255,7 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
         open={!!qrLoc}
         onClose={() => setQrLoc(null)}
         title={qrLoc?.name || ''}
-        subtitle={qrLoc?.address || qrLoc?.project_name || 'Escanear para ver y completar la OT'}
+        subtitle={qrLoc?.address || qrLoc?.project_name || 'Escanear para ver las OTs del establecimiento'}
         value={qrLoc ? getQROTUrl(qrLoc) : ''}
       />
 

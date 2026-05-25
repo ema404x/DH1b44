@@ -14,6 +14,7 @@ import FicharUbicacion from '@/pages/FicharUbicacion';
 import OrdenTrabajoPublica from '@/pages/OrdenTrabajoPublica';
 import EjecutarOrdenPublica from '@/pages/EjecutarOrdenPublica';
 import EjecutarOTSimplePublic from '@/pages/EjecutarOTSimple';
+import PortalOperario from '@/pages/PortalOperario';
 
 // Páginas autenticadas — lazy loading (se cargan solo cuando el usuario navega a ellas)
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
@@ -156,6 +157,7 @@ function App() {
             <Route path="/orden-trabajo" element={<OrdenTrabajoPublica />} />
             <Route path="/ejecutar-ot" element={<EjecutarOrdenPublica />} />
             <Route path="/ejecutar-ot-simple" element={<EjecutarOTSimplePublic />} />
+            <Route path="/portal-operario" element={<PortalOperario />} />
             {/* Rutas autenticadas */}
             <Route path="/*" element={
               <AuthProvider>
