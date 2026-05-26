@@ -49,7 +49,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
 
   const handleAprobar = async () => {
     setAprobando(true);
-    const nombreGerente = 'Arq. Raúl García';
+    const nombreGerente = user?.full_name || user?.email || 'Gerencia';
     const payload = {
       aprobado_por: nombreGerente,
       aprobado_por_email: user?.email,
@@ -76,7 +76,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
 
   const handleRechazar = () => {
     if (!motivo.trim()) { toast.error('Ingresá el motivo de rechazo'); return; }
-    const nombreGerente = 'Arq. Raúl García';
+    const nombreGerente = user?.full_name || user?.email || 'Gerencia';
     updateMutation.mutate({
       aprobado_por: nombreGerente,
       aprobado_por_email: user?.email,
