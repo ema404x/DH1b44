@@ -17,7 +17,7 @@ export function useCurrentUser() {
   const employeeRole = userPermissions?._employeeRole || null;
 
   // Roles que deben ver solo sus propios datos
-  const FIELD_ROLES = ['jefe_sitio', 'inspector', 'tecnico', 'supervisor'];
+  const FIELD_ROLES = ['jefe_sitio', 'jefe de sitio', 'inspector', 'tecnico', 'supervisor'];
 
   // Roles de empleado que tienen visibilidad total (como admin)
   const ADMIN_EMPLOYEE_ROLES = ['administrativo', 'admin', 'gerente', 'gerencia'];

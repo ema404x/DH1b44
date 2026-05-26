@@ -110,7 +110,7 @@ export default function WorkOrders() {
   });
 
   const visibleOrders = useMemo(() =>
-    filterByUser(orders, ['assigned_name', 'assigned_to', 'created_by'])
+    filterByUser(orders, ['assigned_name', 'assigned_to', 'created_by', 'location'])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   , [orders, currentUser, isAdmin]);
 

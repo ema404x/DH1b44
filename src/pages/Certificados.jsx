@@ -38,7 +38,8 @@ export default function Certificados() {
     refetchOnWindowFocus: true,
   });
 
-  const certificados = filterByUser(rawCertificados, ['jefe_sitio', 'jefe_sitio_email']);
+  // Para certificados: filtrar por creador (created_by_id) ya que no tienen campo jefe_sitio directo
+  const certificados = filterByUser(rawCertificados, ['contratista_id']);
 
   // Al guardar: siempre crea un registro nuevo (nunca actualiza el existente)
   // y si el estado es 'emitido', crea automáticamente una SolicitudCertificado
