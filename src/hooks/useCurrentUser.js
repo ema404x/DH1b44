@@ -20,7 +20,7 @@ export function useCurrentUser() {
   const FIELD_ROLES = ['jefe_sitio', 'inspector', 'tecnico', 'supervisor'];
 
   // Roles de empleado que tienen visibilidad total (como admin)
-  const ADMIN_EMPLOYEE_ROLES = ['administrativo', 'admin', 'gerente'];
+  const ADMIN_EMPLOYEE_ROLES = ['administrativo', 'admin', 'gerente', 'gerencia'];
 
   // Es "super admin" si:
   // 1. Tiene role=admin en la plataforma y NO tiene rol de campo, O
