@@ -76,6 +76,10 @@
     "assigned_comuna": {
       "type": "string"
     },
+    "firma_url": {
+      "type": "string",
+      "description": "URL de la firma digital guardada del empleado"
+    },
     "notes": {
       "type": "string"
     }
