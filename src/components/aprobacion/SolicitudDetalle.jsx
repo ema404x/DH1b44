@@ -46,8 +46,10 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
     });
   };
 
+  const puedeAprobar = user?.email?.toLowerCase() === 'rgarciamejores@gmail.com';
+
   const handleAprobar = () => {
-    // Abrir modal de firma antes de confirmar
+    if (!puedeAprobar) { toast.error('Solo Raúl García puede aprobar certificados'); return; }
     setShowFirmaModal(true);
   };
 
@@ -273,7 +275,8 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
                 size="sm"
                 className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                 onClick={handleAprobar}
-                disabled={updateMutation.isPending || aprobando}
+                disabled={updateMutation.isPending || aprobando || !puedeAprobar}
+                title={!puedeAprobar ? 'Solo Raúl García puede aprobar' : ''}
               >
                 <CheckSquare className="h-4 w-4" /> Aprobar
               </Button>
