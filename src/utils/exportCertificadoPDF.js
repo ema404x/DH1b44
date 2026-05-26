@@ -278,8 +278,8 @@ export async function exportCertificadoPDF(form) {
 
   // Bloque de firma de Raúl García (si el certificado está aprobado)
   if (firmaBase64) {
-    const FIRMA_W = 60;
-    const FIRMA_H = 22;
+    const FIRMA_W = 55;
+    const FIRMA_H = 40;
     const FIRMA_X = M;
     const FIRMA_Y = y;
 
