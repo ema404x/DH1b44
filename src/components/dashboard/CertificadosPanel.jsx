@@ -55,6 +55,21 @@ export default function CertificadosPanel({ filterCutoff = null }) {
 
   const recentCerts = thisMonthCerts.slice(0, 4);
 
+  // Conteo de abonos por comuna (histórico total)
+  const abonosPorComuna = useMemo(() => {
+    const comunas = { '8A': 0, '8B': 0, '10A': 0, 'Sin comuna': 0 };
+    certs.filter(c => c.tipo === 'abono_mensual').forEach(c => {
+      const texto = `${c.emprendimiento || ''} ${c.obra_servicio || ''}`.toUpperCase();
+      if (texto.includes('8A') || texto.includes('8 A')) comunas['8A']++;
+      else if (texto.includes('8B') || texto.includes('8 B')) comunas['8B']++;
+      else if (texto.includes('10A') || texto.includes('10 A')) comunas['10A']++;
+      else comunas['Sin comuna']++;
+    });
+    return comunas;
+  }, [certs]);
+
+  const totalAbonos = Object.values(abonosPorComuna).reduce((a, b) => a + b, 0);
+
   return (
     <Card className="border-border/60">
       <CardHeader className="pb-2 pt-4 px-4">
@@ -148,6 +163,28 @@ export default function CertificadosPanel({ filterCutoff = null }) {
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-3 justify-center">
             <Clock className="h-4 w-4" />
             <span>Sin certificados este mes</span>
+          </div>
+        )}
+
+        {/* Abonos por Comuna — histórico total */}
+        {totalAbonos > 0 && (
+          <div>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Abonos por Comuna (total: {totalAbonos})
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {['8A', '8B', '10A'].map(c => (
+                <div key={c} className="rounded-lg bg-violet-50 border border-violet-100 p-2.5 text-center">
+                  <p className="text-lg font-bold text-violet-700">{abonosPorComuna[c]}</p>
+                  <p className="text-[10px] text-violet-600 font-medium">Comuna {c}</p>
+                </div>
+              ))}
+            </div>
+            {abonosPorComuna['Sin comuna'] > 0 && (
+              <p className="text-[10px] text-muted-foreground mt-1.5 text-center">
+                + {abonosPorComuna['Sin comuna']} sin comuna asignada
+              </p>
+            )}
           </div>
         )}
       </CardContent>
