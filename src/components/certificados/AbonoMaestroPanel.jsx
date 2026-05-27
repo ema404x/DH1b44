@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Calendar, Clock, CheckCircle2, Loader2, AlertCircle, Upload, Sparkles, FileText, Layers } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, Clock, CheckCircle2, Loader2, AlertCircle, Upload, Sparkles, FileText, Layers, RefreshCw } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
@@ -193,7 +193,84 @@ export default function AbonoMaestroPanel() {
     setShowForm(true);
   };
 
+  const [importandoCerts, setImportandoCerts] = useState(false);
   const [extractingOC, setExtractingOC] = useState(false);
+
+  const importarDesdeCertificados = async () => {
+    setImportandoCerts(true);
+    try {
+      const certs = await base44.entities.Certificado.list('-created_date', 500);
+      const abonos_existentes = await base44.entities.AbonoMaestro.list('-created_date', 500);
+      
+      // Agrupar certificados de tipo abono_mensual por contratista + ada_numero
+      const grupos = {};
+      certs
+        .filter(c => c.tipo === 'abono_mensual' && c.contratista && c.ada_numero)
+        .forEach(c => {
+          const key = `${c.contratista}__${c.ada_numero}`;
+          if (!grupos[key]) {
+            grupos[key] = { contratista: c.contratista, ada_numero: c.ada_numero, certs: [] };
+          }
+          grupos[key].certs.push(c);
+        });
+
+      // Filtrar los que ya tienen abono maestro
+      const abonosExistentesKeys = new Set(
+        abonos_existentes.map(a => `${a.contratista}__${a.ada_numero}`)
+      );
+      const nuevos = Object.values(grupos).filter(g => !abonosExistentesKeys.has(`${g.contratista}__${g.ada_numero}`));
+
+      if (nuevos.length === 0) {
+        toast.info('Todos los abonos ya están creados como Abonos Maestros');
+        return;
+      }
+
+      let creados = 0;
+      for (const grupo of nuevos) {
+        // Tomar el cert más reciente como referencia
+        const certRef = grupo.certs.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0];
+        const cantMeses = grupo.certs.length;
+
+        // Intentar determinar fecha inicio: usar fecha_inicio del cert más antiguo
+        const certMasAntiguo = grupo.certs.sort((a, b) => new Date(a.created_date) - new Date(b.created_date))[0];
+        const fechaOCEmision = certMasAntiguo.fecha_inicio || certMasAntiguo.created_date?.substring(0, 10) || '';
+        
+        // Calcular monto total = suma de subtotales únicos o usar monto_contratado
+        const montoMensual = certRef.monto_contratado || certRef.subtotal || 0;
+        const montoTotal = montoMensual; // Contrato abono: monto mensual × meses no disponible, usar mensual
+
+        await base44.entities.AbonoMaestro.create({
+          contratista: grupo.contratista,
+          ada_numero: grupo.ada_numero,
+          oc_numero: certRef.oc_numero || '',
+          obra_servicio: certRef.obra_servicio || '',
+          emprendimiento: certRef.emprendimiento || '',
+          monto_total_contrato: montoTotal,
+          duracion_meses: Math.max(cantMeses, 1),
+          monto_mensual: montoTotal,
+          fecha_oc_emision: fechaOCEmision,
+          fecha_inicio_validez: fechaOCEmision,
+          fecha_fin_validez: '',
+          plazo_obra: certRef.plazo_obra || '',
+          plazo_entrega: certRef.plazo_entrega || '',
+          condiciones_pago: certRef.condiciones_pago || '',
+          anticipo_pct: certRef.anticipo_pct || 0,
+          fondo_reparo_pct: certRef.fondo_reparo_pct || 5,
+          items: certRef.items || [],
+          certificados_emitidos: cantMeses,
+          estado: 'activo',
+        });
+        creados++;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['abonos-maestro'] });
+      toast.success(`${creados} Abono${creados > 1 ? 's' : ''} Maestro${creados > 1 ? 's' : ''} creado${creados > 1 ? 's' : ''} correctamente`);
+    } catch (e) {
+      toast.error('Error al importar: ' + e.message);
+    } finally {
+      setImportandoCerts(false);
+    }
+  };
 
   const extractFromOC = async (file) => {
     if (!file || file.type !== 'application/pdf') return toast.error('Solo se aceptan archivos PDF');
@@ -242,10 +319,16 @@ export default function AbonoMaestroPanel() {
             Configurá los contratos de abono mensual. El sistema certificará automáticamente cada mes.
           </p>
         </div>
-        <Button onClick={handleNew} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nuevo Abono
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={importarDesdeCertificados} disabled={importandoCerts} className="gap-2">
+            {importandoCerts ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Armar desde Certificados
+          </Button>
+          <Button onClick={handleNew} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nuevo Abono
+          </Button>
+        </div>
       </div>
 
       {/* Lista */}
