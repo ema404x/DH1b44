@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Plus, Pencil, Trash2, Calendar, Clock, CheckCircle2, Loader2, AlertCircle,
   Upload, Sparkles, RefreshCw, AlertTriangle, ChevronDown, ChevronUp,
-  FileText, DollarSign, Info, X
+  FileText, DollarSign, Info, X, Zap, ChevronRight
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -644,6 +644,30 @@ export default function AbonoMaestroPanel() {
   });
 
   const [importandoCerts, setImportandoCerts] = useState(false);
+  const [forzandoGen, setForzandoGen] = useState(false);
+  const [resultadoGen, setResultadoGen] = useState(null);
+
+  const forzarGeneracion = async () => {
+    if (!window.confirm('¿Forzar la generación de certificados mensuales ahora? Esto creará los certificados del próximo mes para todos los Abonos Maestros activos.')) return;
+    setForzandoGen(true);
+    setResultadoGen(null);
+    try {
+      const res = await base44.functions.invoke('generateMonthlyCertificates', { forceRun: true });
+      const data = res.data;
+      setResultadoGen(data);
+      if (data.success) {
+        toast.success(`${data.generatedCertificates?.length || 0} certificados generados para ${data.mesPeriodo}`);
+        queryClient.invalidateQueries({ queryKey: ['abonos-maestro'] });
+        queryClient.invalidateQueries({ queryKey: ['certificados'] });
+      } else {
+        toast.error(data.message || 'Error en la generación');
+      }
+    } catch (e) {
+      toast.error('Error: ' + e.message);
+    } finally {
+      setForzandoGen(false);
+    }
+  };
 
   const importarDesdeCertificados = async () => {
     setImportandoCerts(true);
@@ -748,16 +772,67 @@ export default function AbonoMaestroPanel() {
             </div>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={importarDesdeCertificados} disabled={importandoCerts} className="gap-2 text-xs h-8">
             {importandoCerts ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
             Importar desde Certs.
+          </Button>
+          <Button
+            variant="outline"
+            onClick={forzarGeneracion}
+            disabled={forzandoGen || stats.activos === 0}
+            className="gap-2 text-xs h-8 border-amber-500/50 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+          >
+            {forzandoGen ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+            Forzar Generación
           </Button>
           <Button onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); }} className="gap-2 h-8 text-xs">
             <Plus className="h-3.5 w-3.5" /> Nuevo Abono
           </Button>
         </div>
       </div>
+
+      {/* Resultado de generación forzada */}
+      {resultadoGen && (
+        <div className={`rounded-lg border p-4 space-y-3 ${resultadoGen.success ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-destructive/10 border-destructive/30'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {resultadoGen.success ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <AlertCircle className="h-4 w-4 text-destructive" />}
+              <p className="text-sm font-semibold">{resultadoGen.message}</p>
+            </div>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setResultadoGen(null)}>
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          {resultadoGen.generatedCertificates?.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[11px] text-muted-foreground font-semibold uppercase">Certificados generados:</p>
+              {resultadoGen.generatedCertificates.map((c, i) => (
+                <div key={i} className="flex items-center justify-between text-xs bg-background/60 rounded px-3 py-1.5">
+                  <span className="font-medium">{c.contratista}</span>
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <span>Cert N° {c.numero_en_contrato}</span>
+                    <span className="text-emerald-400 font-semibold">{fmt(c.monto)}</span>
+                    {c.pdf_url && <a href={c.pdf_url} target="_blank" rel="noreferrer" className="text-primary hover:underline flex items-center gap-1"><FileText className="h-3 w-3" />PDF</a>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {resultadoGen.skipped?.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[11px] text-muted-foreground font-semibold uppercase">Omitidos ({resultadoGen.skipped.length}):</p>
+              {resultadoGen.skipped.map((s, i) => (
+                <div key={i} className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <ChevronRight className="h-3 w-3 shrink-0" />
+                  <span className="font-medium">{s.contratista}</span>
+                  <span>— {s.reason}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Lista */}
       {isLoading ? (
