@@ -1,0 +1,41 @@
+{
+  "name": "DireccionMapa",
+  "type": "object",
+  "properties": {
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Nombre del jefe de sitio responsable"
+    },
+    "comuna": {
+      "type": "string",
+      "enum": [
+        "COMUNA 8A1",
+        "COMUNA 8B1",
+        "COMUNA 10A1"
+      ],
+      "description": "Comuna de CABA"
+    },
+    "direccion": {
+      "type": "string",
+      "description": "Direcci\u00f3n completa"
+    },
+    "cant_escuelas": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad de escuelas en esta direcci\u00f3n"
+    },
+    "lat": {
+      "type": "number",
+      "description": "Latitud GPS"
+    },
+    "lng": {
+      "type": "number",
+      "description": "Longitud GPS"
+    }
+  },
+  "required": [
+    "jefe_sitio",
+    "comuna",
+    "direccion"
+  ]
+}

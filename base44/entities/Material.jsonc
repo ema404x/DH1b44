@@ -1,0 +1,68 @@
+{
+  "name": "Material",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "code": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "electrico",
+        "plomeria",
+        "pintura",
+        "construccion",
+        "herreria",
+        "herramientas",
+        "seguridad",
+        "climatizacion",
+        "otros"
+      ],
+      "default": "construccion"
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "unidad",
+        "metro",
+        "metro2",
+        "metro3",
+        "kg",
+        "litro",
+        "bolsa",
+        "caja",
+        "rollo"
+      ],
+      "default": "unidad"
+    },
+    "stock": {
+      "type": "number",
+      "default": 0
+    },
+    "min_stock": {
+      "type": "number",
+      "default": 0
+    },
+    "unit_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "supplier": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string",
+      "description": "Ubicaci\u00f3n en dep\u00f3sito"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "category"
+  ]
+}

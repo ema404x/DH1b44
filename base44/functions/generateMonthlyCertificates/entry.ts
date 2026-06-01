@@ -35,6 +35,19 @@ function getLastBusinessDayOfMonth(year, month) {
   return date;
 }
 
+const fmt = (n) => {
+  const num = typeof n === 'number' ? n : parseFloat(n) || 0;
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(num);
+};
+
+const fmtDate = (d) => {
+  try {
+    if (!d) return '—';
+    const [y, m, day] = d.split('-');
+    return `${day}/${m}/${y}`;
+  } catch { return d || '—'; }
+};
+
 const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
 
 async function loadLogoBase64() {
@@ -50,74 +63,211 @@ async function loadLogoBase64() {
 
 async function generateCertificatePDF(certificado) {
   const logoBase64 = await loadLogoBase64();
+
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const W = 297, M = 10;
+  const W = 297, H = 210, M = 10, C = W - M * 2;
+  const FOOTER_H = 10;
+  const SAFE_BOTTOM = H - FOOTER_H - 5;
+
+  const allItems = certificado.items || [];
+
+  // Para abono mensual: no hay medición parcial, el subtotal es la suma de importe_total de ítems
+  const subtotalContrato = allItems.reduce((acc, it) => {
+    return acc + (it.importe_total || (it.cantidad * it.importe_unitario) || 0);
+  }, 0);
+
+  // Solo aplica anticipo/fondo si están explícitamente definidos y > 0 en el abono maestro
+  const anticipo_pct = certificado.anticipo_pct || 0;
+  const fondo_reparo_pct = certificado.fondo_reparo_pct || 0;
+  const pdfSubtotal = subtotalContrato || certificado.subtotal || 0;
+  const pdfAnticipo = anticipo_pct > 0 ? pdfSubtotal * (anticipo_pct / 100) : 0;
+  const pdfFondoReparo = fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0;
+  const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
+
+  const montoContratado = certificado.monto_contratado || 0;
+
+  const drawPageHeader = () => {
+    doc.setFillColor(15, 28, 46);
+    doc.rect(0, 0, W, 22, 'F');
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'JPEG', M, 1.5, 46, 18);
+    } else {
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MEJORES', M, 12);
+    }
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`CERTIFICADO N° ${certificado.numero}`, W - M, 10, { align: 'right' });
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(
+      `ABONO MENSUAL · ${fmtDate(certificado.fecha_certificado)}`,
+      W - M, 17, { align: 'right' }
+    );
+  };
+
+  const drawFooter = (pageNum, totalPages) => {
+    doc.setFillColor(15, 28, 46);
+    doc.rect(0, H - FOOTER_H, W, FOOTER_H, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Av. Córdoba 1351 1°Piso · (C1055AAD) CABA · Tel 4816-0111 · www.mejores.ar', M, H - 3.5);
+    doc.text(`CERT N° ${certificado.numero} · Pág ${pageNum}/${totalPages}`, W - M, H - 3.5, { align: 'right' });
+  };
+
+  // Columnas de la tabla — igual que exportCertificadoPDF (sin columnas de medición para abono mensual simplificado)
+  const TABLE_COLS = (() => {
+    const defs = [
+      { w: 7,  label: 'N°',        align: 'right' },
+      { w: 100,label: 'DESCRIPCIÓN', align: 'left'  },
+      { w: 12, label: 'UM',        align: 'left'   },
+      { w: 14, label: 'CANT.',     align: 'right'  },
+      { w: 30, label: 'IMP. UNIT.',align: 'right'  },
+      { w: 34, label: 'IMP. TOTAL',align: 'right'  },
+    ];
+    let cx = M;
+    return defs.map(d => { const col = { ...d, x: cx }; cx += d.w; return col; });
+  })();
+
+  const DESCR_COL = TABLE_COLS[1];
+
+  const drawTableHeader = (atY) => {
+    const ROW_H = 8;
+    doc.setFillColor(15, 28, 46);
+    doc.rect(M, atY, C, ROW_H, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    TABLE_COLS.forEach(({ x, w, label, align }) => {
+      const cx = align === 'right' ? x + w - 1 : x + 1;
+      doc.text(label, cx, atY + 5.5, { align: align === 'right' ? 'right' : 'left' });
+    });
+    return atY + ROW_H;
+  };
+
+  // PAGE 1
+  drawPageHeader();
+  let y = 26;
+  let pageNum = 1;
+
+  // Info del certificado
+  const leftInfo = [
+    ['EMPRENDIMIENTO', certificado.emprendimiento],
+    ['OBRA / SERVICIO', certificado.obra_servicio],
+    ['CONTRATISTA', certificado.contratista],
+    ['BASE', certificado.base || '—'],
+  ];
+  const rightInfo = [
+    ['ADA N°', certificado.ada_numero],
+    ['OC N°', certificado.oc_numero || '—'],
+    ['MES / PERÍODO', certificado.mes_periodo],
+    ['FECHA INICIO', fmtDate(certificado.fecha_inicio)],
+    ['PLAZO', certificado.plazo_obra || '—'],
+    ['FIN', fmtDate(certificado.fecha_finalizacion)],
+    ['MONTO CONTRATADO', fmt(montoContratado)],
+  ];
+
+  const INFO_LINE = 5.5;
+  doc.setFontSize(8);
+  doc.setTextColor(40, 40, 40);
+  leftInfo.forEach(([k, v], i) => {
+    const ry = y + i * INFO_LINE;
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80); doc.text(k + ':', M, ry);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20); doc.text(String(v || '—'), M + 40, ry);
+  });
+  rightInfo.forEach(([k, v], i) => {
+    const ry = y + i * INFO_LINE;
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80); doc.text(k + ':', W / 2 + 5, ry);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20); doc.text(String(v || '—'), W / 2 + 48, ry);
+  });
+  y += Math.max(leftInfo.length, rightInfo.length) * INFO_LINE + 4;
+
+  doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.3);
+  doc.line(M, y, W - M, y);
+  y += 4;
+
+  y = drawTableHeader(y);
+
+  // Filas de ítems
+  doc.setFont('helvetica', 'normal');
+  allItems.forEach((item, idx) => {
+    doc.setFontSize(7);
+    const descLines = doc.splitTextToSize(item.descripcion || '', DESCR_COL.w - 2);
+    const ROW_H = Math.max(7, descLines.length * 4.2 + 2);
+
+    if (y + ROW_H > SAFE_BOTTOM) {
+      drawFooter(pageNum, '??');
+      doc.addPage();
+      pageNum++;
+      drawPageHeader();
+      y = 26;
+      y = drawTableHeader(y);
+    }
+
+    doc.setFillColor(idx % 2 === 0 ? 255 : 245, idx % 2 === 0 ? 255 : 247, idx % 2 === 0 ? 255 : 250);
+    doc.rect(M, y, C, ROW_H, 'F');
+    doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.15);
+    doc.line(M, y + ROW_H, M + C, y + ROW_H);
+
+    const ty = y + ROW_H / 2 + 2;
+    doc.setFontSize(7); doc.setTextColor(40, 40, 40);
+
+    const col = TABLE_COLS;
+    doc.setFont('helvetica', 'normal');
+    doc.text(String(item.numero || idx + 1), col[0].x + col[0].w - 1, ty, { align: 'right' });
+    doc.text(descLines, DESCR_COL.x + 1, y + 4.5);
+    doc.text(item.um || '', col[2].x + 1, ty);
+    doc.text(String(item.cantidad || ''), col[3].x + col[3].w - 1, ty, { align: 'right' });
+    doc.text(fmt(item.importe_unitario), col[4].x + col[4].w - 1, ty, { align: 'right' });
+    doc.setFont('helvetica', 'bold');
+    doc.text(fmt(item.importe_total), col[5].x + col[5].w - 1, ty, { align: 'right' });
+
+    y += ROW_H;
+  });
+
+  // Totales
+  const TOTALS_H = 38 + (pdfAnticipo > 0 ? 8 : 0) + (pdfFondoReparo > 0 ? 8 : 0);
+  if (y + TOTALS_H > SAFE_BOTTOM) {
+    drawFooter(pageNum, '??');
+    doc.addPage();
+    pageNum++;
+    drawPageHeader();
+    y = 26;
+  }
+  y += 5;
+
+  doc.setFillColor(235, 243, 255);
+  doc.rect(W - M - 90, y, 90, 8, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(15, 28, 46);
+  doc.text('SUBTOTAL:', W - M - 88, y + 5.5);
+  doc.text(fmt(pdfSubtotal), W - M - 1, y + 5.5, { align: 'right' });
+  y += 10;
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
+  if (pdfAnticipo > 0) {
+    doc.text(`Anticipo/Desacopio (${anticipo_pct}%):   -${fmt(pdfAnticipo)}`, W - M, y, { align: 'right' });
+    y += 7;
+  }
+  if (pdfFondoReparo > 0) {
+    doc.text(`Fondo de Reparo (${fondo_reparo_pct}%):   -${fmt(pdfFondoReparo)}`, W - M, y, { align: 'right' });
+    y += 7;
+  }
 
   doc.setFillColor(15, 28, 46);
-  doc.rect(0, 0, W, 22, 'F');
-  if (logoBase64) {
-    doc.addImage(logoBase64, 'JPEG', M, 1, 50, 19);
-  } else {
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-    doc.text('MEJORES', M, 10);
-  }
-  doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text(`CERTIFICADO DE ABONO MENSUAL N° ${certificado.numero_en_contrato} (${certificado.numero})`, W - M, 10, { align: 'right' });
-  doc.setFontSize(8); doc.setFont('helvetica', 'normal');
-  doc.text(`Mes: ${certificado.mes_periodo} · Fecha: ${certificado.fecha_certificado}`, W - M, 16, { align: 'right' });
+  doc.rect(W - M - 90, y, 90, 10, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.text('TOTAL NETO:', W - M - 88, y + 7);
+  doc.text(fmt(pdfTotalNeto), W - M - 1, y + 7, { align: 'right' });
 
-  let y = 30;
-  doc.setTextColor(60, 60, 60); doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold'); doc.text('CONTRATISTA:', M, y);
-  doc.setFont('helvetica', 'normal'); doc.text(certificado.contratista || '—', M + 30, y);
-  doc.setFont('helvetica', 'bold'); doc.text('EMPRENDIMIENTO:', W / 2, y);
-  doc.setFont('helvetica', 'normal'); doc.text(certificado.emprendimiento || '—', W / 2 + 35, y);
-  y += 8;
-  doc.setFont('helvetica', 'bold'); doc.text('OBRA / SERVICIO:', M, y);
-  doc.setFont('helvetica', 'normal'); doc.text(certificado.obra_servicio || '—', M + 30, y);
-  doc.setFont('helvetica', 'bold'); doc.text('OC N°:', W / 2, y);
-  doc.setFont('helvetica', 'normal'); doc.text(certificado.oc_numero || '—', W / 2 + 18, y);
-  y += 8;
-  doc.setFont('helvetica', 'bold'); doc.text('ADA N°:', M, y);
-  doc.setFont('helvetica', 'normal'); doc.text(certificado.ada_numero || '—', M + 18, y);
-  doc.setFont('helvetica', 'bold'); doc.text('CERTIFICADO:', W / 2, y);
-  doc.setFont('helvetica', 'normal'); doc.text(`${certificado.numero_en_contrato} de ${certificado.duracion_meses_total}`, W / 2 + 25, y);
-  y += 14;
-
-  // Item único: el abono mensual
-  doc.setFillColor(15, 28, 46); doc.rect(M, y, W - M * 2, 6, 'F');
-  doc.setTextColor(255, 255, 255); doc.setFontSize(6.5); doc.setFont('helvetica', 'bold');
-  doc.text('DESCRIPCIÓN', M + 5, y + 4);
-  doc.text('UM', M + 160, y + 4);
-  doc.text('CANTIDAD', M + 180, y + 4);
-  doc.text('IMPORTE', W - M - 5, y + 4, { align: 'right' });
-  y += 8;
-
-  doc.setFillColor(247, 247, 247); doc.rect(M, y - 1, W - M * 2, 8, 'F');
-  doc.setTextColor(50, 50, 50); doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
-  doc.text(`Abono mensual de mantenimiento – ${certificado.mes_periodo}`, M + 5, y + 4);
-  doc.text('MES', M + 160, y + 4);
-  doc.text('1', M + 185, y + 4);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`$${(certificado.subtotal || 0).toLocaleString('es-AR')}`, W - M - 5, y + 4, { align: 'right' });
-  y += 12;
-
-  // Subtotal
-  doc.setFillColor(230, 240, 255); doc.rect(W - M - 80, y, 80, 6, 'F');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(15, 28, 46);
-  doc.text('IMPORTE DEL CERTIFICADO:', W - M - 78, y + 4);
-  doc.text(`$${(certificado.subtotal || 0).toLocaleString('es-AR')}`, W - M - 1, y + 4, { align: 'right' });
-
-  // Footer
-  const pages = doc.getNumberOfPages();
-  for (let p = 1; p <= pages; p++) {
+  // Footers finales
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
-    doc.setFillColor(15, 28, 46); doc.rect(0, 197, W, 8, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(6); doc.setFont('helvetica', 'normal');
-    doc.text('Av. Córdoba 1351 1°Piso · (C1055AAD) Ciudad Aut. de Bs. As. · Tel 4816-0111 · www.mejores.ar', M, 202);
-    doc.text(`CERT N° ${certificado.numero} · Pág ${p}/${pages}`, W - M, 202, { align: 'right' });
+    drawFooter(p, totalPages);
   }
 
   return doc.output('arraybuffer');
@@ -190,7 +340,6 @@ Deno.serve(async (req) => {
         generado_automaticamente: true
       });
 
-      // También verificar por contratista si no hay OC
       const existingPorContratista = !abono.oc_numero
         ? await base44.asServiceRole.entities.Certificado.filter({
             contratista: abono.contratista,
@@ -217,7 +366,7 @@ Deno.serve(async (req) => {
       const certNumber = lastNum + 1;
 
       const fechaCert = lastBizDay.toISOString().split('T')[0];
-      const montoMensual = abono.monto_mensual || (abono.monto_total_contrato / abono.duracion_meses);
+      const montoMensual = abono.monto_mensual || (abono.monto_total_contrato / Math.max(abono.duracion_meses, 1));
 
       // Usar ítems del contrato maestro si existen, sino generar ítem genérico
       const certItems = abono.items?.length
@@ -227,7 +376,7 @@ Deno.serve(async (req) => {
             um: it.um || 'MES',
             cantidad: it.cantidad || 1,
             importe_unitario: it.importe_unitario || 0,
-            importe_total: it.importe_total || (it.cantidad * it.importe_unitario) || 0,
+            importe_total: it.importe_total || ((it.cantidad || 1) * (it.importe_unitario || 0)) || 0,
           }))
         : [{
             numero: 1,
@@ -238,12 +387,16 @@ Deno.serve(async (req) => {
             importe_total: montoMensual,
           }];
 
+      // Subtotal real basado en los ítems
+      const subtotalReal = certItems.reduce((acc, it) => acc + (it.importe_total || 0), 0) || montoMensual;
+
       const newCert = {
         numero: certNumber,
         tipo: 'abono_mensual',
         estado: 'emitido',
         generado_automaticamente: true,
         contratista: abono.contratista,
+        contratista_id: abono.created_by_id || '',
         emprendimiento: abono.emprendimiento || '',
         obra_servicio: abono.obra_servicio || '',
         ada_numero: abono.ada_numero || '',
@@ -255,16 +408,16 @@ Deno.serve(async (req) => {
         plazo_entrega: abono.plazo_entrega || '',
         condiciones_pago: abono.condiciones_pago || '',
         monto_contratado: abono.monto_total_contrato,
-        subtotal: montoMensual,
+        subtotal: subtotalReal,
+        // Solo guardar porcentajes si fueron definidos explícitamente (> 0) en el abono maestro
         anticipo_pct: abono.anticipo_pct || 0,
         fondo_reparo_pct: abono.fondo_reparo_pct || 0,
         items: certItems,
-        // Campos extra para el PDF
         numero_en_contrato: numeroEnContrato,
         duracion_meses_total: abono.duracion_meses,
       };
 
-      // Generar y subir PDF
+      // Generar y subir PDF profesional
       let pdfUrl = '';
       try {
         const pdfBuffer = await generateCertificatePDF(newCert);
@@ -293,7 +446,7 @@ Deno.serve(async (req) => {
         numero_en_contrato: numeroEnContrato,
         contratista: abono.contratista,
         mes: mesFormato,
-        monto: montoMensual,
+        monto: subtotalReal,
         pdf_url: pdfUrl
       });
     }

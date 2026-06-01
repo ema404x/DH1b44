@@ -1,0 +1,26 @@
+{
+  "name": "EscuelaMapa",
+  "type": "object",
+  "properties": {
+    "direccion_mapa_id": {
+      "type": "string",
+      "description": "ID de la DireccionMapa relacionada"
+    },
+    "nombre": {
+      "type": "string",
+      "description": "Nombre del establecimiento/escuela"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Nombre del jefe de sitio (desnormalizado)"
+    },
+    "comuna": {
+      "type": "string",
+      "description": "Comuna (desnormalizado)"
+    }
+  },
+  "required": [
+    "direccion_mapa_id",
+    "nombre"
+  ]
+}

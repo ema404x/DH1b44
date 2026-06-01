@@ -15,5 +15,6 @@
       "default": false,
       "description": "Habilita al usuario a eliminar pendientes SAP"
     }
-  }
+  },
+  "required": []
 }

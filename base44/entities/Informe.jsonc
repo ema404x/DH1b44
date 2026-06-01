@@ -1,0 +1,90 @@
+{
+  "name": "Informe",
+  "type": "object",
+  "properties": {
+    "titulo": {
+      "type": "string"
+    },
+    "codigo": {
+      "type": "string"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "avance_obra",
+        "inspeccion",
+        "mantenimiento",
+        "financiero",
+        "seguridad",
+        "final",
+        "otro"
+      ],
+      "default": "avance_obra"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "pendiente",
+        "en_preparacion",
+        "enviado",
+        "aprobado",
+        "rechazado",
+        "vencido"
+      ],
+      "default": "pendiente"
+    },
+    "prioridad": {
+      "type": "string",
+      "enum": [
+        "baja",
+        "media",
+        "alta",
+        "urgente"
+      ],
+      "default": "media"
+    },
+    "proyecto_nombre": {
+      "type": "string"
+    },
+    "cliente_nombre": {
+      "type": "string"
+    },
+    "responsable": {
+      "type": "string"
+    },
+    "fecha_limite": {
+      "type": "string",
+      "format": "date"
+    },
+    "fecha_envio": {
+      "type": "string",
+      "format": "date"
+    },
+    "fecha_aprobacion": {
+      "type": "string",
+      "format": "date"
+    },
+    "descripcion": {
+      "type": "string"
+    },
+    "observaciones": {
+      "type": "string"
+    },
+    "requiere_firma": {
+      "type": "boolean",
+      "default": false
+    },
+    "firma_obtenida": {
+      "type": "boolean",
+      "default": false
+    },
+    "archivo_url": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "titulo",
+    "tipo",
+    "estado"
+  ]
+}
