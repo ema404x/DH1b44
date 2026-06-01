@@ -35,9 +35,29 @@ function getLastBusinessDayOfMonth(year, month) {
   return date;
 }
 
-const fmt = (n) => {
-  const num = typeof n === 'number' ? n : parseFloat(n) || 0;
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(num);
+// Parsea montos que pueden venir como string "1.234.567" (separador de miles con punto)
+// o número nativo. Nunca usa parseFloat directo sobre strings con puntos de miles.
+const parseMonto = (v) => {
+  if (v === null || v === undefined || v === '') return 0;
+  if (typeof v === 'number') return v;
+  // Remover puntos de miles y reemplazar coma decimal por punto
+  const clean = String(v).replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(clean);
+  return isNaN(n) ? 0 : n;
+};
+
+// Formatea como moneda ARS sin depender de Intl (puede fallar en Deno con es-AR)
+const fmt = (v) => {
+  const n = typeof v === 'number' ? v : parseMonto(v);
+  if (!n && n !== 0) return '$ 0';
+  // Formatear manualmente con puntos de miles
+  const parts = Math.round(n).toString().split('');
+  const result = [];
+  parts.reverse().forEach((d, i) => {
+    if (i > 0 && i % 3 === 0) result.push('.');
+    result.push(d);
+  });
+  return '$ ' + result.reverse().join('');
 };
 
 const fmtDate = (d) => {
@@ -73,18 +93,18 @@ async function generateCertificatePDF(certificado) {
 
   // Para abono mensual: no hay medición parcial, el subtotal es la suma de importe_total de ítems
   const subtotalContrato = allItems.reduce((acc, it) => {
-    return acc + (it.importe_total || (it.cantidad * it.importe_unitario) || 0);
+    return acc + (parseMonto(it.importe_total) || (parseMonto(it.cantidad) * parseMonto(it.importe_unitario)) || 0);
   }, 0);
 
   // Solo aplica anticipo/fondo si están explícitamente definidos y > 0 en el abono maestro
-  const anticipo_pct = certificado.anticipo_pct || 0;
-  const fondo_reparo_pct = certificado.fondo_reparo_pct || 0;
-  const pdfSubtotal = subtotalContrato || certificado.subtotal || 0;
+  const anticipo_pct = parseFloat(certificado.anticipo_pct) || 0;
+  const fondo_reparo_pct = parseFloat(certificado.fondo_reparo_pct) || 0;
+  const pdfSubtotal = subtotalContrato || parseMonto(certificado.subtotal) || 0;
   const pdfAnticipo = anticipo_pct > 0 ? pdfSubtotal * (anticipo_pct / 100) : 0;
   const pdfFondoReparo = fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0;
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
-  const montoContratado = certificado.monto_contratado || 0;
+  const montoContratado = parseMonto(certificado.monto_contratado);
 
   const drawPageHeader = () => {
     doc.setFillColor(15, 28, 46);
@@ -366,18 +386,26 @@ Deno.serve(async (req) => {
       const certNumber = lastNum + 1;
 
       const fechaCert = lastBizDay.toISOString().split('T')[0];
-      const montoMensual = abono.monto_mensual || (abono.monto_total_contrato / Math.max(abono.duracion_meses, 1));
+      // Parsear montos correctamente (pueden venir como strings "1.234.567")
+      const montoTotalContrato = parseMonto(abono.monto_total_contrato);
+      const duracionMeses = Math.max(parseInt(abono.duracion_meses) || 1, 1);
+      const montoMensual = parseMonto(abono.monto_mensual) || (montoTotalContrato / duracionMeses);
 
       // Usar ítems del contrato maestro si existen, sino generar ítem genérico
       const certItems = abono.items?.length
-        ? abono.items.map((it, idx) => ({
-            numero: idx + 1,
-            descripcion: it.descripcion || `Abono mensual – ${mesPeriodoLabel}`,
-            um: it.um || 'MES',
-            cantidad: it.cantidad || 1,
-            importe_unitario: it.importe_unitario || 0,
-            importe_total: it.importe_total || ((it.cantidad || 1) * (it.importe_unitario || 0)) || 0,
-          }))
+        ? abono.items.map((it, idx) => {
+            const impUnit = parseMonto(it.importe_unitario);
+            const cant = parseFloat(it.cantidad) || 1;
+            const impTotal = parseMonto(it.importe_total) || (cant * impUnit);
+            return {
+              numero: idx + 1,
+              descripcion: it.descripcion || `Abono mensual – ${mesPeriodoLabel}`,
+              um: it.um || 'MES',
+              cantidad: cant,
+              importe_unitario: impUnit,
+              importe_total: impTotal,
+            };
+          })
         : [{
             numero: 1,
             descripcion: `Abono mensual de mantenimiento – ${mesPeriodoLabel}`,
@@ -407,7 +435,7 @@ Deno.serve(async (req) => {
         plazo_obra: abono.plazo_obra || 'Mensual',
         plazo_entrega: abono.plazo_entrega || '',
         condiciones_pago: abono.condiciones_pago || '',
-        monto_contratado: abono.monto_total_contrato,
+        monto_contratado: montoTotalContrato,
         subtotal: subtotalReal,
         // Solo guardar porcentajes si fueron definidos explícitamente (> 0) en el abono maestro
         anticipo_pct: abono.anticipo_pct || 0,
