@@ -66,13 +66,15 @@ export async function exportCertificadoPDF(form) {
 
   // El subtotal a certificar es lo que el usuario certificó (presente), o el total del contrato
   const pdfSubtotal = hasMedicion ? totalPresente : subtotalContrato;
+  // Base para calcular el % de deducciones: monto_contratado del encabezado si está definido, sino suma de ítems
+  const baseDeduccion = parseMonto(form.monto_contratado) > 0 ? parseMonto(form.monto_contratado) : subtotalContrato;
   // Si hay monto manual guardado (_anticipo_monto / _fondo_reparo_monto), usarlo directamente
   const pdfAnticipo = form._anticipo_monto != null
     ? form._anticipo_monto
-    : (anticipo_pct > 0 ? subtotalContrato * (anticipo_pct / 100) : 0);
+    : (anticipo_pct > 0 ? baseDeduccion * (anticipo_pct / 100) : 0);
   const pdfFondoReparo = form._fondo_reparo_monto != null
     ? form._fondo_reparo_monto
-    : (fondo_reparo_pct > 0 ? subtotalContrato * (fondo_reparo_pct / 100) : 0);
+    : (fondo_reparo_pct > 0 ? baseDeduccion * (fondo_reparo_pct / 100) : 0);
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
   // Monto contratado: exactamente lo que el usuario ingresó, parseado correctamente

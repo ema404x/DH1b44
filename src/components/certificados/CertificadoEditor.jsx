@@ -178,6 +178,10 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const removeItem = (i) => setForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }));
 
   const subtotal = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
+  // montoContratado: campo del encabezado si está cargado, sino suma de ítems
+  const montoContratado = parseMonto(form.monto_contratado) > 0
+    ? parseMonto(form.monto_contratado)
+    : subtotal;
   // hasMedicion = true SOLO si algún ítem fue explícitamente editado por el usuario
   const hasMedicion = form.items.some(it => it._med_editado);
   // totalPresente y totalSaldo calculados en tiempo real, sin depender de campos guardados
@@ -186,12 +190,13 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
     : 0;
   const totalSaldo = hasMedicion ? Math.max(0, subtotal - totalPresente) : 0;
   const baseCalculo = hasMedicion ? totalPresente : subtotal;
+  // Las deducciones en % se calculan sobre el monto total contratado
   const anticipo = form.anticipo_monto_manual != null
     ? form.anticipo_monto_manual
-    : (form.anticipo_pct > 0 ? subtotal * (form.anticipo_pct / 100) : 0);
+    : (form.anticipo_pct > 0 ? montoContratado * (form.anticipo_pct / 100) : 0);
   const fondoReparo = form.fondo_reparo_monto_manual != null
     ? form.fondo_reparo_monto_manual
-    : (form.fondo_reparo_pct > 0 ? subtotal * (form.fondo_reparo_pct / 100) : 0);
+    : (form.fondo_reparo_pct > 0 ? montoContratado * (form.fondo_reparo_pct / 100) : 0);
   const totalNeto = baseCalculo - anticipo - fondoReparo;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
