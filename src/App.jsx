@@ -23,7 +23,6 @@ const WorkOrders = lazy(() => import('@/pages/WorkOrders'));
 const Clients = lazy(() => import('@/pages/Clients'));
 const Employees = lazy(() => import('@/pages/Employees'));
 const Inventory = lazy(() => import('@/pages/Inventory'));
-const Quotes = lazy(() => import('@/pages/Quotes'));
 const Invoices = lazy(() => import('@/pages/Invoices'));
 const Finanzas = lazy(() => import('@/pages/Finanzas'));
 const Presupuestos = lazy(() => import('@/pages/Presupuestos'));
@@ -111,7 +110,6 @@ const AuthenticatedApp = () => {
         <Route path="/clientes" element={<ProtectedPage moduleKey="Client"><Clients /></ProtectedPage>} />
         <Route path="/empleados" element={<ProtectedPage moduleKey="Employee"><Employees /></ProtectedPage>} />
         <Route path="/inventario" element={<ProtectedPage moduleKey="Inventory"><Inventory /></ProtectedPage>} />
-        <Route path="/presupuestos" element={<ProtectedPage moduleKey="Quote"><Quotes /></ProtectedPage>} />
         <Route path="/presupuestos-obra" element={<ProtectedPage moduleKey="PresupuestosObra"><Presupuestos /></ProtectedPage>} />
         <Route path="/facturacion" element={<ProtectedPage moduleKey="Invoice"><Invoices /></ProtectedPage>} />
         <Route path="/finanzas" element={<ProtectedPage moduleKey="Finanzas"><Finanzas /></ProtectedPage>} />

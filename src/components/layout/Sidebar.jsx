@@ -38,7 +38,6 @@ const navGroups = [
     label: 'Comercial',
     items: [
       { label: 'Proveedores', icon: Truck, path: '/clientes' },
-      { label: 'Presupuestos', icon: FileText, path: '/presupuestos' },
       { label: 'Presupuestos Obra', icon: Calculator, path: '/presupuestos-obra' },
       { label: 'Control de Riesgos', icon: ShieldAlert, path: '/control-riesgo' },
       { label: 'Certificados', icon: Award, path: '/certificados' },
@@ -140,7 +139,6 @@ export default function Sidebar() {
     '/reportes': 'Reportes',
     '/automatizaciones': 'Automatizaciones',
     '/clientes': 'Client',
-    '/presupuestos': 'Quote',
     '/presupuestos-obra': 'PresupuestosObra',
     '/control-riesgo': 'ControlRiesgo',
     '/certificados': 'Certificado',
