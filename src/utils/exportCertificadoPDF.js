@@ -66,8 +66,13 @@ export async function exportCertificadoPDF(form) {
 
   // El subtotal a certificar es lo que el usuario certificó (presente), o el total del contrato
   const pdfSubtotal = hasMedicion ? totalPresente : subtotalContrato;
-  const pdfAnticipo = anticipo_pct > 0 ? pdfSubtotal * (anticipo_pct / 100) : 0;
-  const pdfFondoReparo = fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0;
+  // Si hay monto manual guardado (_anticipo_monto / _fondo_reparo_monto), usarlo directamente
+  const pdfAnticipo = form._anticipo_monto != null
+    ? form._anticipo_monto
+    : (anticipo_pct > 0 ? pdfSubtotal * (anticipo_pct / 100) : 0);
+  const pdfFondoReparo = form._fondo_reparo_monto != null
+    ? form._fondo_reparo_monto
+    : (fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0);
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
   // Monto contratado: exactamente lo que el usuario ingresó, parseado correctamente
@@ -263,10 +268,16 @@ export async function exportCertificadoPDF(form) {
 
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
   if (pdfAnticipo > 0) {
-    doc.text(`Anticipo/Desacopio (${anticipo_pct}%):   -${fmt(pdfAnticipo)}`, W - M, y, { align: 'right' }); y += 7;
+    const antiLabel = form.anticipo_monto_manual != null
+      ? `Anticipo/Desacopio (monto fijo):   -${fmt(pdfAnticipo)}`
+      : `Anticipo/Desacopio (${anticipo_pct}%):   -${fmt(pdfAnticipo)}`;
+    doc.text(antiLabel, W - M, y, { align: 'right' }); y += 7;
   }
   if (pdfFondoReparo > 0) {
-    doc.text(`Fondo de Reparo (${fondo_reparo_pct}%):   -${fmt(pdfFondoReparo)}`, W - M, y, { align: 'right' }); y += 7;
+    const fondoLabel = form.fondo_reparo_monto_manual != null
+      ? `Fondo de Reparo (monto fijo):   -${fmt(pdfFondoReparo)}`
+      : `Fondo de Reparo (${fondo_reparo_pct}%):   -${fmt(pdfFondoReparo)}`;
+    doc.text(fondoLabel, W - M, y, { align: 'right' }); y += 7;
   }
 
   doc.setFillColor(15, 28, 46);

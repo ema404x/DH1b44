@@ -86,7 +86,9 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       fecha_certificado: new Date().toISOString().split('T')[0],
       numero_recepcion: '',
       anticipo_pct: initialData?.anticipo_pct ?? 0,
+      anticipo_monto_manual: initialData?.anticipo_monto_manual ?? null,
       fondo_reparo_pct: initialData?.fondo_reparo_pct ?? 0,
+      fondo_reparo_monto_manual: initialData?.fondo_reparo_monto_manual ?? null,
       subtotal: initialData?.subtotal || 0,
       _validation: initialData?._validation || null,
       ada_pdf_url: initialData?.ada_pdf_url || '',
@@ -184,8 +186,12 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
     : 0;
   const totalSaldo = hasMedicion ? Math.max(0, subtotal - totalPresente) : 0;
   const baseCalculo = hasMedicion ? totalPresente : subtotal;
-  const anticipo = form.anticipo_pct > 0 ? baseCalculo * (form.anticipo_pct / 100) : 0;
-  const fondoReparo = form.fondo_reparo_pct > 0 ? baseCalculo * (form.fondo_reparo_pct / 100) : 0;
+  const anticipo = form.anticipo_monto_manual != null
+    ? form.anticipo_monto_manual
+    : (form.anticipo_pct > 0 ? baseCalculo * (form.anticipo_pct / 100) : 0);
+  const fondoReparo = form.fondo_reparo_monto_manual != null
+    ? form.fondo_reparo_monto_manual
+    : (form.fondo_reparo_pct > 0 ? baseCalculo * (form.fondo_reparo_pct / 100) : 0);
   const totalNeto = baseCalculo - anticipo - fondoReparo;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
@@ -302,8 +308,8 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           }>
             {form.tipo === 'abono_mensual' ? 'Abono Mensual' : form.tipo === 'informe' ? 'Informe' : 'Obra'}
           </Badge>
-          <Button variant="outline" className="gap-2" onClick={() => onPreview({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion })}><Eye className="h-4 w-4" />Vista previa</Button>
-          <Button className="gap-2" onClick={() => onSave({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion })} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
+          <Button variant="outline" className="gap-2" onClick={() => onPreview({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo })}><Eye className="h-4 w-4" />Vista previa</Button>
+          <Button className="gap-2" onClick={() => onSave({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo })} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
         </div>
       </div>
 
@@ -514,23 +520,58 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
               <span className="text-orange-600 font-semibold">{fmt(totalSaldo)}</span>
             </div>
           )}
+          {/* Anticipo / Desacopio */}
           <div className="flex justify-between w-full text-sm items-center gap-2">
-            <span className="text-muted-foreground">Anticipo/Desacopio %:</span>
-            <Input type="number" min="0" className="w-20 h-7 text-xs" value={form.anticipo_pct} onChange={e => set('anticipo_pct', +e.target.value)} />
+            <span className="text-muted-foreground shrink-0">Anticipo/Desacopio:</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                className={`text-[10px] px-2 py-0.5 rounded font-semibold transition-colors ${form.anticipo_monto_manual == null ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+                onClick={() => set('anticipo_monto_manual', null)}
+              >%</button>
+              <button
+                type="button"
+                className={`text-[10px] px-2 py-0.5 rounded font-semibold transition-colors ${form.anticipo_monto_manual != null ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+                onClick={() => set('anticipo_monto_manual', anticipo || 0)}
+              >$</button>
+              {form.anticipo_monto_manual == null ? (
+                <Input type="number" min="0" className="w-20 h-7 text-xs" value={form.anticipo_pct} onChange={e => set('anticipo_pct', +e.target.value)} />
+              ) : (
+                <Input type="number" min="0" className="w-28 h-7 text-xs border-amber-500/60 focus:ring-amber-400" value={form.anticipo_monto_manual} onChange={e => set('anticipo_monto_manual', +e.target.value)} />
+              )}
+            </div>
           </div>
           {anticipo > 0 && (
             <div className="flex justify-between w-full text-xs text-muted-foreground">
-              <span>Anticipo ({form.anticipo_pct}%):</span>
+              <span>Anticipo {form.anticipo_monto_manual == null ? `(${form.anticipo_pct}%)` : '(monto fijo)'}:</span>
               <span className="text-destructive">-{fmt(anticipo)}</span>
             </div>
           )}
+
+          {/* Fondo de Reparo */}
           <div className="flex justify-between w-full text-sm items-center gap-2">
-            <span className="text-muted-foreground">Fondo de Reparo %:</span>
-            <Input type="number" min="0" className="w-20 h-7 text-xs" value={form.fondo_reparo_pct} onChange={e => set('fondo_reparo_pct', +e.target.value)} />
+            <span className="text-muted-foreground shrink-0">Fondo de Reparo:</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                className={`text-[10px] px-2 py-0.5 rounded font-semibold transition-colors ${form.fondo_reparo_monto_manual == null ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+                onClick={() => set('fondo_reparo_monto_manual', null)}
+              >%</button>
+              <button
+                type="button"
+                className={`text-[10px] px-2 py-0.5 rounded font-semibold transition-colors ${form.fondo_reparo_monto_manual != null ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+                onClick={() => set('fondo_reparo_monto_manual', fondoReparo || 0)}
+              >$</button>
+              {form.fondo_reparo_monto_manual == null ? (
+                <Input type="number" min="0" className="w-20 h-7 text-xs" value={form.fondo_reparo_pct} onChange={e => set('fondo_reparo_pct', +e.target.value)} />
+              ) : (
+                <Input type="number" min="0" className="w-28 h-7 text-xs border-amber-500/60 focus:ring-amber-400" value={form.fondo_reparo_monto_manual} onChange={e => set('fondo_reparo_monto_manual', +e.target.value)} />
+              )}
+            </div>
           </div>
           {fondoReparo > 0 && (
             <div className="flex justify-between w-full text-xs text-muted-foreground">
-              <span>Fondo de Reparo ({form.fondo_reparo_pct}%):</span>
+              <span>Fondo de Reparo {form.fondo_reparo_monto_manual == null ? `(${form.fondo_reparo_pct}%)` : '(monto fijo)'}:</span>
               <span className="text-destructive">-{fmt(fondoReparo)}</span>
             </div>
           )}
