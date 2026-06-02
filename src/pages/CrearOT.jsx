@@ -2,18 +2,17 @@
  * CrearOT — Formulario profesional de alta de Órdenes de Trabajo
  * Flujo guiado por pasos: Ubicación → Detalle → Tareas & Materiales → Asignación → Confirmación
  */
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Mic, MicOff, Camera, CheckCircle2, Loader2, MapPin,
   ClipboardList, Zap, X, QrCode, Plus, Trash2, ChevronRight,
   ChevronLeft, Clock, Package, Wrench, AlertTriangle,
-  Layers, ArrowLeft
+  Layers, ArrowLeft, Search
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import QRCodeModal from '@/components/shared/QRCodeModal';
@@ -125,6 +124,11 @@ export default function CrearOT() {
   const fileRef = useRef();
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  // ── Location search state ────────────────────────────────────────────────
+  const [locationSearch, setLocationSearch] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const locationSearchRef = useRef(null);
+
   // ── Queries ─────────────────────────────────────────────────────────────────
 
   const { data: locations = [], isLoading: loadingLocations } = useQuery({
@@ -150,10 +154,35 @@ export default function CrearOT() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
-  const handleSelectLocation = useCallback((locId) => {
-    const loc = activeLocations.find(l => l.id === locId);
-    setSelectedLocation(loc || null);
-  }, [activeLocations]);
+  const handleSelectLocation = useCallback((loc) => {
+    setSelectedLocation(loc);
+    setLocationSearch(loc.name);
+    setShowSuggestions(false);
+  }, []);
+
+  const handleClearLocation = useCallback(() => {
+    setSelectedLocation(null);
+    setLocationSearch('');
+    setShowSuggestions(false);
+    setTimeout(() => locationSearchRef.current?.focus(), 50);
+  }, []);
+
+  const filteredSuggestions = useMemo(() =>
+    activeLocations.filter(l =>
+      !locationSearch ||
+      l.name?.toLowerCase().includes(locationSearch.toLowerCase()) ||
+      l.address?.toLowerCase().includes(locationSearch.toLowerCase())
+    ).slice(0, 8)
+  , [activeLocations, locationSearch]);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.target.closest('#location-search-container')) setShowSuggestions(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Plantilla → pre-llena campos
   const handleApplyTemplate = useCallback((template) => {
@@ -375,32 +404,68 @@ export default function CrearOT() {
               </div>
             ) : (
               <div className="space-y-2">
-                <Select
-                  value={selectedLocation?.id || ''}
-                  onValueChange={handleSelectLocation}
-                >
-                  <SelectTrigger className="bg-card border-border text-foreground h-12">
-                    <SelectValue placeholder="Seleccionar establecimiento..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeLocations.map(loc => (
-                      <SelectItem key={loc.id} value={loc.id}>
-                        <span className="font-medium">{loc.name}</span>
-                        {loc.address ? <span className="text-muted-foreground ml-1 text-xs">— {loc.address}</span> : null}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Input con búsqueda */}
+                <div id="location-search-container" className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    ref={locationSearchRef}
+                    value={locationSearch}
+                    onChange={e => {
+                      setLocationSearch(e.target.value);
+                      setSelectedLocation(null);
+                      setShowSuggestions(true);
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    placeholder="Escribí para buscar establecimiento..."
+                    className="bg-card border-border text-foreground h-12 pl-9 pr-9"
+                  />
+                  {locationSearch && (
+                    <button
+                      onClick={handleClearLocation}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+
+                  {/* Dropdown de sugerencias */}
+                  {showSuggestions && filteredSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden">
+                      {filteredSuggestions.map(loc => (
+                        <button
+                          key={loc.id}
+                          onMouseDown={() => handleSelectLocation(loc)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-accent transition-colors border-b border-border/50 last:border-0"
+                        >
+                          <MapPin className="h-4 w-4 text-primary shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{loc.name}</p>
+                            {loc.address && <p className="text-xs text-muted-foreground truncate">{loc.address}</p>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Sin resultados */}
+                  {showSuggestions && locationSearch && filteredSuggestions.length === 0 && (
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-card border border-border rounded-xl shadow-xl px-4 py-3 text-sm text-muted-foreground">
+                      Sin resultados para "{locationSearch}"
+                    </div>
+                  )}
+                </div>
 
                 {selectedLocation && (
                   <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm space-y-1">
-                    <p className="font-semibold text-foreground">{selectedLocation.name}</p>
+                    <p className="font-semibold text-foreground flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-primary" /> {selectedLocation.name}
+                    </p>
                     {selectedLocation.address && <p className="text-muted-foreground text-xs flex items-center gap-1"><MapPin className="h-3 w-3" />{selectedLocation.address}</p>}
                     {selectedLocation.project_name && <p className="text-muted-foreground text-xs">Proyecto: {selectedLocation.project_name}</p>}
                   </div>
                 )}
 
-                {!selectedLocation && (
+                {!selectedLocation && !locationSearch && (
                   <p className="text-xs text-muted-foreground text-center py-2">
                     La ubicación es opcional — podés continuar sin seleccionarla
                   </p>
