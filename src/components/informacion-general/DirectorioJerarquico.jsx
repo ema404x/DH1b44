@@ -16,18 +16,37 @@ export default function DirectorioJerarquico() {
   const [search, setSearch] = useState('');
   const [selectedComuna, setSelectedComuna] = useState('all');
   const [expandedDir, setExpandedDir] = useState(null);
-  const [editingInspector, setEditingInspector] = useState(null); // id de dirección en edición
+  const [editingInspector, setEditingInspector] = useState(null);
   const [inspectorValue, setInspectorValue] = useState('');
+  const [editingJefe, setEditingJefe] = useState(null);
+  const [jefeValue, setJefeValue] = useState('');
   const queryClient = useQueryClient();
 
   const updateDireccionMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Direccion.update(id, data),
-    onSuccess: () => {
+    mutationFn: async ({ id, data, escuelas }) => {
+      // 1. Actualizar la dirección
+      await base44.entities.Direccion.update(id, data);
+      // 2. Propagar a todas las LocationData vinculadas
+      if (escuelas?.length > 0) {
+        await Promise.all(escuelas.map(esc =>
+          base44.entities.LocationData.update(esc.id, data)
+        ));
+      }
+    },
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['direcciones'] });
       queryClient.invalidateQueries({ queryKey: ['locations'] });
-      toast.success('Inspector actualizado');
-      setEditingInspector(null);
-      setInspectorValue('');
+      queryClient.invalidateQueries({ queryKey: ['locations-crear-ot'] });
+      if (variables.data.inspector !== undefined) {
+        toast.success('Inspector actualizado en dirección y escuelas vinculadas');
+        setEditingInspector(null);
+        setInspectorValue('');
+      }
+      if (variables.data.jefe_sitio !== undefined) {
+        toast.success('Jefe de sitio actualizado en dirección y escuelas vinculadas');
+        setEditingJefe(null);
+        setJefeValue('');
+      }
     },
   });
 
@@ -157,11 +176,47 @@ export default function DirectorioJerarquico() {
                       <Badge variant="outline" className="text-xs border-slate-600 text-slate-300">
                         {dir.comuna}
                       </Badge>
-                      {dir.jefe_sitio && (
-                        <Badge className="bg-blue-500/20 text-blue-300 border-0 text-xs">
-                          <Users className="h-2.5 w-2.5 mr-1" /> {dir.jefe_sitio}
-                        </Badge>
+
+                      {/* Jefe de Sitio — editable */}
+                      {editingJefe === dir.id ? (
+                        <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                          <input
+                            autoFocus
+                            value={jefeValue}
+                            onChange={e => setJefeValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') updateDireccionMutation.mutate({ id: dir.id, data: { jefe_sitio: jefeValue }, escuelas: dir.escuelas });
+                              if (e.key === 'Escape') { setEditingJefe(null); setJefeValue(''); }
+                            }}
+                            className="bg-slate-700 border border-slate-600 rounded px-2 py-0.5 text-xs text-white w-36 outline-none focus:border-primary/50"
+                            placeholder="Nombre jefe sitio..."
+                          />
+                          <button
+                            onClick={() => updateDireccionMutation.mutate({ id: dir.id, data: { jefe_sitio: jefeValue }, escuelas: dir.escuelas })}
+                            className="text-emerald-400 hover:text-emerald-300"
+                          ><Check className="h-3.5 w-3.5" /></button>
+                          <button
+                            onClick={() => { setEditingJefe(null); setJefeValue(''); }}
+                            className="text-slate-400 hover:text-slate-300"
+                          ><X className="h-3.5 w-3.5" /></button>
+                        </span>
+                      ) : (
+                        <span
+                          onClick={e => { e.stopPropagation(); setEditingJefe(dir.id); setJefeValue(dir.jefe_sitio || ''); }}
+                          className="cursor-pointer"
+                        >
+                          {dir.jefe_sitio ? (
+                            <Badge className="bg-blue-500/20 text-blue-300 border-0 text-xs hover:bg-blue-500/30">
+                              <Users className="h-2.5 w-2.5 mr-1" />{dir.jefe_sitio}
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-slate-700/50 text-slate-500 border border-dashed border-slate-600 text-xs hover:border-slate-500 hover:text-slate-400">
+                              + Asignar jefe
+                            </Badge>
+                          )}
+                        </span>
                       )}
+
                       {editingInspector === dir.id ? (
                         <span className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                           <input
@@ -169,14 +224,14 @@ export default function DirectorioJerarquico() {
                             value={inspectorValue}
                             onChange={e => setInspectorValue(e.target.value)}
                             onKeyDown={e => {
-                              if (e.key === 'Enter') updateDireccionMutation.mutate({ id: dir.id, data: { inspector: inspectorValue } });
+                              if (e.key === 'Enter') updateDireccionMutation.mutate({ id: dir.id, data: { inspector: inspectorValue }, escuelas: dir.escuelas });
                               if (e.key === 'Escape') { setEditingInspector(null); setInspectorValue(''); }
                             }}
                             className="bg-slate-700 border border-slate-600 rounded px-2 py-0.5 text-xs text-white w-36 outline-none focus:border-primary/50"
                             placeholder="Nombre inspector..."
                           />
                           <button
-                            onClick={() => updateDireccionMutation.mutate({ id: dir.id, data: { inspector: inspectorValue } })}
+                            onClick={() => updateDireccionMutation.mutate({ id: dir.id, data: { inspector: inspectorValue }, escuelas: dir.escuelas })}
                             className="text-emerald-400 hover:text-emerald-300"
                           ><Check className="h-3.5 w-3.5" /></button>
                           <button
