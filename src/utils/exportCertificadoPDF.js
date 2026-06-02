@@ -255,6 +255,9 @@ export async function exportCertificadoPDF(form) {
   }
   y += 5;
 
+  // % certificado sobre el total del contrato
+  const pctCertificado = subtotalContrato > 0 ? (pdfSubtotal / subtotalContrato) * 100 : 0;
+
   if (hasMedicion) {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
     doc.text(`Total contrato: ${fmt(subtotalContrato)}`, W - M, y, { align: 'right' }); y += 6;
@@ -267,6 +270,13 @@ export async function exportCertificadoPDF(form) {
   doc.text(hasMedicion ? 'IMP. CERTIFICADO:' : 'SUBTOTAL:', W - M - 88, y + 5.5);
   doc.text(fmt(pdfSubtotal), W - M - 1, y + 5.5, { align: 'right' });
   y += 10;
+
+  // Porcentaje certificado — sutil, en gris claro
+  if (pctCertificado > 0) {
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(6.5); doc.setTextColor(140, 150, 165);
+    doc.text(`Representa el ${pctCertificado.toFixed(1)}% del total del contrato`, W - M, y, { align: 'right' });
+    y += 6;
+  }
 
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
   if (pdfAnticipo > 0) {
