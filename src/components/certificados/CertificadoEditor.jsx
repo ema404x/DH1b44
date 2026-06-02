@@ -188,10 +188,10 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const baseCalculo = hasMedicion ? totalPresente : subtotal;
   const anticipo = form.anticipo_monto_manual != null
     ? form.anticipo_monto_manual
-    : (form.anticipo_pct > 0 ? baseCalculo * (form.anticipo_pct / 100) : 0);
+    : (form.anticipo_pct > 0 ? subtotal * (form.anticipo_pct / 100) : 0);
   const fondoReparo = form.fondo_reparo_monto_manual != null
     ? form.fondo_reparo_monto_manual
-    : (form.fondo_reparo_pct > 0 ? baseCalculo * (form.fondo_reparo_pct / 100) : 0);
+    : (form.fondo_reparo_pct > 0 ? subtotal * (form.fondo_reparo_pct / 100) : 0);
   const totalNeto = baseCalculo - anticipo - fondoReparo;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
