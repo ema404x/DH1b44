@@ -120,6 +120,15 @@
       ],
       "default": "normal"
     },
+    "ciclo": {
+      "type": "string",
+      "description": "Ciclo mensual al que pertenece este registro (ej: Mayo 2026). Vac\u00edo = ciclo activo."
+    },
+    "ciclo_archivado": {
+      "type": "boolean",
+      "default": false,
+      "description": "true cuando el ciclo fue cerrado y archivado. Los registros archivados son de solo lectura."
+    },
     "notas": {
       "type": "string",
       "description": "Observaciones generales"

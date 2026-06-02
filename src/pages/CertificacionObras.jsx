@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -7,12 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Plus, Search, FileCheck, DollarSign, Clock, TrendingUp, CheckCircle2,
-  AlertCircle, Filter, ChevronDown, Building2, User, Calendar, Hash, FileSpreadsheet, Download
+  AlertCircle, Filter, ChevronDown, Building2, User, Calendar, Hash, FileSpreadsheet, Download, Lock
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ObraCertificacionDialog from '@/components/certificacion/ObraCertificacionDialog';
 import ObraCertificacionCard from '@/components/certificacion/ObraCertificacionCard';
 import ImportarObrasExcel from '@/components/certificacion/ImportarObrasExcel';
+import CicloSelector from '@/components/certificacion/CicloSelector';
 import { exportarComunaPDF, exportarFiltradoPDF } from '@/components/certificacion/ExportarComunaPDF';
 
 const ESTADO_CONFIG = {
@@ -37,11 +38,32 @@ export default function CertificacionObras() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [cicloVista, setCicloVista] = useState('activo'); // 'activo' | nombre del ciclo archivado
 
-  const { data: obras = [], isLoading } = useQuery({
+  const { data: todasObras = [], isLoading } = useQuery({
     queryKey: ['obras-certificacion'],
-    queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 500),
+    queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 1000),
   });
+
+  // Obras del ciclo activo (no archivadas)
+  const obrasActivas = useMemo(
+    () => todasObras.filter(o => !o.ciclo_archivado),
+    [todasObras]
+  );
+
+  // Lista de ciclos archivados disponibles (ordenados más reciente primero)
+  const ciclosArchivados = useMemo(() => {
+    const set = new Set(todasObras.filter(o => o.ciclo_archivado && o.ciclo).map(o => o.ciclo));
+    return Array.from(set).sort().reverse();
+  }, [todasObras]);
+
+  // Obras que se muestran según ciclo seleccionado
+  const obras = useMemo(() => {
+    if (cicloVista === 'activo') return obrasActivas;
+    return todasObras.filter(o => o.ciclo === cicloVista && o.ciclo_archivado);
+  }, [cicloVista, obrasActivas, todasObras]);
+
+  const esArchivado = cicloVista !== 'activo';
 
   const saveMutation = useMutation({
     mutationFn: (data) => data.id
@@ -127,21 +149,35 @@ export default function CertificacionObras() {
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <FileCheck className="h-6 w-6 text-primary" />
             Certificación de Obras
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Listado de obras pendientes de cobro y en gestión</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {esArchivado
+              ? `Ciclo archivado — ${cicloVista}`
+              : 'Listado de obras pendientes de cobro y en gestión'}
+          </p>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
-            <FileSpreadsheet className="h-4 w-4" /> Importar Excel
-          </Button>
-          <Button onClick={handleNew} className="gap-2">
-            <Plus className="h-4 w-4" /> Nueva Obra
-          </Button>
+        <div className="flex flex-wrap gap-2 shrink-0 items-center">
+          <CicloSelector
+            cicloActivo={cicloVista}
+            ciclosDisponibles={ciclosArchivados}
+            onCambiarCiclo={setCicloVista}
+            obrasActivas={obrasActivas}
+          />
+          {!esArchivado && (
+            <>
+              <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
+                <FileSpreadsheet className="h-4 w-4" /> Importar Excel
+              </Button>
+              <Button onClick={handleNew} className="gap-2">
+                <Plus className="h-4 w-4" /> Nueva Obra
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -331,15 +367,16 @@ export default function CertificacionObras() {
               obra={obra}
               estadoConfig={ESTADO_CONFIG}
               prioridadConfig={PRIORIDAD_CONFIG}
-              onEdit={handleEdit}
-              onDelete={() => deleteMutation.mutate(obra.id)}
-              onEstadoChange={(id, estado) => saveMutation.mutate({ id, estado_cobro: estado })}
-              onTramoChange={(id, tramo) => saveMutation.mutate({
+              readOnly={esArchivado}
+              onEdit={esArchivado ? undefined : handleEdit}
+              onDelete={esArchivado ? undefined : () => deleteMutation.mutate(obra.id)}
+              onEstadoChange={esArchivado ? undefined : (id, estado) => saveMutation.mutate({ id, estado_cobro: estado })}
+              onTramoChange={esArchivado ? undefined : (id, tramo) => saveMutation.mutate({
                 id,
                 tramo_certificacion: tramo || undefined,
                 color_avance: tramo === 'primer_50' ? 'amarillo' : tramo === 'segundo_50' ? 'naranja' : 'auto',
               })}
-              onNotasChange={(id, notas) => saveMutation.mutate({ id, notas })}
+              onNotasChange={esArchivado ? undefined : (id, notas) => saveMutation.mutate({ id, notas })}
               fmt={fmt}
             />
           ))}

@@ -10,7 +10,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-export default function ObraCertificacionCard({ obra, estadoConfig, prioridadConfig, onEdit, onDelete, onEstadoChange, onTramoChange, onNotasChange, fmt }) {
+export default function ObraCertificacionCard({ obra, estadoConfig, prioridadConfig, onEdit, onDelete, onEstadoChange, onTramoChange, onNotasChange, fmt, readOnly = false }) {
   const [expanded, setExpanded] = useState(false);
   const [editingNotas, setEditingNotas] = useState(false);
   const [notasValue, setNotasValue] = useState(obra.notas || '');
@@ -117,7 +117,7 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
             </div>
 
             {/* Notas editables inline */}
-            {editingNotas ? (
+            {!readOnly && editingNotas ? (
               <div className="flex items-start gap-2">
                 <textarea
                   autoFocus
@@ -138,11 +138,11 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
               </div>
             ) : (
               <p
-                className="text-xs text-muted-foreground italic border-l-2 border-border pl-2 cursor-pointer hover:text-foreground hover:border-primary/50 transition-colors"
-                onClick={() => setEditingNotas(true)}
-                title="Click para editar"
+                className={`text-xs text-muted-foreground italic border-l-2 border-border pl-2 transition-colors ${!readOnly ? 'cursor-pointer hover:text-foreground hover:border-primary/50' : ''}`}
+                onClick={() => !readOnly && setEditingNotas(true)}
+                title={readOnly ? '' : 'Click para editar'}
               >
-                {obra.notas || <span className="not-italic opacity-40">+ Agregar nota...</span>}
+                {obra.notas || (!readOnly && <span className="not-italic opacity-40">+ Agregar nota...</span>)}
               </p>
             )}
             {obra.estado_cobro === 'observado' && obra.motivo_observacion && (
@@ -155,40 +155,48 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
 
           {/* Acciones */}
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 shrink-0">
-            <Select
-              value={obra.tramo_certificacion || 'sin_tramo'}
-              onValueChange={(v) => onTramoChange(obra.id, v === 'sin_tramo' ? null : v)}
-            >
-              <SelectTrigger className="h-8 w-32 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sin_tramo">— Sin tramo</SelectItem>
-                <SelectItem value="primer_50">🟡 1° 50%</SelectItem>
-                <SelectItem value="segundo_50">🟠 2° 50%</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={obra.estado_cobro} onValueChange={(v) => onEstadoChange(obra.id, v)}>
-              <SelectTrigger className="h-8 w-36 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="listo_certificar">✅ Listo para Certificar</SelectItem>
-                <SelectItem value="faltan_actas">⚠️ Faltan Cargar Actas</SelectItem>
-                <SelectItem value="pendiente">🔴 Pendiente</SelectItem>
-                <SelectItem value="observado">⚫ Observado</SelectItem>
-                <SelectItem value="falta_aprobar_mein">🟣 Falta Aprobar Orden MEIN</SelectItem>
-              </SelectContent>
-            </Select>
+            {!readOnly && (
+              <>
+                <Select
+                  value={obra.tramo_certificacion || 'sin_tramo'}
+                  onValueChange={(v) => onTramoChange(obra.id, v === 'sin_tramo' ? null : v)}
+                >
+                  <SelectTrigger className="h-8 w-32 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sin_tramo">— Sin tramo</SelectItem>
+                    <SelectItem value="primer_50">🟡 1° 50%</SelectItem>
+                    <SelectItem value="segundo_50">🟠 2° 50%</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={obra.estado_cobro} onValueChange={(v) => onEstadoChange(obra.id, v)}>
+                  <SelectTrigger className="h-8 w-36 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="listo_certificar">✅ Listo para Certificar</SelectItem>
+                    <SelectItem value="faltan_actas">⚠️ Faltan Cargar Actas</SelectItem>
+                    <SelectItem value="pendiente">🔴 Pendiente</SelectItem>
+                    <SelectItem value="observado">⚫ Observado</SelectItem>
+                    <SelectItem value="falta_aprobar_mein">🟣 Falta Aprobar Orden MEIN</SelectItem>
+                  </SelectContent>
+                </Select>
+              </>
+            )}
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpanded(!expanded)}>
               {expanded ? <ChevronUp className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(obra)}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={onDelete}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {!readOnly && (
+              <>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(obra)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={onDelete}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
