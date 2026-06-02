@@ -2,7 +2,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calendar, Building2, User, DollarSign, TrendingUp, Paperclip, Clock, CheckCircle2, XCircle, Eye } from 'lucide-react';
+import { Calendar, Building2, User, DollarSign, TrendingUp, Paperclip, Clock, CheckCircle2, XCircle, Eye, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -20,7 +20,7 @@ const prioridadConfig = {
   urgente: { label: 'Urgente', color: 'bg-red-100 text-red-700 font-bold' },
 };
 
-export default function SolicitudCard({ solicitud, onView, onEdit, isAdmin }) {
+export default function SolicitudCard({ solicitud, onView, onEdit, onDelete, isAdmin }) {
   const estado = estadoConfig[solicitud.estado] || estadoConfig.borrador;
   const prioridad = prioridadConfig[solicitud.prioridad] || prioridadConfig.normal;
   const canEdit = !isAdmin && (solicitud.estado === 'borrador' || solicitud.estado === 'rechazada');
@@ -103,6 +103,20 @@ export default function SolicitudCard({ solicitud, onView, onEdit, isAdmin }) {
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => onView(solicitud)}>
               <Eye className="h-3.5 w-3.5" /> Ver detalle
             </Button>
+            {isAdmin && onDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => {
+                  if (window.confirm(`¿Eliminar la solicitud "${solicitud.titulo}"? Esta acción no se puede deshacer.`)) {
+                    onDelete(solicitud.id);
+                  }
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>

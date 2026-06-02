@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, FileCheck2, Clock, CheckCircle2, XCircle, SendHorizonal } from 'lucide-react';
+import { Plus, Search, FileCheck2, Clock, CheckCircle2, XCircle, SendHorizonal, Filter } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
 import PageHeader from '@/components/shared/PageHeader';
 import SolicitudForm from '@/components/aprobacion/SolicitudForm';
 import SolicitudCard from '@/components/aprobacion/SolicitudCard';
@@ -36,6 +37,7 @@ export default function AprobacionCertificados() {
   const [editing, setEditing] = useState(null);
   const [tab, setTab] = useState('todas');
   const [search, setSearch] = useState('');
+  const [filtroPrioridad, setFiltroPrioridad] = useState('todas');
 
   const { data: solicitudes = [], isLoading } = useQuery({
     queryKey: ['solicitudes-cert'],
@@ -47,7 +49,7 @@ export default function AprobacionCertificados() {
     ? solicitudes
     : solicitudes.filter(s => s.jefe_sitio_email === user?.email || s.created_by === user?.email);
 
-  // Filtro tab + search
+  // Filtro tab + search + prioridad
   const filtered = misSolicitudes.filter(s => {
     const matchTab = tab === 'todas' || s.estado === tab;
     const matchSearch = !search ||
@@ -55,7 +57,8 @@ export default function AprobacionCertificados() {
       s.establecimiento?.toLowerCase().includes(search.toLowerCase()) ||
       s.jefe_sitio?.toLowerCase().includes(search.toLowerCase()) ||
       s.numero?.toLowerCase().includes(search.toLowerCase());
-    return matchTab && matchSearch;
+    const matchPrioridad = filtroPrioridad === 'todas' || s.prioridad === filtroPrioridad;
+    return matchTab && matchSearch && matchPrioridad;
   });
 
   const counts = {
@@ -65,6 +68,11 @@ export default function AprobacionCertificados() {
     rechazada: misSolicitudes.filter(s => s.estado === 'rechazada').length,
     borrador: misSolicitudes.filter(s => s.estado === 'borrador').length,
   };
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.SolicitudCertificado.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes-cert'] }),
+  });
 
   const handleNew = () => { setEditing(null); setView('form'); };
   const handleEdit = (sol) => { setEditing(sol); setView('form'); };
@@ -153,6 +161,18 @@ export default function AprobacionCertificados() {
             className="pl-9"
           />
         </div>
+        <Select value={filtroPrioridad} onValueChange={setFiltroPrioridad}>
+          <SelectTrigger className="w-40 gap-1.5">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+            <SelectValue placeholder="Prioridad" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas las prioridades</SelectItem>
+            <SelectItem value="normal">Normal</SelectItem>
+            <SelectItem value="alta">Alta</SelectItem>
+            <SelectItem value="urgente">Urgente</SelectItem>
+          </SelectContent>
+        </Select>
         {isSuperAdmin && (
           <Button variant="outline" onClick={handleNew} className="gap-2">
             <Plus className="h-4 w-4" /> Nueva solicitud
@@ -196,6 +216,7 @@ export default function AprobacionCertificados() {
                     isAdmin={isSuperAdmin}
                     onView={handleView}
                     onEdit={handleEdit}
+                    onDelete={isSuperAdmin ? (id) => deleteMutation.mutate(id) : undefined}
                   />
                 ))}
               </div>
