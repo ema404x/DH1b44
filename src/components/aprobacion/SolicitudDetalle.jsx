@@ -5,13 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle2, XCircle, MessageSquare, Paperclip, TrendingUp, DollarSign, Calendar, User, Building2, CheckSquare, ArrowLeft, Clock, FileText, Download, ExternalLink } from 'lucide-react';
+import { CheckCircle2, XCircle, MessageSquare, Paperclip, TrendingUp, DollarSign, Calendar, User, Building2, CheckSquare, ArrowLeft, Clock, FileText, ChevronDown, ChevronUp, ExternalLink, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import FirmaGerenteModal from '@/components/aprobacion/FirmaGerenteModal';
-import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 
 const estadoConfig = {
   borrador:    { label: 'Borrador',     color: 'bg-slate-100 text-slate-600 border-slate-300' },
@@ -27,7 +26,9 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
   const [motivo, setMotivo] = useState('');
   const [aprobando, setAprobando] = useState(false);
   const [showFirmaModal, setShowFirmaModal] = useState(false);
-  const [exportando, setExportando] = useState(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
+  const [showPdf, setShowPdf] = useState(false);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
 
   // Cargar el certificado vinculado si existe
   const { data: certificado } = useQuery({
@@ -37,15 +38,40 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
     select: (data) => data?.[0] || null,
   });
 
-  const handleVerCertificado = async () => {
-    if (certificado?.pdf_url) {
-      window.open(certificado.pdf_url, '_blank');
+  const handleTogglePdf = async () => {
+    if (showPdf) { setShowPdf(false); return; }
+
+    // Si ya hay un pdf_url guardado, usarlo directo
+    if (certificado?.pdf_url && !pdfBlobUrl) {
+      setPdfBlobUrl(certificado.pdf_url);
+      setShowPdf(true);
       return;
     }
+
+    // Si ya generamos el blob, solo mostrar
+    if (pdfBlobUrl) { setShowPdf(true); return; }
+
     if (!certificado) return;
-    setExportando(true);
-    await exportCertificadoPDF(certificado);
-    setExportando(false);
+    setGenerandoPdf(true);
+
+    // Importar dinámicamente
+    const [{ exportCertificadoPDF: exportFn }, jsPDFModule] = await Promise.all([
+      import('@/utils/exportCertificadoPDF'),
+      import('jspdf'),
+    ]);
+    const jsPDFClass = jsPDFModule.default;
+
+    // Monkey-patch save para capturar el blob en lugar de descargar
+    const origSave = jsPDFClass.prototype.save;
+    jsPDFClass.prototype.save = function() {
+      const blob = this.output('blob');
+      const url = URL.createObjectURL(blob);
+      setPdfBlobUrl(url);
+      setShowPdf(true);
+      setGenerandoPdf(false);
+    };
+    await exportFn(certificado);
+    jsPDFClass.prototype.save = origSave;
   };
 
   const updateMutation = useMutation({
@@ -141,33 +167,57 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
 
       {/* Certificado vinculado */}
       {solicitud.certificado_id && (
-        <Card className="border-blue-200 bg-blue-50/20">
-          <CardContent className="p-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                <FileText className="h-4 w-4 text-blue-600" />
+        <Card className="border-blue-200 bg-blue-50/20 overflow-hidden">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Certificado vinculado</p>
+                  <p className="text-xs text-muted-foreground">
+                    {certificado
+                      ? `N° ${certificado.numero} · ${certificado.contratista || ''}`
+                      : 'Cargando...'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold">Certificado vinculado</p>
-                <p className="text-xs text-muted-foreground">
-                  {certificado
-                    ? `N° ${certificado.numero} · ${certificado.contratista || ''}`
-                    : 'Cargando...'}
-                </p>
+              <div className="flex items-center gap-2">
+                {pdfBlobUrl && (
+                  <a href={pdfBlobUrl} download={`Certificado_${certificado?.numero || ''}.pdf`}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 flex-shrink-0"
+                  onClick={handleTogglePdf}
+                  disabled={!certificado || generandoPdf}
+                >
+                  {generandoPdf
+                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generando...</>
+                    : showPdf
+                      ? <><ChevronUp className="h-3.5 w-3.5" /> Ocultar PDF</>
+                      : <><ChevronDown className="h-3.5 w-3.5" /> Ver PDF</>
+                  }
+                </Button>
               </div>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-2 flex-shrink-0"
-              onClick={handleVerCertificado}
-              disabled={!certificado || exportando}
-            >
-              {certificado?.pdf_url
-                ? <><ExternalLink className="h-3.5 w-3.5" /> Ver PDF</>
-                : <><Download className="h-3.5 w-3.5" /> {exportando ? 'Generando...' : 'Exportar PDF'}</>
-              }
-            </Button>
+
+            {/* Vista inline del PDF */}
+            {showPdf && pdfBlobUrl && (
+              <div className="mt-4 rounded-md overflow-hidden border border-border">
+                <iframe
+                  src={pdfBlobUrl}
+                  className="w-full"
+                  style={{ height: '600px' }}
+                  title="Certificado PDF"
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
