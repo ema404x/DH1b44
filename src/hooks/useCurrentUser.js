@@ -13,8 +13,12 @@ import { AuthContext } from '@/lib/AuthContext';
 export function useCurrentUser() {
   const { user: currentUser, userPermissions, isLoadingAuth: loading } = useContext(AuthContext);
 
-  // Rol del empleado vinculado (viene de AuthContext vía vincularEmpleado)
+  // Rol y nombre del empleado vinculado (viene de AuthContext vía vincularEmpleado)
   const employeeRole = userPermissions?._employeeRole || null;
+  // Nombre del empleado configurado en el módulo de Empleados (tiene prioridad sobre full_name de plataforma)
+  const employeeName = userPermissions?._employeeName || null;
+  // Nombre a mostrar: nombre en ficha de empleado > nombre de plataforma
+  const displayName = employeeName || currentUser?.full_name || currentUser?.email || 'Usuario';
 
   // Roles que deben ver solo sus propios datos
   const FIELD_ROLES = ['jefe_sitio', 'jefe de sitio', 'inspector', 'tecnico', 'supervisor'];
@@ -61,5 +65,5 @@ export function useCurrentUser() {
     });
   }
 
-  return { currentUser, user: currentUser, isAdmin, isSuperAdmin, employeeRole, loading, filterByUser, userPermissions };
+  return { currentUser, user: currentUser, isAdmin, isSuperAdmin, employeeRole, employeeName, displayName, loading, filterByUser, userPermissions };
 }

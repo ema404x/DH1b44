@@ -31,7 +31,11 @@ export const AuthProvider = ({ children }) => {
           const perms = vinculacion.data.employee_permissions || {};
           // Guardar el rol del empleado dentro del objeto de permisos para que
           // useCurrentUser pueda determinar si debe filtrar datos por usuario.
-          setUserPermissions({ ...perms, _employeeRole: vinculacion.data.employee_role || null });
+          setUserPermissions({
+            ...perms,
+            _employeeRole: vinculacion.data.employee_role || null,
+            _employeeName: vinculacion.data.employee_name || null,
+          });
         } else if (vinculacion?.data?.linked === false) {
           if (currentUser?.role !== 'admin') {
             setUserPermissions({});
