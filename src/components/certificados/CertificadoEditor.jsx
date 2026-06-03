@@ -89,6 +89,7 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       anticipo_monto_manual: initialData?.anticipo_monto_manual ?? null,
       fondo_reparo_pct: initialData?.fondo_reparo_pct ?? 0,
       fondo_reparo_monto_manual: initialData?.fondo_reparo_monto_manual ?? null,
+      fondo_reparo_label: initialData?.fondo_reparo_label || '',
       subtotal: initialData?.subtotal || 0,
       _validation: initialData?._validation || null,
       ada_pdf_url: initialData?.ada_pdf_url || '',
@@ -555,7 +556,12 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
 
           {/* Fondo de Reparo */}
           <div className="flex justify-between w-full text-sm items-center gap-2">
-            <span className="text-muted-foreground shrink-0">Fondo de Reparo:</span>
+            <Input
+              className="h-7 text-xs w-36 shrink-0"
+              placeholder="Fondo de Reparo"
+              value={form.fondo_reparo_label}
+              onChange={e => set('fondo_reparo_label', e.target.value)}
+            />
             <div className="flex items-center gap-1.5">
               <button
                 type="button"

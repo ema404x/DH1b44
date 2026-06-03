@@ -286,9 +286,10 @@ export async function exportCertificadoPDF(form) {
     doc.text(antiLabel, W - M, y, { align: 'right' }); y += 7;
   }
   if (pdfFondoReparo > 0) {
+    const fondoNombre = form.fondo_reparo_label || 'Fondo de Reparo';
     const fondoLabel = form.fondo_reparo_monto_manual != null
-      ? `Fondo de Reparo (monto fijo):   -${fmt(pdfFondoReparo)}`
-      : `Fondo de Reparo (${fondo_reparo_pct}%):   -${fmt(pdfFondoReparo)}`;
+      ? `${fondoNombre} (monto fijo):   -${fmt(pdfFondoReparo)}`
+      : `${fondoNombre} (${fondo_reparo_pct}%):   -${fmt(pdfFondoReparo)}`;
     doc.text(fondoLabel, W - M, y, { align: 'right' }); y += 7;
   }
 
