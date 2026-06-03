@@ -3,13 +3,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Pin, Lock, Megaphone, MoreVertical, Reply, Paperclip, Clock, Trash2 } from "lucide-react";
+import { ArrowLeft, Pin, Lock, Megaphone, MoreVertical, Reply, Paperclip, Clock, Trash2, Pencil } from "lucide-react";
 import ForoReacciones from "./ForoReacciones";
 import ForoEncuesta from "./ForoEncuesta";
 import ForoEditorMensaje from "./ForoEditorMensaje";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const tiempoRelativo = (f) => f ? formatDistanceToNow(new Date(f), { addSuffix: true, locale: es }) : "";
 
@@ -71,9 +74,19 @@ function RespuestaItem({ respuesta, userId, user, onReaccion, onEliminar, onResp
   );
 }
 
-export default function ForoHiloDetalle({ hilo, user, onVolver, usuarios }) {
+export default function ForoHiloDetalle({ hilo, user, onVolver, onEliminarHilo, usuarios }) {
   const qc = useQueryClient();
   const [respondiendo, setRespondiendo] = useState(null);
+  const [editandoHilo, setEditandoHilo] = useState(false);
+  const [editTitulo, setEditTitulo] = useState(hilo.titulo);
+  const [editCuerpo, setEditCuerpo] = useState(hilo.cuerpo);
+
+  const esAutorOAdmin = user?.role === 'admin' || hilo.autor_id === user?.id;
+
+  const editarHiloMut = useMutation({
+    mutationFn: (data) => base44.entities.ForoHilo.update(hilo.id, data),
+    onSuccess: () => { qc.invalidateQueries(["foro-hilos"]); setEditandoHilo(false); },
+  });
 
   const { data: respuestas = [] } = useQuery({
     queryKey: ["foro-respuestas", hilo.id],
@@ -185,17 +198,31 @@ export default function ForoHiloDetalle({ hilo, user, onVolver, usuarios }) {
             {hilo.fijado && <Pin className="h-4 w-4 text-primary" />}
             {hilo.cerrado && <Lock className="h-4 w-4 text-muted-foreground" />}
           </div>
-          {user?.role === 'admin' && (
+          {esAutorOAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => base44.entities.ForoHilo.update(hilo.id, { fijado: !hilo.fijado }).then(() => qc.invalidateQueries(["foro-hilos"]))}>
-                  <Pin className="h-4 w-4 mr-2" /> {hilo.fijado ? "Desfijar" : "Fijar"}
+                <DropdownMenuItem onClick={() => { setEditTitulo(hilo.titulo); setEditCuerpo(hilo.cuerpo); setEditandoHilo(true); }}>
+                  <Pencil className="h-4 w-4 mr-2" /> Editar
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => base44.entities.ForoHilo.update(hilo.id, { cerrado: !hilo.cerrado }).then(() => qc.invalidateQueries(["foro-hilos"]))}>
-                  <Lock className="h-4 w-4 mr-2" /> {hilo.cerrado ? "Abrir" : "Cerrar"}
+                {user?.role === 'admin' && (
+                  <>
+                    <DropdownMenuItem onClick={() => base44.entities.ForoHilo.update(hilo.id, { fijado: !hilo.fijado }).then(() => qc.invalidateQueries(["foro-hilos"]))}>
+                      <Pin className="h-4 w-4 mr-2" /> {hilo.fijado ? "Desfijar" : "Fijar"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => base44.entities.ForoHilo.update(hilo.id, { cerrado: !hilo.cerrado }).then(() => qc.invalidateQueries(["foro-hilos"]))}>
+                      <Lock className="h-4 w-4 mr-2" /> {hilo.cerrado ? "Abrir" : "Cerrar"}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => { if (confirm("¿Eliminar este hilo y todas sus respuestas?")) onEliminarHilo(hilo.id); }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Eliminar hilo
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -216,6 +243,26 @@ export default function ForoHiloDetalle({ hilo, user, onVolver, usuarios }) {
         </div>
 
         <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{hilo.cuerpo}</p>
+
+        {/* Dialog edición */}
+        <Dialog open={editandoHilo} onOpenChange={setEditandoHilo}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader><DialogTitle>Editar hilo</DialogTitle></DialogHeader>
+            <div className="flex flex-col gap-3 mt-2">
+              <Input value={editTitulo} onChange={e => setEditTitulo(e.target.value)} placeholder="Título" />
+              <Textarea value={editCuerpo} onChange={e => setEditCuerpo(e.target.value)} placeholder="Contenido" className="min-h-[120px]" />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditandoHilo(false)}>Cancelar</Button>
+                <Button
+                  onClick={() => editarHiloMut.mutate({ titulo: editTitulo, cuerpo: editCuerpo })}
+                  disabled={editarHiloMut.isPending || !editTitulo.trim() || !editCuerpo.trim()}
+                >
+                  Guardar cambios
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
         <AdjuntosGaleria adjuntos={hilo.adjuntos} />
         <ForoEncuesta encuesta={hilo.encuesta} userId={user?.id} onVotar={(opId) => votarMut.mutate(opId)} />
 

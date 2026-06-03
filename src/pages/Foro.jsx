@@ -84,6 +84,15 @@ export default function Foro() {
     },
   });
 
+  const eliminarHiloMut = useMutation({
+    mutationFn: async (id) => {
+      const respuestas = await base44.entities.ForoRespuesta.filter({ hilo_id: id });
+      await Promise.all(respuestas.map(r => base44.entities.ForoRespuesta.delete(r.id)));
+      return base44.entities.ForoHilo.delete(id);
+    },
+    onSuccess: () => { qc.invalidateQueries(["foro-hilos"]); setHiloActivo(null); },
+  });
+
   const crearCategoriaMut = useMutation({
     mutationFn: (data) => base44.entities.ForoCategoria.create(data),
     onSuccess: () => { qc.invalidateQueries(["foro-categorias"]); setNuevaCatOpen(false); setNuevaCat({ nombre: "", icono: "💬", descripcion: "" }); },
@@ -125,6 +134,7 @@ export default function Foro() {
           hilo={hiloActivoData}
           user={user}
           onVolver={() => setHiloActivo(null)}
+          onEliminarHilo={(id) => eliminarHiloMut.mutate(id)}
           usuarios={usuarios}
         />
       </div>
