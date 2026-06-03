@@ -540,7 +540,7 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
                 onClick={() => set('anticipo_monto_manual', anticipo || 0)}
               >$</button>
               {form.anticipo_monto_manual == null ? (
-                <Input type="number" min="0" className="w-20 h-7 text-xs" value={form.anticipo_pct} onChange={e => set('anticipo_pct', +e.target.value)} />
+                <Input type="number" min="0" className="w-20 h-7 text-xs" placeholder="0" value={form.anticipo_pct || ''} onChange={e => set('anticipo_pct', +e.target.value)} />
               ) : (
                 <Input type="number" min="0" className="w-28 h-7 text-xs border-amber-500/60 focus:ring-amber-400" value={form.anticipo_monto_manual} onChange={e => set('anticipo_monto_manual', +e.target.value)} />
               )}
@@ -568,7 +568,7 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
                 onClick={() => set('fondo_reparo_monto_manual', fondoReparo || 0)}
               >$</button>
               {form.fondo_reparo_monto_manual == null ? (
-                <Input type="number" min="0" className="w-20 h-7 text-xs" value={form.fondo_reparo_pct} onChange={e => set('fondo_reparo_pct', +e.target.value)} />
+                <Input type="number" min="0" className="w-20 h-7 text-xs" placeholder="0" value={form.fondo_reparo_pct || ''} onChange={e => set('fondo_reparo_pct', +e.target.value)} />
               ) : (
                 <Input type="number" min="0" className="w-28 h-7 text-xs border-amber-500/60 focus:ring-amber-400" value={form.fondo_reparo_monto_manual} onChange={e => set('fondo_reparo_monto_manual', +e.target.value)} />
               )}
