@@ -21,6 +21,7 @@ const MODULES = [
   { key: 'Dashboard', label: 'Dashboard', group: 'General' },
   { key: 'Calendario', label: 'Calendario', group: 'General' },
   { key: 'Alertas', label: 'Alertas Proactivas', group: 'General' },
+  { key: 'Foro', label: 'Foro de Comunicaciones', group: 'General' },
   { key: 'Project', label: 'Proyectos', group: 'Operaciones' },
   { key: 'WorkOrder', label: 'Órdenes de Trabajo', group: 'Operaciones' },
   { key: 'Pendientes', label: 'Pendientes SAP', group: 'Operaciones' },
