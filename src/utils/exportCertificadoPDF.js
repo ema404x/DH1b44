@@ -72,9 +72,10 @@ export async function exportCertificadoPDF(form) {
   const pdfAnticipo = form._anticipo_monto != null
     ? form._anticipo_monto
     : (anticipo_pct > 0 ? baseDeduccion * (anticipo_pct / 100) : 0);
-  const pdfFondoReparo = form._fondo_reparo_monto != null
+  const fondoReparoCalculado = form._fondo_reparo_monto != null
     ? form._fondo_reparo_monto
     : (fondo_reparo_pct > 0 ? baseDeduccion * (fondo_reparo_pct / 100) : 0);
+  const pdfFondoReparo = form.fondo_reparo_aplicar ? fondoReparoCalculado : 0;
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
   // Monto contratado: exactamente lo que el usuario ingresó, parseado correctamente

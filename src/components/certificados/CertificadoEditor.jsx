@@ -90,6 +90,7 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
       fondo_reparo_pct: initialData?.fondo_reparo_pct ?? 0,
       fondo_reparo_monto_manual: initialData?.fondo_reparo_monto_manual ?? null,
       fondo_reparo_label: initialData?.fondo_reparo_label || '',
+      fondo_reparo_aplicar: initialData?.fondo_reparo_aplicar ?? false,
       subtotal: initialData?.subtotal || 0,
       _validation: initialData?._validation || null,
       ada_pdf_url: initialData?.ada_pdf_url || '',
@@ -195,9 +196,10 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
   const anticipo = form.anticipo_monto_manual != null
     ? form.anticipo_monto_manual
     : (form.anticipo_pct > 0 ? montoContratado * (form.anticipo_pct / 100) : 0);
-  const fondoReparo = form.fondo_reparo_monto_manual != null
+  const fondoReparoMonto = form.fondo_reparo_monto_manual != null
     ? form.fondo_reparo_monto_manual
     : (form.fondo_reparo_pct > 0 ? montoContratado * (form.fondo_reparo_pct / 100) : 0);
+  const fondoReparo = form.fondo_reparo_aplicar ? fondoReparoMonto : 0;
   const totalNeto = baseCalculo - anticipo - fondoReparo;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
@@ -571,7 +573,7 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
               <button
                 type="button"
                 className={`text-[10px] px-2 py-0.5 rounded font-semibold transition-colors ${form.fondo_reparo_monto_manual != null ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
-                onClick={() => set('fondo_reparo_monto_manual', fondoReparo || 0)}
+                onClick={() => set('fondo_reparo_monto_manual', fondoReparoMonto || 0)}
               >$</button>
               {form.fondo_reparo_monto_manual == null ? (
                 <Input type="number" min="0" className="w-20 h-7 text-xs" placeholder="0" value={form.fondo_reparo_pct || ''} onChange={e => set('fondo_reparo_pct', +e.target.value)} />
@@ -580,10 +582,18 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
               )}
             </div>
           </div>
-          {fondoReparo > 0 && (
-            <div className="flex justify-between w-full text-xs text-muted-foreground">
-              <span>Fondo de Reparo {form.fondo_reparo_monto_manual == null ? `(${form.fondo_reparo_pct}%)` : '(monto fijo)'}:</span>
-              <span className="text-destructive">-{fmt(fondoReparo)}</span>
+          {fondoReparoMonto > 0 && (
+            <div className="flex justify-between w-full text-xs items-center">
+              <span className="text-muted-foreground">
+                {form.fondo_reparo_label || 'Fondo de Reparo'} {form.fondo_reparo_monto_manual == null ? `(${form.fondo_reparo_pct}%)` : '(monto fijo)'}: <span className="font-semibold">{fmt(fondoReparoMonto)}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => set('fondo_reparo_aplicar', !form.fondo_reparo_aplicar)}
+                className={`text-[10px] px-2.5 py-1 rounded font-semibold transition-colors border ${form.fondo_reparo_aplicar ? 'bg-destructive/10 text-destructive border-destructive/30' : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'}`}
+              >
+                {form.fondo_reparo_aplicar ? `✓ Descontando -${fmt(fondoReparoMonto)}` : 'Aplicar descuento'}
+              </button>
             </div>
           )}
           <div className="w-full border-t pt-2 flex justify-between font-bold">
