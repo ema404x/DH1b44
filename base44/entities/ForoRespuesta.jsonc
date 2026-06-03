@@ -1,0 +1,68 @@
+{
+  "name": "ForoRespuesta",
+  "type": "object",
+  "properties": {
+    "hilo_id": {
+      "type": "string",
+      "description": "ID del ForoHilo al que pertenece"
+    },
+    "cuerpo": {
+      "type": "string",
+      "description": "Contenido de la respuesta"
+    },
+    "autor_nombre": {
+      "type": "string"
+    },
+    "autor_id": {
+      "type": "string"
+    },
+    "adjuntos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "imagen",
+              "archivo"
+            ]
+          }
+        }
+      }
+    },
+    "reacciones": {
+      "type": "object",
+      "description": "Mapa emoji -> array de user IDs",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "menciones": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "responde_a_id": {
+      "type": "string",
+      "description": "ID de ForoRespuesta si es un reply"
+    },
+    "responde_a_autor": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "hilo_id",
+    "cuerpo"
+  ]
+}

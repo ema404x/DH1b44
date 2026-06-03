@@ -1,0 +1,38 @@
+{
+  "name": "ForoNotificacion",
+  "type": "object",
+  "properties": {
+    "usuario_id": {
+      "type": "string",
+      "description": "ID del usuario destinatario"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "mencion",
+        "respuesta",
+        "anuncio"
+      ],
+      "description": "Tipo de notificaci\u00f3n"
+    },
+    "hilo_id": {
+      "type": "string"
+    },
+    "hilo_titulo": {
+      "type": "string"
+    },
+    "actor_nombre": {
+      "type": "string",
+      "description": "Quien gener\u00f3 la notificaci\u00f3n"
+    },
+    "leida": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "usuario_id",
+    "tipo",
+    "hilo_id"
+  ]
+}

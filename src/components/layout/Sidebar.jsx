@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -64,6 +64,12 @@ const navGroups = [
       { label: 'Control de Acceso', icon: Lock, path: '/permisos' },
       { label: 'Auditoría', icon: FileText, path: '/auditoria' },
       { label: 'Centro de Seguridad', icon: Shield, path: '/seguridad' },
+    ]
+  },
+  {
+    label: 'Comunicación',
+    items: [
+      { label: 'Foro de Comunicaciones', icon: MessageSquare, path: '/foro' },
     ]
   },
   {
@@ -155,6 +161,7 @@ export default function Sidebar() {
     '/permisos': 'Permisos',
     '/auditoria': 'AuditLog',
     '/seguridad': 'Seguridad',
+    '/foro': null,
     '/tutorial': null,
     '/importar': 'ImportarDatos',
   };

@@ -1,0 +1,128 @@
+{
+  "name": "ForoHilo",
+  "type": "object",
+  "properties": {
+    "titulo": {
+      "type": "string",
+      "description": "T\u00edtulo del hilo"
+    },
+    "cuerpo": {
+      "type": "string",
+      "description": "Contenido del post inicial"
+    },
+    "categoria_id": {
+      "type": "string",
+      "description": "ID de ForoCategoria"
+    },
+    "categoria_nombre": {
+      "type": "string"
+    },
+    "autor_nombre": {
+      "type": "string"
+    },
+    "autor_id": {
+      "type": "string"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "hilo",
+        "anuncio"
+      ],
+      "default": "hilo"
+    },
+    "adjuntos": {
+      "type": "array",
+      "description": "Archivos e im\u00e1genes adjuntas",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "imagen",
+              "archivo"
+            ]
+          }
+        }
+      }
+    },
+    "encuesta": {
+      "type": "object",
+      "description": "Encuesta opcional asociada al hilo",
+      "properties": {
+        "pregunta": {
+          "type": "string"
+        },
+        "opciones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "texto": {
+                "type": "string"
+              },
+              "votos": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Array de user IDs que votaron"
+              }
+            }
+          }
+        },
+        "activa": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "reacciones": {
+      "type": "object",
+      "description": "Mapa emoji -> array de user IDs",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "menciones": {
+      "type": "array",
+      "description": "IDs de usuarios mencionados",
+      "items": {
+        "type": "string"
+      }
+    },
+    "total_respuestas": {
+      "type": "number",
+      "default": 0
+    },
+    "vistas": {
+      "type": "number",
+      "default": 0
+    },
+    "fijado": {
+      "type": "boolean",
+      "default": false
+    },
+    "cerrado": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "titulo",
+    "cuerpo"
+  ]
+}

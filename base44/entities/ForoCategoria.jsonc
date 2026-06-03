@@ -1,0 +1,33 @@
+{
+  "name": "ForoCategoria",
+  "type": "object",
+  "properties": {
+    "nombre": {
+      "type": "string",
+      "description": "Nombre de la categor\u00eda"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripci\u00f3n breve"
+    },
+    "icono": {
+      "type": "string",
+      "description": "Emoji o icono representativo"
+    },
+    "color": {
+      "type": "string",
+      "description": "Color de acento (hex o tailwind)"
+    },
+    "orden": {
+      "type": "number",
+      "default": 0
+    },
+    "activa": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "nombre"
+  ]
+}
