@@ -72,10 +72,10 @@ export async function exportCertificadoPDF(form) {
   const pdfAnticipo = form._anticipo_monto != null
     ? form._anticipo_monto
     : (anticipo_pct > 0 ? baseDeduccion * (anticipo_pct / 100) : 0);
-  // Fondo de reparo se calcula siempre sobre el 100% del contrato
+  // Fondo de reparo: usar monto contratado del encabezado si está definido, sino suma de ítems
   const fondoReparoCalculado = form._fondo_reparo_monto != null
     ? form._fondo_reparo_monto
-    : (fondo_reparo_pct > 0 ? subtotalContrato * (fondo_reparo_pct / 100) : 0);
+    : (fondo_reparo_pct > 0 ? baseDeduccion * (fondo_reparo_pct / 100) : 0);
   const pdfFondoReparo = form.fondo_reparo_aplicar ? fondoReparoCalculado : 0;
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
