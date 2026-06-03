@@ -36,7 +36,10 @@ function AdjuntosGaleria({ adjuntos }) {
   );
 }
 
+const DEV_EMAIL = 'emmmanuel0011@gmail.com';
+
 function RespuestaItem({ respuesta, userId, user, onReaccion, onEliminar, onResponder }) {
+  const esDev = user?.email === DEV_EMAIL;
   return (
     <div className="flex gap-3 group">
       <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold shrink-0 mt-1">
@@ -63,7 +66,7 @@ function RespuestaItem({ respuesta, userId, user, onReaccion, onEliminar, onResp
           <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground gap-1" onClick={() => onResponder(respuesta)}>
             <Reply className="h-3 w-3" /> Responder
           </Button>
-          {(user?.role === 'admin' || respuesta.autor_id === userId) && (
+          {(esDev || respuesta.autor_id === userId) && (
             <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => onEliminar(respuesta.id)}>
               <Trash2 className="h-3 w-3" />
             </Button>
@@ -81,7 +84,10 @@ export default function ForoHiloDetalle({ hilo, user, onVolver, onEliminarHilo, 
   const [editTitulo, setEditTitulo] = useState(hilo.titulo);
   const [editCuerpo, setEditCuerpo] = useState(hilo.cuerpo);
 
-  const esAutorOAdmin = user?.role === 'admin' || hilo.autor_id === user?.id;
+  const esDev = user?.email === DEV_EMAIL;
+  const esAutor = hilo.autor_id === user?.id;
+  const esAutorOAdmin = esAutor || esDev;
+  const puedeModerar = user?.role === 'admin' || esDev; // fijar/cerrar
 
   const editarHiloMut = useMutation({
     mutationFn: (data) => base44.entities.ForoHilo.update(hilo.id, data),
@@ -207,7 +213,7 @@ export default function ForoHiloDetalle({ hilo, user, onVolver, onEliminarHilo, 
                 <DropdownMenuItem onClick={() => { setEditTitulo(hilo.titulo); setEditCuerpo(hilo.cuerpo); setEditandoHilo(true); }}>
                   <Pencil className="h-4 w-4 mr-2" /> Editar
                 </DropdownMenuItem>
-                {user?.role === 'admin' && (
+                {puedeModerar && (
                   <>
                     <DropdownMenuItem onClick={() => base44.entities.ForoHilo.update(hilo.id, { fijado: !hilo.fijado }).then(() => qc.invalidateQueries(["foro-hilos"]))}>
                       <Pin className="h-4 w-4 mr-2" /> {hilo.fijado ? "Desfijar" : "Fijar"}
