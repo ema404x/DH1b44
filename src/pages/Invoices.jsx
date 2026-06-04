@@ -16,6 +16,7 @@ import StatsCard from '@/components/shared/StatsCard';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import CertificacionesVinculadas from '@/components/finanzas/CertificacionesVinculadas';
 import ReporteMensualComparativo from '@/components/reportes/ReporteMensualComparativo';
+import DashboardFinanciero from '@/components/finanzas/DashboardFinanciero';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const invoiceFields = [
@@ -41,7 +42,7 @@ export default function Invoices() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [activeTab, setActiveTab] = useState('facturas');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const queryClient = useQueryClient();
 
   const { data: invoices = [], isLoading } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list('-created_date') });
@@ -71,18 +72,26 @@ export default function Invoices() {
       <PageHeader title="Facturación" subtitle="Control de facturas y pagos" actionLabel="Nueva Factura" onAction={() => { setEditing(null); setDialogOpen(true); }} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3">
-          <TabsTrigger value="facturas" className="gap-2">
-            <Receipt className="h-4 w-4" />
-            Facturas
-          </TabsTrigger>
-          <TabsTrigger value="reportes" className="gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Reportes
-          </TabsTrigger>
-        </TabsList>
+         <TabsList className="grid w-full grid-cols-3 sm:grid-cols-3">
+           <TabsTrigger value="dashboard" className="gap-2">
+             <DollarSign className="h-4 w-4" />
+             Dashboard
+           </TabsTrigger>
+           <TabsTrigger value="facturas" className="gap-2">
+             <Receipt className="h-4 w-4" />
+             Facturas
+           </TabsTrigger>
+           <TabsTrigger value="reportes" className="gap-2">
+             <BarChart3 className="h-4 w-4" />
+             Reportes
+           </TabsTrigger>
+         </TabsList>
 
-        <TabsContent value="facturas" className="space-y-6 mt-6">
+         <TabsContent value="dashboard" className="mt-6">
+           <DashboardFinanciero />
+         </TabsContent>
+
+         <TabsContent value="facturas" className="space-y-6 mt-6">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatsCard title="Pendiente de Cobro" value={`$${totalPending.toLocaleString()}`} icon={DollarSign} color="amber" />
         <StatsCard title="Cobrado" value={`$${totalPaid.toLocaleString()}`} icon={DollarSign} color="green" />
