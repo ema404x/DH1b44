@@ -71,6 +71,11 @@ function parseSheet(wb, sheetName, comunaDefault) {
       const func   = Math.round(parseFloat(row[g.func])   || 0);
       const nofunc = Math.round(parseFloat(row[g.nofunc]) || 0);
       const cantInt = Math.round(cant);
+
+      // Descartar filas donde cantidad existe pero funciona Y no_funciona son ambos 0
+      // (son filas de subtotales o acumulados del Excel, no datos reales)
+      if (func === 0 && nofunc === 0) continue;
+
       const pct = cantInt > 0 ? Math.round((func / cantInt) * 100) : 0;
 
       records.push({
