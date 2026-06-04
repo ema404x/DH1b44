@@ -4,8 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Pencil, Trash2, User, MapPin, Calendar, AlertCircle, Eye } from 'lucide-react';
-import { differenceInDays, isPast, format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { differenceInDays, format, parseISO, startOfDay } from 'date-fns';
 
 const tipoIcons = {
   mantenimiento: '🔧',
@@ -23,8 +22,11 @@ const estadoLabels = {
 };
 
 export default function PendienteCard({ pendiente: p, estadoColors, prioridadColors, onEdit, onDelete, canDelete = false }) {
-  const isVencido = p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado';
-  const diasRestantes = p.fecha_limite ? differenceInDays(new Date(p.fecha_limite), new Date()) : null;
+  // Parsear como fecha local para evitar el desfase de timezone (UTC vs Argentina)
+  const fechaLimite = p.fecha_limite ? parseISO(p.fecha_limite) : null;
+  const hoy = startOfDay(new Date());
+  const isVencido = fechaLimite && startOfDay(fechaLimite) < hoy && p.estado !== 'resuelto' && p.estado !== 'cancelado';
+  const diasRestantes = fechaLimite ? differenceInDays(startOfDay(fechaLimite), hoy) : null;
 
   return (
     <Card className={`group hover:shadow-md transition-shadow cursor-pointer ${isVencido ? 'border-red-300 bg-red-50/30' : ''}`} onClick={() => onEdit(p)}>
@@ -81,7 +83,7 @@ export default function PendienteCard({ pendiente: p, estadoColors, prioridadCol
                   ? 'Vence hoy'
                   : diasRestantes !== null && diasRestantes > 0
                   ? `Vence en ${diasRestantes}d`
-                  : format(new Date(p.fecha_limite), 'dd/MM/yyyy')}
+                  : format(fechaLimite, 'dd/MM/yyyy')}
               </span>
             </div>
           )}
