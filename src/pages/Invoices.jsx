@@ -13,6 +13,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
 import StatsCard from '@/components/shared/StatsCard';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
+import CertificacionesVinculadas from '@/components/finanzas/CertificacionesVinculadas';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const invoiceFields = [
@@ -37,6 +38,7 @@ export default function Invoices() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const queryClient = useQueryClient();
 
   const { data: invoices = [], isLoading } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list('-created_date') });
@@ -91,6 +93,7 @@ export default function Invoices() {
       {filtered.length === 0 && !isLoading ? (
         <EmptyState icon={Receipt} title="No hay facturas" description="Creá tu primera factura" actionLabel="Nueva Factura" onAction={() => { setEditing(null); setDialogOpen(true); }} />
       ) : (
+        <div className="space-y-4">
         <Card>
           <div className="overflow-x-auto">
             <Table>
@@ -109,9 +112,9 @@ export default function Invoices() {
               <TableBody>
                 {filtered.map(invoice => (
                   <TableRow key={invoice.id} className="group">
-                    <TableCell className="font-mono text-xs">{invoice.code || '-'}</TableCell>
-                    <TableCell className="font-medium">{invoice.client_name}</TableCell>
-                    <TableCell className="hidden md:table-cell text-sm">{invoice.project_name || '-'}</TableCell>
+                    <TableCell className="font-mono text-xs cursor-pointer hover:text-primary" onClick={() => setSelectedInvoice(invoice)}>{invoice.code || '-'}</TableCell>
+                    <TableCell className="font-medium cursor-pointer hover:text-primary" onClick={() => setSelectedInvoice(invoice)}>{invoice.client_name}</TableCell>
+                    <TableCell className="hidden md:table-cell text-sm cursor-pointer hover:text-primary" onClick={() => setSelectedInvoice(invoice)}>{invoice.project_name || '-'}</TableCell>
                     <TableCell><StatusBadge value={invoice.status} /></TableCell>
                     <TableCell className="text-right font-semibold">${(invoice.total || 0).toLocaleString()}</TableCell>
                     <TableCell className="hidden lg:table-cell text-xs">{invoice.issue_date ? format(new Date(invoice.issue_date), 'dd/MM/yy') : '-'}</TableCell>
@@ -136,6 +139,14 @@ export default function Invoices() {
             </Table>
           </div>
         </Card>
+
+        {selectedInvoice && (
+          <CertificacionesVinculadas 
+            projectName={selectedInvoice.project_name} 
+            clientName={selectedInvoice.client_name}
+          />
+        )}
+        </div>
       )}
 
       <EntityFormDialog
