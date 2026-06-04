@@ -1,0 +1,81 @@
+{
+  "name": "EquipamientoCalefaccion",
+  "type": "object",
+  "properties": {
+    "escuela": {
+      "type": "string",
+      "description": "Nombre/direcci\u00f3n del establecimiento"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Jefe de sitio responsable"
+    },
+    "comuna": {
+      "type": "string",
+      "enum": [
+        "8A",
+        "8B",
+        "10A"
+      ],
+      "description": "Comuna"
+    },
+    "tipo_equipo": {
+      "type": "string",
+      "enum": [
+        "estufas",
+        "radiadores",
+        "conductos",
+        "calderas",
+        "vrv",
+        "vrv_bajo_silueta",
+        "aire_acondicionado_calor",
+        "otros"
+      ],
+      "description": "Tipo de equipo de calefacci\u00f3n"
+    },
+    "cantidad_total": {
+      "type": "number",
+      "default": 0
+    },
+    "cantidad_funciona": {
+      "type": "number",
+      "default": 0
+    },
+    "cantidad_no_funciona": {
+      "type": "number",
+      "default": 0
+    },
+    "porcentaje_operativo": {
+      "type": "number",
+      "default": 0,
+      "description": "% de equipos operativos"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "critico",
+        "alerta",
+        "normal",
+        "optimo"
+      ],
+      "default": "normal",
+      "description": "Estado calculado seg\u00fan % operativo"
+    },
+    "periodo": {
+      "type": "string",
+      "description": "Per\u00edodo del relevamiento (ej: Mayo 2026)"
+    },
+    "observaciones": {
+      "type": "string"
+    },
+    "alerta_generada": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "escuela",
+    "tipo_equipo",
+    "comuna"
+  ]
+}

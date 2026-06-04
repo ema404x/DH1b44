@@ -50,6 +50,7 @@ const InformePlaneacion = lazy(() => import('@/pages/InformePlaneacion'));
 const CalendarioInformes = lazy(() => import('@/pages/CalendarioInformes'));
 const CrearOT = lazy(() => import('@/pages/CrearOT'));
 const Foro = lazy(() => import('@/pages/Foro'));
+const Calefaccion = lazy(() => import('@/pages/Calefaccion'));
 import ProtectedPage from '@/components/shared/ProtectedPage';
 
 // Spinner de carga mientras se descarga la página lazy
@@ -138,6 +139,7 @@ const AuthenticatedApp = () => {
         <Route path="/calendario-informes" element={<ProtectedPage moduleKey="Informes"><CalendarioInformes /></ProtectedPage>} />
         <Route path="/crear-ot" element={<ProtectedPage moduleKey="WorkOrder"><CrearOT /></ProtectedPage>} />
         <Route path="/foro" element={<Foro />} />
+        <Route path="/calefaccion" element={<ProtectedPage moduleKey="Calefaccion"><Calefaccion /></ProtectedPage>} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
