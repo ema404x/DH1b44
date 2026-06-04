@@ -94,14 +94,36 @@ Deno.serve(async (req) => {
     const buffer = await res.arrayBuffer();
     const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
 
-    const allRecords = [
-      ...parseSheet(wb, 'COMUNA 8A ', '8A'),
-      ...parseSheet(wb, 'COMUNA 8B', '8B'),
-      ...parseSheet(wb, 'COMUNA 10A', '10A'),
+    // Intentar nombres de hojas con y sin espacios
+    const sheetNames = wb.SheetNames;
+    const findSheet = (name) => sheetNames.find(s => s.trim().toUpperCase() === name.trim().toUpperCase()) || name;
+
+    const allRecordsRaw = [
+      ...parseSheet(wb, findSheet('COMUNA 8A'), '8A'),
+      ...parseSheet(wb, findSheet('COMUNA 8B'), '8B'),
+      ...parseSheet(wb, findSheet('COMUNA 10A'), '10A'),
     ];
 
     // Actualizar período si se indicó
-    if (periodo) allRecords.forEach(r => r.periodo = periodo);
+    if (periodo) allRecordsRaw.forEach(r => r.periodo = periodo);
+
+    // Unificar registros con la misma escuela+tipo_equipo+comune (por si una escuela aparece en múltiples filas)
+    const unifyMap = {};
+    for (const r of allRecordsRaw) {
+      const key = `${r.escuela}||${r.tipo_equipo}||${r.comuna}||${r.periodo}`;
+      if (!unifyMap[key]) {
+        unifyMap[key] = { ...r };
+      } else {
+        unifyMap[key].cantidad_total += r.cantidad_total;
+        unifyMap[key].cantidad_funciona += r.cantidad_funciona;
+        unifyMap[key].cantidad_no_funciona += r.cantidad_no_funciona;
+        const total = unifyMap[key].cantidad_total;
+        const pct = total > 0 ? Math.round((unifyMap[key].cantidad_funciona / total) * 100) : 0;
+        unifyMap[key].porcentaje_operativo = pct;
+        unifyMap[key].estado = calcEstado(pct);
+      }
+    }
+    const allRecords = Object.values(unifyMap);
 
     // Opcionalmente limpiar registros anteriores del mismo período
     if (limpiar_anteriores && allRecords.length > 0) {
