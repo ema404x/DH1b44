@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, X, ClipboardList, FileText, Wrench, Calendar
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isSameDay, isToday, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import EventDetailPanel from '@/components/calendario/EventDetailPanel';
 
 const PRIORITY_COLORS = {
@@ -85,10 +86,15 @@ export default function Calendario() {
   const [selectedDay, setSelectedDay] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const queryClient = useQueryClient();
+  const { filterByUser, isSuperAdmin, employeeRole } = useCurrentUser();
 
-  const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
-  const { data: informes = [] } = useQuery({ queryKey: ['informes'], queryFn: () => base44.entities.Informe.list() });
+  const { data: rawOrders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
+  const { data: rawInformes = [] } = useQuery({ queryKey: ['informes'], queryFn: () => base44.entities.Informe.list() });
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list() });
+
+  // Filtrar OT por usuario actual — jefe de sitio solo ve las suyas
+  const orders = filterByUser(rawOrders, ['assigned_to', 'assigned_name']);
+  const informes = filterByUser(rawInformes, ['responsable']);
 
   const updateOT = useMutation({
     mutationFn: ({ id, data }) => base44.entities.WorkOrder.update(id, data),
