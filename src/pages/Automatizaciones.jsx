@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,9 @@ import { isPast, parseISO, format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import PageHeader from '@/components/shared/PageHeader';
+import FiltroAlertas from '@/components/automatizaciones/FiltroAlertas';
+import EstadisticasAlertas from '@/components/automatizaciones/EstadisticasAlertas';
+import HistorialAutomatizaciones from '@/components/automatizaciones/HistorialAutomatizaciones';
 import { Link } from 'react-router-dom';
 
 const TIPO_INFO = {
@@ -34,21 +37,19 @@ const fmtDate = (d) => {
 
 export default function Automatizaciones() {
   const [running, setRunning] = useState(false);
+  const [filteredLogs, setFilteredLogs] = useState([]);
   const qc = useQueryClient();
-
-  // Automatizaciones del sistema (hard-coded display - datos reales del scheduler)
-  const AUTOMATIZACIONES_SISTEMA = [
-    { nombre: 'Chequeo diario de alertas proactivas', funcion: 'checkAlertas', horario: 'Diario 8:00 AM', runs: 18, estado: 'activo' },
-    { nombre: 'Generar Certificados Mensuales', funcion: 'generateMonthlyCertificates', horario: 'Diario 8:00 AM (cron)', runs: 27, estado: 'activo' },
-    { nombre: 'Detección de Patrones de Emergencias', funcion: 'detectarPatronesEmergencias', horario: 'Diario 10:00 AM', runs: 0, estado: 'activo' },
-    { nombre: 'Resumen Semanal por Email', funcion: 'resumenSemanal', horario: 'Lunes 8:00 AM', runs: 0, estado: 'activo' },
-  ];
 
   const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list() });
   const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list() });
   const { data: configs = [] } = useQuery({ queryKey: ['alerta-configs'], queryFn: () => base44.entities.AlertaConfig.list() });
-  const { data: logs = [] } = useQuery({ queryKey: ['alerta-logs'], queryFn: () => base44.entities.AlertaLog.list('-fecha_alerta', 30) });
+  const { data: logs = [] } = useQuery({ queryKey: ['alerta-logs'], queryFn: () => base44.entities.AlertaLog.list('-fecha_alerta', 100) });
+
+  // Inicializar filtered logs cuando logs cambian
+  React.useEffect(() => {
+    setFilteredLogs(logs);
+  }, [logs]);
 
   const activeConfigs = configs.filter(c => c.activo);
 
@@ -98,7 +99,7 @@ export default function Automatizaciones() {
     },
   ];
 
-  const logsRecientes = logs.slice(0, 20);
+
 
   return (
     <div className="space-y-6">
@@ -201,36 +202,19 @@ export default function Automatizaciones() {
           </Card>
 
           {/* Automatizaciones del sistema */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-primary" />
-                Automatizaciones Programadas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {AUTOMATIZACIONES_SISTEMA.map(auto => (
-                <div key={auto.funcion} className="flex items-center gap-3 p-2.5 rounded-lg border border-border/50 hover:bg-muted/20 transition-colors">
-                  <div className="h-2 w-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{auto.nombre}</p>
-                    <p className="text-[10px] text-muted-foreground">{auto.horario} · {auto.runs} ejecuciones</p>
-                  </div>
-                  <Badge variant="outline" className="text-[9px] border-emerald-500/30 text-emerald-400 flex-shrink-0">activo</Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <HistorialAutomatizaciones />
         </div>
 
-        {/* Panel derecho: Log reciente */}
-        <div>
-          <Card className="h-full">
+        {/* Panel derecho: Estadísticas y Log */}
+        <div className="space-y-4">
+          <EstadisticasAlertas logs={filteredLogs} />
+          
+          <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-primary" />
-                  Alertas Recientes
+                  Alertas
                 </CardTitle>
                 <Link to="/alertas">
                   <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground">
@@ -239,15 +223,17 @@ export default function Automatizaciones() {
                 </Link>
               </div>
             </CardHeader>
-            <CardContent>
-              {logsRecientes.length === 0 ? (
+            <CardContent className="space-y-3">
+              <FiltroAlertas logs={logs} onFilter={setFilteredLogs} />
+              
+              {filteredLogs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                  <p className="text-sm">Sin alertas recientes</p>
+                  <p className="text-sm">Sin alertas con estos filtros</p>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
-                  {logsRecientes.map(log => {
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                  {filteredLogs.slice(0, 20).map(log => {
                     const info = TIPO_INFO[log.tipo] || TIPO_INFO.pendiente_vencido;
                     const Icon = info.icon;
                     return (

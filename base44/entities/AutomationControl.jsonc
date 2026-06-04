@@ -1,0 +1,44 @@
+{
+  "name": "AutomationControl",
+  "type": "object",
+  "properties": {
+    "nombre": {
+      "type": "string",
+      "description": "Nombre de la automatizaci\u00f3n (checkAlertas, generateMonthlyCertificates, etc)"
+    },
+    "activa": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si la automatizaci\u00f3n est\u00e1 habilitada"
+    },
+    "ultima_ejecucion": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la \u00faltima ejecuci\u00f3n"
+    },
+    "estado_ultima_ejecucion": {
+      "type": "string",
+      "enum": [
+        "exitosa",
+        "fallida",
+        "pendiente"
+      ],
+      "default": "pendiente"
+    },
+    "mensage_error": {
+      "type": "string",
+      "description": "Mensaje de error si la \u00faltima ejecuci\u00f3n fall\u00f3"
+    },
+    "total_ejecuciones": {
+      "type": "number",
+      "default": 0
+    },
+    "total_errores": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "nombre"
+  ]
+}
