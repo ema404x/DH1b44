@@ -89,7 +89,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     },
   });
 
-  const set = (key, val) => setData(prev => ({ ...prev, [key]: val }));
+  const set = useCallback((key, val) => setData(prev => ({ ...prev, [key]: val })), []);
 
   // Debounced auto-save ref — prevents race conditions from rapid field updates
   const saveTimerRef = useRef(null);

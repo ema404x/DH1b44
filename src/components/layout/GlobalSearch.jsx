@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Search, FolderKanban, ClipboardList, Users, Package, X } from 'lucide-react';
@@ -25,7 +25,7 @@ export default function GlobalSearch() {
   const { data: clients = [] } = useQuery({ queryKey: ['clients'], queryFn: () => base44.entities.Client.list(), enabled: everOpened, staleTime: 1000 * 60 * 15 });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list(), enabled: everOpened, staleTime: 1000 * 60 * 15 });
 
-  const openSearch = () => { setEverOpened(true); setOpen(true); };
+  const openSearch = useCallback(() => { setEverOpened(true); setOpen(true); }, []);
 
   // Keyboard shortcut
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function GlobalSearch() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [openSearch]);
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 50);

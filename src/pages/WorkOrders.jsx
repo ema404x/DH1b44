@@ -30,7 +30,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 
 function WorkOrderCard({ order, onOpen, onShowQR }) {
-  const isOverdue = order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status);
+  const isOverdue = (() => { try { return order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
 
   return (
     <motion.div
@@ -87,7 +87,7 @@ export default function WorkOrders() {
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['workorders'],
-    queryFn: () => base44.entities.WorkOrder.list('-created_date')
+    queryFn: () => base44.entities.WorkOrder.list('-created_date', 500)
   });
 
   const createMutation = useMutation({
@@ -111,8 +111,7 @@ export default function WorkOrders() {
 
   const visibleOrders = useMemo(() =>
     filterByUser(orders, ['assigned_name', 'assigned_to', 'created_by', 'location'])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  , [orders, currentUser, isAdmin]);
+  , [orders, filterByUser]);
 
   const filtered = useMemo(() => visibleOrders.filter(o => {
     const matchSearch = !search || o.title?.toLowerCase().includes(search.toLowerCase());

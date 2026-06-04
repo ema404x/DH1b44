@@ -26,7 +26,8 @@ export const AuthProvider = ({ children }) => {
       // Vincular ficha de empleado y cargar permisos reales según su rol
       // Esto corre en CADA carga (no solo al login) para garantizar permisos actualizados
       try {
-        const vinculacion = await base44.functions.invoke('vincularEmpleado', {});
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
+        const vinculacion = await Promise.race([base44.functions.invoke('vincularEmpleado', {}), timeoutPromise]);
         if (vinculacion?.data?.linked) {
           const perms = vinculacion.data.employee_permissions || {};
           // Guardar el rol del empleado dentro del objeto de permisos para que

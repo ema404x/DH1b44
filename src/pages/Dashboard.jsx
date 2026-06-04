@@ -241,7 +241,7 @@ export default function Dashboard() {
     const activeProjects   = filteredProjects.filter(p => p.status === 'en_progreso').length;
     const pendingOrders    = orders.filter(o => ['pendiente', 'asignada'].includes(o.status)).length;
     const inProgressOrders = orders.filter(o => o.status === 'en_progreso').length;
-    const overdueOrders    = orders.filter(o => o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada', 'cancelada'].includes(o.status)).length;
+    const overdueOrders    = orders.filter(o => { try { return o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada', 'cancelada'].includes(o.status); } catch { return false; } }).length;
     const activeClients    = clients.filter(c => c.status === 'activo').length;
     const activeEmployees  = employees.filter(e => e.status === 'activo').length;
 
@@ -251,7 +251,7 @@ export default function Dashboard() {
     const pendingInvoices  = invoices.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0);
 
     const lowStockItems  = materials.filter(m => m.stock <= m.min_stock && m.min_stock > 0);
-    const overdueAssets  = assets.filter(a => a.next_maintenance && isPast(parseISO(a.next_maintenance)));
+    const overdueAssets  = assets.filter(a => { try { return a.next_maintenance && isPast(parseISO(a.next_maintenance)); } catch { return false; } });
     const completedThisMonth = orders.filter(o => o.completed_date && parseISO(o.completed_date) >= thisMonth && o.status === 'completada').length;
     const efficiency     = orders.length > 0 ? Math.round((orders.filter(o => o.status === 'completada').length / orders.length) * 100) : 0;
     const urgentOrders   = orders.filter(o => ['pendiente', 'asignada', 'en_progreso'].includes(o.status) && ['urgente', 'alta'].includes(o.priority));
@@ -264,7 +264,7 @@ export default function Dashboard() {
       lowStockItems, overdueAssets, completedThisMonth, efficiency,
       recentProjects, urgentOrders, hasAlerts,
     };
-  }, [projects, orders, clients, invoices, materials, assets, employees, filteredProjects]);
+  }, [filteredProjects, orders, clients, invoices, materials, assets, employees]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
