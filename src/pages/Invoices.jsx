@@ -166,8 +166,18 @@ export default function Invoices() {
       )}
         </TabsContent>
 
-        <TabsContent value="reportes" className="mt-6">
-          <ReporteMensualComparativo />
+        <TabsContent value="reportes" className="mt-6 space-y-8">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Certificación por Mantenimiento</h3>
+            <p className="text-sm text-muted-foreground">Dinero que sale de la empresa - Pagos a proveedores</p>
+            <ReporteMensualComparativo />
+          </div>
+          
+          <div className="space-y-4 border-t pt-8">
+            <h3 className="text-lg font-semibold">Obra/Proyecto</h3>
+            <p className="text-sm text-muted-foreground">Dinero que entra a la empresa - Certificaciones de obras</p>
+            <CertificacionesVinculadas />
+          </div>
         </TabsContent>
       </Tabs>
 
