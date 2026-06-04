@@ -133,10 +133,10 @@ export default function CrearOT() {
 
   const { data: locations = [], isLoading: loadingLocations } = useQuery({
     queryKey: ['locations-crear-ot'],
-    queryFn: () => base44.entities.LocationQR.list('name', 200),
+    queryFn: () => base44.entities.LocationQR.list('name', 2000),
     staleTime: 60000,
   });
-  const activeLocations = locations.filter(l => l.is_active !== false);
+  const activeLocations = locations;
 
   // ── Mutation ─────────────────────────────────────────────────────────────────
 
