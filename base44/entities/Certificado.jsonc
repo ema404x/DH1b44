@@ -146,9 +146,26 @@
       "type": "number",
       "default": 0
     },
+    "anticipo_monto_manual": {
+      "type": "number",
+      "description": "Monto fijo de anticipo (si se ingres\u00f3 manualmente en lugar de %)"
+    },
     "fondo_reparo_pct": {
       "type": "number",
       "default": 5
+    },
+    "fondo_reparo_monto_manual": {
+      "type": "number",
+      "description": "Monto fijo de fondo de reparo (si se ingres\u00f3 manualmente en lugar de %)"
+    },
+    "fondo_reparo_label": {
+      "type": "string",
+      "description": "Etiqueta personalizada para el fondo de reparo (ej: Desacopio, Fondo de Reparo)"
+    },
+    "fondo_reparo_aplicar": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el fondo de reparo se descuenta del total neto"
     },
     "pdf_url": {
       "type": "string"
