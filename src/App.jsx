@@ -46,7 +46,7 @@ const InspeccionColegio = lazy(() => import('@/pages/InspeccionColegio'));
 const AprobacionCertificados = lazy(() => import('@/pages/AprobacionCertificados'));
 const ControlRiesgo = lazy(() => import('@/pages/ControlRiesgo'));
 const CertificacionObras = lazy(() => import('@/pages/CertificacionObras'));
-const InformePlaneacion = lazy(() => import('@/pages/InformePlaneacion'));
+
 const CalendarioInformes = lazy(() => import('@/pages/CalendarioInformes'));
 const CrearOT = lazy(() => import('@/pages/CrearOT'));
 const Foro = lazy(() => import('@/pages/Foro'));
@@ -135,7 +135,7 @@ const AuthenticatedApp = () => {
         <Route path="/aprobacion-certificados" element={<ProtectedPage moduleKey="AprobacionCertificados"><AprobacionCertificados /></ProtectedPage>} />
         <Route path="/control-riesgo" element={<ProtectedPage moduleKey="ControlRiesgo"><ControlRiesgo /></ProtectedPage>} />
         <Route path="/certificacion-obras" element={<ProtectedPage moduleKey="CertificacionObras"><CertificacionObras /></ProtectedPage>} />
-        <Route path="/informe-planeacion" element={<ProtectedPage moduleKey="InformePlaneacion"><InformePlaneacion /></ProtectedPage>} />
+
         <Route path="/calendario-informes" element={<ProtectedPage moduleKey="Informes"><CalendarioInformes /></ProtectedPage>} />
         <Route path="/crear-ot" element={<ProtectedPage moduleKey="WorkOrder"><CrearOT /></ProtectedPage>} />
         <Route path="/foro" element={<Foro />} />
