@@ -174,9 +174,10 @@ export default function Calefaccion() {
   }, [equiposCategoria]);
 
   const porComuna = useMemo(() => {
+    const COMUNAS_VALIDAS = ['8A', '8B', '10A'];
     const map = {};
     equiposCategoria.forEach(e => {
-      const k = e.comuna || 'N/A';
+      const k = COMUNAS_VALIDAS.includes(e.comuna) ? e.comuna : '8A';
       if (!map[k]) map[k] = { comuna: k, total: 0, funciona: 0, no_funciona: 0, criticos: 0 };
       map[k].total += e.cantidad_total || 0;
       map[k].funciona += e.cantidad_funciona || 0;
