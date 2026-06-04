@@ -23,11 +23,20 @@ Deno.serve(async (req) => {
       return Response.json({ linked: false, reason: 'no_match' });
     }
 
+    // Si hay múltiples empleados con el mismo email, usar al que ya está vinculado o al más reciente activo
+    let emp;
     if (matches.length > 1) {
-      console.warn(`Múltiples fichas con email ${user.email}: ${matches.map(e => e.id).join(', ')}`);
+      const alreadyLinked = matches.find(e => e.user_id === user.id);
+      if (alreadyLinked) {
+        emp = alreadyLinked;
+      } else {
+        const activeEmployees = matches.filter(e => e.status === 'activo');
+        emp = activeEmployees.length > 0 ? activeEmployees[0] : matches[0];
+      }
+      console.warn(`[vincularEmpleado] Múltiples fichas con email ${user.email}: vinculando a ${emp.full_name} (${emp.id})`);
+    } else {
+      emp = matches[0];
     }
-
-    const emp = matches[0];
 
     // Vincular user_id si aún no está
     if (emp.user_id !== user.id) {

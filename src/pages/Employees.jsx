@@ -16,6 +16,7 @@ import EmptyState from '@/components/shared/EmptyState';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import AsignacionAutomatica from '@/components/employees/AsignacionAutomatica';
 import InviteUserDialog from '@/components/employees/InviteUserDialog';
+import SyncEmployeesButton from '@/components/employees/SyncEmployeesButton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -199,6 +200,7 @@ export default function Employees() {
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4">
+            <SyncEmployeesButton onSyncComplete={() => queryClient.invalidateQueries({ queryKey: ['employees'] })} />
             <AsignacionAutomatica
               employees={employees}
               locations={locations}
