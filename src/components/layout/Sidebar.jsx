@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
+import { useForoNotificaciones } from '@/hooks/useForoNotificaciones';
 
 const navGroups = [
   {
@@ -83,7 +84,9 @@ const navGroups = [
   },
 ];
 
-function NavItem({ item, collapsed, active, onClick }) {
+function NavItem({ item, collapsed, active, onClick, hasNewMessages }) {
+  const isForo = item.path === '/foro';
+  
   return (
     <div className="relative group">
       <Link
@@ -94,7 +97,8 @@ function NavItem({ item, collapsed, active, onClick }) {
           collapsed && "justify-center px-0 mx-1",
           active
             ? "bg-primary/15 text-white"
-              : "text-white/80 hover:bg-sidebar-accent/70 hover:text-white"
+              : "text-white/80 hover:bg-sidebar-accent/70 hover:text-white",
+          isForo && hasNewMessages && !active && "animate-blink"
         )}
       >
         {/* Active indicator bar */}
@@ -104,7 +108,8 @@ function NavItem({ item, collapsed, active, onClick }) {
         <item.icon className={cn(
           "flex-shrink-0 transition-transform duration-150",
           collapsed ? "h-[18px] w-[18px]" : "h-[16px] w-[16px]",
-          active ? "text-primary" : ""
+          active ? "text-primary" : "",
+          isForo && hasNewMessages && !active && "animate-blink"
         )} />
         {!collapsed && (
           <span className="truncate">{item.label}</span>
@@ -128,6 +133,14 @@ export default function Sidebar() {
   const { user, userPermissions } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { hasNewMessages, resetNotification } = useForoNotificaciones();
+  
+  // Resetear notificación cuando se abre el foro
+  useEffect(() => {
+    if (location.pathname === '/foro') {
+      resetNotification();
+    }
+  }, [location.pathname, resetNotification]);
 
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/';
@@ -239,6 +252,7 @@ export default function Sidebar() {
                   collapsed={collapsed}
                   active={isActive(item.path)}
                   onClick={() => setMobileOpen(false)}
+                  hasNewMessages={item.path === '/foro' ? hasNewMessages : false}
                 />
               ))}
             </div>
