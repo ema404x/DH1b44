@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import {
   Flame, AlertTriangle, CheckCircle2, XCircle, Upload,
-  BarChart3, Building2, Search, Download, RefreshCw, Zap, Droplets, Wind, Wrench, Settings
+  BarChart3, Building2, Search, Download, RefreshCw, Zap, Droplets, Wind, Settings
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -17,8 +17,8 @@ import {
 } from 'recharts';
 import ImportarCalefaccionModal from '@/components/calefaccion/ImportarCalefaccionModal';
 import TablaEquipos from '@/components/calefaccion/TablaEquipos';
-
-const COLORS = ['#ef4444', '#f97316', '#3b82f6', '#10b981'];
+import EscuelaCard from '@/components/calefaccion/EscuelaCard';
+import ProgressRing from '@/components/calefaccion/ProgressRing';
 
 const ESTADO_CONFIG = {
   critico: { color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/30', badge: 'bg-red-500/20 text-red-300 border-red-500/40', label: 'Crítico', icon: XCircle },
@@ -38,148 +38,79 @@ const TIPO_LABELS = {
   otros: 'Otros',
 };
 
-// ─── Categorías del módulo ────────────────────────────────────────────────────
-// Cada categoría filtra los equipos por tipo_equipo. "todos" = sin filtro.
-// Para agregar una nueva categoría basta con agregar un objeto aquí.
 const CATEGORIAS = [
-  {
-    id: 'calefaccion',
-    label: 'Calefacción',
-    icon: Flame,
-    iconBg: 'from-orange-500 to-red-600',
-    iconShadow: 'shadow-orange-500/20',
-    tipos: ['estufas', 'radiadores', 'conductos', 'calderas', 'vrv', 'vrv_bajo_silueta', 'aire_acondicionado_calor'],
-  },
-  {
-    id: 'electricidad',
-    label: 'Electricidad',
-    icon: Zap,
-    iconBg: 'from-yellow-500 to-amber-600',
-    iconShadow: 'shadow-yellow-500/20',
-    tipos: [], // vacío = usar tipo_equipo === 'otros' o todos los que no encajan en otra categoría
-    emptyLabel: 'Sin datos de electricidad todavía. Importá un Excel con equipos eléctricos.',
-  },
-  {
-    id: 'plomeria',
-    label: 'Plomería',
-    icon: Droplets,
-    iconBg: 'from-blue-500 to-cyan-600',
-    iconShadow: 'shadow-blue-500/20',
-    tipos: [],
-    emptyLabel: 'Sin datos de plomería todavía.',
-  },
-  {
-    id: 'ventilacion',
-    label: 'Ventilación',
-    icon: Wind,
-    iconBg: 'from-teal-500 to-emerald-600',
-    iconShadow: 'shadow-teal-500/20',
-    tipos: ['aire_acondicionado_calor', 'conductos'],
-  },
-  {
-    id: 'todos',
-    label: 'Todos',
-    icon: Settings,
-    iconBg: 'from-slate-500 to-slate-600',
-    iconShadow: 'shadow-slate-500/20',
-    tipos: null, // null = mostrar todo sin filtrar
-  },
+  { id: 'calefaccion', label: 'Calefacción', icon: Flame, iconBg: 'from-orange-500 to-red-600', tipos: ['estufas', 'radiadores', 'conductos', 'calderas', 'vrv', 'vrv_bajo_silueta', 'aire_acondicionado_calor'] },
+  { id: 'electricidad', label: 'Electricidad', icon: Zap, iconBg: 'from-yellow-500 to-amber-600', tipos: [], emptyLabel: 'Sin datos de electricidad todavía.' },
+  { id: 'plomeria', label: 'Plomería', icon: Droplets, iconBg: 'from-blue-500 to-cyan-600', tipos: [], emptyLabel: 'Sin datos de plomería todavía.' },
+  { id: 'ventilacion', label: 'Ventilación', icon: Wind, iconBg: 'from-teal-500 to-emerald-600', tipos: ['aire_acondicionado_calor', 'conductos'] },
+  { id: 'todos', label: 'Todos', icon: Settings, iconBg: 'from-slate-500 to-slate-600', tipos: null },
 ];
 
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
-const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
+const PIE_ESTADO = [
+  { key: 'critico', name: 'Crítico', color: '#ef4444' },
+  { key: 'alerta',  name: 'Alerta',  color: '#f97316' },
+  { key: 'normal',  name: 'Normal',  color: '#3b82f6' },
+  { key: 'optimo',  name: 'Óptimo',  color: '#10b981' },
+];
 
-function KpiCard({ label, value, sub, icon: Icon, colorClass, bgClass }) {
-  return (
-    <motion.div variants={item}>
-      <Card className={`border ${bgClass} bg-transparent`}>
-        <CardContent className="p-4 flex items-center gap-4">
-          <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${bgClass} shrink-0`}>
-            <Icon className={`h-5 w-5 ${colorClass}`} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-400 font-medium">{label}</p>
-            <p className={`text-2xl font-bold ${colorClass}`}>{value}</p>
-            {sub && <p className="text-xs text-slate-500">{sub}</p>}
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
+const RING_STATE_COLOR = { optimo: '#10b981', normal: '#3b82f6', alerta: '#f97316', critico: '#ef4444' };
 
 export default function Calefaccion() {
-  const [showImport, setShowImport] = useState(false);
-  const [categoriaId, setCategoriaId] = useState('calefaccion');
-  const [filtroComuna, setFiltroComuna] = useState('todas');
-  const [filtroEstado, setFiltroEstado] = useState('todos');
-  const [filtroTipo, setFiltroTipo] = useState('todos');
-  const [busqueda, setBusqueda] = useState('');
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [showImport, setShowImport]       = useState(false);
+  const [categoriaId, setCategoriaId]     = useState('calefaccion');
+  const [filtroComuna, setFiltroComuna]   = useState('todas');
+  const [filtroEstado, setFiltroEstado]   = useState('todos');
+  const [filtroTipo, setFiltroTipo]       = useState('todos');
+  const [busqueda, setBusqueda]           = useState('');
+  const [activeTab, setActiveTab]         = useState('dashboard');
 
   const categoria = CATEGORIAS.find(c => c.id === categoriaId) || CATEGORIAS[0];
-  const CatIcon = categoria.icon;
+  const CatIcon   = categoria.icon;
 
   const { data: equipos = [], isLoading, refetch } = useQuery({
     queryKey: ['calefaccion'],
     queryFn: () => base44.entities.EquipamientoCalefaccion.list('-created_date', 5000),
   });
 
-  // Filtrar por categoría
   const equiposCategoria = useMemo(() => {
-    if (categoria.tipos === null) return equipos; // "todos"
-    if (!categoria.tipos || categoria.tipos.length === 0) return []; // categoría vacía
+    if (categoria.tipos === null) return equipos;
+    if (!categoria.tipos || categoria.tipos.length === 0) return [];
     return equipos.filter(e => categoria.tipos.includes(e.tipo_equipo));
   }, [equipos, categoria]);
 
-  // Filtros adicionales
   const equiposFiltrados = useMemo(() => {
     return equiposCategoria.filter(e => {
       if (filtroComuna !== 'todas' && e.comuna !== filtroComuna) return false;
       if (filtroEstado !== 'todos' && e.estado !== filtroEstado) return false;
-      if (filtroTipo !== 'todos' && e.tipo_equipo !== filtroTipo) return false;
+      if (filtroTipo   !== 'todos' && e.tipo_equipo !== filtroTipo) return false;
       if (busqueda && !e.escuela?.toLowerCase().includes(busqueda.toLowerCase()) &&
           !e.jefe_sitio?.toLowerCase().includes(busqueda.toLowerCase())) return false;
       return true;
     });
   }, [equiposCategoria, filtroComuna, filtroEstado, filtroTipo, busqueda]);
 
-  // KPIs globales (de la categoría seleccionada)
   const kpis = useMemo(() => {
-    const total    = equiposCategoria.reduce((s, e) => s + (e.cantidad_total || 0), 0);
-    const funciona = equiposCategoria.reduce((s, e) => s + (e.cantidad_funciona || 0), 0);
+    const total      = equiposCategoria.reduce((s, e) => s + (e.cantidad_total || 0), 0);
+    const funciona   = equiposCategoria.reduce((s, e) => s + (e.cantidad_funciona || 0), 0);
     const noFunciona = total - funciona;
     const escuelasSet = new Set(equiposCategoria.map(e => e.escuela));
-    // Escuelas (no registros) con al menos un tipo en estado crítico / alerta
     const escuelasCritico = new Set(equiposCategoria.filter(e => e.estado === 'critico').map(e => e.escuela));
     const escuelasAlerta  = new Set(equiposCategoria.filter(e => e.estado === 'alerta').map(e => e.escuela));
     const pct = total > 0 ? Math.round((funciona / total) * 100) : 0;
     return {
-      total, funciona, noFunciona,
-      pct,
+      total, funciona, noFunciona, pct,
       escuelas: escuelasSet.size,
       criticos: escuelasCritico.size,
       alertas:  escuelasAlerta.size,
-      // registros para referencia interna
       registrosCriticos: equiposCategoria.filter(e => e.estado === 'critico').length,
       registrosAlertas:  equiposCategoria.filter(e => e.estado === 'alerta').length,
     };
   }, [equiposCategoria]);
 
-  // Colores fijos por estado — siempre rojo=crítico, naranja=alerta, azul=normal, verde=óptimo
-  const PIE_ESTADO = [
-    { key: 'critico', name: 'Crítico', color: '#ef4444' },
-    { key: 'alerta',  name: 'Alerta',  color: '#f97316' },
-    { key: 'normal',  name: 'Normal',  color: '#3b82f6' },
-    { key: 'optimo',  name: 'Óptimo',  color: '#10b981' },
-  ];
-
   const porEstado = useMemo(() => {
     const counts = {};
     equiposCategoria.forEach(e => { counts[e.estado] = (counts[e.estado] || 0) + (e.cantidad_total || 0); });
-    return PIE_ESTADO
-      .map(s => ({ ...s, value: counts[s.key] || 0 }))
-      .filter(d => d.value > 0);
+    return PIE_ESTADO.map(s => ({ ...s, value: counts[s.key] || 0 })).filter(d => d.value > 0);
   }, [equiposCategoria]);
 
   const porTipo = useMemo(() => {
@@ -205,16 +136,23 @@ export default function Calefaccion() {
       map[k].escuelas.add(e.escuela);
       if (e.estado === 'critico') map[k].escuelasCriticas.add(e.escuela);
     });
-    // Materializar Sets a números y calcular no_funciona consistentemente
-    return Object.values(map)
-      .map(c => ({
-        ...c,
-        no_funciona:    c.total - c.funciona,
-        escuelas:       c.escuelas.size,
-        criticos:       c.escuelasCriticas.size,
-      }))
-      .sort((a, b) => a.comuna.localeCompare(b.comuna));
+    return Object.values(map).map(c => ({
+      ...c,
+      no_funciona: c.total - c.funciona,
+      escuelas:    c.escuelas.size,
+      criticos:    c.escuelasCriticas.size,
+    })).sort((a, b) => a.comuna.localeCompare(b.comuna));
   }, [equiposCategoria]);
+
+  // Grupos de escuelas para el dashboard card-centric
+  const escuelasGrupo = useMemo(() => {
+    const map = {};
+    equiposFiltrados.forEach(e => {
+      if (!map[e.escuela]) map[e.escuela] = { escuela: e.escuela, jefe_sitio: e.jefe_sitio, comuna: e.comuna, registros: [] };
+      map[e.escuela].registros.push(e);
+    });
+    return Object.values(map);
+  }, [equiposFiltrados]);
 
   const escuelasCriticas = useMemo(() => {
     const map = {};
@@ -241,63 +179,63 @@ export default function Calefaccion() {
 
   const TABS = [
     { id: 'dashboard', label: 'Dashboard' },
-    { id: 'alertas', label: `Alertas${kpis.criticos + kpis.alertas > 0 ? ` (${kpis.criticos + kpis.alertas})` : ''}` },
-    { id: 'tabla', label: 'Detalle' },
+    { id: 'alertas',   label: `Alertas${kpis.criticos + kpis.alertas > 0 ? ` (${kpis.criticos + kpis.alertas})` : ''}` },
+    { id: 'tabla',     label: 'Detalle' },
   ];
 
   const isEmpty = equiposCategoria.length === 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 md:p-6 space-y-5">
+    <div className="min-h-screen bg-[#0d1117] p-4 md:p-6 space-y-4">
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${categoria.iconBg} flex items-center justify-center shadow-lg ${categoria.iconShadow}`}>
-            <CatIcon className="h-6 w-6 text-white" />
+          <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${categoria.iconBg} flex items-center justify-center shadow-lg`}>
+            <CatIcon className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">Plan de Infraestructura</h1>
+            <h1 className="text-lg font-bold text-white">Plan de Infraestructura</h1>
             <p className="text-xs text-slate-400">{kpis.escuelas} establecimientos · {equiposCategoria.length} registros</p>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5 border-slate-700 text-slate-300">
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="h-8 px-3 border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-700">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1.5 border-slate-700 text-slate-300">
+          <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-8 px-3 border-slate-700 bg-slate-800/60 text-slate-300 hover:bg-slate-700 gap-1.5">
             <Download className="h-3.5 w-3.5" /> CSV
           </Button>
-          <Button size="sm" onClick={() => setShowImport(true)} className="gap-1.5 bg-orange-600 hover:bg-orange-700">
+          <Button size="sm" onClick={() => setShowImport(true)} className="h-8 px-3 gap-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold">
             <Upload className="h-3.5 w-3.5" /> Importar Excel
           </Button>
         </div>
       </div>
 
-      {/* Selector de categorías */}
+      {/* ── Categorías ── */}
       <div className="flex gap-2 flex-wrap">
         {CATEGORIAS.map(cat => {
-          const Icon = cat.icon;
+          const Icon   = cat.icon;
           const active = cat.id === categoriaId;
           return (
             <button
               key={cat.id}
               onClick={() => { setCategoriaId(cat.id); setActiveTab('dashboard'); setFiltroComuna('todas'); setFiltroEstado('todos'); setFiltroTipo('todos'); setBusqueda(''); }}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium border transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-sm font-medium border transition-all ${
                 active
-                  ? `bg-gradient-to-r ${cat.iconBg} text-white border-transparent shadow-lg`
-                  : 'bg-slate-800/50 text-slate-400 border-slate-700/50 hover:border-slate-600 hover:text-white'
+                  ? `bg-gradient-to-r ${cat.iconBg} text-white border-transparent shadow`
+                  : 'bg-slate-800/60 text-slate-400 border-slate-700/60 hover:border-slate-600 hover:text-white'
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3.5 w-3.5" />
               {cat.label}
             </button>
           );
         })}
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-slate-800/50 rounded-xl p-1 w-fit">
+      {/* ── Tabs ── */}
+      <div className="flex gap-1 bg-slate-800/50 rounded-xl p-1 w-fit border border-slate-700/40">
         {TABS.map(t => (
           <button
             key={t.id}
@@ -311,6 +249,74 @@ export default function Calefaccion() {
         ))}
       </div>
 
+      {/* ── Filters (Detalle tab) ── */}
+      {activeTab === 'tabla' && (
+        <div className="flex flex-wrap gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <Input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar escuela o jefe..." className="bg-slate-800 border-slate-700 text-white pl-8 h-8 w-52 text-sm" />
+          </div>
+          <Select value={filtroComuna} onValueChange={setFiltroComuna}>
+            <SelectTrigger className="w-36 h-8 bg-slate-800 border-slate-700 text-white text-sm"><SelectValue placeholder="Comuna" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas las comunas</SelectItem>
+              <SelectItem value="8A">Comuna 8A</SelectItem>
+              <SelectItem value="8B">Comuna 8B</SelectItem>
+              <SelectItem value="10A">Comuna 10A</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+            <SelectTrigger className="w-32 h-8 bg-slate-800 border-slate-700 text-white text-sm"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="critico">Crítico</SelectItem>
+              <SelectItem value="alerta">Alerta</SelectItem>
+              <SelectItem value="normal">Normal</SelectItem>
+              <SelectItem value="optimo">Óptimo</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+            <SelectTrigger className="w-40 h-8 bg-slate-800 border-slate-700 text-white text-sm"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los tipos</SelectItem>
+              {Object.entries(TIPO_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-slate-500 self-center">{equiposFiltrados.length} registros</span>
+        </div>
+      )}
+
+      {/* ── Dashboard filters (card view) ── */}
+      {activeTab === 'dashboard' && !isEmpty && (
+        <div className="flex flex-wrap gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <Input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar escuela..." className="bg-slate-800/60 border-slate-700 text-white pl-8 h-8 w-48 text-sm" />
+          </div>
+          <Select value={filtroComuna} onValueChange={setFiltroComuna}>
+            <SelectTrigger className="w-36 h-8 bg-slate-800/60 border-slate-700 text-white text-sm"><SelectValue placeholder="Comuna" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas las comunas</SelectItem>
+              <SelectItem value="8A">Comuna 8A</SelectItem>
+              <SelectItem value="8B">Comuna 8B</SelectItem>
+              <SelectItem value="10A">Comuna 10A</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+            <SelectTrigger className="w-32 h-8 bg-slate-800/60 border-slate-700 text-white text-sm"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="critico">Crítico</SelectItem>
+              <SelectItem value="alerta">Alerta</SelectItem>
+              <SelectItem value="normal">Normal</SelectItem>
+              <SelectItem value="optimo">Óptimo</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-slate-500 self-center">{escuelasGrupo.length} escuelas</span>
+        </div>
+      )}
+
+      {/* ── Content ── */}
       {isLoading ? (
         <div className="flex items-center justify-center py-20 text-slate-400 gap-2">
           <RefreshCw className="h-5 w-5 animate-spin" /> Cargando datos...
@@ -325,120 +331,124 @@ export default function Calefaccion() {
             <p className="text-sm text-slate-400 mt-1">{categoria.emptyLabel || 'Importá el Excel de relevamiento para comenzar'}</p>
           </div>
           {(categoria.id === 'calefaccion' || categoria.id === 'todos') && (
-            <Button onClick={() => setShowImport(true)} className="gap-2 bg-orange-600 hover:bg-orange-700 mt-2">
+            <Button onClick={() => setShowImport(true)} className="gap-2 bg-orange-500 hover:bg-orange-600 mt-2">
               <Upload className="h-4 w-4" /> Importar Excel
             </Button>
           )}
         </div>
       ) : (
         <>
-          {/* DASHBOARD TAB */}
+          {/* ═══════════════ DASHBOARD TAB ═══════════════ */}
           {activeTab === 'dashboard' && (
             <div className="space-y-5">
-              <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <KpiCard label="Unidades Relevadas"   value={kpis.total.toLocaleString()}    sub={`${kpis.escuelas} establecimientos`}                                    icon={Building2}    colorClass="text-blue-400"    bgClass="bg-blue-500/10 border-blue-500/30" />
-                <KpiCard label="Operatividad Global"  value={`${kpis.pct}%`}                sub={`${kpis.funciona.toLocaleString()} funcionando · ${kpis.noFunciona.toLocaleString()} con fallas`} icon={CheckCircle2}  colorClass="text-emerald-400" bgClass="bg-emerald-500/10 border-emerald-500/30" />
-                <KpiCard label="Establec. Críticos"   value={kpis.criticos}                  sub={`${kpis.registrosCriticos} tipo(s) con <50% operativo`}                   icon={XCircle}      colorClass="text-red-400"     bgClass="bg-red-500/10 border-red-500/30" />
-                <KpiCard label="Establec. en Alerta"  value={kpis.alertas}                   sub={`${kpis.registrosAlertas} tipo(s) con 50–74% operativo`}                  icon={AlertTriangle} colorClass="text-orange-400"  bgClass="bg-orange-500/10 border-orange-500/30" />
-              </motion.div>
+              {/* Cards grid por escuela */}
+              {escuelasGrupo.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-sm">Sin escuelas con los filtros seleccionados</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 gap-4">
+                  {escuelasGrupo.map((g) => (
+                    <EscuelaCard
+                      key={g.escuela}
+                      escuela={g.escuela}
+                      jefe_sitio={g.jefe_sitio}
+                      comuna={g.comuna}
+                      registros={g.registros}
+                      tipoLabels={TIPO_LABELS}
+                    />
+                  ))}
+                </div>
+              )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <Card className="lg:col-span-2 border-0 bg-slate-800/40 backdrop-blur">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-white flex items-center gap-2"><BarChart3 className="h-4 w-4 text-orange-400" /> Unidades por Tipo de Equipo</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={260}>
-                      <BarChart data={porTipo}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                        <XAxis dataKey="tipo" tick={{ fontSize: 10, fill: '#94a3b8' }} angle={-20} textAnchor="end" height={55} />
-                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                        <Tooltip
-                          formatter={(value, name) => [value.toLocaleString() + ' uds.', name]}
-                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px', fontSize: 12 }} />
-                        <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
-                        <Bar dataKey="funciona"    name="Operativas"  fill="#10b981" radius={[4,4,0,0]} stackId="a" />
-                        <Bar dataKey="no_funciona" name="Con fallas"  fill="#ef4444" radius={[4,4,0,0]} stackId="a" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
+              {/* ── Tabla por tipo ── */}
+              <div className="rounded-2xl border border-slate-700/50 bg-slate-800/40 overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-700/50 flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-orange-400" /> Unidades por Tipo de Equipo
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-700/40">
+                        <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Tipo</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Operativas</th>
+                        <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">Con fallas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {porTipo.map((t, i) => (
+                        <tr key={i} className="border-b border-slate-700/20 hover:bg-slate-700/20 transition-colors">
+                          <td className="px-5 py-2.5 text-white text-sm font-medium">{t.tipo}</td>
+                          <td className="px-4 py-2.5 text-right">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="text-white font-bold text-sm">{Math.round(t.funciona).toLocaleString()}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium">Operativas</span>
+                            </span>
+                          </td>
+                          <td className="px-5 py-2.5 text-right">
+                            {t.no_funciona > 0 ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className="text-red-400 font-bold text-sm">{Math.round(t.no_funciona).toLocaleString()}</span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30 font-medium">Con fallas</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 text-xs">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-                <Card className="border-0 bg-slate-800/40 backdrop-blur">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-white">Distribución por Estado</CardTitle>
-                    <p className="text-xs text-slate-400 mt-0.5">En unidades de equipo</p>
-                  </CardHeader>
-                  <CardContent className="flex flex-col items-center">
-                    <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
-                        <Pie data={porEstado} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
-                          label={({ percent }) => `${(percent*100).toFixed(0)}%`} labelLine={false}>
-                          {porEstado.map((entry) => <Cell key={entry.key} fill={entry.color} />)}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value, name) => [value.toLocaleString() + ' uds.', name]}
-                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px', fontSize: 12 }} />
-                        <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
+              {/* ── Distribución y por comuna ── */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Pie */}
+                <div className="rounded-2xl border border-slate-700/50 bg-slate-800/40 p-5">
+                  <h3 className="text-sm font-bold text-white mb-1">Distribución por Estado</h3>
+                  <p className="text-xs text-slate-400 mb-3">En unidades de equipo</p>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie data={porEstado} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80}
+                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                        {porEstado.map((entry) => <Cell key={entry.key} fill={entry.color} />)}
+                      </Pie>
+                      <Tooltip formatter={(v, n) => [v.toLocaleString() + ' uds.', n]}
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px', fontSize: 12 }} />
+                      <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
 
-                <Card className="lg:col-span-3 border-0 bg-slate-800/40 backdrop-blur">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-white">Operatividad por Comuna</CardTitle>
-                    <p className="text-xs text-slate-400 mt-0.5">Porcentaje calculado sobre unidades relevadas</p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      {porComuna.map(c => {
-                        const pct = c.total > 0 ? Math.round((c.funciona / c.total) * 100) : 0;
-                        const barColor = pct < 50 ? 'bg-red-500' : pct < 75 ? 'bg-orange-500' : pct < 90 ? 'bg-blue-500' : 'bg-emerald-500';
-                        const pctColor = pct < 50 ? 'text-red-400' : pct < 75 ? 'text-orange-400' : pct < 90 ? 'text-blue-400' : 'text-emerald-400';
-                        return (
-                          <div key={c.comuna} className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <span className="text-lg font-bold text-white">Comuna {c.comuna}</span>
-                                <p className="text-xs text-slate-400 mt-0.5">{c.escuelas} establecimientos</p>
-                              </div>
-                              <span className={`text-xl font-bold ${pctColor}`}>{pct}%</span>
-                            </div>
-                            <div className="w-full bg-slate-600/50 rounded-full h-2">
-                              <div className={`h-2 rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 text-xs text-center">
-                              <div className="bg-slate-700/40 rounded-lg py-2">
-                                <p className="text-slate-400 mb-0.5">Relevadas</p>
-                                <p className="font-bold text-white text-sm">{c.total.toLocaleString()}</p>
-                              </div>
-                              <div className="bg-slate-700/40 rounded-lg py-2">
-                                <p className="text-slate-400 mb-0.5">Operativas</p>
-                                <p className="font-bold text-emerald-400 text-sm">{c.funciona.toLocaleString()}</p>
-                              </div>
-                              <div className="bg-slate-700/40 rounded-lg py-2">
-                                <p className="text-slate-400 mb-0.5">Con fallas</p>
-                                <p className="font-bold text-red-400 text-sm">{c.no_funciona.toLocaleString()}</p>
-                              </div>
-                            </div>
+                {/* Por comuna — progress rings */}
+                <div className="rounded-2xl border border-slate-700/50 bg-slate-800/40 p-5">
+                  <h3 className="text-sm font-bold text-white mb-1">Operatividad por Comuna</h3>
+                  <p className="text-xs text-slate-400 mb-4">Porcentaje calculado sobre unidades relevadas</p>
+                  <div className="flex flex-wrap gap-4 justify-around">
+                    {porComuna.map(c => {
+                      const pct = c.total > 0 ? Math.round((c.funciona / c.total) * 100) : 0;
+                      const color = pct < 50 ? '#ef4444' : pct < 75 ? '#f97316' : pct < 90 ? '#3b82f6' : '#10b981';
+                      return (
+                        <div key={c.comuna} className="flex flex-col items-center gap-2">
+                          <ProgressRing pct={pct} size={80} stroke={7} color={color} />
+                          <div className="text-center">
+                            <p className="text-xs font-bold text-white">Comuna {c.comuna}</p>
+                            <p className="text-[10px] text-slate-400">{c.escuelas} estab.</p>
                             {c.criticos > 0 && (
-                              <div className="flex items-center gap-1.5 text-xs text-red-300 bg-red-500/10 rounded-lg px-2 py-1.5 border border-red-500/20">
-                                <AlertTriangle className="h-3 w-3 shrink-0" />
-                                {c.criticos} establecimiento{c.criticos > 1 ? 's' : ''} en estado crítico
-                              </div>
+                              <p className="text-[10px] text-red-400">{c.criticos} crít.</p>
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          {/* ALERTAS TAB */}
+          {/* ═══════════════ ALERTAS TAB ═══════════════ */}
           {activeTab === 'alertas' && (
             <div className="space-y-4">
               <p className="text-xs text-slate-400">{escuelasCriticas.length} establecimientos con equipos críticos o en alerta</p>
@@ -482,50 +492,9 @@ export default function Calefaccion() {
             </div>
           )}
 
-          {/* TABLA TAB */}
+          {/* ═══════════════ TABLA TAB ═══════════════ */}
           {activeTab === 'tabla' && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-3">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <Input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar escuela o jefe..." className="bg-slate-800 border-slate-700 text-white pl-8 h-9 w-56 text-sm" />
-                </div>
-                <Select value={filtroComuna} onValueChange={setFiltroComuna}>
-                  <SelectTrigger className="w-36 h-9 bg-slate-800 border-slate-700 text-white text-sm">
-                    <SelectValue placeholder="Comuna" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas las comunas</SelectItem>
-                    <SelectItem value="8A">Comuna 8A</SelectItem>
-                    <SelectItem value="8B">Comuna 8B</SelectItem>
-                    <SelectItem value="10A">Comuna 10A</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-                  <SelectTrigger className="w-36 h-9 bg-slate-800 border-slate-700 text-white text-sm">
-                    <SelectValue placeholder="Estado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos los estados</SelectItem>
-                    <SelectItem value="critico">Crítico</SelectItem>
-                    <SelectItem value="alerta">Alerta</SelectItem>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="optimo">Óptimo</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-                  <SelectTrigger className="w-44 h-9 bg-slate-800 border-slate-700 text-white text-sm">
-                    <SelectValue placeholder="Tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos los tipos</SelectItem>
-                    {Object.entries(TIPO_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <span className="text-xs text-slate-500 self-center">{equiposFiltrados.length} registros</span>
-              </div>
-              <TablaEquipos equipos={equiposFiltrados} estadoConfig={ESTADO_CONFIG} tipoLabels={TIPO_LABELS} />
-            </div>
+            <TablaEquipos equipos={equiposFiltrados} estadoConfig={ESTADO_CONFIG} tipoLabels={TIPO_LABELS} />
           )}
         </>
       )}
