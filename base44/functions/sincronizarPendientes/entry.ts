@@ -14,18 +14,42 @@ const norm = (s) => s ? String(s).trim().toUpperCase().replace(/\s+/g, ' ') : ''
 
 /** Construye todos los índices de lookup a partir de LocationData y Direccion */
 function buildIndexes(locations, direcciones, employees) {
-  const byEstablecimiento = new Map(); // norm(establecimiento) → loc
-  const byDireccion = new Map();       // norm(direccion física) → loc
+  const byEstablecimiento = new Map(); // norm(establecimiento) → { jefe_sitio, inspector }
+  const byDireccion = new Map();       // norm(direccion física) → { jefe_sitio, inspector }
 
   for (const loc of locations) {
-    if (loc.establecimiento) byEstablecimiento.set(norm(loc.establecimiento), loc);
-    // LocationData puede tener campo 'direccion' o inferirse del padre Direccion
-    if (loc.direccion) byDireccion.set(norm(loc.direccion), loc);
+    const info = { jefe_sitio: loc.jefe_sitio, inspector: loc.inspector };
+    if (loc.establecimiento) byEstablecimiento.set(norm(loc.establecimiento), info);
   }
 
+  // Direccion entity: indexar por dirección y también poblar byEstablecimiento
+  // con las escuelas de cada dirección si la LocationData las tiene vinculadas.
+  // Adicionalmente, cada Direccion tiene jefe_sitio e inspector propios.
   const dirByInspector = new Map(); // norm(inspector) → dir
   for (const dir of direcciones) {
     if (dir.inspector) dirByInspector.set(norm(dir.inspector), dir);
+    if (dir.direccion) {
+      // La dirección misma sirve como clave de sitio en Pendiente.sitio
+      byDireccion.set(norm(dir.direccion), { jefe_sitio: dir.jefe_sitio, inspector: dir.inspector });
+    }
+  }
+
+  // Mezclar: LocationData con su direccion vinculada si tiene direccion_id
+  // Para ello, armar mapa direccion_id → Direccion
+  const dirById = new Map();
+  for (const dir of direcciones) dirById.set(dir.id, dir);
+
+  for (const loc of locations) {
+    const info = { jefe_sitio: loc.jefe_sitio, inspector: loc.inspector };
+    // Si loc no tiene jefe_sitio propio, heredar de su Direccion padre
+    if (!info.jefe_sitio && loc.direccion_id) {
+      const parent = dirById.get(loc.direccion_id);
+      if (parent) {
+        info.jefe_sitio = parent.jefe_sitio;
+        info.inspector = info.inspector || parent.inspector;
+      }
+    }
+    if (loc.establecimiento) byEstablecimiento.set(norm(loc.establecimiento), info);
   }
 
   const empEmail = new Map(); // norm(full_name) → email
@@ -44,28 +68,28 @@ function resolveFromIndexes(indexes, { establecimiento, sitio, direccion, inspec
   const { byEstablecimiento, byDireccion, dirByInspector, empEmail } = indexes;
 
   // 1. Match por nombre de establecimiento
-  let loc = (establecimiento && byEstablecimiento.get(norm(establecimiento)))
-         || (sitio && byEstablecimiento.get(norm(sitio)))
-         || null;
+  let info = (establecimiento && byEstablecimiento.get(norm(establecimiento)))
+          || (sitio && byEstablecimiento.get(norm(sitio)))
+          || null;
 
-  // 2. Match por dirección física
-  if (!loc) {
-    loc = (direccion && byDireccion.get(norm(direccion)))
-       || (sitio && byDireccion.get(norm(sitio)))
-       || null;
+  // 2. Match por dirección física (campo direccion o sitio)
+  if (!info) {
+    info = (direccion && byDireccion.get(norm(direccion)))
+        || (sitio && byDireccion.get(norm(sitio)))
+        || null;
   }
 
   const result = {};
 
-  if (loc) {
-    if (loc.jefe_sitio) {
-      result.jefe_sitio = loc.jefe_sitio;
-      result.jefe_sitio_email = empEmail.get(norm(loc.jefe_sitio)) || '';
+  if (info) {
+    if (info.jefe_sitio) {
+      result.jefe_sitio = info.jefe_sitio;
+      result.jefe_sitio_email = empEmail.get(norm(info.jefe_sitio)) || '';
     }
-    if (loc.inspector) result.inspector = loc.inspector;
+    if (info.inspector) result.inspector = info.inspector;
   }
 
-  // 3. Fallback: si hay inspector pero sin jefe, buscar en Direccion
+  // 3. Fallback: si hay inspector pero sin jefe, buscar en Direccion por inspector
   const inspectorToLookup = result.inspector || currentInspector;
   if (!result.jefe_sitio && inspectorToLookup) {
     const dir = dirByInspector.get(norm(inspectorToLookup));
