@@ -17,6 +17,7 @@ import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import CertificacionesVinculadas from '@/components/finanzas/CertificacionesVinculadas';
 import ReporteMensualComparativo from '@/components/reportes/ReporteMensualComparativo';
 import DashboardFinanciero from '@/components/finanzas/DashboardFinanciero';
+import GastoMensualAbonosMensuales from '@/components/reportes/GastoMensualAbonosMensuales';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const invoiceFields = [
@@ -177,11 +178,17 @@ export default function Invoices() {
 
         <TabsContent value="reportes" className="mt-6 space-y-8">
           <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Gasto Mensual - Abonos Mensuales</h3>
+            <p className="text-sm text-muted-foreground">Análisis de gastos en certificados de abonos mensuales</p>
+            <GastoMensualAbonosMensuales />
+          </div>
+
+          <div className="space-y-4 border-t pt-8">
             <h3 className="text-lg font-semibold">Certificación por Mantenimiento</h3>
             <p className="text-sm text-muted-foreground">Dinero que sale de la empresa - Pagos a proveedores</p>
             <ReporteMensualComparativo />
           </div>
-          
+
           <div className="space-y-4 border-t pt-8">
             <h3 className="text-lg font-semibold">Obra/Proyecto</h3>
             <p className="text-sm text-muted-foreground">Dinero que entra a la empresa - Certificaciones de obras</p>
