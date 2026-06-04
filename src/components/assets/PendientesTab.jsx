@@ -13,7 +13,14 @@ import {
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { isPast, format } from 'date-fns';
+import { format, parseISO, startOfDay } from 'date-fns';
+
+// Parsea fecha YYYY-MM-DD como local (evita desfase UTC → Argentina)
+const parseLocalDate = (s) => s ? parseISO(s) : null;
+const isVencidoDate = (fecha_limite, estado) => {
+  if (!fecha_limite || estado === 'resuelto' || estado === 'cancelado') return false;
+  return startOfDay(parseLocalDate(fecha_limite)) < startOfDay(new Date());
+};
 import { toast } from 'sonner';
 import PendienteDialog from '@/components/assets/PendienteDialog';
 import PendienteCard from '@/components/assets/PendienteCard';
@@ -135,7 +142,7 @@ export default function PendientesTab() {
       stats[c] = {
         total: cp.length,
         pendiente: cp.filter(p => p.estado === 'pendiente').length,
-        vencidos: cp.filter(p => p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado').length,
+        vencidos: cp.filter(p => isVencidoDate(p.fecha_limite, p.estado)).length,
       };
     }
     return stats;
@@ -185,7 +192,7 @@ export default function PendientesTab() {
     pendiente: comunaPendientes.filter(p => p.estado === 'pendiente').length,
     asignado: comunaPendientes.filter(p => p.estado === 'asignado' || p.estado === 'en_progreso').length,
     resuelto: comunaPendientes.filter(p => p.estado === 'resuelto').length,
-    vencidos: comunaPendientes.filter(p => p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado').length,
+    vencidos: comunaPendientes.filter(p => isVencidoDate(p.fecha_limite, p.estado)).length,
   }), [comunaPendientes]);
 
   function toggleSort(col) {
@@ -410,7 +417,7 @@ export default function PendientesTab() {
                     </td>
                   </tr>
                 ) : filtered.map((p, idx) => {
-                  const isVencido = p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado';
+                  const isVencido = isVencidoDate(p.fecha_limite, p.estado);
                   return (
                     <tr
                       key={p.id}
@@ -430,10 +437,10 @@ export default function PendientesTab() {
                       </td>
                       <td className="px-3 py-2 text-xs font-mono whitespace-nowrap">{p.numero_sap || '—'}</td>
                       <td className="px-3 py-2 text-xs whitespace-nowrap">
-                        {p.fecha_emision_sap ? format(new Date(p.fecha_emision_sap), 'dd/MM/yy') : '—'}
+                        {p.fecha_emision_sap ? format(parseLocalDate(p.fecha_emision_sap), 'dd/MM/yy') : '—'}
                       </td>
                       <td className={`px-3 py-2 text-xs whitespace-nowrap font-medium ${isVencido ? 'text-red-400' : ''}`}>
-                        {p.fecha_limite ? format(new Date(p.fecha_limite), 'dd/MM/yy') : '—'}
+                        {p.fecha_limite ? format(parseLocalDate(p.fecha_limite), 'dd/MM/yy') : '—'}
                         {isVencido && ' ⚠'}
                       </td>
                       <td className="px-3 py-2 text-xs whitespace-nowrap">{p.clase_orden || '—'}</td>
