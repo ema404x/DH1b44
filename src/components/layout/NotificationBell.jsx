@@ -36,10 +36,11 @@ export default function NotificationBell() {
     queryFn: () => base44.entities.Notification.list('-created_date', 30),
   });
 
-  const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list(), staleTime: 60000 });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list(), staleTime: 60000 });
-  const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list(), staleTime: 60000 });
-  const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list(), staleTime: 60000 });
+  const NOTIF_STALE = 1000 * 60 * 15; // 15 min — estos datos no cambian seguido
+  const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 200), staleTime: NOTIF_STALE });
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list('-updated_date', 100), staleTime: NOTIF_STALE });
+  const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list('-updated_date', 100), staleTime: NOTIF_STALE });
+  const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list('-updated_date', 100), staleTime: NOTIF_STALE });
 
   const markReadMutation = useMutation({
     mutationFn: (id) => base44.entities.Notification.update(id, { read: true }),

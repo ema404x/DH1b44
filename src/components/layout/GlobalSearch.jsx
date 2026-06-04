@@ -15,20 +15,24 @@ const categoryConfig = {
 export default function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [everOpened, setEverOpened] = useState(false);
   const inputRef = useRef();
   const navigate = useNavigate();
 
-  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: () => base44.entities.Project.list() });
-  const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
-  const { data: clients = [] } = useQuery({ queryKey: ['clients'], queryFn: () => base44.entities.Client.list() });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list() });
+  // Solo cargar datos cuando el buscador se abre por primera vez
+  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: () => base44.entities.Project.list(), enabled: everOpened, staleTime: 1000 * 60 * 15 });
+  const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 200), enabled: everOpened, staleTime: 1000 * 60 * 15 });
+  const { data: clients = [] } = useQuery({ queryKey: ['clients'], queryFn: () => base44.entities.Client.list(), enabled: everOpened, staleTime: 1000 * 60 * 15 });
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list(), enabled: everOpened, staleTime: 1000 * 60 * 15 });
+
+  const openSearch = () => { setEverOpened(true); setOpen(true); };
 
   // Keyboard shortcut
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setOpen(true);
+        openSearch();
       }
       if (e.key === 'Escape') setOpen(false);
     };
@@ -61,7 +65,7 @@ export default function GlobalSearch() {
     <>
       {/* Trigger */}
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => openSearch()}
         className="flex items-center gap-2 px-3 h-9 rounded-lg border border-white/10 bg-white/5 text-sm text-slate-400 hover:bg-white/10 hover:text-white transition-colors w-full max-w-xs"
       >
         <Search className="h-3.5 w-3.5 flex-shrink-0" />
