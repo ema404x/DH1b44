@@ -11,8 +11,13 @@ export default function DashboardFinanciero() {
   const { data: certificates = [] } = useQuery({ queryKey: ['certificados'], queryFn: () => base44.entities.Certificado.list() });
   const { data: obrasData = [] } = useQuery({ queryKey: ['obrasCertificacion'], queryFn: () => base44.entities.ObraCertificacion.list() });
 
+  // Filtrar solo obras que tienen certificados emitidos
+  const obrasConCertificados = obrasData.filter(obra => 
+    certificates.some(cert => cert.obra_servicio === obra.titulo)
+  );
+
   // Cálculos financieros
-  const totalIngresos = obrasData.reduce((sum, obra) => sum + (obra.monto_contrato || 0), 0);
+  const totalIngresos = obrasConCertificados.reduce((sum, obra) => sum + (obra.monto_contrato || 0), 0);
   const totalGastos = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
   const flujoNeto = totalIngresos - totalGastos;
   
@@ -55,7 +60,7 @@ export default function DashboardFinanciero() {
           value={`$${totalIngresos.toLocaleString()}`} 
           icon={TrendingUp} 
           color="green"
-          subtitle={`${obrasData.length} obras`}
+          subtitle={`${obrasConCertificados.length} obras certificadas`}
         />
         <StatsCard 
           title="Gastos Totales" 
