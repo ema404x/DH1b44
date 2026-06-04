@@ -69,6 +69,52 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
     enabled: open,
   });
 
+  const { data: locations = [] } = useQuery({
+    queryKey: ['locations-list'],
+    queryFn: () => base44.entities.LocationData.list(),
+    enabled: open,
+  });
+
+  const { data: direcciones = [] } = useQuery({
+    queryKey: ['direcciones-list'],
+    queryFn: () => base44.entities.Direccion.list(),
+    enabled: open,
+  });
+
+  // Auto-completar inspector y jefe al cambiar sitio/establecimiento
+  const autoFillFromLocation = (field, value) => {
+    const norm = (s) => s ? String(s).trim().toUpperCase() : '';
+    const normVal = norm(value);
+    if (!normVal) return {};
+
+    const loc = locations.find(l =>
+      (field === 'establecimiento' && norm(l.establecimiento) === normVal) ||
+      (field === 'sitio' && norm(l.ubic_tecnica) === normVal)
+    );
+
+    if (!loc) return {};
+    const patch = {};
+    if (loc.jefe_sitio) {
+      patch.jefe_sitio = loc.jefe_sitio;
+      const emp = employees.find(e => norm(e.full_name) === norm(loc.jefe_sitio));
+      if (emp?.email) patch.jefe_sitio_email = emp.email;
+    }
+    if (loc.inspector) patch.inspector = loc.inspector;
+    return patch;
+  };
+
+  // Fallback: si solo hay inspector, buscar jefe en Direccion
+  const autoFillFromInspector = (inspectorName) => {
+    const norm = (s) => s ? String(s).trim().toUpperCase() : '';
+    const dir = direcciones.find(d => norm(d.inspector) === norm(inspectorName));
+    if (!dir?.jefe_sitio) return {};
+    const emp = employees.find(e => norm(e.full_name) === norm(dir.jefe_sitio));
+    return {
+      jefe_sitio: dir.jefe_sitio,
+      ...(emp?.email ? { jefe_sitio_email: emp.email } : {}),
+    };
+  };
+
   useEffect(() => {
     setForm(pendiente ? { ...empty, ...pendiente } : empty);
     setTab('editar');
@@ -137,8 +183,11 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
                   <Input value={form.numero_sap_desaprobado || ''} onChange={e => set('numero_sap_desaprobado', e.target.value)} placeholder="Si aplica" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Inspector (creó la orden)</Label>
-                  <Input value={form.inspector || ''} onChange={e => set('inspector', e.target.value)} placeholder="Nombre del inspector" />
+                   <Label className="text-xs">Inspector (creó la orden)</Label>
+                   <Input value={form.inspector || ''} onChange={e => {
+                     const patch = autoFillFromInspector(e.target.value);
+                     setForm(prev => ({ ...prev, inspector: e.target.value, ...patch }));
+                   }} placeholder="Nombre del inspector" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Comuna</Label>
@@ -196,12 +245,18 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Ubicación / Dirección</Label>
-                  <Input value={form.sitio} onChange={e => set('sitio', e.target.value)} placeholder="Ej: MARTINEZ CASTRO 3061" />
+                   <Label className="text-xs">Ubicación / Dirección</Label>
+                   <Input value={form.sitio} onChange={e => {
+                     const patch = autoFillFromLocation('sitio', e.target.value);
+                     setForm(prev => ({ ...prev, sitio: e.target.value, ...patch }));
+                   }} placeholder="Ej: MARTINEZ CASTRO 3061" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Establecimiento</Label>
-                  <Input value={form.establecimiento || ''} onChange={e => set('establecimiento', e.target.value)} placeholder="Nombre del establecimiento" />
+                   <Label className="text-xs">Establecimiento</Label>
+                   <Input value={form.establecimiento || ''} onChange={e => {
+                     const patch = autoFillFromLocation('establecimiento', e.target.value);
+                     setForm(prev => ({ ...prev, establecimiento: e.target.value, ...patch }));
+                   }} placeholder="Nombre del establecimiento" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Proyecto</Label>
