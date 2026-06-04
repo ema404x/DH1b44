@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import DirectorioJerarquico from '@/components/informacion-general/DirectorioJerarquico';
 import ImportadorSimple from '@/components/informacion-general/ImportadorSimple';
 import ImportadorDireccionesJefes from '@/components/informacion-general/ImportadorDireccionesJefes';
+import SincronizarModulos from '@/components/informacion-general/SincronizarModulos';
 
 const COMUNAS = [
   { id: '8A', label: 'Comuna 8A', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
@@ -226,6 +227,11 @@ export default function InformacionGeneral() {
                     </motion.button>
                   ))}
                 </div>
+              </motion.div>
+
+              {/* Sincronizar módulos */}
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mb-6">
+                <SincronizarModulos />
               </motion.div>
 
               {/* Directorio */}

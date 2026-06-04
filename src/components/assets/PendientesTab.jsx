@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Search, Plus, ClipboardList, AlertCircle, Upload,
-  LayoutGrid, Table2, X, ChevronUp, ChevronDown, Trash2, RefreshCw
+  LayoutGrid, Table2, X, ChevronUp, ChevronDown, Trash2
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -65,7 +65,7 @@ export default function PendientesTab() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+
   const qc = useQueryClient();
   const { isAdmin, filterByUser } = useCurrentUser();
 
@@ -107,20 +107,7 @@ export default function PendientesTab() {
   const openNew = () => { setSelected(null); setDialogOpen(true); };
   const openEdit = (p) => { setSelected(p); setDialogOpen(true); };
 
-  const handleSync = async () => {
-    setSyncing(true);
-    try {
-      const res = await base44.functions.invoke('sincronizarPendientes', { comuna: activeComuna, force_all: false });
-      const d = res.data;
-      qc.invalidateQueries({ queryKey: ['pendientes'] });
-      toast.success(`Sincronizado: ${d.actualizados} pendientes actualizados, ${d.sin_cambios} sin cambios`);
-      if (d.errores?.length) toast.warning(`${d.errores.length} errores durante la sincronización`);
-    } catch (e) {
-      toast.error('Error al sincronizar: ' + e.message);
-    } finally {
-      setSyncing(false);
-    }
-  };
+
 
   const toggleSelectId = (id, e) => {
     e.stopPropagation();
@@ -342,10 +329,7 @@ export default function PendientesTab() {
             <Button variant="outline" className="gap-1.5" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4" /> Importar SAP
             </Button>
-            <Button variant="outline" className="gap-1.5" onClick={handleSync} disabled={syncing}>
-              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Sincronizando...' : 'Sincronizar Info General'}
-            </Button>
+
             {canDelete && selectedIds.size > 0 && (
               <>
                 <span className="text-sm font-medium text-primary self-center">{selectedIds.size} sel.</span>

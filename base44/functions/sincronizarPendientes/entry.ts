@@ -1,20 +1,99 @@
 /**
- * Sincronizar pendientes con la información del módulo Información General.
- * 
- * Lógica de matching (en orden de prioridad):
- * 1. Por LocationData: si el sitio/establecimiento del pendiente coincide con
- *    un LocationData, se toman jefe_sitio e inspector de ese registro.
- * 2. Por Direccion (inspector → jefe_sitio): si el pendiente tiene inspector
- *    y no se encontró match en LocationData, se busca en Direccion por inspector.
+ * Sincronización global: actualiza jefe_sitio e inspector en todos los módulos
+ * que usan esa información (Pendiente, ObraCertificacion, EquipamientoCalefaccion).
  *
- * Solo se actualizan registros donde realmente cambia algo.
+ * Estrategia de matching (en orden de prioridad):
+ * 1. LocationData por establecimiento (nombre exacto normalizado)
+ * 2. LocationData por dirección física
+ * 3. Direccion por inspector (inspector → jefe_sitio)
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-function normalize(s) {
-  if (!s) return '';
-  return String(s).trim().toUpperCase().replace(/\s+/g, ' ');
+const norm = (s) => s ? String(s).trim().toUpperCase().replace(/\s+/g, ' ') : '';
+
+/** Construye todos los índices de lookup a partir de LocationData y Direccion */
+function buildIndexes(locations, direcciones, employees) {
+  const byEstablecimiento = new Map(); // norm(establecimiento) → loc
+  const byDireccion = new Map();       // norm(direccion física) → loc
+
+  for (const loc of locations) {
+    if (loc.establecimiento) byEstablecimiento.set(norm(loc.establecimiento), loc);
+    // LocationData puede tener campo 'direccion' o inferirse del padre Direccion
+    if (loc.direccion) byDireccion.set(norm(loc.direccion), loc);
+  }
+
+  const dirByInspector = new Map(); // norm(inspector) → dir
+  for (const dir of direcciones) {
+    if (dir.inspector) dirByInspector.set(norm(dir.inspector), dir);
+  }
+
+  const empEmail = new Map(); // norm(full_name) → email
+  for (const e of employees) {
+    if (e.full_name) empEmail.set(norm(e.full_name), e.email || '');
+  }
+
+  return { byEstablecimiento, byDireccion, dirByInspector, empEmail };
+}
+
+/**
+ * Resuelve jefe_sitio e inspector para un registro dado sus campos de ubicación.
+ * Devuelve { jefe_sitio, jefe_sitio_email, inspector } o {} si no hay datos.
+ */
+function resolveFromIndexes(indexes, { establecimiento, sitio, direccion, inspector: currentInspector }) {
+  const { byEstablecimiento, byDireccion, dirByInspector, empEmail } = indexes;
+
+  // 1. Match por nombre de establecimiento
+  let loc = (establecimiento && byEstablecimiento.get(norm(establecimiento)))
+         || (sitio && byEstablecimiento.get(norm(sitio)))
+         || null;
+
+  // 2. Match por dirección física
+  if (!loc) {
+    loc = (direccion && byDireccion.get(norm(direccion)))
+       || (sitio && byDireccion.get(norm(sitio)))
+       || null;
+  }
+
+  const result = {};
+
+  if (loc) {
+    if (loc.jefe_sitio) {
+      result.jefe_sitio = loc.jefe_sitio;
+      result.jefe_sitio_email = empEmail.get(norm(loc.jefe_sitio)) || '';
+    }
+    if (loc.inspector) result.inspector = loc.inspector;
+  }
+
+  // 3. Fallback: si hay inspector pero sin jefe, buscar en Direccion
+  const inspectorToLookup = result.inspector || currentInspector;
+  if (!result.jefe_sitio && inspectorToLookup) {
+    const dir = dirByInspector.get(norm(inspectorToLookup));
+    if (dir?.jefe_sitio) {
+      result.jefe_sitio = dir.jefe_sitio;
+      result.jefe_sitio_email = empEmail.get(norm(dir.jefe_sitio)) || '';
+    }
+  }
+
+  return result;
+}
+
+/** Calcula el patch a aplicar (solo campos que realmente cambian) */
+function buildPatch(current, resolved, canSetEstado = false) {
+  const patch = {};
+  if (resolved.jefe_sitio && resolved.jefe_sitio !== (current.jefe_sitio || '')) {
+    patch.jefe_sitio = resolved.jefe_sitio;
+  }
+  if (resolved.jefe_sitio_email && resolved.jefe_sitio_email !== (current.jefe_sitio_email || '')) {
+    patch.jefe_sitio_email = resolved.jefe_sitio_email;
+  }
+  if (resolved.inspector && resolved.inspector !== (current.inspector || '')) {
+    patch.inspector = resolved.inspector;
+  }
+  if (canSetEstado && patch.jefe_sitio && (current.estado === 'pendiente')) {
+    patch.estado = 'asignado';
+  }
+  return patch;
 }
 
 Deno.serve(async (req) => {
@@ -24,107 +103,103 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { comuna, force_all = false } = body;
+    const { modules = ['pendientes', 'obras', 'calefaccion'], force_all = true } = body;
 
-    // Cargar todos los datos necesarios en paralelo
-    const [pendientes, locations, direcciones, employees] = await Promise.all([
-      base44.entities.Pendiente.list(),
+    // Cargar todo en paralelo
+    const [pendientes, obras, calefaccion, locations, direcciones, employees] = await Promise.all([
+      modules.includes('pendientes') ? base44.entities.Pendiente.list() : Promise.resolve([]),
+      modules.includes('obras') ? base44.entities.ObraCertificacion.list() : Promise.resolve([]),
+      modules.includes('calefaccion') ? base44.entities.EquipamientoCalefaccion.list() : Promise.resolve([]),
       base44.entities.LocationData.list(),
       base44.entities.Direccion.list(),
       base44.entities.Employee.list(),
     ]);
 
-    // Índice de LocationData: normalizar establecimiento y sitio para búsqueda rápida
-    const locByEstablecimiento = new Map();
-    const locBySitio = new Map();
-    for (const loc of locations) {
-      if (loc.establecimiento) locByEstablecimiento.set(normalize(loc.establecimiento), loc);
-      if (loc.ubic_tecnica) locBySitio.set(normalize(loc.ubic_tecnica), loc);
-    }
+    const indexes = buildIndexes(locations, direcciones, employees);
 
-    // Índice de Direccion: inspector → { jefe_sitio, inspector }
-    const dirByInspector = new Map();
-    for (const dir of direcciones) {
-      if (dir.inspector) dirByInspector.set(normalize(dir.inspector), dir);
-    }
+    const summary = {};
 
-    // Índice de employees: nombre → email
-    const empByName = new Map();
-    for (const e of employees) {
-      if (e.full_name) empByName.set(normalize(e.full_name), e.email || '');
-    }
+    // --- PENDIENTES ---
+    if (modules.includes('pendientes')) {
+      let updated = 0, unchanged = 0, errors = 0;
+      const targets = pendientes.filter(p =>
+        p.estado !== 'resuelto' && p.estado !== 'cancelado' &&
+        (force_all || !p.jefe_sitio || !p.inspector)
+      );
 
-    // Filtrar pendientes a procesar
-    const targets = pendientes.filter(p => {
-      if (p.estado === 'resuelto' || p.estado === 'cancelado') return false;
-      if (comuna && p.comuna !== comuna) return false;
-      // force_all: procesar todos, incluso los ya asignados
-      // por defecto: solo los que les falta jefe_sitio o inspector
-      if (!force_all && p.jefe_sitio && p.inspector) return false;
-      return true;
-    });
-
-    let updated = 0;
-    let unchanged = 0;
-    const errores = [];
-
-    for (const p of targets) {
-      let newJefe = p.jefe_sitio || null;
-      let newJefeEmail = p.jefe_sitio_email || null;
-      let newInspector = p.inspector || null;
-
-      // 1. Buscar en LocationData por establecimiento o sitio
-      const normEstab = normalize(p.establecimiento);
-      const normSitio = normalize(p.sitio);
-
-      const loc = (normEstab && locByEstablecimiento.get(normEstab))
-               || (normSitio && locBySitio.get(normSitio))
-               || null;
-
-      if (loc) {
-        if (loc.jefe_sitio) {
-          newJefe = loc.jefe_sitio;
-          newJefeEmail = empByName.get(normalize(loc.jefe_sitio)) || newJefeEmail;
-        }
-        if (loc.inspector) newInspector = loc.inspector;
+      for (const p of targets) {
+        const resolved = resolveFromIndexes(indexes, {
+          establecimiento: p.establecimiento,
+          sitio: p.sitio,
+          inspector: p.inspector,
+        });
+        const patch = buildPatch(p, resolved, true);
+        if (Object.keys(patch).length === 0) { unchanged++; continue; }
+        try {
+          await base44.entities.Pendiente.update(p.id, patch);
+          updated++;
+        } catch { errors++; }
       }
+      summary.pendientes = { procesados: targets.length, actualizados: updated, sin_cambios: unchanged, errors };
+    }
 
-      // 2. Si todavía falta el jefe, buscar en Direccion por inspector
-      if (!newJefe && newInspector) {
-        const dir = dirByInspector.get(normalize(newInspector));
-        if (dir?.jefe_sitio) {
-          newJefe = dir.jefe_sitio;
-          newJefeEmail = empByName.get(normalize(dir.jefe_sitio)) || newJefeEmail;
-        }
+    // --- OBRAS CERTIFICACION ---
+    if (modules.includes('obras')) {
+      let updated = 0, unchanged = 0, errors = 0;
+      const targets = obras.filter(o =>
+        !o.ciclo_archivado && (force_all || !o.jefe_sitio || !o.inspector)
+      );
+
+      for (const o of targets) {
+        const resolved = resolveFromIndexes(indexes, {
+          establecimiento: o.establecimiento,
+          direccion: o.direccion,
+          inspector: o.inspector,
+        });
+        const patch = buildPatch(o, resolved, false);
+        if (Object.keys(patch).length === 0) { unchanged++; continue; }
+        try {
+          await base44.entities.ObraCertificacion.update(o.id, patch);
+          updated++;
+        } catch { errors++; }
       }
+      summary.obras = { procesados: targets.length, actualizados: updated, sin_cambios: unchanged, errors };
+    }
 
-      // 3. Solo actualizar si hay cambio real
-      const changed = newJefe !== (p.jefe_sitio || null)
-                   || newInspector !== (p.inspector || null)
-                   || (newJefeEmail && newJefeEmail !== (p.jefe_sitio_email || null));
+    // --- CALEFACCION ---
+    if (modules.includes('calefaccion')) {
+      let updated = 0, unchanged = 0, errors = 0;
+      const targets = calefaccion.filter(c =>
+        force_all || !c.jefe_sitio || !c.inspector
+      );
 
-      if (!changed) { unchanged++; continue; }
-
-      try {
+      for (const c of targets) {
+        const resolved = resolveFromIndexes(indexes, {
+          establecimiento: c.escuela,
+          inspector: null,
+        });
+        // Calefaccion solo tiene jefe_sitio
         const patch = {};
-        if (newJefe !== (p.jefe_sitio || null)) patch.jefe_sitio = newJefe;
-        if (newJefeEmail && newJefeEmail !== (p.jefe_sitio_email || null)) patch.jefe_sitio_email = newJefeEmail;
-        if (newInspector !== (p.inspector || null)) patch.inspector = newInspector;
-        if (newJefe && p.estado === 'pendiente') patch.estado = 'asignado';
-
-        await base44.entities.Pendiente.update(p.id, patch);
-        updated++;
-      } catch (e) {
-        errores.push(`Pendiente ${p.numero_sap || p.id}: ${e.message}`);
+        if (resolved.jefe_sitio && resolved.jefe_sitio !== (c.jefe_sitio || '')) {
+          patch.jefe_sitio = resolved.jefe_sitio;
+        }
+        if (Object.keys(patch).length === 0) { unchanged++; continue; }
+        try {
+          await base44.entities.EquipamientoCalefaccion.update(c.id, patch);
+          updated++;
+        } catch { errors++; }
       }
+      summary.calefaccion = { procesados: targets.length, actualizados: updated, sin_cambios: unchanged, errors };
     }
+
+    const totalActualizados = Object.values(summary).reduce((s, m) => s + m.actualizados, 0);
+    const totalProcesados = Object.values(summary).reduce((s, m) => s + m.procesados, 0);
 
     return Response.json({
       success: true,
-      total_procesados: targets.length,
-      actualizados: updated,
-      sin_cambios: unchanged,
-      errores: errores.slice(0, 10),
+      total_procesados: totalProcesados,
+      total_actualizados: totalActualizados,
+      detalle: summary,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
