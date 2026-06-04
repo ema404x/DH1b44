@@ -5,15 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Plus, Search, FileCheck, DollarSign, Clock, TrendingUp, CheckCircle2,
-  AlertCircle, Filter, ChevronDown, Building2, User, Calendar, Hash, FileSpreadsheet, Download, Lock
+  AlertCircle, Filter, ChevronDown, Building2, User, Calendar, Hash, FileSpreadsheet, Download, Lock, BarChart3
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ObraCertificacionDialog from '@/components/certificacion/ObraCertificacionDialog';
 import ObraCertificacionCard from '@/components/certificacion/ObraCertificacionCard';
 import ImportarObrasExcel from '@/components/certificacion/ImportarObrasExcel';
 import CicloSelector from '@/components/certificacion/CicloSelector';
+import ReporteMensualComparativo from '@/components/reportes/ReporteMensualComparativo';
 import { exportarComunaPDF, exportarFiltradoPDF } from '@/components/certificacion/ExportarComunaPDF';
 
 const ESTADO_CONFIG = {
@@ -38,7 +40,8 @@ export default function CertificacionObras() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [cicloVista, setCicloVista] = useState('activo'); // 'activo' | nombre del ciclo archivado
+  const [cicloVista, setCicloVista] = useState('activo');
+  const [activeTab, setActiveTab] = useState('obras');
 
   const { data: todasObras = [], isLoading } = useQuery({
     queryKey: ['obras-certificacion'],
@@ -156,32 +159,52 @@ export default function CertificacionObras() {
             Certificación de Obras
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {esArchivado
+            {activeTab === 'reportes'
+              ? 'Reportes mensuales: certificación vs facturación'
+              : esArchivado
               ? `Ciclo archivado — ${cicloVista}`
               : 'Listado de obras pendientes de cobro y en gestión'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0 items-center">
-          <CicloSelector
-            cicloActivo={cicloVista}
-            ciclosDisponibles={ciclosArchivados}
-            onCambiarCiclo={setCicloVista}
-            obrasActivas={obrasActivas}
-          />
-          {!esArchivado && (
+          {activeTab === 'obras' && (
             <>
-              <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
-                <FileSpreadsheet className="h-4 w-4" /> Importar Excel
-              </Button>
-              <Button onClick={handleNew} className="gap-2">
-                <Plus className="h-4 w-4" /> Nueva Obra
-              </Button>
+              <CicloSelector
+                cicloActivo={cicloVista}
+                ciclosDisponibles={ciclosArchivados}
+                onCambiarCiclo={setCicloVista}
+                obrasActivas={obrasActivas}
+              />
+              {!esArchivado && (
+                <>
+                  <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
+                    <FileSpreadsheet className="h-4 w-4" /> Importar Excel
+                  </Button>
+                  <Button onClick={handleNew} className="gap-2">
+                    <Plus className="h-4 w-4" /> Nueva Obra
+                  </Button>
+                </>
+              )}
             </>
           )}
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3">
+          <TabsTrigger value="obras" className="gap-2">
+            <FileCheck className="h-4 w-4" />
+            Obras
+          </TabsTrigger>
+          <TabsTrigger value="reportes" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Reportes
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="obras" className="space-y-6 mt-6">
+          {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card className="border-emerald-500/20 bg-emerald-500/5">
           <CardContent className="p-4">
@@ -401,6 +424,12 @@ export default function CertificacionObras() {
         estadoConfig={ESTADO_CONFIG}
         prioridadConfig={PRIORIDAD_CONFIG}
       />
+        </TabsContent>
+
+        <TabsContent value="reportes" className="mt-6">
+          <ReporteMensualComparativo />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
