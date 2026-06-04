@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2, Wand2, Layers } from 'lucide-react';
+import HistorialAcumulados from './HistorialAcumulados';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 const parseMonto = (v) => {
@@ -321,6 +322,14 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           <Button className="gap-2" onClick={() => onSave({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo })} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
         </div>
       </div>
+
+      {/* Historial de acumulados */}
+      <HistorialAcumulados 
+        adaNumero={form.ada_numero} 
+        ocNumero={form.oc_numero} 
+        contratista={form.contratista}
+        montoContratado={parseMonto(form.monto_contratado) > 0 ? parseMonto(form.monto_contratado) : subtotal}
+      />
 
       {/* Banner de validación de subtotal */}
       {validacion && (
