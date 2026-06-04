@@ -9,16 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import {
   Flame, AlertTriangle, CheckCircle2, XCircle, Upload,
-  BarChart3, Building2, Search, Download, RefreshCw, Filter
+  BarChart3, Building2, Search, Download, RefreshCw, Zap, Droplets, Wind, Wrench, Settings
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, RadarChart, PolarGrid, PolarAngleAxis, Radar
+  PieChart, Pie, Cell, Legend
 } from 'recharts';
 import ImportarCalefaccionModal from '@/components/calefaccion/ImportarCalefaccionModal';
 import TablaEquipos from '@/components/calefaccion/TablaEquipos';
 
 const COLORS = ['#ef4444', '#f97316', '#3b82f6', '#10b981'];
+
 const ESTADO_CONFIG = {
   critico: { color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/30', badge: 'bg-red-500/20 text-red-300 border-red-500/40', label: 'Crítico', icon: XCircle },
   alerta:  { color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/30', badge: 'bg-orange-500/20 text-orange-300 border-orange-500/40', label: 'Alerta', icon: AlertTriangle },
@@ -36,6 +37,54 @@ const TIPO_LABELS = {
   aire_acondicionado_calor: 'Aire Acond.',
   otros: 'Otros',
 };
+
+// ─── Categorías del módulo ────────────────────────────────────────────────────
+// Cada categoría filtra los equipos por tipo_equipo. "todos" = sin filtro.
+// Para agregar una nueva categoría basta con agregar un objeto aquí.
+const CATEGORIAS = [
+  {
+    id: 'calefaccion',
+    label: 'Calefacción',
+    icon: Flame,
+    iconBg: 'from-orange-500 to-red-600',
+    iconShadow: 'shadow-orange-500/20',
+    tipos: ['estufas', 'radiadores', 'conductos', 'calderas', 'vrv', 'vrv_bajo_silueta', 'aire_acondicionado_calor'],
+  },
+  {
+    id: 'electricidad',
+    label: 'Electricidad',
+    icon: Zap,
+    iconBg: 'from-yellow-500 to-amber-600',
+    iconShadow: 'shadow-yellow-500/20',
+    tipos: [], // vacío = usar tipo_equipo === 'otros' o todos los que no encajan en otra categoría
+    emptyLabel: 'Sin datos de electricidad todavía. Importá un Excel con equipos eléctricos.',
+  },
+  {
+    id: 'plomeria',
+    label: 'Plomería',
+    icon: Droplets,
+    iconBg: 'from-blue-500 to-cyan-600',
+    iconShadow: 'shadow-blue-500/20',
+    tipos: [],
+    emptyLabel: 'Sin datos de plomería todavía.',
+  },
+  {
+    id: 'ventilacion',
+    label: 'Ventilación',
+    icon: Wind,
+    iconBg: 'from-teal-500 to-emerald-600',
+    iconShadow: 'shadow-teal-500/20',
+    tipos: ['aire_acondicionado_calor', 'conductos'],
+  },
+  {
+    id: 'todos',
+    label: 'Todos',
+    icon: Settings,
+    iconBg: 'from-slate-500 to-slate-600',
+    iconShadow: 'shadow-slate-500/20',
+    tipos: null, // null = mostrar todo sin filtrar
+  },
+];
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35 } } };
@@ -61,20 +110,31 @@ function KpiCard({ label, value, sub, icon: Icon, colorClass, bgClass }) {
 
 export default function Calefaccion() {
   const [showImport, setShowImport] = useState(false);
+  const [categoriaId, setCategoriaId] = useState('calefaccion');
   const [filtroComuna, setFiltroComuna] = useState('todas');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
 
+  const categoria = CATEGORIAS.find(c => c.id === categoriaId) || CATEGORIAS[0];
+  const CatIcon = categoria.icon;
+
   const { data: equipos = [], isLoading, refetch } = useQuery({
     queryKey: ['calefaccion'],
     queryFn: () => base44.entities.EquipamientoCalefaccion.list('-created_date', 5000),
   });
 
-  // Filtros
+  // Filtrar por categoría
+  const equiposCategoria = useMemo(() => {
+    if (categoria.tipos === null) return equipos; // "todos"
+    if (!categoria.tipos || categoria.tipos.length === 0) return []; // categoría vacía
+    return equipos.filter(e => categoria.tipos.includes(e.tipo_equipo));
+  }, [equipos, categoria]);
+
+  // Filtros adicionales
   const equiposFiltrados = useMemo(() => {
-    return equipos.filter(e => {
+    return equiposCategoria.filter(e => {
       if (filtroComuna !== 'todas' && e.comuna !== filtroComuna) return false;
       if (filtroEstado !== 'todos' && e.estado !== filtroEstado) return false;
       if (filtroTipo !== 'todos' && e.tipo_equipo !== filtroTipo) return false;
@@ -82,30 +142,28 @@ export default function Calefaccion() {
           !e.jefe_sitio?.toLowerCase().includes(busqueda.toLowerCase())) return false;
       return true;
     });
-  }, [equipos, filtroComuna, filtroEstado, filtroTipo, busqueda]);
+  }, [equiposCategoria, filtroComuna, filtroEstado, filtroTipo, busqueda]);
 
-  // KPIs globales
+  // KPIs globales (de la categoría seleccionada)
   const kpis = useMemo(() => {
-    const total = equipos.reduce((s, e) => s + (e.cantidad_total || 0), 0);
-    const funciona = equipos.reduce((s, e) => s + (e.cantidad_funciona || 0), 0);
-    const criticos = equipos.filter(e => e.estado === 'critico').length;
-    const alertas = equipos.filter(e => e.estado === 'alerta').length;
+    const total = equiposCategoria.reduce((s, e) => s + (e.cantidad_total || 0), 0);
+    const funciona = equiposCategoria.reduce((s, e) => s + (e.cantidad_funciona || 0), 0);
+    const criticos = equiposCategoria.filter(e => e.estado === 'critico').length;
+    const alertas = equiposCategoria.filter(e => e.estado === 'alerta').length;
     const pct = total > 0 ? Math.round((funciona / total) * 100) : 0;
-    return { total, funciona, criticos, alertas, pct, escuelas: new Set(equipos.map(e => e.escuela)).size };
-  }, [equipos]);
+    return { total, funciona, criticos, alertas, pct, escuelas: new Set(equiposCategoria.map(e => e.escuela)).size };
+  }, [equiposCategoria]);
 
-  // Por estado (pie)
   const porEstado = useMemo(() => [
-    { name: 'Crítico', value: equipos.filter(e => e.estado === 'critico').length },
-    { name: 'Alerta',  value: equipos.filter(e => e.estado === 'alerta').length },
-    { name: 'Normal',  value: equipos.filter(e => e.estado === 'normal').length },
-    { name: 'Óptimo',  value: equipos.filter(e => e.estado === 'optimo').length },
-  ].filter(d => d.value > 0), [equipos]);
+    { name: 'Crítico', value: equiposCategoria.filter(e => e.estado === 'critico').length },
+    { name: 'Alerta',  value: equiposCategoria.filter(e => e.estado === 'alerta').length },
+    { name: 'Normal',  value: equiposCategoria.filter(e => e.estado === 'normal').length },
+    { name: 'Óptimo',  value: equiposCategoria.filter(e => e.estado === 'optimo').length },
+  ].filter(d => d.value > 0), [equiposCategoria]);
 
-  // Por tipo (bar)
   const porTipo = useMemo(() => {
     const map = {};
-    equipos.forEach(e => {
+    equiposCategoria.forEach(e => {
       const k = e.tipo_equipo;
       if (!map[k]) map[k] = { tipo: TIPO_LABELS[k] || k, total: 0, funciona: 0, no_funciona: 0 };
       map[k].total += e.cantidad_total || 0;
@@ -113,12 +171,11 @@ export default function Calefaccion() {
       map[k].no_funciona += e.cantidad_no_funciona || 0;
     });
     return Object.values(map).sort((a, b) => b.total - a.total);
-  }, [equipos]);
+  }, [equiposCategoria]);
 
-  // Por comuna (bar)
   const porComuna = useMemo(() => {
     const map = {};
-    equipos.forEach(e => {
+    equiposCategoria.forEach(e => {
       const k = e.comuna || 'N/A';
       if (!map[k]) map[k] = { comuna: k, total: 0, funciona: 0, no_funciona: 0, criticos: 0 };
       map[k].total += e.cantidad_total || 0;
@@ -127,17 +184,16 @@ export default function Calefaccion() {
       if (e.estado === 'critico') map[k].criticos++;
     });
     return Object.values(map);
-  }, [equipos]);
+  }, [equiposCategoria]);
 
-  // Escuelas críticas
   const escuelasCriticas = useMemo(() => {
     const map = {};
-    equipos.filter(e => e.estado === 'critico' || e.estado === 'alerta').forEach(e => {
+    equiposCategoria.filter(e => e.estado === 'critico' || e.estado === 'alerta').forEach(e => {
       if (!map[e.escuela]) map[e.escuela] = { escuela: e.escuela, jefe: e.jefe_sitio, comuna: e.comuna, problemas: [] };
-      map[e.escuela].problemas.push({ tipo: TIPO_LABELS[e.tipo_equipo], no_funciona: e.cantidad_no_funciona, estado: e.estado });
+      map[e.escuela].problemas.push({ tipo: TIPO_LABELS[e.tipo_equipo] || e.tipo_equipo, no_funciona: e.cantidad_no_funciona, estado: e.estado });
     });
     return Object.values(map).sort((a, b) => b.problemas.length - a.problemas.length);
-  }, [equipos]);
+  }, [equiposCategoria]);
 
   const handleExportCSV = () => {
     const headers = ['Escuela', 'Jefe Sitio', 'Comuna', 'Tipo Equipo', 'Total', 'Funciona', 'No Funciona', '% Operativo', 'Estado'];
@@ -150,7 +206,7 @@ export default function Calefaccion() {
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'calefaccion.csv'; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = `infraestructura-${categoriaId}.csv`; a.click();
   };
 
   const TABS = [
@@ -159,21 +215,23 @@ export default function Calefaccion() {
     { id: 'tabla', label: 'Detalle' },
   ];
 
+  const isEmpty = equiposCategoria.length === 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 md:p-6 space-y-5">
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
-            <Flame className="h-6 w-6 text-white" />
+          <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${categoria.iconBg} flex items-center justify-center shadow-lg ${categoria.iconShadow}`}>
+            <CatIcon className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">Plan de Calefacción</h1>
-            <p className="text-xs text-slate-400">{kpis.escuelas} establecimientos · {equipos.length} registros</p>
+            <h1 className="text-xl font-bold text-white">Plan de Infraestructura</h1>
+            <p className="text-xs text-slate-400">{kpis.escuelas} establecimientos · {equiposCategoria.length} registros</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5 border-slate-700 text-slate-300">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
@@ -184,6 +242,28 @@ export default function Calefaccion() {
             <Upload className="h-3.5 w-3.5" /> Importar Excel
           </Button>
         </div>
+      </div>
+
+      {/* Selector de categorías */}
+      <div className="flex gap-2 flex-wrap">
+        {CATEGORIAS.map(cat => {
+          const Icon = cat.icon;
+          const active = cat.id === categoriaId;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => { setCategoriaId(cat.id); setActiveTab('dashboard'); setFiltroComuna('todas'); setFiltroEstado('todos'); setFiltroTipo('todos'); setBusqueda(''); }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium border transition-all ${
+                active
+                  ? `bg-gradient-to-r ${cat.iconBg} text-white border-transparent shadow-lg`
+                  : 'bg-slate-800/50 text-slate-400 border-slate-700/50 hover:border-slate-600 hover:text-white'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {cat.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Tabs */}
@@ -205,34 +285,34 @@ export default function Calefaccion() {
         <div className="flex items-center justify-center py-20 text-slate-400 gap-2">
           <RefreshCw className="h-5 w-5 animate-spin" /> Cargando datos...
         </div>
-      ) : equipos.length === 0 ? (
+      ) : isEmpty ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
           <div className="h-16 w-16 rounded-2xl bg-slate-800 flex items-center justify-center">
-            <Flame className="h-8 w-8 text-slate-600" />
+            <CatIcon className="h-8 w-8 text-slate-600" />
           </div>
           <div>
-            <p className="text-lg font-semibold text-white">Sin datos de calefacción</p>
-            <p className="text-sm text-slate-400 mt-1">Importá el Excel de relevamiento para comenzar</p>
+            <p className="text-lg font-semibold text-white">Sin datos de {categoria.label.toLowerCase()}</p>
+            <p className="text-sm text-slate-400 mt-1">{categoria.emptyLabel || 'Importá el Excel de relevamiento para comenzar'}</p>
           </div>
-          <Button onClick={() => setShowImport(true)} className="gap-2 bg-orange-600 hover:bg-orange-700 mt-2">
-            <Upload className="h-4 w-4" /> Importar Excel
-          </Button>
+          {(categoria.id === 'calefaccion' || categoria.id === 'todos') && (
+            <Button onClick={() => setShowImport(true)} className="gap-2 bg-orange-600 hover:bg-orange-700 mt-2">
+              <Upload className="h-4 w-4" /> Importar Excel
+            </Button>
+          )}
         </div>
       ) : (
         <>
           {/* DASHBOARD TAB */}
           {activeTab === 'dashboard' && (
             <div className="space-y-5">
-              {/* KPIs */}
               <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <KpiCard label="Total Equipos" value={kpis.total.toLocaleString()} sub={`${kpis.escuelas} establecimientos`} icon={Building2} colorClass="text-blue-400" bgClass="bg-blue-500/10 border-blue-500/30" />
                 <KpiCard label="Operativos" value={`${kpis.pct}%`} sub={`${kpis.funciona.toLocaleString()} unidades`} icon={CheckCircle2} colorClass="text-emerald-400" bgClass="bg-emerald-500/10 border-emerald-500/30" />
-                <KpiCard label="Críticos" value={kpis.criticos} sub="equipos < 50% operativo" icon={XCircle} colorClass="text-red-400" bgClass="bg-red-500/10 border-red-500/30" />
-                <KpiCard label="En Alerta" value={kpis.alertas} sub="equipos 50-75% operativo" icon={AlertTriangle} colorClass="text-orange-400" bgClass="bg-orange-500/10 border-orange-500/30" />
+                <KpiCard label="Críticos" value={kpis.criticos} sub="registros < 50% operativo" icon={XCircle} colorClass="text-red-400" bgClass="bg-red-500/10 border-red-500/30" />
+                <KpiCard label="En Alerta" value={kpis.alertas} sub="registros 50-75% operativo" icon={AlertTriangle} colorClass="text-orange-400" bgClass="bg-orange-500/10 border-orange-500/30" />
               </motion.div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                {/* Por tipo */}
                 <Card className="lg:col-span-2 border-0 bg-slate-800/40 backdrop-blur">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm text-white flex items-center gap-2"><BarChart3 className="h-4 w-4 text-orange-400" /> Equipos por Tipo</CardTitle>
@@ -252,7 +332,6 @@ export default function Calefaccion() {
                   </CardContent>
                 </Card>
 
-                {/* Por estado (pie) */}
                 <Card className="border-0 bg-slate-800/40 backdrop-blur">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm text-white">Estado General</CardTitle>
@@ -261,8 +340,7 @@ export default function Calefaccion() {
                     <ResponsiveContainer width="100%" height={200}>
                       <PieChart>
                         <Pie data={porEstado} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
-                          label={({ name, percent }) => `${(percent*100).toFixed(0)}%`}
-                          labelLine={false}>
+                          label={({ percent }) => `${(percent*100).toFixed(0)}%`} labelLine={false}>
                           {porEstado.map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
                         </Pie>
                         <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} />
@@ -272,7 +350,6 @@ export default function Calefaccion() {
                   </CardContent>
                 </Card>
 
-                {/* Por comuna */}
                 <Card className="lg:col-span-3 border-0 bg-slate-800/40 backdrop-blur">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm text-white">Operatividad por Comuna</CardTitle>
@@ -298,7 +375,7 @@ export default function Calefaccion() {
                             </div>
                             {c.criticos > 0 && (
                               <div className="flex items-center gap-1.5 text-xs text-red-300 bg-red-500/10 rounded-lg px-2 py-1.5">
-                                <AlertTriangle className="h-3 w-3" /> {c.criticos} tipo(s) de equipo en estado crítico
+                                <AlertTriangle className="h-3 w-3" /> {c.criticos} tipo(s) en estado crítico
                               </div>
                             )}
                           </div>
@@ -319,7 +396,7 @@ export default function Calefaccion() {
                 <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
                   <CheckCircle2 className="h-12 w-12 text-emerald-500" />
                   <p className="text-lg font-semibold text-white">Sin alertas activas</p>
-                  <p className="text-sm text-slate-400">Todos los equipos están operando normalmente</p>
+                  <p className="text-sm text-slate-400">Todos los equipos de {categoria.label.toLowerCase()} están operando normalmente</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -358,7 +435,6 @@ export default function Calefaccion() {
           {/* TABLA TAB */}
           {activeTab === 'tabla' && (
             <div className="space-y-4">
-              {/* Filtros */}
               <div className="flex flex-wrap gap-3">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />

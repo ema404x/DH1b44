@@ -29,7 +29,7 @@ const navGroups = [
       { label: 'Órdenes de Trabajo', icon: ClipboardList, path: '/ordenes' },
       { label: 'Pendientes', icon: ClipboardCheck, path: '/activos' },
       { label: 'Informes', icon: ClipboardCheck, path: '/informes' },
-      { label: 'Plan de Calefacción', icon: Flame, path: '/calefaccion' },
+      { label: 'Plan de Infraestructura', icon: Wrench, path: '/calefaccion' },
       { label: 'Inspección de Colegios', icon: ClipboardCheck, path: '/inspeccion-colegio' },
       { label: 'Reportes & KPIs', icon: BarChart2, path: '/reportes' },
       { label: 'Automatizaciones', icon: Zap, path: '/automatizaciones' },
