@@ -16,11 +16,20 @@ import { es } from 'date-fns/locale';
 
 // Convertir número serial de Excel a Date
 const excelSerialToDate = (serial) => {
-  if (!serial || typeof serial !== 'number') return null;
-  // Excel serial date starts from Jan 1, 1900
-  const excelEpoch = new Date(1900, 0, 1);
-  const date = new Date(excelEpoch.getTime() + (serial - 1) * 86400000);
-  return date;
+  if (!serial) return null;
+  const parsed = parseInt(serial);
+  if (isNaN(parsed) || parsed <= 0) return null;
+  try {
+    const excelEpoch = new Date(1900, 0, 1);
+    const date = new Date(excelEpoch.getTime() + (parsed - 1) * 86400000);
+    return isValid(date) ? date : null;
+  } catch {
+    return null;
+  }
+};
+
+const isValid = (date) => {
+  return date instanceof Date && !isNaN(date.getTime());
 };
 
 export default function InformePlaneacion() {
@@ -219,10 +228,10 @@ export default function InformePlaneacion() {
                       <div>
                         <p className="text-xs font-semibold text-slate-400 uppercase mb-1">Fecha Envío</p>
                         <p className="text-xs text-slate-300">
-                          {inf.fecha_envio_contratar ? 
-                            format(excelSerialToDate(parseInt(inf.fecha_envio_contratar)), 'dd/MM/yyyy', { locale: es })
-                            : '—'
-                          }
+                          {(() => {
+                            const fecha = excelSerialToDate(inf.fecha_envio_contratar);
+                            return fecha ? format(fecha, 'dd/MM/yyyy', { locale: es }) : '—';
+                          })()}
                         </p>
                       </div>
 
