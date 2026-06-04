@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Lock, HardDrive, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Shield, Lock, HardDrive, AlertTriangle, CheckCircle2, Activity, History } from 'lucide-react';
 import TwoFactorSetup from '@/components/security/TwoFactorSetup';
 import BackupManager from '@/components/security/BackupManager';
+import SessionAudit from '@/components/security/SessionAudit';
+import SensitiveChangesLog from '@/components/security/SensitiveChangesLog';
+import SuspiciousActivityAlerts from '@/components/security/SuspiciousActivityAlerts';
 
 export default function Seguridad() {
   return (
@@ -50,18 +53,30 @@ export default function Seguridad() {
       </div>
 
       <Tabs defaultValue="2fa" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="2fa" className="gap-2">
             <Lock className="h-4 w-4" />
-            2FA
+            <span className="hidden sm:inline">2FA</span>
           </TabsTrigger>
           <TabsTrigger value="backup" className="gap-2">
             <HardDrive className="h-4 w-4" />
-            Backups
+            <span className="hidden sm:inline">Backups</span>
           </TabsTrigger>
           <TabsTrigger value="encriptacion" className="gap-2">
             <Shield className="h-4 w-4" />
-            Encriptación
+            <span className="hidden sm:inline">Encriptación</span>
+          </TabsTrigger>
+          <TabsTrigger value="sesiones" className="gap-2">
+            <Activity className="h-4 w-4" />
+            <span className="hidden sm:inline">Sesiones</span>
+          </TabsTrigger>
+          <TabsTrigger value="cambios" className="gap-2">
+            <History className="h-4 w-4" />
+            <span className="hidden sm:inline">Cambios</span>
+          </TabsTrigger>
+          <TabsTrigger value="alertas" className="gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            <span className="hidden sm:inline">Alertas</span>
           </TabsTrigger>
         </TabsList>
 
@@ -112,6 +127,30 @@ export default function Seguridad() {
               <strong>Nota:</strong> Para máxima seguridad, tu aplicación debería estar detrás de un WAF (Web Application Firewall) y ejecutarse en una Red Privada Virtual (VPN).
             </p>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="sesiones" className="space-y-4">
+          <Card className="p-6 bg-blue-50 border-blue-200">
+            <h3 className="font-bold text-blue-900 mb-2">Auditoría de Sesiones Activas</h3>
+            <p className="text-sm text-blue-800">Visualiza todos los accesos registrados a tu cuenta, incluyendo direcciones IP y dispositivos. Detecta actividad no autorizada.</p>
+          </Card>
+          <SessionAudit />
+        </TabsContent>
+
+        <TabsContent value="cambios" className="space-y-4">
+          <Card className="p-6 bg-blue-50 border-blue-200">
+            <h3 className="font-bold text-blue-900 mb-2">Historial de Cambios Sensibles</h3>
+            <p className="text-sm text-blue-800">Registro completo de modificaciones en datos críticos (certificados, facturas, empleados, permisos). Quién, qué y cuándo.</p>
+          </Card>
+          <SensitiveChangesLog />
+        </TabsContent>
+
+        <TabsContent value="alertas" className="space-y-4">
+          <Card className="p-6 bg-blue-50 border-blue-200">
+            <h3 className="font-bold text-blue-900 mb-2">Alertas de Actividad Sospechosa</h3>
+            <p className="text-sm text-blue-800">Detección automática de patrones anormales: accesos desde múltiples ubicaciones, actividad inusualmente alta, y más.</p>
+          </Card>
+          <SuspiciousActivityAlerts />
         </TabsContent>
       </Tabs>
 
