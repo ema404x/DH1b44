@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Receipt, Pencil, Trash2, DollarSign } from 'lucide-react';
+import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
+import { Search, Receipt, Pencil, Trash2, DollarSign, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -14,6 +15,7 @@ import EmptyState from '@/components/shared/EmptyState';
 import StatsCard from '@/components/shared/StatsCard';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import CertificacionesVinculadas from '@/components/finanzas/CertificacionesVinculadas';
+import ReporteMensualComparativo from '@/components/reportes/ReporteMensualComparativo';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const invoiceFields = [
@@ -39,6 +41,7 @@ export default function Invoices() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [activeTab, setActiveTab] = useState('facturas');
   const queryClient = useQueryClient();
 
   const { data: invoices = [], isLoading } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list('-created_date') });
@@ -67,6 +70,19 @@ export default function Invoices() {
     <div className="space-y-6">
       <PageHeader title="Facturación" subtitle="Control de facturas y pagos" actionLabel="Nueva Factura" onAction={() => { setEditing(null); setDialogOpen(true); }} />
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3">
+          <TabsTrigger value="facturas" className="gap-2">
+            <Receipt className="h-4 w-4" />
+            Facturas
+          </TabsTrigger>
+          <TabsTrigger value="reportes" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Reportes
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="facturas" className="space-y-6 mt-6">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatsCard title="Pendiente de Cobro" value={`$${totalPending.toLocaleString()}`} icon={DollarSign} color="amber" />
         <StatsCard title="Cobrado" value={`$${totalPaid.toLocaleString()}`} icon={DollarSign} color="green" />
@@ -148,6 +164,12 @@ export default function Invoices() {
         )}
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="reportes" className="mt-6">
+          <ReporteMensualComparativo />
+        </TabsContent>
+      </Tabs>
 
       <EntityFormDialog
         open={dialogOpen}
