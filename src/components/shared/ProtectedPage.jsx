@@ -6,11 +6,28 @@ import { ShieldOff } from 'lucide-react';
  * Envuelve una página protegiendo su acceso según permisos de rol.
  * Si el usuario no tiene permiso 'read' en el módulo, muestra pantalla de acceso denegado.
  *
- * @param {string} moduleKey - Clave del módulo en RolePermission
+ * @param {string} moduleKey - Clave del módulo en RolePermission (requerido)
  * @param {React.ReactNode} children - Contenido de la página
  */
 export default function ProtectedPage({ moduleKey, children }) {
   const { allowed, loading } = usePermission(moduleKey, 'read');
+
+  // Validar que moduleKey sea proporcionado
+  if (!moduleKey) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-6">
+        <div className="h-16 w-16 rounded-2xl bg-destructive/10 flex items-center justify-center">
+          <ShieldOff className="h-8 w-8 text-destructive" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold">Configuración incorrecta</h2>
+          <p className="text-muted-foreground mt-1 text-sm max-w-sm">
+            Esta página no está configurada correctamente. Contactá a un administrador.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

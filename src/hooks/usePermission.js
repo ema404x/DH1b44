@@ -22,7 +22,9 @@ export function usePermission(moduleKey, action = 'read') {
   if (userPermissions === null) return { allowed: false, loading: false };
 
   // Sin permisos configurados para este usuario → denegar
-  if (!moduleKey) return { allowed: true, loading: false };
+  if (!moduleKey) {
+    return { allowed: false, loading: false };
+  }
 
   const allowed = userPermissions?.[moduleKey]?.[action] === true;
   return { allowed, loading: false };

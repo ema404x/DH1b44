@@ -7,6 +7,7 @@ import BackupManager from '@/components/security/BackupManager';
 import SessionAudit from '@/components/security/SessionAudit';
 import SensitiveChangesLog from '@/components/security/SensitiveChangesLog';
 import SuspiciousActivityAlerts from '@/components/security/SuspiciousActivityAlerts';
+import AuditSystemCheck from '@/components/audit/AuditSystemCheck';
 
 export default function Seguridad() {
   return (
@@ -53,7 +54,7 @@ export default function Seguridad() {
       </div>
 
       <Tabs defaultValue="2fa" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="2fa" className="gap-2">
             <Lock className="h-4 w-4" />
             <span className="hidden sm:inline">2FA</span>
@@ -77,6 +78,10 @@ export default function Seguridad() {
           <TabsTrigger value="alertas" className="gap-2">
             <AlertTriangle className="h-4 w-4" />
             <span className="hidden sm:inline">Alertas</span>
+          </TabsTrigger>
+          <TabsTrigger value="auditoria" className="gap-2">
+            <Shield className="h-4 w-4" />
+            <span className="hidden sm:inline">Auditoría</span>
           </TabsTrigger>
         </TabsList>
 
@@ -151,6 +156,14 @@ export default function Seguridad() {
             <p className="text-sm text-blue-800">Detección automática de patrones anormales: accesos desde múltiples ubicaciones, actividad inusualmente alta, y más.</p>
           </Card>
           <SuspiciousActivityAlerts />
+        </TabsContent>
+
+        <TabsContent value="auditoria" className="space-y-4">
+          <Card className="p-6 bg-blue-50 border-blue-200">
+            <h3 className="font-bold text-blue-900 mb-2">Auditoría del Sistema</h3>
+            <p className="text-sm text-blue-800">Escanea el sistema en busca de inconsistencias, duplicados de email, configuraciones incompletas, y otras anomalías.</p>
+          </Card>
+          <AuditSystemCheck />
         </TabsContent>
       </Tabs>
 
