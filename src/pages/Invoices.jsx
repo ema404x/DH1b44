@@ -18,6 +18,7 @@ import CertificacionesVinculadas from '@/components/finanzas/CertificacionesVinc
 import ReporteMensualComparativo from '@/components/reportes/ReporteMensualComparativo';
 import DashboardFinanciero from '@/components/finanzas/DashboardFinanciero';
 import GastoMensualAbonosMensuales from '@/components/reportes/GastoMensualAbonosMensuales';
+import FiltrosAvanzadosFacturas from '@/components/invoices/FiltrosAvanzadosFacturas';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const invoiceFields = [
@@ -38,12 +39,11 @@ const invoiceFields = [
 ];
 
 export default function Invoices() {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [filtered, setFiltered] = useState([]);
   const queryClient = useQueryClient();
 
   const { data: invoices = [], isLoading } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list('-created_date') });
@@ -58,11 +58,10 @@ export default function Invoices() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices'] })
   });
 
-  const filtered = invoices.filter(i => {
-    const matchSearch = !search || i.client_name?.toLowerCase().includes(search.toLowerCase()) || i.code?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || i.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  // Inicializar filtered con todas las facturas
+  React.useEffect(() => {
+    setFiltered(invoices);
+  }, [invoices]);
 
   const totalPending = invoices.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0);
   const totalPaid = invoices.filter(i => i.status === 'pagada').reduce((s, i) => s + (i.total || 0), 0);
@@ -99,22 +98,7 @@ export default function Invoices() {
         <StatsCard title="Vencido" value={`$${totalOverdue.toLocaleString()}`} icon={DollarSign} color="red" />
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar facturas..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            <SelectItem value="pendiente">Pendiente</SelectItem>
-            <SelectItem value="pagada">Pagada</SelectItem>
-            <SelectItem value="vencida">Vencida</SelectItem>
-            <SelectItem value="cancelada">Cancelada</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <FiltrosAvanzadosFacturas invoices={invoices} onFilter={setFiltered} />
 
       {filtered.length === 0 && !isLoading ? (
         <EmptyState icon={Receipt} title="No hay facturas" description="Creá tu primera factura" actionLabel="Nueva Factura" onAction={() => { setEditing(null); setDialogOpen(true); }} />
