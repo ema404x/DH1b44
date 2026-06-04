@@ -30,6 +30,7 @@ const MODULES = [
   { key: 'MapaJefes', label: 'Mapa de Jefes', group: 'Operaciones' },
   { key: 'InspeccionColegio', label: 'Inspección de Colegios', group: 'Operaciones' },
   { key: 'InformePlaneacion', label: 'Informe de Planeación', group: 'Operaciones' },
+  { key: 'Calefaccion', label: 'Plan de Infraestructura', group: 'Operaciones' },
   { key: 'Informes', label: 'Informes', group: 'Reportes' },
   { key: 'Reportes', label: 'Reportes & KPIs', group: 'Reportes' },
   { key: 'ControlRiesgo', label: 'Control de Riesgos', group: 'Reportes' },
