@@ -2,12 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, AlertTriangle, Calendar } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import InformesStats from '@/components/informes/InformesStats';
 import InformesAlertas from '@/components/informes/InformesAlertas';
 import InformesTabla from '@/components/informes/InformesTabla';
 import InformeFormDialog from '@/components/informes/InformeFormDialog';
+import PlanificacionTab from '@/components/informes/PlanificacionTab';
 
 export default function Informes() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -73,6 +74,9 @@ export default function Informes() {
           <TabsTrigger value="vencidos" className="flex items-center gap-2 text-red-600">
             <AlertTriangle className="h-3.5 w-3.5" /> Vencidos ({vencidos.length})
           </TabsTrigger>
+          <TabsTrigger value="planificacion" className="flex items-center gap-2">
+            <Calendar className="h-3.5 w-3.5" /> Planificación
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="todos" className="mt-4">
@@ -86,6 +90,9 @@ export default function Informes() {
         </TabsContent>
         <TabsContent value="vencidos" className="mt-4">
           <InformesTabla informes={vencidos} onEdit={handleEdit} onDelete={(id) => deleteMutation.mutate(id)} isLoading={isLoading} highlight="vencido" />
+        </TabsContent>
+        <TabsContent value="planificacion" className="mt-4">
+          <PlanificacionTab />
         </TabsContent>
       </Tabs>
 
