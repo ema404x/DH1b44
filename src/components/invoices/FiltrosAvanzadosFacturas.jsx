@@ -73,10 +73,10 @@ export default function FiltrosAvanzadosFacturas({ invoices = [], onFilter, clie
       <div className="relative flex-1 group">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
         <Input 
-          placeholder="Buscar por cliente, nº factura o proyecto..." 
+          placeholder="Buscar factura, cliente o proyecto..." 
           value={search} 
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 border-border/50 focus:border-primary/30 transition-colors" 
+          className="pl-9 border-border/50 bg-muted/20 focus:bg-background focus:border-primary/40 transition-all h-9" 
         />
       </div>
 
@@ -100,13 +100,13 @@ export default function FiltrosAvanzadosFacturas({ invoices = [], onFilter, clie
 
       {/* Panel de filtros avanzados */}
       {expanded && (
-        <Card className="p-4 space-y-4 border-border/50 animate-in fade-in-50 duration-200 shadow-sm bg-card/50 backdrop-blur-sm">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <Card className="p-5 space-y-5 border-border/50 animate-in fade-in-50 duration-200 shadow-sm bg-muted/20 backdrop-blur-xs rounded-xl">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Estado */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-foreground">Estado</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground/80">Estado</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-8 text-sm border-border/50 hover:border-primary/30 transition-colors">
+                <SelectTrigger className="h-8 text-xs border-border/50 bg-background hover:border-primary/40 transition-all rounded-lg">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -120,10 +120,10 @@ export default function FiltrosAvanzadosFacturas({ invoices = [], onFilter, clie
             </div>
 
             {/* Cliente */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-foreground">Cliente</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground/80">Cliente</label>
               <Select value={clientFilter} onValueChange={setClientFilter}>
-                <SelectTrigger className="h-8 text-sm border-border/50 hover:border-primary/30 transition-colors">
+                <SelectTrigger className="h-8 text-xs border-border/50 bg-background hover:border-primary/40 transition-all rounded-lg">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -136,10 +136,10 @@ export default function FiltrosAvanzadosFacturas({ invoices = [], onFilter, clie
             </div>
 
             {/* Proyecto */}
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-foreground">Proyecto</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground/80">Proyecto</label>
               <Select value={projectFilter} onValueChange={setProjectFilter}>
-                <SelectTrigger className="h-8 text-sm border-border/50 hover:border-primary/30 transition-colors">
+                <SelectTrigger className="h-8 text-xs border-border/50 bg-background hover:border-primary/40 transition-all rounded-lg">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -153,66 +153,60 @@ export default function FiltrosAvanzadosFacturas({ invoices = [], onFilter, clie
           </div>
 
           {/* Rango de fechas */}
-          <div className="border-t border-border/50 pt-3">
-            <label className="text-xs font-semibold text-foreground block mb-2">Rango de fechas</label>
-            <div className="flex gap-2">
-              <div className="flex-1 space-y-1">
-                <Input 
-                  type="date" 
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="h-8 text-sm border-border/50 hover:border-primary/30 transition-colors"
-                  placeholder="Desde"
-                />
-              </div>
-              <div className="flex-1 space-y-1">
-                <Input 
-                  type="date" 
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="h-8 text-sm border-border/50 hover:border-primary/30 transition-colors"
-                  placeholder="Hasta"
-                />
-              </div>
+          <div className="border-t border-border/50 pt-4">
+            <label className="text-xs font-semibold text-foreground/80 block mb-2.5">Rango de fechas</label>
+            <div className="grid grid-cols-2 gap-2">
+              <Input 
+                type="date" 
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-8 text-xs border-border/50 bg-background hover:border-primary/40 transition-all rounded-lg"
+                placeholder="Desde"
+              />
+              <Input 
+                type="date" 
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-8 text-xs border-border/50 bg-background hover:border-primary/40 transition-all rounded-lg"
+                placeholder="Hasta"
+              />
             </div>
           </div>
 
           {/* Rango de montos */}
-          <div className="border-t border-border/50 pt-3">
-            <label className="text-xs font-semibold text-foreground block mb-2">Rango de monto ($)</label>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Input 
-                  type="number" 
-                  value={amountFrom}
-                  onChange={(e) => setAmountFrom(e.target.value)}
-                  className="h-8 text-sm border-border/50 hover:border-primary/30 transition-colors"
-                  placeholder="Desde"
-                />
-              </div>
-              <div className="flex-1">
-                <Input 
-                  type="number" 
-                  value={amountTo}
-                  onChange={(e) => setAmountTo(e.target.value)}
-                  className="h-8 text-sm border-border/50 hover:border-primary/30 transition-colors"
-                  placeholder="Hasta"
-                />
-              </div>
+          <div className="border-t border-border/50 pt-4">
+            <label className="text-xs font-semibold text-foreground/80 block mb-2.5">Rango de monto ($)</label>
+            <div className="grid grid-cols-2 gap-2">
+              <Input 
+                type="number" 
+                value={amountFrom}
+                onChange={(e) => setAmountFrom(e.target.value)}
+                className="h-8 text-xs border-border/50 bg-background hover:border-primary/40 transition-all rounded-lg"
+                placeholder="Desde"
+              />
+              <Input 
+                type="number" 
+                value={amountTo}
+                onChange={(e) => setAmountTo(e.target.value)}
+                className="h-8 text-xs border-border/50 bg-background hover:border-primary/40 transition-all rounded-lg"
+                placeholder="Hasta"
+              />
             </div>
           </div>
 
           {/* Botón reset */}
           {activeFilters > 0 && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={resetFilters}
-              className="w-full text-xs border-border/50 hover:bg-muted/40 hover:border-primary/30 transition-all"
-            >
-              <X className="h-3 w-3 mr-1" />
-              Limpiar todos los filtros
-            </Button>
+            <div className="border-t border-border/50 pt-3">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={resetFilters}
+                className="w-full text-xs h-8 border-border/50 bg-background hover:bg-muted/40 hover:border-destructive/30 transition-all text-muted-foreground hover:text-destructive"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Limpiar filtros
+              </Button>
+            </div>
           )}
         </Card>
       )}

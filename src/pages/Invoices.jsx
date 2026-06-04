@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Receipt, Pencil, Trash2, DollarSign, BarChart3 } from 'lucide-react';
+import { Search, Receipt, Pencil, Trash2, DollarSign, BarChart3, TrendingUp, TrendingDown, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -69,7 +69,9 @@ export default function Invoices() {
 
   return (
     <div className="space-y-8 pb-8">
-      <PageHeader title="Facturación" subtitle="Gestión integral de facturas, cobros y reportes financieros" actionLabel="Nueva Factura" onAction={() => { setEditing(null); setDialogOpen(true); }} />
+      <div className="bg-gradient-to-br from-primary/5 via-primary/2.5 to-transparent border border-primary/10 rounded-2xl p-8">
+        <PageHeader title="Facturación" subtitle="Gestión integral de facturas, cobros y reportes financieros" actionLabel="Nueva Factura" onAction={() => { setEditing(null); setDialogOpen(true); }} />
+      </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
          <TabsList className="grid w-full grid-cols-3 bg-muted/40 border border-border rounded-lg p-1">
@@ -94,27 +96,62 @@ export default function Invoices() {
          <TabsContent value="facturas" className="space-y-6 mt-8 animate-in fade-in-50 duration-300">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="animate-in fade-in-50 duration-300" style={{animationDelay: '50ms'}}>
-          <StatsCard title="Pendiente de Cobro" value={`$${totalPending.toLocaleString()}`} icon={DollarSign} color="amber" />
+          <Card className="border-border/50 bg-gradient-to-br from-amber/5 to-transparent p-5 hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Pendiente de Cobro</p>
+                <p className="text-2xl font-bold text-foreground mt-2">${totalPending.toLocaleString()}</p>
+              </div>
+              <Clock className="h-5 w-5 text-amber-500/60" />
+            </div>
+          </Card>
         </div>
         <div className="animate-in fade-in-50 duration-300" style={{animationDelay: '100ms'}}>
-          <StatsCard title="Cobrado" value={`$${totalPaid.toLocaleString()}`} icon={DollarSign} color="green" />
+          <Card className="border-border/50 bg-gradient-to-br from-green-500/5 to-transparent p-5 hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Cobrado</p>
+                <p className="text-2xl font-bold text-foreground mt-2">${totalPaid.toLocaleString()}</p>
+              </div>
+              <TrendingUp className="h-5 w-5 text-green-500/60" />
+            </div>
+          </Card>
         </div>
         <div className="animate-in fade-in-50 duration-300" style={{animationDelay: '150ms'}}>
-          <StatsCard title="Vencido" value={`$${totalOverdue.toLocaleString()}`} icon={DollarSign} color="red" />
+          <Card className="border-border/50 bg-gradient-to-br from-red-500/5 to-transparent p-5 hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Vencido</p>
+                <p className="text-2xl font-bold text-foreground mt-2">${totalOverdue.toLocaleString()}</p>
+              </div>
+              <TrendingDown className="h-5 w-5 text-red-500/60" />
+            </div>
+          </Card>
         </div>
       </div>
 
-      <FiltrosAvanzadosFacturas invoices={invoices} onFilter={setFiltered} />
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground mb-3">Búsqueda y Filtros</h3>
+        </div>
+        <FiltrosAvanzadosFacturas invoices={invoices} onFilter={setFiltered} />
+      </div>
 
       {isLoading ? (
-        <Card className="p-8 flex justify-center items-center">
-          <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
+        <Card className="p-12 flex justify-center items-center border-border/50">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
+            <p className="text-sm text-muted-foreground">Cargando facturas...</p>
+          </div>
         </Card>
       ) : filtered.length === 0 ? (
         <EmptyState icon={Receipt} title="No hay facturas" description="Creá tu primera factura" actionLabel="Nueva Factura" onAction={() => { setEditing(null); setDialogOpen(true); }} />
       ) : (
         <div className="space-y-4 animate-in fade-in-50 duration-300">
-        <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Listado de Facturas ({filtered.length})</h3>
+        </div>
+        <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-muted/30">
@@ -173,33 +210,33 @@ export default function Invoices() {
         </TabsContent>
 
          <TabsContent value="reportes" className="mt-8 space-y-8 animate-in fade-in-50 duration-300">
-           <div className="space-y-4 animate-in fade-in-50 duration-300" style={{animationDelay: '50ms'}}>
-             <div className="flex items-start justify-between">
+           <div className="space-y-5 animate-in fade-in-50 duration-300" style={{animationDelay: '50ms'}}>
+             <Card className="border-border/30 bg-gradient-to-r from-blue-500/5 to-transparent p-4">
                <div>
-                 <h3 className="text-lg font-semibold">Gasto Mensual - Abonos Mensuales</h3>
-                 <p className="text-sm text-muted-foreground mt-1">Análisis de gastos en certificados de abonos mensuales</p>
+                 <h3 className="text-sm font-semibold text-foreground">Gasto Mensual - Abonos Mensuales</h3>
+                 <p className="text-xs text-muted-foreground mt-1">Análisis de gastos en certificados de abonos mensuales</p>
                </div>
-             </div>
+             </Card>
              <GastoMensualAbonosMensuales />
            </div>
 
-           <div className="space-y-4 border-t border-border/50 pt-8 animate-in fade-in-50 duration-300" style={{animationDelay: '100ms'}}>
-             <div className="flex items-start justify-between">
+           <div className="space-y-5 border-t border-border/30 pt-8 animate-in fade-in-50 duration-300" style={{animationDelay: '100ms'}}>
+             <Card className="border-border/30 bg-gradient-to-r from-purple-500/5 to-transparent p-4">
                <div>
-                 <h3 className="text-lg font-semibold">Certificación por Mantenimiento</h3>
-                 <p className="text-sm text-muted-foreground mt-1">Dinero que sale de la empresa - Pagos a proveedores</p>
+                 <h3 className="text-sm font-semibold text-foreground">Certificación por Mantenimiento</h3>
+                 <p className="text-xs text-muted-foreground mt-1">Dinero que sale de la empresa - Pagos a proveedores</p>
                </div>
-             </div>
+             </Card>
              <ReporteMensualComparativo />
            </div>
 
-           <div className="space-y-4 border-t border-border/50 pt-8 animate-in fade-in-50 duration-300" style={{animationDelay: '150ms'}}>
-             <div className="flex items-start justify-between">
+           <div className="space-y-5 border-t border-border/30 pt-8 animate-in fade-in-50 duration-300" style={{animationDelay: '150ms'}}>
+             <Card className="border-border/30 bg-gradient-to-r from-teal-500/5 to-transparent p-4">
                <div>
-                 <h3 className="text-lg font-semibold">Obra/Proyecto</h3>
-                 <p className="text-sm text-muted-foreground mt-1">Dinero que entra a la empresa - Certificaciones de obras</p>
+                 <h3 className="text-sm font-semibold text-foreground">Obra/Proyecto</h3>
+                 <p className="text-xs text-muted-foreground mt-1">Dinero que entra a la empresa - Certificaciones de obras</p>
                </div>
-             </div>
+             </Card>
              <CertificacionesVinculadas />
            </div>
          </TabsContent>
