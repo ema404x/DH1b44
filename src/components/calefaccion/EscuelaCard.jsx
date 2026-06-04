@@ -1,5 +1,5 @@
-import React from 'react';
-import { MoreHorizontal } from 'lucide-react';
+import { useState } from 'react';
+import { MoreHorizontal, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 import ProgressRing from './ProgressRing';
 import { Badge } from '@/components/ui/badge';
 
@@ -24,6 +24,17 @@ const RING_COLOR = {
 const prioridad = { critico: 0, alerta: 1, normal: 2, optimo: 3 };
 
 export default function EscuelaCard({ escuela, jefe_sitio, comuna, registros, tipoLabels }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied]     = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(escuela);
+    setCopied(true);
+    setMenuOpen(false);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const totalUnids = registros.reduce((s, r) => s + Math.round(r.cantidad_total || 0), 0);
   const totalFunc  = registros.reduce((s, r) => s + Math.round(r.cantidad_funciona || 0), 0);
   const totalFallas = totalUnids - totalFunc;
@@ -45,9 +56,36 @@ export default function EscuelaCard({ escuela, jefe_sitio, comuna, registros, ti
           <h3 className="text-sm font-bold text-white truncate">{escuela}</h3>
           <p className="text-xs text-slate-400 truncate mt-0.5">{jefe_sitio || 'Sin jefe asignado'} · {comuna ? `C. ${comuna}` : ''}</p>
         </div>
-        <button className="text-slate-500 hover:text-slate-300 transition-colors ml-2 shrink-0">
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
+        <div className="relative ml-2 shrink-0">
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            className="text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-md hover:bg-slate-700/60"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+          {menuOpen && (
+            <>
+              {/* overlay para cerrar */}
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-7 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 min-w-[170px]">
+                <button
+                  onClick={() => { setExpanded(e => !e); setMenuOpen(false); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/60 hover:text-white transition-colors"
+                >
+                  {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                  {expanded ? 'Ocultar detalle' : 'Ver detalle completo'}
+                </button>
+                <button
+                  onClick={handleCopy}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/60 hover:text-white transition-colors"
+                >
+                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copied ? '¡Copiado!' : 'Copiar nombre'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Body */}
@@ -82,7 +120,7 @@ export default function EscuelaCard({ escuela, jefe_sitio, comuna, registros, ti
 
           {/* Lista priorizada */}
           <div>
-            <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1 font-semibold">Priorizado de alist</p>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1 font-semibold">Priorizado</p>
             <ul className="space-y-0.5">
               {sortedRegistros.slice(0, 4).map((r, i) => {
                 const func = Math.round(r.cantidad_funciona);
@@ -106,6 +144,48 @@ export default function EscuelaCard({ escuela, jefe_sitio, comuna, registros, ti
           </div>
         </div>
       </div>
+
+      {/* Panel detalle expandido */}
+      {expanded && (
+        <div className="border-t border-slate-700/50 px-4 py-3 bg-slate-900/40">
+          <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-2 font-semibold">Detalle por tipo de equipo</p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-slate-500 text-[10px]">
+                <th className="text-left pb-1.5">Tipo</th>
+                <th className="text-right pb-1.5">Total</th>
+                <th className="text-right pb-1.5">Funciona</th>
+                <th className="text-right pb-1.5">Fallas</th>
+                <th className="text-right pb-1.5">%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRegistros.map((r, i) => {
+                const tot   = Math.round(r.cantidad_total);
+                const func  = Math.round(r.cantidad_funciona);
+                const fallas = tot - func;
+                const pct   = tot > 0 ? Math.round((func / tot) * 100) : 0;
+                const dotColor = r.estado === 'critico' ? 'bg-red-500' : r.estado === 'alerta' ? 'bg-orange-500' : r.estado === 'normal' ? 'bg-blue-500' : 'bg-emerald-500';
+                return (
+                  <tr key={i} className="border-t border-slate-700/30">
+                    <td className="py-1.5 flex items-center gap-1.5">
+                      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotColor}`} />
+                      {tipoLabels[r.tipo_equipo] || r.tipo_equipo}
+                    </td>
+                    <td className="text-right text-slate-400">{tot}</td>
+                    <td className="text-right text-emerald-400 font-medium">{func}</td>
+                    <td className="text-right text-red-400 font-medium">{fallas > 0 ? fallas : '—'}</td>
+                    <td className="text-right font-bold text-white">{pct}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {sortedRegistros[0]?.observaciones && (
+            <p className="mt-2 text-[10px] text-slate-500 italic">{sortedRegistros[0].observaciones}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
