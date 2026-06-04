@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, CheckCircle2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
@@ -15,6 +16,7 @@ export default function SincronizarModulos() {
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
+  const qc = useQueryClient();
 
   const handleSync = async () => {
     setSyncing(true);
@@ -26,6 +28,15 @@ export default function SincronizarModulos() {
       });
       const d = res.data;
       setResult(d);
+      // Invalidar todos los caches relevantes para que los módulos recarguen
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['pendientes'] }),
+        qc.invalidateQueries({ queryKey: ['obras'] }),
+        qc.invalidateQueries({ queryKey: ['calefaccion'] }),
+        qc.invalidateQueries({ queryKey: ['ObraCertificacion'] }),
+        qc.invalidateQueries({ queryKey: ['EquipamientoCalefaccion'] }),
+        qc.invalidateQueries({ queryKey: ['Pendiente'] }),
+      ]);
       if (d.total_actualizados > 0) {
         toast.success(`Sincronización completa: ${d.total_actualizados} registros actualizados en ${Object.keys(d.detalle).length} módulos`);
       } else {
