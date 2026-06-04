@@ -1,5 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { queryClientInstance } from '@/lib/query-client';
+import { saveCacheEntry } from '@/lib/persistCache';
 
 export const AuthContext = createContext();
 
@@ -22,6 +24,25 @@ export const AuthProvider = ({ children }) => {
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
+
+      // Pre-fetch silencioso de entidades críticas para hidratar el cache
+      // Corre en background, no bloquea el login
+      setTimeout(() => {
+        const prefetchEntity = async (key, fetcher) => {
+          try {
+            const existing = queryClientInstance.getQueryData([key]);
+            if (existing) return; // ya está en memoria
+            const data = await fetcher();
+            if (data?.length > 0) {
+              queryClientInstance.setQueryData([key], data);
+              saveCacheEntry(key, data);
+            }
+          } catch (_) { /* silencioso */ }
+        };
+        prefetchEntity('workorders', () => base44.entities.WorkOrder.list('-updated_date', 300));
+        prefetchEntity('employees',  () => base44.entities.Employee.list('-updated_date', 200));
+        prefetchEntity('pendientes', () => base44.entities.Pendiente.list('-updated_date', 300));
+      }, 1500); // esperar 1.5s para no competir con el primer render
 
       // Vincular ficha de empleado y cargar permisos reales según su rol
       // Esto corre en CADA carga (no solo al login) para garantizar permisos actualizados

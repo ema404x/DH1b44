@@ -12,8 +12,12 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useEmergencyNotifications } from '@/hooks/useEmergencyNotifications';
 import EmergencyAlert from '@/components/emergencias/EmergencyAlert';
 import { useState } from 'react';
+import { useSmartCache } from '@/hooks/useSmartCache';
 
 export default function AppLayout() {
+  // Activa el sistema de caché persistente — hydration instantánea + auto-persist
+  useSmartCache();
+
   const { isOnline, pendingCount, isSyncing, syncPending } = useOfflineQueue((count) => {
     toast.success(`${count} orden${count !== 1 ? 'es' : ''} de trabajo sincronizada${count !== 1 ? 's' : ''} correctamente`);
   });

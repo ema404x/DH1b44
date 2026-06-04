@@ -1,5 +1,5 @@
 import React from 'react';
-import { WifiOff, RefreshCw, Download, CloudOff, CheckCircle2, Loader2 } from 'lucide-react';
+import { WifiOff, RefreshCw, Download, CloudOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePWA } from '@/hooks/usePWA';
 
@@ -19,12 +19,12 @@ export function OfflineBar({ isOnline, pendingCount, isSyncing, lastSynced, onSy
     );
   }
 
-  // Barra de sincronización en proceso
+  // Sincronización de OTs pendientes — indicador pequeño no intrusivo (esquina)
   if (isSyncing) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-blue-500 text-white text-xs font-semibold py-2 px-4 shadow-lg">
-        <Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
-        <span>Sincronizando {pendingCount} orden{pendingCount !== 1 ? 'es' : ''} de trabajo...</span>
+      <div className="fixed bottom-4 right-4 z-[100] flex items-center gap-2 bg-slate-800/90 backdrop-blur border border-slate-700 text-white text-xs font-medium py-2 px-3 rounded-lg shadow-xl">
+        <Loader2 className="h-3 w-3 animate-spin text-blue-400 flex-shrink-0" />
+        <span className="text-slate-300">Sincronizando en segundo plano...</span>
       </div>
     );
   }
