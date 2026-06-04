@@ -77,7 +77,11 @@ function parseSheet(wb, sheetName, comunaDefault) {
         cantidad_no_funciona: nofunc,
         porcentaje_operativo: pct,
         estado: calcEstado(pct),
-        periodo: 'Mayo 2026',
+        periodo: periodo || (() => {
+          const d = new Date();
+          return d.toLocaleString('es-AR', { month: 'long', year: 'numeric', timeZone: 'America/Buenos_Aires' })
+            .replace(/^\w/, c => c.toUpperCase());
+        })(),
         alerta_generada: false,
       });
     }

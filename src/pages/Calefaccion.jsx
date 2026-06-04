@@ -146,20 +146,41 @@ export default function Calefaccion() {
 
   // KPIs globales (de la categoría seleccionada)
   const kpis = useMemo(() => {
-    const total = equiposCategoria.reduce((s, e) => s + (e.cantidad_total || 0), 0);
+    const total    = equiposCategoria.reduce((s, e) => s + (e.cantidad_total || 0), 0);
     const funciona = equiposCategoria.reduce((s, e) => s + (e.cantidad_funciona || 0), 0);
-    const criticos = equiposCategoria.filter(e => e.estado === 'critico').length;
-    const alertas = equiposCategoria.filter(e => e.estado === 'alerta').length;
+    const noFunciona = total - funciona;
+    const escuelasSet = new Set(equiposCategoria.map(e => e.escuela));
+    // Escuelas (no registros) con al menos un tipo en estado crítico / alerta
+    const escuelasCritico = new Set(equiposCategoria.filter(e => e.estado === 'critico').map(e => e.escuela));
+    const escuelasAlerta  = new Set(equiposCategoria.filter(e => e.estado === 'alerta').map(e => e.escuela));
     const pct = total > 0 ? Math.round((funciona / total) * 100) : 0;
-    return { total, funciona, criticos, alertas, pct, escuelas: new Set(equiposCategoria.map(e => e.escuela)).size };
+    return {
+      total, funciona, noFunciona,
+      pct,
+      escuelas: escuelasSet.size,
+      criticos: escuelasCritico.size,
+      alertas:  escuelasAlerta.size,
+      // registros para referencia interna
+      registrosCriticos: equiposCategoria.filter(e => e.estado === 'critico').length,
+      registrosAlertas:  equiposCategoria.filter(e => e.estado === 'alerta').length,
+    };
   }, [equiposCategoria]);
 
-  const porEstado = useMemo(() => [
-    { name: 'Crítico', value: equiposCategoria.filter(e => e.estado === 'critico').length },
-    { name: 'Alerta',  value: equiposCategoria.filter(e => e.estado === 'alerta').length },
-    { name: 'Normal',  value: equiposCategoria.filter(e => e.estado === 'normal').length },
-    { name: 'Óptimo',  value: equiposCategoria.filter(e => e.estado === 'optimo').length },
-  ].filter(d => d.value > 0), [equiposCategoria]);
+  // Colores fijos por estado — siempre rojo=crítico, naranja=alerta, azul=normal, verde=óptimo
+  const PIE_ESTADO = [
+    { key: 'critico', name: 'Crítico', color: '#ef4444' },
+    { key: 'alerta',  name: 'Alerta',  color: '#f97316' },
+    { key: 'normal',  name: 'Normal',  color: '#3b82f6' },
+    { key: 'optimo',  name: 'Óptimo',  color: '#10b981' },
+  ];
+
+  const porEstado = useMemo(() => {
+    const counts = {};
+    equiposCategoria.forEach(e => { counts[e.estado] = (counts[e.estado] || 0) + (e.cantidad_total || 0); });
+    return PIE_ESTADO
+      .map(s => ({ ...s, value: counts[s.key] || 0 }))
+      .filter(d => d.value > 0);
+  }, [equiposCategoria]);
 
   const porTipo = useMemo(() => {
     const map = {};
@@ -178,13 +199,21 @@ export default function Calefaccion() {
     const map = {};
     equiposCategoria.forEach(e => {
       const k = COMUNAS_VALIDAS.includes(e.comuna) ? e.comuna : '8A';
-      if (!map[k]) map[k] = { comuna: k, total: 0, funciona: 0, no_funciona: 0, criticos: 0 };
-      map[k].total += e.cantidad_total || 0;
+      if (!map[k]) map[k] = { comuna: k, total: 0, funciona: 0, escuelas: new Set(), escuelasCriticas: new Set() };
+      map[k].total    += e.cantidad_total || 0;
       map[k].funciona += e.cantidad_funciona || 0;
-      map[k].no_funciona += e.cantidad_no_funciona || 0;
-      if (e.estado === 'critico') map[k].criticos++;
+      map[k].escuelas.add(e.escuela);
+      if (e.estado === 'critico') map[k].escuelasCriticas.add(e.escuela);
     });
-    return Object.values(map);
+    // Materializar Sets a números y calcular no_funciona consistentemente
+    return Object.values(map)
+      .map(c => ({
+        ...c,
+        no_funciona:    c.total - c.funciona,
+        escuelas:       c.escuelas.size,
+        criticos:       c.escuelasCriticas.size,
+      }))
+      .sort((a, b) => a.comuna.localeCompare(b.comuna));
   }, [equiposCategoria]);
 
   const escuelasCriticas = useMemo(() => {
@@ -307,16 +336,16 @@ export default function Calefaccion() {
           {activeTab === 'dashboard' && (
             <div className="space-y-5">
               <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <KpiCard label="Total Equipos" value={kpis.total.toLocaleString()} sub={`${kpis.escuelas} establecimientos`} icon={Building2} colorClass="text-blue-400" bgClass="bg-blue-500/10 border-blue-500/30" />
-                <KpiCard label="Operativos" value={`${kpis.pct}%`} sub={`${kpis.funciona.toLocaleString()} unidades`} icon={CheckCircle2} colorClass="text-emerald-400" bgClass="bg-emerald-500/10 border-emerald-500/30" />
-                <KpiCard label="Críticos" value={kpis.criticos} sub="registros < 50% operativo" icon={XCircle} colorClass="text-red-400" bgClass="bg-red-500/10 border-red-500/30" />
-                <KpiCard label="En Alerta" value={kpis.alertas} sub="registros 50-75% operativo" icon={AlertTriangle} colorClass="text-orange-400" bgClass="bg-orange-500/10 border-orange-500/30" />
+                <KpiCard label="Unidades Relevadas"   value={kpis.total.toLocaleString()}    sub={`${kpis.escuelas} establecimientos`}                                    icon={Building2}    colorClass="text-blue-400"    bgClass="bg-blue-500/10 border-blue-500/30" />
+                <KpiCard label="Operatividad Global"  value={`${kpis.pct}%`}                sub={`${kpis.funciona.toLocaleString()} funcionando · ${kpis.noFunciona.toLocaleString()} con fallas`} icon={CheckCircle2}  colorClass="text-emerald-400" bgClass="bg-emerald-500/10 border-emerald-500/30" />
+                <KpiCard label="Establec. Críticos"   value={kpis.criticos}                  sub={`${kpis.registrosCriticos} tipo(s) con <50% operativo`}                   icon={XCircle}      colorClass="text-red-400"     bgClass="bg-red-500/10 border-red-500/30" />
+                <KpiCard label="Establec. en Alerta"  value={kpis.alertas}                   sub={`${kpis.registrosAlertas} tipo(s) con 50–74% operativo`}                  icon={AlertTriangle} colorClass="text-orange-400"  bgClass="bg-orange-500/10 border-orange-500/30" />
               </motion.div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 <Card className="lg:col-span-2 border-0 bg-slate-800/40 backdrop-blur">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-white flex items-center gap-2"><BarChart3 className="h-4 w-4 text-orange-400" /> Equipos por Tipo</CardTitle>
+                    <CardTitle className="text-sm text-white flex items-center gap-2"><BarChart3 className="h-4 w-4 text-orange-400" /> Unidades por Tipo de Equipo</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={260}>
@@ -324,10 +353,12 @@ export default function Calefaccion() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                         <XAxis dataKey="tipo" tick={{ fontSize: 10, fill: '#94a3b8' }} angle={-20} textAnchor="end" height={55} />
                         <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
+                        <Tooltip
+                          formatter={(value, name) => [value.toLocaleString() + ' uds.', name]}
+                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px', fontSize: 12 }} />
                         <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
-                        <Bar dataKey="funciona" name="Funciona" fill="#10b981" radius={[4,4,0,0]} stackId="a" />
-                        <Bar dataKey="no_funciona" name="No Funciona" fill="#ef4444" radius={[4,4,0,0]} stackId="a" />
+                        <Bar dataKey="funciona"    name="Operativas"  fill="#10b981" radius={[4,4,0,0]} stackId="a" />
+                        <Bar dataKey="no_funciona" name="Con fallas"  fill="#ef4444" radius={[4,4,0,0]} stackId="a" />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -335,16 +366,19 @@ export default function Calefaccion() {
 
                 <Card className="border-0 bg-slate-800/40 backdrop-blur">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-white">Estado General</CardTitle>
+                    <CardTitle className="text-sm text-white">Distribución por Estado</CardTitle>
+                    <p className="text-xs text-slate-400 mt-0.5">En unidades de equipo</p>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center">
                     <ResponsiveContainer width="100%" height={200}>
                       <PieChart>
                         <Pie data={porEstado} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
                           label={({ percent }) => `${(percent*100).toFixed(0)}%`} labelLine={false}>
-                          {porEstado.map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
+                          {porEstado.map((entry) => <Cell key={entry.key} fill={entry.color} />)}
                         </Pie>
-                        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} />
+                        <Tooltip
+                          formatter={(value, name) => [value.toLocaleString() + ' uds.', name]}
+                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px', fontSize: 12 }} />
                         <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
                       </PieChart>
                     </ResponsiveContainer>
@@ -354,29 +388,44 @@ export default function Calefaccion() {
                 <Card className="lg:col-span-3 border-0 bg-slate-800/40 backdrop-blur">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm text-white">Operatividad por Comuna</CardTitle>
+                    <p className="text-xs text-slate-400 mt-0.5">Porcentaje calculado sobre unidades relevadas</p>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {porComuna.map(c => {
                         const pct = c.total > 0 ? Math.round((c.funciona / c.total) * 100) : 0;
-                        const color = pct < 50 ? 'bg-red-500' : pct < 75 ? 'bg-orange-500' : pct < 90 ? 'bg-blue-500' : 'bg-emerald-500';
+                        const barColor = pct < 50 ? 'bg-red-500' : pct < 75 ? 'bg-orange-500' : pct < 90 ? 'bg-blue-500' : 'bg-emerald-500';
+                        const pctColor = pct < 50 ? 'text-red-400' : pct < 75 ? 'text-orange-400' : pct < 90 ? 'text-blue-400' : 'text-emerald-400';
                         return (
                           <div key={c.comuna} className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4 space-y-3">
                             <div className="flex items-center justify-between">
-                              <span className="text-lg font-bold text-white">Comuna {c.comuna}</span>
-                              <span className={`text-sm font-bold ${pct < 50 ? 'text-red-400' : pct < 75 ? 'text-orange-400' : 'text-emerald-400'}`}>{pct}%</span>
+                              <div>
+                                <span className="text-lg font-bold text-white">Comuna {c.comuna}</span>
+                                <p className="text-xs text-slate-400 mt-0.5">{c.escuelas} establecimientos</p>
+                              </div>
+                              <span className={`text-xl font-bold ${pctColor}`}>{pct}%</span>
                             </div>
-                            <div className="w-full bg-slate-600/50 rounded-full h-2.5">
-                              <div className={`h-2.5 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+                            <div className="w-full bg-slate-600/50 rounded-full h-2">
+                              <div className={`h-2 rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
                             </div>
                             <div className="grid grid-cols-3 gap-2 text-xs text-center">
-                              <div><p className="text-slate-400">Total</p><p className="font-bold text-white">{c.total}</p></div>
-                              <div><p className="text-slate-400">Funcionan</p><p className="font-bold text-emerald-400">{c.funciona}</p></div>
-                              <div><p className="text-slate-400">Fallas</p><p className="font-bold text-red-400">{c.no_funciona}</p></div>
+                              <div className="bg-slate-700/40 rounded-lg py-2">
+                                <p className="text-slate-400 mb-0.5">Relevadas</p>
+                                <p className="font-bold text-white text-sm">{c.total.toLocaleString()}</p>
+                              </div>
+                              <div className="bg-slate-700/40 rounded-lg py-2">
+                                <p className="text-slate-400 mb-0.5">Operativas</p>
+                                <p className="font-bold text-emerald-400 text-sm">{c.funciona.toLocaleString()}</p>
+                              </div>
+                              <div className="bg-slate-700/40 rounded-lg py-2">
+                                <p className="text-slate-400 mb-0.5">Con fallas</p>
+                                <p className="font-bold text-red-400 text-sm">{c.no_funciona.toLocaleString()}</p>
+                              </div>
                             </div>
                             {c.criticos > 0 && (
-                              <div className="flex items-center gap-1.5 text-xs text-red-300 bg-red-500/10 rounded-lg px-2 py-1.5">
-                                <AlertTriangle className="h-3 w-3" /> {c.criticos} tipo(s) en estado crítico
+                              <div className="flex items-center gap-1.5 text-xs text-red-300 bg-red-500/10 rounded-lg px-2 py-1.5 border border-red-500/20">
+                                <AlertTriangle className="h-3 w-3 shrink-0" />
+                                {c.criticos} establecimiento{c.criticos > 1 ? 's' : ''} en estado crítico
                               </div>
                             )}
                           </div>
@@ -408,7 +457,7 @@ export default function Calefaccion() {
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <p className="text-sm font-semibold text-white leading-tight">{e.escuela}</p>
-                              <p className="text-xs text-slate-400 mt-0.5">{e.jefe} · Comuna {e.comuna}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">{e.jefe || 'Sin jefe asignado'} · {e.comuna ? `Comuna ${e.comuna}` : 'Comuna sin datos'}</p>
                             </div>
                             <Badge className={`shrink-0 text-xs ${e.problemas.some(p => p.estado === 'critico') ? 'bg-red-500/20 text-red-300 border-red-500/40' : 'bg-orange-500/20 text-orange-300 border-orange-500/40'}`}>
                               {e.problemas.some(p => p.estado === 'critico') ? '🔴 Crítico' : '🟠 Alerta'}
