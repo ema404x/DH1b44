@@ -36,11 +36,11 @@ export default function TablaEquipos({ equipos, estadoConfig, tipoLabels }) {
                   <td className="px-4 py-2.5 text-slate-300 text-xs max-w-[140px] truncate">{e.jefe_sitio || '—'}</td>
                   <td className="px-3 py-2.5 text-slate-400 text-xs">{e.comuna}</td>
                   <td className="px-3 py-2.5 text-slate-300 text-xs">{tipoLabels[e.tipo_equipo] || e.tipo_equipo}</td>
-                  <td className="px-3 py-2.5 text-white text-xs text-right font-semibold">{e.cantidad_total}</td>
-                  <td className="px-3 py-2.5 text-emerald-400 text-xs text-right">{e.cantidad_funciona}</td>
-                  <td className="px-3 py-2.5 text-red-400 text-xs text-right">{e.cantidad_no_funciona || 0}</td>
+                  <td className="px-3 py-2.5 text-white text-xs text-right font-semibold">{Math.round(e.cantidad_total)}</td>
+                  <td className="px-3 py-2.5 text-emerald-400 text-xs text-right">{Math.round(e.cantidad_funciona)}</td>
+                  <td className="px-3 py-2.5 text-red-400 text-xs text-right">{Math.round(e.cantidad_total) - Math.round(e.cantidad_funciona)}</td>
                   <td className="px-3 py-2.5 text-xs text-right">
-                    <span className={cfg.color + ' font-bold'}>{e.porcentaje_operativo}%</span>
+                    <span className={cfg.color + ' font-bold'}>{Math.round(e.cantidad_total) > 0 ? Math.round((Math.round(e.cantidad_funciona) / Math.round(e.cantidad_total)) * 100) : 0}%</span>
                   </td>
                   <td className="px-3 py-2.5 text-center">
                     <Badge className={`text-[10px] px-2 py-0.5 border ${cfg.badge}`}>

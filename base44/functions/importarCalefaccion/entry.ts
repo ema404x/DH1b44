@@ -48,8 +48,13 @@ function parseSheet(wb, sheetName, comunaDefault) {
     // Fila de cabecera secundaria (CANTIDAD, FUNCIONA...)
     if (row[3] === 'CANTIDAD' || String(row[3] || '').toUpperCase() === 'CANTIDAD') continue;
 
-    const escuela = row[1] ? String(row[1]).trim() : currentEscuela;
-    if (!escuela) continue;
+    const escuelaCruda = row[1] ? String(row[1]).trim() : currentEscuela;
+    if (!escuelaCruda) continue;
+    // Ignorar filas cuyo campo "escuela" es en realidad un nombre de comuna o cabecera
+    const esNombreComuna = /^(COMUNA\s*)?(8A|8B|10A)$/i.test(escuelaCruda) ||
+      /^(ESCUELA|ESTABLECIMIENTO|NOMBRE|JEFE|TOTAL|CANTIDAD)$/i.test(escuelaCruda);
+    if (esNombreComuna) continue;
+    const escuela = escuelaCruda;
     currentEscuela = escuela;
 
     // Solo cambiar comuna si la celda contiene explícitamente "8A", "8B" o "10A"
@@ -63,16 +68,17 @@ function parseSheet(wb, sheetName, comunaDefault) {
       const cant = parseFloat(row[g.cant]);
       if (!cant || isNaN(cant) || cant <= 0) continue;
 
-      const func = parseFloat(row[g.func]) || 0;
-      const nofunc = parseFloat(row[g.nofunc]) || 0;
-      const pct = cant > 0 ? Math.round((func / cant) * 100) : 0;
+      const func   = Math.round(parseFloat(row[g.func])   || 0);
+      const nofunc = Math.round(parseFloat(row[g.nofunc]) || 0);
+      const cantInt = Math.round(cant);
+      const pct = cantInt > 0 ? Math.round((func / cantInt) * 100) : 0;
 
       records.push({
         escuela: currentEscuela,
         jefe_sitio: currentJefe || '',
         comuna: currentComuna || comunaDefault,
         tipo_equipo: g.tipo,
-        cantidad_total: cant,
+        cantidad_total: cantInt,
         cantidad_funciona: func,
         cantidad_no_funciona: nofunc,
         porcentaje_operativo: pct,
@@ -134,19 +140,19 @@ Deno.serve(async (req) => {
     }
     const allRecords = Object.values(unifyMap);
 
-    // Opcionalmente limpiar registros anteriores del mismo período
-    if (limpiar_anteriores && allRecords.length > 0) {
+    // SIEMPRE limpiar todos los registros del mismo período antes de insertar
+    // Esto garantiza que no haya duplicados sin importar cuántas veces se reimporte
+    if (allRecords.length > 0) {
       const periodoTarget = allRecords[0].periodo;
       let existing = [];
       try {
         existing = await base44.asServiceRole.entities.EquipamientoCalefaccion.filter({ periodo: periodoTarget });
       } catch (_) {}
-      // Borrar en lotes de 50 con pausa para no superar rate limit
       const DEL_BATCH = 50;
       for (let i = 0; i < existing.length; i += DEL_BATCH) {
         const batch = existing.slice(i, i + DEL_BATCH);
         await Promise.all(batch.map(e => base44.asServiceRole.entities.EquipamientoCalefaccion.delete(e.id)));
-        if (i + DEL_BATCH < existing.length) await new Promise(r => setTimeout(r, 500));
+        if (i + DEL_BATCH < existing.length) await new Promise(r => setTimeout(r, 400));
       }
     }
 
