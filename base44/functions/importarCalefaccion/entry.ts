@@ -104,22 +104,29 @@ Deno.serve(async (req) => {
     if (periodo) allRecords.forEach(r => r.periodo = periodo);
 
     // Opcionalmente limpiar registros anteriores del mismo período
-    if (limpiar_anteriores) {
-      const existing = await base44.asServiceRole.entities.EquipamientoCalefaccion.filter({ periodo: allRecords[0]?.periodo });
-      for (const e of existing) {
-        await base44.asServiceRole.entities.EquipamientoCalefaccion.delete(e.id);
+    if (limpiar_anteriores && allRecords.length > 0) {
+      const periodoTarget = allRecords[0].periodo;
+      let existing = [];
+      try {
+        existing = await base44.asServiceRole.entities.EquipamientoCalefaccion.filter({ periodo: periodoTarget });
+      } catch (_) {}
+      // Borrar en lotes de 50 con pausa para no superar rate limit
+      const DEL_BATCH = 50;
+      for (let i = 0; i < existing.length; i += DEL_BATCH) {
+        const batch = existing.slice(i, i + DEL_BATCH);
+        await Promise.all(batch.map(e => base44.asServiceRole.entities.EquipamientoCalefaccion.delete(e.id)));
+        if (i + DEL_BATCH < existing.length) await new Promise(r => setTimeout(r, 500));
       }
     }
 
-    // Insertar en lotes de 50
+    // Insertar en lotes de 50 usando bulkCreate con pausa entre lotes
     let created = 0;
     const BATCH = 50;
     for (let i = 0; i < allRecords.length; i += BATCH) {
       const batch = allRecords.slice(i, i + BATCH);
-      for (const r of batch) {
-        await base44.asServiceRole.entities.EquipamientoCalefaccion.create(r);
-        created++;
-      }
+      await base44.asServiceRole.entities.EquipamientoCalefaccion.bulkCreate(batch);
+      created += batch.length;
+      if (i + BATCH < allRecords.length) await new Promise(r => setTimeout(r, 300));
     }
 
     // Generar alertas automáticas para equipos críticos
