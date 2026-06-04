@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import {
   BarChart2, TrendingUp, Clock, Package, Wrench, CheckCircle2, AlertTriangle, Download,
-  Filter, FileText, Target, Users, Activity, Zap, RefreshCw, CalendarDays
+  Filter, FileText, Target, Users, Activity, Zap, RefreshCw, CalendarDays, ClipboardList
 } from 'lucide-react';
 import { exportKPIsPDF } from '@/utils/exportPDF';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, isWithinInterval } from 'date-fns';
@@ -90,6 +90,7 @@ export default function Reportes() {
   const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list() });
   const { data: employees = [] } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list() });
   const { data: locations = [] } = useQuery({ queryKey: ['locations'], queryFn: () => base44.entities.LocationData.list() });
+  const { data: pendientes = [] } = useQuery({ queryKey: ['pendientes_reportes'], queryFn: () => base44.entities.Pendiente.list() });
 
   // Get unique filter options
   const comunasUnicas = ['8A', '8B', '10A'];
@@ -182,6 +183,58 @@ export default function Reportes() {
   ).map(([name, costo]) => ({ name, costo }))
     .sort((a, b) => b.costo - a.costo)
     .slice(0, 6);
+
+  // KPIs Pendientes
+  const pendientesActivos = pendientes.filter(p => !['resuelto', 'cancelado'].includes(p.estado));
+  const pendientesResueltos = pendientes.filter(p => p.estado === 'resuelto');
+  const tasaResolucionPend = pendientes.length > 0 ? Math.round((pendientesResueltos.length / pendientes.length) * 100) : 0;
+
+  // Vencidos: fecha_limite pasada y no resuelto
+  const hoy = new Date();
+  const pendientesVencidos = pendientesActivos.filter(p => p.fecha_limite && new Date(p.fecha_limite) < hoy);
+
+  // Pendientes por estado
+  const pendientesPorEstado = ['pendiente', 'asignado', 'en_progreso', 'resuelto', 'cancelado'].map(estado => ({
+    name: { pendiente: 'Pendiente', asignado: 'Asignado', en_progreso: 'En Progreso', resuelto: 'Resuelto', cancelado: 'Cancelado' }[estado],
+    value: pendientes.filter(p => p.estado === estado).length,
+  })).filter(d => d.value > 0);
+
+  // Pendientes por tipo
+  const pendientesPorTipo = ['mantenimiento', 'obra', 'inspeccion', 'emergencia'].map(tipo => ({
+    name: { mantenimiento: 'Mantenimiento', obra: 'Obra', inspeccion: 'Inspección', emergencia: 'Emergencia' }[tipo],
+    value: pendientes.filter(p => p.tipo === tipo).length,
+  })).filter(d => d.value > 0);
+
+  // Pendientes por prioridad
+  const pendientesPorPrioridad = ['urgente', 'alta', 'media', 'baja'].map(p => ({
+    name: { urgente: 'Urgente', alta: 'Alta', media: 'Media', baja: 'Baja' }[p],
+    total: pendientes.filter(x => x.prioridad === p).length,
+    resueltos: pendientes.filter(x => x.prioridad === p && x.estado === 'resuelto').length,
+  })).filter(d => d.total > 0).map(d => ({ ...d, eficiencia: Math.round((d.resueltos / d.total) * 100) }));
+
+  // Pendientes por jefe de sitio
+  const pendientesPorJefe = Object.entries(
+    pendientes.reduce((acc, p) => {
+      const j = p.jefe_sitio || 'Sin asignar';
+      if (!acc[j]) acc[j] = { total: 0, resueltos: 0, vencidos: 0 };
+      acc[j].total++;
+      if (p.estado === 'resuelto') acc[j].resueltos++;
+      if (!['resuelto','cancelado'].includes(p.estado) && p.fecha_limite && new Date(p.fecha_limite) < hoy) acc[j].vencidos++;
+      return acc;
+    }, {})
+  ).map(([jefe, data]) => ({
+    jefe: jefe.split(' ').slice(0, 2).join(' '),
+    ...data,
+    eficiencia: data.total > 0 ? Math.round((data.resueltos / data.total) * 100) : 0,
+  })).sort((a, b) => b.total - a.total).slice(0, 8);
+
+  // Pendientes por comuna
+  const pendientesPorComuna = ['8A', '8B', '10A'].map(c => ({
+    comuna: c,
+    total: pendientes.filter(p => p.comuna === c).length,
+    resueltos: pendientes.filter(p => p.comuna === c && p.estado === 'resuelto').length,
+    activos: pendientes.filter(p => p.comuna === c && !['resuelto','cancelado'].includes(p.estado)).length,
+  })).filter(d => d.total > 0);
 
   // KPIs
   const completadas = filteredOrders.filter(o => o.status === 'completada').length;
@@ -321,11 +374,12 @@ export default function Reportes() {
       {/* Tabs */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
         <Tabs defaultValue="operaciones" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 bg-slate-800/50 border border-slate-700/50">
+          <TabsList className="grid w-full grid-cols-6 bg-slate-800/50 border border-slate-700/50">
             <TabsTrigger value="operaciones" className="gap-1.5 text-xs"><Activity className="h-3.5 w-3.5" /> Operaciones</TabsTrigger>
             <TabsTrigger value="personal" className="gap-1.5 text-xs"><Users className="h-3.5 w-3.5" /> Personal</TabsTrigger>
             <TabsTrigger value="financiero" className="gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" /> Financiero</TabsTrigger>
             <TabsTrigger value="inventario" className="gap-1.5 text-xs"><Package className="h-3.5 w-3.5" /> Inventario</TabsTrigger>
+            <TabsTrigger value="pendientes" className="gap-1.5 text-xs"><ClipboardList className="h-3.5 w-3.5" /> Pendientes</TabsTrigger>
             <TabsTrigger value="semanal" className="gap-1.5 text-xs"><CalendarDays className="h-3.5 w-3.5" /> Semanal</TabsTrigger>
           </TabsList>
 
@@ -510,6 +564,135 @@ export default function Reportes() {
               </motion.div>
             </motion.div>
           </TabsContent>
+          {/* Pendientes */}
+          <TabsContent value="pendientes" className="mt-4 space-y-4">
+            {/* KPIs Pendientes */}
+            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <motion.div variants={item}>
+                <KpiMetric title="Total Pendientes" value={pendientes.length} subtitle={`${pendientesActivos.length} activos`} icon={ClipboardList} color="blue" />
+              </motion.div>
+              <motion.div variants={item}>
+                <KpiMetric title="Tasa Resolución" value={`${tasaResolucionPend}%`} subtitle={`${pendientesResueltos.length} resueltos`} icon={CheckCircle2} color="green" />
+              </motion.div>
+              <motion.div variants={item}>
+                <KpiMetric title="Vencidos" value={pendientesVencidos.length} subtitle="Fecha límite superada" icon={AlertTriangle} color="red" />
+              </motion.div>
+              <motion.div variants={item}>
+                <KpiMetric title="Sin Asignar" value={pendientes.filter(p => !p.jefe_sitio && !['resuelto','cancelado'].includes(p.estado)).length} subtitle="Requieren atención" icon={Target} color="amber" />
+              </motion.div>
+            </motion.div>
+
+            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Por estado */}
+              <motion.div variants={item}>
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Distribución por Estado</CardTitle></CardHeader>
+                  <CardContent className="flex items-center justify-center">
+                    {pendientesPorEstado.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500">Sin datos</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie data={pendientesPorEstado} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}>
+                            {pendientesPorEstado.map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
+                          </Pie>
+                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Por prioridad */}
+              <motion.div variants={item}>
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Eficiencia por Prioridad</CardTitle></CardHeader>
+                  <CardContent>
+                    {pendientesPorPrioridad.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500">Sin datos</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={pendientesPorPrioridad}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                          <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} formatter={(v, n) => [n === 'eficiencia' ? `${v}%` : v, n === 'eficiencia' ? 'Eficiencia %' : n === 'total' ? 'Total' : 'Resueltos']} />
+                          <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
+                          <Bar dataKey="total" fill="#334155" name="Total" radius={[4,4,0,0]} />
+                          <Bar dataKey="resueltos" fill="#10b981" name="Resueltos" radius={[4,4,0,0]} />
+                          <Bar dataKey="eficiencia" fill="#06b6d4" name="Eficiencia %" radius={[4,4,0,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Por jefe de sitio */}
+              <motion.div variants={item} className="lg:col-span-2">
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Eficiencia por Jefe de Sitio</CardTitle></CardHeader>
+                  <CardContent>
+                    {pendientesPorJefe.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500">Sin jefes asignados</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={280}>
+                        <BarChart data={pendientesPorJefe}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                          <XAxis dataKey="jefe" tick={{ fontSize: 10, fill: '#94a3b8' }} angle={-30} textAnchor="end" height={70} />
+                          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} formatter={(v, n) => [n === 'eficiencia' ? `${v}%` : v, { total: 'Total', resueltos: 'Resueltos', vencidos: 'Vencidos', eficiencia: 'Eficiencia %' }[n] || n]} />
+                          <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
+                          <Bar dataKey="total" fill="#3b82f6" name="Total" radius={[4,4,0,0]} />
+                          <Bar dataKey="resueltos" fill="#10b981" name="Resueltos" radius={[4,4,0,0]} />
+                          <Bar dataKey="vencidos" fill="#ef4444" name="Vencidos" radius={[4,4,0,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Por comuna */}
+              <motion.div variants={item} className="lg:col-span-2">
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Pendientes por Comuna</CardTitle></CardHeader>
+                  <CardContent>
+                    {pendientesPorComuna.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500">Sin datos por comuna</div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {pendientesPorComuna.map((c, i) => (
+                          <div key={c.comuna} className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-lg font-bold text-white">Comuna {c.comuna}</span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">{c.total} total</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-slate-400">Resueltos</span>
+                                <span className="text-emerald-400 font-semibold">{c.resueltos}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-slate-400">Activos</span>
+                                <span className="text-amber-400 font-semibold">{c.activos}</span>
+                              </div>
+                              <div className="w-full bg-slate-600/50 rounded-full h-2 mt-2">
+                                <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${c.total > 0 ? (c.resueltos / c.total) * 100 : 0}%` }} />
+                              </div>
+                              <div className="text-xs text-slate-500 text-right">{c.total > 0 ? Math.round((c.resueltos/c.total)*100) : 0}% resuelto</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
+          </TabsContent>
+
           {/* Resumen Semanal */}
           <TabsContent value="semanal" className="mt-4 space-y-4">
             <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
