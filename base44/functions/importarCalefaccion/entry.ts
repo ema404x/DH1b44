@@ -1,17 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
 
-// Mapeo de nombres de escuelas que deben unificarse
-const ESCUELA_ALIAS = {
-  'VARELA 2751': 'RABANAL 2751',
-  'varela 2751': 'RABANAL 2751',
-};
-
-function normalizeEscuela(nombre) {
-  if (!nombre) return nombre;
-  const trimmed = nombre.trim();
-  return ESCUELA_ALIAS[trimmed] || ESCUELA_ALIAS[trimmed.toUpperCase()] || trimmed;
-}
 
 const TIPO_MAP = {
   'ESTUFAS': 'estufas',
@@ -59,12 +48,15 @@ function parseSheet(wb, sheetName, comunaDefault) {
     // Fila de cabecera secundaria (CANTIDAD, FUNCIONA...)
     if (row[3] === 'CANTIDAD' || String(row[3] || '').toUpperCase() === 'CANTIDAD') continue;
 
-    const escuelaNombrada = row[1] ? String(row[1]).trim() : currentEscuela;
-    if (!escuelaNombrada) continue;
-    const escuela = normalizeEscuela(escuelaNombrada);
+    const escuela = row[1] ? String(row[1]).trim() : currentEscuela;
+    if (!escuela) continue;
     currentEscuela = escuela;
 
-    if (row[0]) currentComuna = String(row[0]).replace(/^C/i, '').trim();
+    // Solo cambiar comuna si la celda contiene explícitamente "8A", "8B" o "10A"
+    if (row[0]) {
+      const val = String(row[0]).replace(/^C/i, '').trim().toUpperCase();
+      if (['8A', '8B', '10A'].includes(val)) currentComuna = val;
+    }
     if (row[2]) currentJefe = String(row[2]).trim();
 
     for (const g of GRUPOS) {
