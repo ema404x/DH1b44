@@ -16,6 +16,7 @@ import ObraCertificacionCard from '@/components/certificacion/ObraCertificacionC
 import ImportarObrasExcel from '@/components/certificacion/ImportarObrasExcel';
 import CicloSelector from '@/components/certificacion/CicloSelector';
 import { exportarComunaPDF, exportarFiltradoPDF } from '@/components/certificacion/ExportarComunaPDF';
+import { usePermission } from '@/hooks/usePermission';
 
 const ESTADO_CONFIG = {
   listo_certificar:    { label: 'Listo para Certificar',   color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
@@ -33,6 +34,9 @@ const PRIORIDAD_CONFIG = {
 
 export default function CertificacionObras() {
   const qc = useQueryClient();
+  const { allowed: canEdit } = usePermission('CertificacionObras', 'update');
+  const { allowed: canCreate } = usePermission('CertificacionObras', 'create');
+  const { allowed: canDelete } = usePermission('CertificacionObras', 'delete');
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroComuna, setFiltroComuna] = useState('todas');
@@ -169,7 +173,7 @@ export default function CertificacionObras() {
             onCambiarCiclo={setCicloVista}
             obrasActivas={obrasActivas}
           />
-          {!esArchivado && (
+          {!esArchivado && canCreate && (
             <>
               <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
                 <FileSpreadsheet className="h-4 w-4" /> Importar Excel
@@ -368,16 +372,16 @@ export default function CertificacionObras() {
               obra={obra}
               estadoConfig={ESTADO_CONFIG}
               prioridadConfig={PRIORIDAD_CONFIG}
-              readOnly={esArchivado}
-              onEdit={esArchivado ? undefined : handleEdit}
-              onDelete={esArchivado ? undefined : () => deleteMutation.mutate(obra.id)}
-              onEstadoChange={esArchivado ? undefined : (id, estado) => saveMutation.mutate({ id, estado_cobro: estado })}
-              onTramoChange={esArchivado ? undefined : (id, tramo) => saveMutation.mutate({
+              readOnly={esArchivado || !canEdit}
+              onEdit={(esArchivado || !canEdit) ? undefined : handleEdit}
+              onDelete={(esArchivado || !canDelete) ? undefined : () => deleteMutation.mutate(obra.id)}
+              onEstadoChange={(esArchivado || !canEdit) ? undefined : (id, estado) => saveMutation.mutate({ id, estado_cobro: estado })}
+              onTramoChange={(esArchivado || !canEdit) ? undefined : (id, tramo) => saveMutation.mutate({
                 id,
                 tramo_certificacion: tramo || undefined,
                 color_avance: tramo === 'primer_50' ? 'amarillo' : tramo === 'segundo_50' ? 'naranja' : 'auto',
               })}
-              onNotasChange={esArchivado ? undefined : (id, notas) => saveMutation.mutate({ id, notas })}
+              onNotasChange={(esArchivado || !canEdit) ? undefined : (id, notas) => saveMutation.mutate({ id, notas })}
               fmt={fmt}
             />
           ))}
@@ -385,7 +389,7 @@ export default function CertificacionObras() {
       )}
 
       <ImportarObrasExcel
-        open={importOpen}
+        open={importOpen && canCreate}
         onClose={() => setImportOpen(false)}
         onImported={() => {
           qc.invalidateQueries({ queryKey: ['obras-certificacion'] });
