@@ -10,6 +10,7 @@ import { Search, Truck, Pencil, Trash2, Phone, Mail, Star, Plus } from 'lucide-r
 import EmptyState from '@/components/shared/EmptyState';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { usePermission } from '@/hooks/usePermission';
 
 const RUBRO_LABELS = {
   construccion: 'Construcción', electricidad: 'Electricidad', plomeria: 'Plomería',
@@ -56,6 +57,9 @@ function StarRating({ value }) {
 }
 
 export default function Clients() {
+  const { allowed: canEdit } = usePermission('Client', 'update');
+  const { allowed: canCreate } = usePermission('Client', 'create');
+  const { allowed: canDelete } = usePermission('Client', 'delete');
   const [search, setSearch] = useState('');
   const [filterRubro, setFilterRubro] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -104,12 +108,14 @@ export default function Clients() {
           </h1>
           <p className="text-slate-400 mt-1">Directorio de proveedores y subcontratistas</p>
         </div>
-        <Button
-          onClick={() => { setEditing(null); setDialogOpen(true); }}
-          className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-lg shadow-cyan-500/30 transition-all"
-        >
-          <Plus className="h-4 w-4" /> Nuevo Proveedor
-        </Button>
+        {canCreate && (
+          <Button
+            onClick={() => { setEditing(null); setDialogOpen(true); }}
+            className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-lg shadow-cyan-500/30 transition-all"
+          >
+            <Plus className="h-4 w-4" /> Nuevo Proveedor
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -206,24 +212,28 @@ export default function Clients() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white" onClick={() => { setEditing(p); setDialogOpen(true); }}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-500/10"><Trash2 className="h-3.5 w-3.5" /></Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Eliminar proveedor?</AlertDialogTitle>
-                              <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteMutation.mutate(p.id)}>Eliminar</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        {canEdit && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white" onClick={() => { setEditing(p); setDialogOpen(true); }}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-500/10"><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>¿Eliminar proveedor?</AlertDialogTitle>
+                                <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteMutation.mutate(p.id)}>Eliminar</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

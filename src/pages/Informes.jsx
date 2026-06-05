@@ -9,8 +9,12 @@ import InformesAlertas from '@/components/informes/InformesAlertas';
 import InformesTabla from '@/components/informes/InformesTabla';
 import InformeFormDialog from '@/components/informes/InformeFormDialog';
 import PlanificacionTab from '@/components/informes/PlanificacionTab';
+import { usePermission } from '@/hooks/usePermission';
 
 export default function Informes() {
+  const { allowed: canEdit } = usePermission('Informes', 'update');
+  const { allowed: canCreate } = usePermission('Informes', 'create');
+  const { allowed: canDelete } = usePermission('Informes', 'delete');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const queryClient = useQueryClient();
@@ -53,8 +57,8 @@ export default function Informes() {
       <PageHeader
         title="Informes"
         subtitle="Control de informes entregados y pendientes"
-        actionLabel="Nuevo Informe"
-        onAction={handleNew}
+        actionLabel={canCreate ? "Nuevo Informe" : undefined}
+        onAction={canCreate ? handleNew : undefined}
       />
 
       <InformesAlertas informes={informes} />
@@ -80,16 +84,16 @@ export default function Informes() {
         </TabsList>
 
         <TabsContent value="todos" className="mt-4">
-          <InformesTabla informes={informes} onEdit={handleEdit} onDelete={(id) => deleteMutation.mutate(id)} isLoading={isLoading} />
+          <InformesTabla informes={informes} onEdit={canEdit ? handleEdit : undefined} onDelete={canDelete ? (id) => deleteMutation.mutate(id) : undefined} isLoading={isLoading} />
         </TabsContent>
         <TabsContent value="pendientes" className="mt-4">
-          <InformesTabla informes={pendientes} onEdit={handleEdit} onDelete={(id) => deleteMutation.mutate(id)} isLoading={isLoading} />
+          <InformesTabla informes={pendientes} onEdit={canEdit ? handleEdit : undefined} onDelete={canDelete ? (id) => deleteMutation.mutate(id) : undefined} isLoading={isLoading} />
         </TabsContent>
         <TabsContent value="entregados" className="mt-4">
-          <InformesTabla informes={enviados} onEdit={handleEdit} onDelete={(id) => deleteMutation.mutate(id)} isLoading={isLoading} />
+          <InformesTabla informes={enviados} onEdit={canEdit ? handleEdit : undefined} onDelete={canDelete ? (id) => deleteMutation.mutate(id) : undefined} isLoading={isLoading} />
         </TabsContent>
         <TabsContent value="vencidos" className="mt-4">
-          <InformesTabla informes={vencidos} onEdit={handleEdit} onDelete={(id) => deleteMutation.mutate(id)} isLoading={isLoading} highlight="vencido" />
+          <InformesTabla informes={vencidos} onEdit={canEdit ? handleEdit : undefined} onDelete={canDelete ? (id) => deleteMutation.mutate(id) : undefined} isLoading={isLoading} highlight="vencido" />
         </TabsContent>
         <TabsContent value="planificacion" className="mt-4">
           <PlanificacionTab />

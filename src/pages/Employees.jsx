@@ -19,6 +19,7 @@ import InviteUserDialog from '@/components/employees/InviteUserDialog';
 import SyncEmployeesButton from '@/components/employees/SyncEmployeesButton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { usePermission } from '@/hooks/usePermission';
 
 const roleLabels = {
   operario: 'Operario', tecnico: 'Técnico', capataz: 'Capataz', supervisor: 'Supervisor',
@@ -63,6 +64,9 @@ const employeeFields = [
 ];
 
 export default function Employees() {
+  const { allowed: canEdit } = usePermission('Employee', 'update');
+  const { allowed: canCreate } = usePermission('Employee', 'create');
+  const { allowed: canDelete } = usePermission('Employee', 'delete');
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -158,12 +162,16 @@ export default function Employees() {
             <p className="text-slate-400 mt-1">{stats.activos} activos de {stats.total} total</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setInviteOpen(true)} className="gap-2 border-slate-700/50 bg-slate-800/50 text-white hover:bg-slate-700/50">
-              <Mail className="h-4 w-4" /> Invitar
-            </Button>
-            <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-lg shadow-cyan-500/50 transition-all">
-              <Plus className="h-4 w-4" /> Nuevo Empleado
-            </Button>
+            {canCreate && (
+              <Button variant="outline" onClick={() => setInviteOpen(true)} className="gap-2 border-slate-700/50 bg-slate-800/50 text-white hover:bg-slate-700/50">
+                <Mail className="h-4 w-4" /> Invitar
+              </Button>
+            )}
+            {canCreate && (
+              <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-lg shadow-cyan-500/50 transition-all">
+                <Plus className="h-4 w-4" /> Nuevo Empleado
+              </Button>
+            )}
           </div>
         </div>
 
@@ -270,24 +278,28 @@ export default function Employees() {
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-cyan-400 hover:text-cyan-300" onClick={() => setQrEmployee(emp)}>
                             <QrCode className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400" onClick={() => { setEditing(emp); setDialogOpen(true); }}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500"><Trash2 className="h-3.5 w-3.5" /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Eliminar empleado?</AlertDialogTitle>
-                                <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteMutation.mutate(emp.id)}>Eliminar</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {canEdit && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400" onClick={() => { setEditing(emp); setDialogOpen(true); }}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500"><Trash2 className="h-3.5 w-3.5" /></Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar empleado?</AlertDialogTitle>
+                                  <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteMutation.mutate(emp.id)}>Eliminar</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </div>
 

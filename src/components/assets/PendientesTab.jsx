@@ -27,6 +27,7 @@ import PendienteCard from '@/components/assets/PendienteCard';
 import ImportarPendientesSAP from '@/components/assets/ImportarPendientesSAP';
 import ExportarPendientesPDF from '@/components/assets/ExportarPendientesPDF';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { usePermission } from '@/hooks/usePermission';
 
 const COMUNAS = ['8A', '8B', '10A'];
 
@@ -68,8 +69,11 @@ export default function PendientesTab() {
 
   const qc = useQueryClient();
   const { isAdmin, filterByUser } = useCurrentUser();
+  const { allowed: canCreate } = usePermission('Asset', 'create');
+  const { allowed: canEdit } = usePermission('Asset', 'update');
+  const { allowed: permCanDelete } = usePermission('Asset', 'delete');
 
-  useEffect(() => { setCanDelete(isAdmin); }, [isAdmin]);
+  useEffect(() => { setCanDelete(isAdmin && permCanDelete); }, [isAdmin, permCanDelete]);
 
   // Reset filters when switching commune
   useEffect(() => {
@@ -326,9 +330,11 @@ export default function PendientesTab() {
                 search ? `Búsqueda: "${search}"` : '',
               ].filter(Boolean).join(' | ')}
             />
-            <Button variant="outline" className="gap-1.5" onClick={() => setImportOpen(true)}>
-              <Upload className="h-4 w-4" /> Importar SAP
-            </Button>
+            {canCreate && (
+              <Button variant="outline" className="gap-1.5" onClick={() => setImportOpen(true)}>
+                <Upload className="h-4 w-4" /> Importar SAP
+              </Button>
+            )}
 
             {canDelete && selectedIds.size > 0 && (
               <>
@@ -357,9 +363,11 @@ export default function PendientesTab() {
                 </button>
               </>
             )}
-            <Button onClick={openNew} className="gap-1.5">
-              <Plus className="h-4 w-4" /> Nuevo
-            </Button>
+            {canCreate && (
+              <Button onClick={openNew} className="gap-1.5">
+                <Plus className="h-4 w-4" /> Nuevo
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -425,8 +433,8 @@ export default function PendientesTab() {
                   return (
                     <tr
                       key={p.id}
-                      onClick={() => openEdit(p)}
-                      className={`border-b cursor-pointer hover:bg-muted/70 transition-colors ${selectedIds.has(p.id) ? 'bg-primary/10' : isVencido ? 'bg-red-950/40' : idx % 2 === 0 ? 'bg-card' : 'bg-muted/20'}`}
+                      onClick={canEdit ? () => openEdit(p) : undefined}
+                      className={`border-b ${canEdit ? 'cursor-pointer' : ''} hover:bg-muted/70 transition-colors ${selectedIds.has(p.id) ? 'bg-primary/10' : isVencido ? 'bg-red-950/40' : idx % 2 === 0 ? 'bg-card' : 'bg-muted/20'}`}
                     >
                       {canDelete && (
                         <td className="px-3 py-2 w-8" onClick={e => toggleSelectId(p.id, e)}>
@@ -498,7 +506,7 @@ export default function PendientesTab() {
               pendiente={p}
               estadoColors={estadoColors}
               prioridadColors={prioridadColors}
-              onEdit={openEdit}
+              onEdit={canEdit ? openEdit : undefined}
               onDelete={(id) => deleteMutation.mutate(id)}
               canDelete={canDelete}
             />

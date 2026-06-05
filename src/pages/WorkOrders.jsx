@@ -25,6 +25,7 @@ import OTTemplateSelector from '@/components/workorders/OTTemplateSelector';
 import HistorialEstablecimiento from '@/components/workorders/HistorialEstablecimiento';
 import ModoCampo from '@/components/workorders/ModosCampo';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { usePermission } from '@/hooks/usePermission';
 
 
 
@@ -79,6 +80,8 @@ export default function WorkOrders() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { currentUser, isAdmin, filterByUser } = useCurrentUser();
+  const { allowed: canCreate } = usePermission('WorkOrder', 'create');
+  const { allowed: canDelete } = usePermission('WorkOrder', 'delete');
 
   const { isOnline, pendingCount } = useOfflineQueue((count) => {
     toast.success(`${count} OT${count !== 1 ? 's' : ''} sincronizada${count !== 1 ? 's' : ''}`);
@@ -176,11 +179,13 @@ export default function WorkOrders() {
           <Button variant="outline" size="sm" onClick={() => setTemplateOpen(true)} className="gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2">
             <Layers className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Plantillas</span>
           </Button>
-          <Link to="/crear-ot">
-            <Button size="sm" className="gap-1 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/50 transition-all text-xs px-2">
-              <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Nueva OT</span><span className="sm:hidden">Nueva</span>
-            </Button>
-          </Link>
+          {canCreate && (
+            <Link to="/crear-ot">
+              <Button size="sm" className="gap-1 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/50 transition-all text-xs px-2">
+                <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Nueva OT</span><span className="sm:hidden">Nueva</span>
+              </Button>
+            </Link>
+          )}
           </div>
         </div>
 
@@ -289,7 +294,7 @@ export default function WorkOrders() {
         <WorkOrderDetailPanel
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
-          onDelete={deleteMutation.mutate}
+          onDelete={canDelete ? deleteMutation.mutate : undefined}
         />
       )}
 

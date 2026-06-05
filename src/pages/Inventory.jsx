@@ -21,6 +21,7 @@ import MovimientoDialog from '@/components/inventory/MovimientoDialog';
 import MovimientosLog from '@/components/inventory/MovimientosLog';
 import RequerimientosList from '@/components/inventory/RequerimientosList';
 import { useEffect } from 'react';
+import { usePermission } from '@/hooks/usePermission';
 
 const categoryLabels = {
   electrico: 'Eléctrico', plomeria: 'Plomería', pintura: 'Pintura', construccion: 'Construcción',
@@ -44,6 +45,9 @@ const materialFields = [
 ];
 
 export default function Inventory() {
+  const { allowed: canEdit } = usePermission('Inventory', 'update');
+  const { allowed: canCreate } = usePermission('Inventory', 'create');
+  const { allowed: canDelete } = usePermission('Inventory', 'delete');
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -114,9 +118,11 @@ export default function Inventory() {
             </h1>
             <p className="text-slate-400 mt-1">{stats.total} materiales • ${stats.totalValue.toLocaleString()}</p>
           </div>
-          <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg shadow-emerald-500/50 transition-all shrink-0">
-            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo</span> Material
-          </Button>
+          {canCreate && (
+            <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg shadow-emerald-500/50 transition-all shrink-0">
+              <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo</span> Material
+            </Button>
+          )}
         </div>
 
         {/* Stats */}
@@ -232,30 +238,38 @@ export default function Inventory() {
                               <TableCell className="text-right text-white font-medium">${((mat.stock || 0) * (mat.unit_cost || 0)).toLocaleString()}</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-400 hover:bg-emerald-500/10" onClick={() => setMovimientoDialog({ tipo: 'entrada', material: mat })}>
-                                    <ArrowDownCircle className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-orange-400 hover:bg-orange-500/10" onClick={() => setMovimientoDialog({ tipo: 'salida', material: mat })}>
-                                    <ArrowUpCircle className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400" onClick={() => { setEditing(mat); setDialogOpen(true); }}>
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500"><Trash2 className="h-3.5 w-3.5" /></Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>¿Eliminar material?</AlertDialogTitle>
-                                        <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => deleteMutation.mutate(mat.id)}>Eliminar</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
+                                  {canEdit && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-400 hover:bg-emerald-500/10" onClick={() => setMovimientoDialog({ tipo: 'entrada', material: mat })}>
+                                      <ArrowDownCircle className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {canEdit && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-orange-400 hover:bg-orange-500/10" onClick={() => setMovimientoDialog({ tipo: 'salida', material: mat })}>
+                                      <ArrowUpCircle className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {canEdit && (
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400" onClick={() => { setEditing(mat); setDialogOpen(true); }}>
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {canDelete && (
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500"><Trash2 className="h-3.5 w-3.5" /></Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>¿Eliminar material?</AlertDialogTitle>
+                                          <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => deleteMutation.mutate(mat.id)}>Eliminar</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  )}
                                 </div>
                               </TableCell>
                             </motion.tr>

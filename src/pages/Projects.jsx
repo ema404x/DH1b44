@@ -11,6 +11,7 @@ import ImportarObrasExcelModal from '@/components/projects/ImportarObrasExcelMod
 import ProjectDetailPanel from '@/components/projects/ProjectDetailPanel';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import { toast } from 'sonner';
+import { usePermission } from '@/hooks/usePermission';
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 
@@ -97,7 +98,7 @@ function fmtFecha(val) {
 
 // ─── Componente fila ─────────────────────────────────────────────────────────
 
-function ProyectoFila({ project, selected, onToggle, onOpen, onDelete }) {
+function ProyectoFila({ project, selected, onToggle, onOpen, onDelete, canDelete }) {
   const detalle = getDetalle(project);
   const colors = DETALLE_COLORS[detalle] || DETALLE_COLORS[project.status] || DETALLE_COLORS['pendiente'];
   const avance = project.progress || 0;
@@ -156,10 +157,12 @@ function ProyectoFila({ project, selected, onToggle, onOpen, onDelete }) {
       <div className="px-2 py-2 text-slate-400 truncate hidden xl:block" title={getInspector(project)}>{getInspector(project)}</div>
       {/* ACCIONES */}
       <div className="px-2 py-2 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-500/10"
-          onClick={() => onDelete(project.id)}>
-          <Trash2 className="h-3 w-3" />
-        </Button>
+        {canDelete && (
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:bg-red-500/10"
+            onClick={() => onDelete(project.id)}>
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -168,6 +171,9 @@ function ProyectoFila({ project, selected, onToggle, onOpen, onDelete }) {
 // ─── Página principal ────────────────────────────────────────────────────────
 
 export default function Projects() {
+  const { allowed: canEdit } = usePermission('Project', 'update');
+  const { allowed: canCreate } = usePermission('Project', 'create');
+  const { allowed: canDelete } = usePermission('Project', 'delete');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [comunaFilter, setComunaFilter] = useState('all');
@@ -293,7 +299,7 @@ export default function Projects() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {selected.size > 0 ? (
+          {selected.size > 0 && canDelete ? (
             <>
               <span className="text-slate-400 text-xs">{selected.size} seleccionadas</span>
               <Button variant="outline" size="sm" className="text-xs h-7" onClick={toggleAll}>
@@ -308,12 +314,16 @@ export default function Projects() {
             </>
           ) : (
             <>
-              <Button variant="outline" size="sm" className="text-xs h-7 gap-1" onClick={() => setShowObrasImporter(true)}>
-                <Upload className="h-3 w-3" /> Importar planilla
-              </Button>
-              <Button size="sm" className="text-xs h-7 gap-1 bg-primary hover:bg-primary/90" onClick={() => { setEditing(null); setDialogOpen(true); }}>
-                <Plus className="h-3 w-3" /> Nueva obra
-              </Button>
+              {canCreate && (
+                <Button variant="outline" size="sm" className="text-xs h-7 gap-1" onClick={() => setShowObrasImporter(true)}>
+                  <Upload className="h-3 w-3" /> Importar planilla
+                </Button>
+              )}
+              {canCreate && (
+                <Button size="sm" className="text-xs h-7 gap-1 bg-primary hover:bg-primary/90" onClick={() => { setEditing(null); setDialogOpen(true); }}>
+                  <Plus className="h-3 w-3" /> Nueva obra
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -422,6 +432,7 @@ export default function Projects() {
                   onToggle={toggleSelect}
                   onOpen={setSelectedProject}
                   onDelete={(id) => deleteMutation.mutate(id)}
+                  canDelete={canDelete}
                 />
               ))
             )}
@@ -443,7 +454,7 @@ export default function Projects() {
         <ProjectDetailPanel
           project={projects.find(p => p.id === selectedProject.id) || selectedProject}
           onClose={() => setSelectedProject(null)}
-          onEdit={() => { setEditing(selectedProject); setDialogOpen(true); setSelectedProject(null); }}
+          onEdit={canEdit ? () => { setEditing(selectedProject); setDialogOpen(true); setSelectedProject(null); } : undefined}
         />
       )}
 
