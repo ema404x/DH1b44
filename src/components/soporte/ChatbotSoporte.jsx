@@ -479,7 +479,11 @@ export default function ChatbotSoporte() {
   };
 
   // Reiniciar contexto de Alice cuando el usuario cambia de módulo (sin resetear mensajes)
+  // También mostrar la burbuja nuevamente al cambiar de módulo
   useEffect(() => {
+    if (prevModuloRef.current !== moduloActual) {
+      setHidden(false);
+    }
     if (!conversation || !currentUser) return;
     if (prevModuloRef.current === moduloActual) return;
     prevModuloRef.current = moduloActual;
@@ -621,7 +625,7 @@ export default function ChatbotSoporte() {
                   className="h-7 px-2 rounded-lg flex items-center gap-1 hover:bg-white/20 transition-colors text-white/60 hover:text-white text-[10px]">
                   Ocultar
                 </button>
-                <button onClick={() => setOpen(false)}
+                <button onClick={() => { setOpen(false); setHidden(true); }}
                   className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors text-white/80 hover:text-white">
                   <X className="h-4 w-4" />
                 </button>
