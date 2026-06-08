@@ -17,6 +17,7 @@ import ImportarObrasExcel from '@/components/certificacion/ImportarObrasExcel';
 import CicloSelector from '@/components/certificacion/CicloSelector';
 import { exportarComunaPDF, exportarFiltradoPDF } from '@/components/certificacion/ExportarComunaPDF';
 import { usePermission } from '@/hooks/usePermission';
+import { useAuth } from '@/lib/AuthContext';
 
 const ESTADO_CONFIG = {
   listo_certificar:    { label: 'Listo para Certificar',   color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
@@ -37,6 +38,8 @@ export default function CertificacionObras() {
   const { allowed: canEdit } = usePermission('CertificacionObras', 'update');
   const { allowed: canCreate } = usePermission('CertificacionObras', 'create');
   const { allowed: canDelete } = usePermission('CertificacionObras', 'delete');
+  const { user } = useAuth();
+  const canCloseCiclo = user?.role === 'admin';
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroComuna, setFiltroComuna] = useState('todas');
@@ -172,6 +175,7 @@ export default function CertificacionObras() {
             ciclosDisponibles={ciclosArchivados}
             onCambiarCiclo={setCicloVista}
             obrasActivas={obrasActivas}
+            canClose={canCloseCiclo}
           />
           {!esArchivado && canCreate && (
             <>

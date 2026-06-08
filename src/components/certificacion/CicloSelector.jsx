@@ -20,7 +20,7 @@ import { es } from 'date-fns/locale';
  *  - onCambiarCiclo: (ciclo: string | 'activo') => void
  *  - obrasActivas: ObraCertificacion[] — solo las activas (sin archivar)
  */
-export default function CicloSelector({ cicloActivo, ciclosDisponibles, onCambiarCiclo, obrasActivas }) {
+export default function CicloSelector({ cicloActivo, ciclosDisponibles, onCambiarCiclo, obrasActivas, canClose = false }) {
   const qc = useQueryClient();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [nuevoCicloNombre, setNuevoCicloNombre] = useState(() => {
@@ -86,8 +86,8 @@ export default function CicloSelector({ cicloActivo, ciclosDisponibles, onCambia
         </SelectContent>
       </Select>
 
-      {/* Botón cerrar ciclo — solo en ciclo activo */}
-      {!esVistaCicloArchivado && obrasActivas.length > 0 && (
+      {/* Botón cerrar ciclo — solo admin y en ciclo activo */}
+      {canClose && !esVistaCicloArchivado && obrasActivas.length > 0 && (
         <Button
           variant="outline"
           size="sm"
