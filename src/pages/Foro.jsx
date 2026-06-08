@@ -79,7 +79,7 @@ export default function Foro() {
           })
         ));
       }
-      qc.invalidateQueries(["foro-hilos"]);
+      qc.invalidateQueries({ queryKey: ["foro-hilos"] });
       setNuevoHiloOpen(false);
     },
   });
@@ -90,12 +90,12 @@ export default function Foro() {
       await Promise.all(respuestas.map(r => base44.entities.ForoRespuesta.delete(r.id)));
       return base44.entities.ForoHilo.delete(id);
     },
-    onSuccess: () => { qc.invalidateQueries(["foro-hilos"]); setHiloActivo(null); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["foro-hilos"] }); setHiloActivo(null); },
   });
 
   const crearCategoriaMut = useMutation({
     mutationFn: (data) => base44.entities.ForoCategoria.create(data),
-    onSuccess: () => { qc.invalidateQueries(["foro-categorias"]); setNuevaCatOpen(false); setNuevaCat({ nombre: "", icono: "💬", descripcion: "" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["foro-categorias"] }); setNuevaCatOpen(false); setNuevaCat({ nombre: "", icono: "💬", descripcion: "" }); },
   });
 
   // Filtrado y ordenamiento

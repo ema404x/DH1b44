@@ -22,7 +22,7 @@ export default function ForoNotificacionesBell({ userId, onClickNotif }) {
 
   const marcarLeidaMut = useMutation({
     mutationFn: (id) => base44.entities.ForoNotificacion.update(id, { leida: true }),
-    onSuccess: () => qc.invalidateQueries(["foro-notificaciones", userId]),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["foro-notificaciones", userId] }),
   });
 
   const marcarTodasMut = useMutation({
@@ -30,7 +30,7 @@ export default function ForoNotificacionesBell({ userId, onClickNotif }) {
       const noLeidas = notifs.filter(n => !n.leida);
       await Promise.all(noLeidas.map(n => base44.entities.ForoNotificacion.update(n.id, { leida: true })));
     },
-    onSuccess: () => qc.invalidateQueries(["foro-notificaciones", userId]),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["foro-notificaciones", userId] }),
   });
 
   const noLeidas = notifs.filter(n => !n.leida).length;

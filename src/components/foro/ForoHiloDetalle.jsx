@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -91,33 +91,57 @@ export default function ForoHiloDetalle({ hilo, user, onVolver, onEliminarHilo, 
 
   const editarHiloMut = useMutation({
     mutationFn: (data) => base44.entities.ForoHilo.update(hilo.id, data),
-    onSuccess: () => { qc.invalidateQueries(["foro-hilos"]); setEditandoHilo(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["foro-hilos"] }); setEditandoHilo(false); },
   });
 
   const { data: respuestas = [] } = useQuery({
     queryKey: ["foro-respuestas", hilo.id],
     queryFn: () => base44.entities.ForoRespuesta.filter({ hilo_id: hilo.id }, "created_date", 200),
+    refetchInterval: 15000,
+    staleTime: 10000,
   });
 
-  // Incrementar vistas
+  // Incrementar vistas — una sola vez por apertura, usando ref para evitar doble ejecución
+  const vistasIncrementadaRef = useRef(false);
   useEffect(() => {
+    if (vistasIncrementadaRef.current) return;
+    vistasIncrementadaRef.current = true;
     base44.entities.ForoHilo.update(hilo.id, { vistas: (hilo.vistas || 0) + 1 });
-  }, [hilo.id]);
+  }, [hilo.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const responderMut = useMutation({
-    mutationFn: (data) => base44.entities.ForoRespuesta.create(data),
-    onSuccess: async () => {
+    mutationFn: async (data) => {
+      const resp = await base44.entities.ForoRespuesta.create(data);
       await base44.entities.ForoHilo.update(hilo.id, { total_respuestas: (hilo.total_respuestas || 0) + 1 });
-      qc.invalidateQueries(["foro-respuestas", hilo.id]);
-      qc.invalidateQueries(["foro-hilos"]);
+      // Notificar al autor del hilo (solo si no es el mismo que responde)
+      if (hilo.autor_id && hilo.autor_id !== data.autor_id) {
+        await base44.entities.ForoNotificacion.create({
+          usuario_id: hilo.autor_id,
+          tipo: 'respuesta',
+          hilo_id: hilo.id,
+          hilo_titulo: hilo.titulo,
+          actor_nombre: data.autor_nombre,
+          leida: false,
+        });
+      }
+      return resp;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["foro-respuestas", hilo.id] });
+      qc.invalidateQueries({ queryKey: ["foro-hilos"] });
       setRespondiendo(null);
     }
   });
 
   const eliminarRespMut = useMutation({
-    mutationFn: (id) => base44.entities.ForoRespuesta.delete(id),
+    mutationFn: async (id) => {
+      await base44.entities.ForoRespuesta.delete(id);
+      const nuevoTotal = Math.max(0, (hilo.total_respuestas || 0) - 1);
+      await base44.entities.ForoHilo.update(hilo.id, { total_respuestas: nuevoTotal });
+    },
     onSuccess: () => {
-      qc.invalidateQueries(["foro-respuestas", hilo.id]);
+      qc.invalidateQueries({ queryKey: ["foro-respuestas", hilo.id] });
+      qc.invalidateQueries({ queryKey: ["foro-hilos"] });
     }
   });
 
@@ -130,7 +154,7 @@ export default function ForoHiloDetalle({ hilo, user, onVolver, onEliminarHilo, 
       recs[emoji] = lista;
       return base44.entities.ForoHilo.update(hilo.id, { reacciones: recs });
     },
-    onSuccess: () => qc.invalidateQueries(["foro-hilos"]),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["foro-hilos"] }),
   });
 
   const reaccionRespMut = useMutation({
@@ -142,7 +166,7 @@ export default function ForoHiloDetalle({ hilo, user, onVolver, onEliminarHilo, 
       recs[emoji] = lista;
       return base44.entities.ForoRespuesta.update(id, { reacciones: recs });
     },
-    onSuccess: () => qc.invalidateQueries(["foro-respuestas", hilo.id]),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["foro-respuestas", hilo.id] }),
   });
 
   const votarMut = useMutation({
@@ -156,22 +180,10 @@ export default function ForoHiloDetalle({ hilo, user, onVolver, onEliminarHilo, 
       });
       return base44.entities.ForoHilo.update(hilo.id, { encuesta: enc });
     },
-    onSuccess: () => qc.invalidateQueries(["foro-hilos"]),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["foro-hilos"] }),
   });
 
   const handleResponder = ({ texto, adjuntos, menciones }) => {
-    const notif = async () => {
-      if (hilo.autor_id && hilo.autor_id !== user.id) {
-        await base44.entities.ForoNotificacion.create({
-          usuario_id: hilo.autor_id,
-          tipo: 'respuesta',
-          hilo_id: hilo.id,
-          hilo_titulo: hilo.titulo,
-          actor_nombre: user.full_name || user.email,
-          leida: false,
-        });
-      }
-    };
     responderMut.mutate({
       hilo_id: hilo.id,
       cuerpo: texto,
@@ -183,7 +195,6 @@ export default function ForoHiloDetalle({ hilo, user, onVolver, onEliminarHilo, 
       responde_a_id: respondiendo?.id || undefined,
       responde_a_autor: respondiendo?.autor_nombre || undefined,
     });
-    notif();
   };
 
   return (
@@ -215,10 +226,10 @@ export default function ForoHiloDetalle({ hilo, user, onVolver, onEliminarHilo, 
                 </DropdownMenuItem>
                 {puedeModerar && (
                   <>
-                    <DropdownMenuItem onClick={() => base44.entities.ForoHilo.update(hilo.id, { fijado: !hilo.fijado }).then(() => qc.invalidateQueries(["foro-hilos"]))}>
+                    <DropdownMenuItem onClick={() => base44.entities.ForoHilo.update(hilo.id, { fijado: !hilo.fijado }).then(() => qc.invalidateQueries({ queryKey: ["foro-hilos"] }))}>
                       <Pin className="h-4 w-4 mr-2" /> {hilo.fijado ? "Desfijar" : "Fijar"}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => base44.entities.ForoHilo.update(hilo.id, { cerrado: !hilo.cerrado }).then(() => qc.invalidateQueries(["foro-hilos"]))}>
+                    <DropdownMenuItem onClick={() => base44.entities.ForoHilo.update(hilo.id, { cerrado: !hilo.cerrado }).then(() => qc.invalidateQueries({ queryKey: ["foro-hilos"] }))}>
                       <Lock className="h-4 w-4 mr-2" /> {hilo.cerrado ? "Abrir" : "Cerrar"}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
