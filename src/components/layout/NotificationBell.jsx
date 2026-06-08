@@ -49,6 +49,19 @@ export default function NotificationBell() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
+  const deleteNotifMutation = useMutation({
+    mutationFn: (id) => base44.entities.Notification.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+
+  const clearAllReadMutation = useMutation({
+    mutationFn: async () => {
+      const read = notifications.filter(n => n.read);
+      await Promise.all(read.map(n => base44.entities.Notification.delete(n.id)));
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+
   const systemAlerts = useMemo(() => {
     const alerts = [];
     const overdueOrders = orders.filter(o => o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada','cancelada'].includes(o.status));
@@ -177,21 +190,27 @@ export default function NotificationBell() {
                           ? formatDistanceToNow(new Date(n.created_date), { addSuffix: true, locale: es })
                           : null;
                         return (
-                          <button key={n.id} onClick={() => handleClick(n)}
+                          <div key={n.id}
                             className={cn(
-                              'w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left transition-all hover:bg-muted/40',
+                              'group flex items-start gap-3 px-3 py-2.5 rounded-xl transition-all hover:bg-muted/40',
                               !n.read && 'bg-primary/5 border border-primary/10'
                             )}>
-                            <div className={cn('mt-0.5 h-7 w-7 rounded-lg flex items-center justify-center shrink-0 bg-muted/50')}>
-                              <Icon className={cn('h-3.5 w-3.5', cfg.icon_color)} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-foreground leading-tight">{n.title}</p>
-                              {n.message && <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{n.message}</p>}
-                              {timeAgo && <p className="text-[10px] text-muted-foreground/50 mt-1">{timeAgo}</p>}
-                            </div>
-                            {!n.read && <div className={cn('mt-1.5 h-2 w-2 rounded-full shrink-0', cfg.dot)} />}
-                          </button>
+                            <button className="flex items-start gap-3 flex-1 min-w-0 text-left" onClick={() => handleClick(n)}>
+                              <div className="mt-0.5 h-7 w-7 rounded-lg flex items-center justify-center shrink-0 bg-muted/50">
+                                <Icon className={cn('h-3.5 w-3.5', cfg.icon_color)} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-foreground leading-tight">{n.title}</p>
+                                {n.message && <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{n.message}</p>}
+                                {timeAgo && <p className="text-[10px] text-muted-foreground/50 mt-1">{timeAgo}</p>}
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => deleteNotifMutation.mutate(n.id)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-500/10 shrink-0">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
                         );
                       })}
                     </>
@@ -201,13 +220,23 @@ export default function NotificationBell() {
             </div>
 
             {/* Footer */}
-            {notifications.some(n => !n.read) && (
-              <div className="px-4 py-2.5 border-t border-border/40 bg-muted/10 flex justify-end">
-                <button
-                  onClick={() => { notifications.filter(n => !n.read).forEach(n => markReadMutation.mutate(n.id)); }}
-                  className="text-xs text-primary hover:text-primary/80 font-medium transition-colors flex items-center gap-1">
-                  <CheckCheck className="h-3 w-3" /> Marcar todo como leído
-                </button>
+            {notifications.length > 0 && (
+              <div className="px-4 py-2.5 border-t border-border/40 bg-muted/10 flex items-center justify-between gap-2">
+                {notifications.some(n => n.read) ? (
+                  <button
+                    onClick={() => clearAllReadMutation.mutate()}
+                    disabled={clearAllReadMutation.isPending}
+                    className="text-xs text-muted-foreground hover:text-red-400 font-medium transition-colors flex items-center gap-1">
+                    <X className="h-3 w-3" /> Limpiar leídas
+                  </button>
+                ) : <span />}
+                {notifications.some(n => !n.read) && (
+                  <button
+                    onClick={() => notifications.filter(n => !n.read).forEach(n => markReadMutation.mutate(n.id))}
+                    className="text-xs text-primary hover:text-primary/80 font-medium transition-colors flex items-center gap-1">
+                    <CheckCheck className="h-3 w-3" /> Marcar todo leído
+                  </button>
+                )}
               </div>
             )}
           </div>
