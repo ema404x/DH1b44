@@ -156,16 +156,18 @@ export default function InspeccionColegioPage() {
 
   const handleGenerarInforme = async () => {
     setGenerando(true);
+    // Limpiar informe anterior para forzar re-render completo al recibir el nuevo
+    setInspeccionActiva(prev => ({ ...prev, informe_generado: null, estado: 'generando' }));
     try {
       await updateMutation.mutateAsync({ id: inspeccionActiva.id, data: { estado: 'generando' } });
       const res = await base44.functions.invoke('generarInformeInspeccion', { inspeccion_id: inspeccionActiva.id });
       const informe = res.data.informe;
-      const updated = { ...inspeccionActiva, informe_generado: informe, estado: 'completado' };
-      setInspeccionActiva(updated);
+      setInspeccionActiva(prev => ({ ...prev, informe_generado: informe, estado: 'completado' }));
       queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
       toast.success('Informe generado correctamente');
     } catch {
       toast.error('Error al generar el informe');
+      setInspeccionActiva(prev => ({ ...prev, estado: 'completado' }));
     } finally {
       setGenerando(false);
     }
