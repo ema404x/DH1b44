@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Plus, Eye, Trash2, Download, Loader2, CheckCircle2, Clock } from 'lucide-react';
+import { FileText, Plus, Eye, Trash2, Loader2, CheckCircle2, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
@@ -22,35 +22,8 @@ const tipoStyle = {
 };
 
 export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete, emptyLabel }) {
-  const [exporting, setExporting] = useState(null);
   const [exportingPDF, setExportingPDF] = useState(null);
   const [search, setSearch] = useState('');
-
-  const handleExport = async (cert, format) => {
-    setExporting(`${cert.id}-${format}`);
-    try {
-      const res = await base44.functions.invoke('exportCertificado', {
-        certificadoData: cert,
-        format: format
-      });
-      const arrayBuffer = await res.data.arrayBuffer?.() || res.data;
-      const blob = new Blob([arrayBuffer], { 
-        type: format === 'excel' 
-          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-          : 'application/pdf'
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Certificado_N${cert.numero}_${cert.contratista?.replace(/ /g, '_') || 'default'}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Error exporting:', err);
-    } finally {
-      setExporting(null);
-    }
-  };
 
   const filtrados = certificados.filter(c =>
     c.numero?.toString().includes(search) ||
@@ -168,16 +141,6 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                   title="Editar"
                 >
                   <Eye className="h-4 w-4" />
-                </Button>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  className="h-8 w-8" 
-                  onClick={() => handleExport(c, 'excel')} 
-                  disabled={exporting === `${c.id}-excel`}
-                  title="Descargar Excel"
-                >
-                  {exporting === `${c.id}-excel` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 </Button>
                 <Button 
                   size="icon" 
