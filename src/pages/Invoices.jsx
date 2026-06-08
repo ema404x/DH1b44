@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Receipt, Pencil, Trash2, DollarSign, BarChart3, TrendingUp, TrendingDown, Clock } from 'lucide-react';
+import { Search, Receipt, Pencil, Trash2, DollarSign, BarChart3, TrendingUp, TrendingDown, Clock, FileCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -19,6 +19,7 @@ import ReporteMensualComparativo from '@/components/reportes/ReporteMensualCompa
 import DashboardFinanciero from '@/components/finanzas/DashboardFinanciero';
 import GastoMensualAbonosMensuales from '@/components/reportes/GastoMensualAbonosMensuales';
 import FiltrosAvanzadosFacturas from '@/components/invoices/FiltrosAvanzadosFacturas';
+import CertificacionObrasPanel from '@/components/invoices/CertificacionObrasPanel';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const invoiceFields = [
@@ -74,7 +75,7 @@ export default function Invoices() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-         <TabsList className="grid w-full grid-cols-3 bg-muted/40 border border-border rounded-lg p-1">
+         <TabsList className="grid w-full grid-cols-4 bg-muted/40 border border-border rounded-lg p-1">
            <TabsTrigger value="dashboard" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
              <DollarSign className="h-4 w-4" />
              <span className="hidden sm:inline">Dashboard</span>
@@ -86,6 +87,10 @@ export default function Invoices() {
            <TabsTrigger value="reportes" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
              <BarChart3 className="h-4 w-4" />
              <span className="hidden sm:inline">Reportes</span>
+           </TabsTrigger>
+           <TabsTrigger value="obras" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+             <FileCheck className="h-4 w-4" />
+             <span className="hidden sm:inline">Certificación Obras</span>
            </TabsTrigger>
          </TabsList>
 
@@ -239,6 +244,9 @@ export default function Invoices() {
              </Card>
              <CertificacionesVinculadas />
            </div>
+         </TabsContent>
+         <TabsContent value="obras" className="mt-8 animate-in fade-in-50 duration-300">
+           <CertificacionObrasPanel />
          </TabsContent>
       </Tabs>
 
