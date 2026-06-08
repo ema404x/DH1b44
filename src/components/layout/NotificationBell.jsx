@@ -1,28 +1,30 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck, AlertTriangle, Info, CheckCircle2, X } from 'lucide-react';
+import { Bell, CheckCheck, AlertTriangle, Info, CheckCircle2, X, AlertCircle, Package, Wrench, Receipt, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isPast, parseISO } from 'date-fns';
+import { isPast, parseISO, formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 
-const typeIcons = {
-  info: Info,
-  warning: AlertTriangle,
-  success: CheckCircle2,
-  error: AlertTriangle,
+const TYPE_CONFIG = {
+  info:    { icon: Info,          bg: 'bg-blue-500/15',    icon_color: 'text-blue-400',    border: 'border-blue-500/30',    dot: 'bg-blue-400'    },
+  warning: { icon: AlertTriangle, bg: 'bg-amber-500/15',   icon_color: 'text-amber-400',   border: 'border-amber-500/30',   dot: 'bg-amber-400'   },
+  success: { icon: CheckCircle2,  bg: 'bg-emerald-500/15', icon_color: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
+  error:   { icon: AlertCircle,   bg: 'bg-red-500/15',     icon_color: 'text-red-400',     border: 'border-red-500/30',     dot: 'bg-red-400'     },
 };
-const typeColors = {
-  info: 'text-blue-500',
-  warning: 'text-amber-500',
-  success: 'text-emerald-500',
-  error: 'text-red-500',
+
+const SYSTEM_ICONS = {
+  'ot-overdue':      ClipboardList,
+  'stock-low':       Package,
+  'maint-overdue':   Wrench,
+  'invoice-overdue': Receipt,
 };
 
 const systemAlertPaths = {
-  'ot-overdue': '/ordenes',
-  'stock-low': '/inventario',
-  'maint-overdue': '/activos',
+  'ot-overdue':      '/ordenes',
+  'stock-low':       '/inventario',
+  'maint-overdue':   '/activos',
   'invoice-overdue': '/facturacion',
 };
 
@@ -36,52 +38,52 @@ export default function NotificationBell() {
     queryFn: () => base44.entities.Notification.list('-created_date', 30),
   });
 
-  const NOTIF_STALE = 1000 * 60 * 15; // 15 min — estos datos no cambian seguido
-  const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 200), staleTime: NOTIF_STALE });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list('-updated_date', 100), staleTime: NOTIF_STALE });
-  const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list('-updated_date', 100), staleTime: NOTIF_STALE });
-  const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list('-updated_date', 100), staleTime: NOTIF_STALE });
+  const STALE = 1000 * 60 * 15;
+  const { data: orders    = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 200), staleTime: STALE });
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),  staleTime: STALE });
+  const { data: assets    = [] } = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 100),     staleTime: STALE });
+  const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),   staleTime: STALE });
 
   const markReadMutation = useMutation({
     mutationFn: (id) => base44.entities.Notification.update(id, { read: true }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
-  // Auto-generate system alerts
   const systemAlerts = useMemo(() => {
     const alerts = [];
-
-    // Overdue work orders
     const overdueOrders = orders.filter(o => o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada','cancelada'].includes(o.status));
-    if (overdueOrders.length > 0) alerts.push({ id: 'ot-overdue', title: `${overdueOrders.length} OT${overdueOrders.length > 1 ? 's' : ''} vencida${overdueOrders.length > 1 ? 's' : ''}`, message: 'Órdenes de trabajo con fecha pasada sin completar', type: 'warning', read: false });
-
-    // Low stock
+    if (overdueOrders.length > 0) alerts.push({ id: 'ot-overdue', title: `${overdueOrders.length} OT${overdueOrders.length > 1 ? 's' : ''} vencida${overdueOrders.length > 1 ? 's' : ''}`, message: 'Órdenes con fecha pasada sin completar', type: 'warning', read: false });
     const lowStock = materials.filter(m => m.stock <= m.min_stock && m.min_stock > 0);
     if (lowStock.length > 0) alerts.push({ id: 'stock-low', title: 'Stock bajo detectado', message: `${lowStock.length} material${lowStock.length > 1 ? 'es' : ''} por debajo del mínimo`, type: 'warning', read: false });
-
-    // Overdue maintenance
     const overdueAssets = assets.filter(a => a.next_maintenance && isPast(parseISO(a.next_maintenance)));
     if (overdueAssets.length > 0) alerts.push({ id: 'maint-overdue', title: `${overdueAssets.length} mantenimiento${overdueAssets.length > 1 ? 's' : ''} vencido${overdueAssets.length > 1 ? 's' : ''}`, message: 'Activos con mantenimiento programado vencido', type: 'error', read: false });
-
-    // Overdue invoices
     const overdueInvoices = invoices.filter(i => i.status === 'vencida' || (i.due_date && isPast(parseISO(i.due_date)) && i.status === 'pendiente'));
     if (overdueInvoices.length > 0) alerts.push({ id: 'invoice-overdue', title: 'Facturas vencidas', message: `${overdueInvoices.length} factura${overdueInvoices.length > 1 ? 's' : ''} pendiente${overdueInvoices.length > 1 ? 's' : ''} de cobro`, type: 'error', read: false });
-
     return alerts;
   }, [orders, materials, assets, invoices]);
 
   const allNotifs = [...systemAlerts, ...notifications];
   const unread = allNotifs.filter(n => !n.read).length;
 
+  const handleClick = (n) => {
+    const isSystem = typeof n.id === 'string' && systemAlertPaths[n.id];
+    if (isSystem) { navigate(systemAlertPaths[n.id]); setOpen(false); }
+    else if (n.id && !n.read) markReadMutation.mutate(n.id);
+  };
+
   return (
     <div className="relative">
+      {/* Bell button */}
       <button
         onClick={() => setOpen(!open)}
-        className="relative h-9 w-9 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors text-slate-300"
+        className={cn(
+          'relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-200',
+          open ? 'bg-primary/15 text-primary' : 'text-slate-400 hover:bg-white/8 hover:text-slate-200'
+        )}
       >
-        <Bell className="h-4.5 w-4.5" />
+        <Bell className={cn('h-4.5 w-4.5 transition-transform duration-200', open && 'scale-110')} />
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 h-4.5 w-4.5 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 h-[18px] min-w-[18px] px-0.5 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center shadow-md shadow-red-500/40 animate-pulse">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
@@ -89,51 +91,113 @@ export default function NotificationBell() {
 
       {open && (
         <>
-          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} style={{ touchAction: 'none' }} />
-          <div className="fixed right-2 top-14 z-[70] w-[calc(100vw-16px)] sm:w-80 sm:absolute sm:right-0 sm:top-11 sm:fixed-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <div>
-                <h3 className="font-semibold text-sm">Notificaciones</h3>
-                {unread > 0 && <p className="text-[11px] text-muted-foreground">{unread} sin leer</p>}
+          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
+          <div className="fixed right-2 top-14 z-[70] w-[calc(100vw-16px)] sm:w-[340px] sm:absolute sm:right-0 sm:top-11 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl shadow-black/30">
+
+            {/* Header */}
+            <div className="px-4 py-3.5 border-b border-border/50 bg-muted/20 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="relative">
+                  <Bell className="h-4 w-4 text-foreground/70" />
+                  {unread > 0 && <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500" />}
+                </div>
+                <div>
+                  <span className="text-sm font-semibold text-foreground">Notificaciones</span>
+                  {unread > 0 && (
+                    <span className="ml-2 text-xs bg-primary/15 text-primary px-1.5 py-0.5 rounded-full font-medium">{unread} nuevas</span>
+                  )}
+                </div>
               </div>
-              <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+              <button onClick={() => setOpen(false)}
+                className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors">
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <div className="max-h-96 overflow-y-auto divide-y divide-border">
-              {allNotifs.length === 0 && (
-                <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                  <CheckCheck className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  Todo al día
+
+            {/* Body */}
+            <div className="max-h-[420px] overflow-y-auto">
+              {allNotifs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <div className="h-12 w-12 rounded-full bg-muted/40 flex items-center justify-center mb-3">
+                    <CheckCheck className="h-5 w-5 opacity-50" />
+                  </div>
+                  <p className="text-sm font-medium">Todo al día</p>
+                  <p className="text-xs mt-1 opacity-60">Sin notificaciones pendientes</p>
+                </div>
+              ) : (
+                <div className="p-2 space-y-1">
+                  {/* Alertas del sistema agrupadas arriba */}
+                  {systemAlerts.length > 0 && (
+                    <>
+                      <div className="px-2 pt-1 pb-0.5">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Sistema</span>
+                      </div>
+                      {systemAlerts.map(n => {
+                        const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.info;
+                        const Icon = SYSTEM_ICONS[n.id] || cfg.icon;
+                        return (
+                          <button key={n.id} onClick={() => handleClick(n)}
+                            className={cn('w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left transition-all hover:scale-[1.01] active:scale-[0.99]', cfg.bg, 'border', cfg.border)}>
+                            <div className={cn('mt-0.5 h-7 w-7 rounded-lg flex items-center justify-center shrink-0', cfg.bg)}>
+                              <Icon className={cn('h-3.5 w-3.5', cfg.icon_color)} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-foreground leading-tight">{n.title}</p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{n.message}</p>
+                            </div>
+                            <div className={cn('mt-1.5 h-2 w-2 rounded-full shrink-0', cfg.dot)} />
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {/* Notificaciones de usuario */}
+                  {notifications.length > 0 && (
+                    <>
+                      <div className="px-2 pt-2 pb-0.5">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Actividad</span>
+                      </div>
+                      {notifications.map(n => {
+                        const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.info;
+                        const Icon = cfg.icon;
+                        const timeAgo = n.created_date
+                          ? formatDistanceToNow(new Date(n.created_date), { addSuffix: true, locale: es })
+                          : null;
+                        return (
+                          <button key={n.id} onClick={() => handleClick(n)}
+                            className={cn(
+                              'w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left transition-all hover:bg-muted/40',
+                              !n.read && 'bg-primary/5 border border-primary/10'
+                            )}>
+                            <div className={cn('mt-0.5 h-7 w-7 rounded-lg flex items-center justify-center shrink-0 bg-muted/50')}>
+                              <Icon className={cn('h-3.5 w-3.5', cfg.icon_color)} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-foreground leading-tight">{n.title}</p>
+                              {n.message && <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{n.message}</p>}
+                              {timeAgo && <p className="text-[10px] text-muted-foreground/50 mt-1">{timeAgo}</p>}
+                            </div>
+                            {!n.read && <div className={cn('mt-1.5 h-2 w-2 rounded-full shrink-0', cfg.dot)} />}
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
               )}
-              {allNotifs.map((n) => {
-                const Icon = typeIcons[n.type] || Info;
-                const isSystem = typeof n.id === 'string' && (n.id.includes('-overdue') || n.id === 'stock-low');
-                const handleClick = () => {
-                  if (isSystem) {
-                    const path = systemAlertPaths[n.id];
-                    if (path) { navigate(path); setOpen(false); }
-                  } else if (n.id) {
-                    markReadMutation.mutate(n.id);
-                  }
-                };
-                return (
-                  <div
-                    key={n.id}
-                    className={cn('flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer', !n.read && 'bg-primary/5')}
-                    onClick={handleClick}
-                  >
-                    <div className={`mt-0.5 flex-shrink-0 ${typeColors[n.type]}`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold">{n.title}</div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{n.message}</div>
-                    </div>
-                    {!n.read && <div className="h-2 w-2 rounded-full bg-primary mt-1 flex-shrink-0" />}
-                  </div>
-                );
-              })}
             </div>
+
+            {/* Footer */}
+            {notifications.some(n => !n.read) && (
+              <div className="px-4 py-2.5 border-t border-border/40 bg-muted/10 flex justify-end">
+                <button
+                  onClick={() => { notifications.filter(n => !n.read).forEach(n => markReadMutation.mutate(n.id)); }}
+                  className="text-xs text-primary hover:text-primary/80 font-medium transition-colors flex items-center gap-1">
+                  <CheckCheck className="h-3 w-3" /> Marcar todo como leído
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
