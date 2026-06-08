@@ -506,18 +506,7 @@ export default function ChatbotSoporte() {
     ? { position: 'fixed', left: pos.x, top: pos.y, bottom: 'auto', right: 'auto' }
     : { position: 'fixed', bottom: 24, right: 24 };
 
-  if (hidden) {
-    return (
-      <button
-        onClick={() => setHidden(false)}
-        className="fixed bottom-6 right-6 z-50 h-8 px-3 rounded-full bg-card border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all shadow-md flex items-center gap-1.5"
-        title="Mostrar asistente Alice"
-      >
-        <MessageCircle className="h-3.5 w-3.5" />
-        Alice
-      </button>
-    );
-  }
+  if (hidden) return null;
 
   return (
     <>
