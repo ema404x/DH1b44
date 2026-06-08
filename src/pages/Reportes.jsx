@@ -83,14 +83,19 @@ export default function Reportes() {
   const [projectFilter, setProjectFilter] = useState('all');
   const [tecnicoFilter, setTecnicoFilter] = useState('all');
 
-  // Fetch all data
-  const { data: orders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
-  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: () => base44.entities.Project.list() });
-  const { data: timeLogs = [] } = useQuery({ queryKey: ['timelogs_all'], queryFn: () => base44.entities.TimeLog.list() });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => base44.entities.Material.list() });
-  const { data: employees = [] } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list() });
-  const { data: locations = [] } = useQuery({ queryKey: ['locations'], queryFn: () => base44.entities.LocationData.list() });
-  const { data: pendientes = [] } = useQuery({ queryKey: ['pendientes_reportes'], queryFn: () => base44.entities.Pendiente.list() });
+  // Reportes usa keys propias para no contaminar el caché del Dashboard.
+  // Los datos analíticos toleran 5 min de desfase (staleTime alto = menos refetches).
+  // Límites razonables: los reportes no necesitan más de N registros para ser útiles.
+  const STALE_5M  = 5  * 60 * 1000;
+  const STALE_10M = 10 * 60 * 1000;
+
+  const { data: orders = [] }    = useQuery({ queryKey: ['workorders-reportes'],  queryFn: () => base44.entities.WorkOrder.list('-created_date', 1000),    staleTime: STALE_5M  });
+  const { data: projects = [] }  = useQuery({ queryKey: ['projects-reportes'],    queryFn: () => base44.entities.Project.list('-updated_date', 300),        staleTime: STALE_10M });
+  const { data: timeLogs = [] }  = useQuery({ queryKey: ['timelogs-reportes'],    queryFn: () => base44.entities.TimeLog.list('-created_date', 500),        staleTime: STALE_10M });
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'],            queryFn: () => base44.entities.Material.list('-updated_date', 300),       staleTime: STALE_10M });
+  const { data: employees = [] } = useQuery({ queryKey: ['employees'],            queryFn: () => base44.entities.Employee.list('-updated_date', 200),       staleTime: STALE_10M });
+  const { data: locations = [] } = useQuery({ queryKey: ['locations-reportes'],   queryFn: () => base44.entities.LocationData.list('-updated_date', 500),   staleTime: STALE_10M });
+  const { data: pendientes = [] }= useQuery({ queryKey: ['pendientes-reportes'],  queryFn: () => base44.entities.Pendiente.list('-created_date', 1000),     staleTime: STALE_5M  });
 
   // Get unique filter options
   const comunasUnicas = ['8A', '8B', '10A'];

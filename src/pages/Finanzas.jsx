@@ -9,9 +9,12 @@ import FlujoDeCaja from '@/components/finanzas/FlujoDeCaja';
 import ResumenFinanciero from '@/components/finanzas/ResumenFinanciero';
 
 export default function Finanzas() {
-  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: () => base44.entities.Project.list() });
-  const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: () => base44.entities.Invoice.list() });
-  const { data: quotes = [] } = useQuery({ queryKey: ['quotes'], queryFn: () => base44.entities.Quote.list() });
+  // Reutiliza las mismas query keys del Dashboard para aprovechar el caché existente.
+  // staleTime de 2 min: suficiente para análisis financiero sin generar tráfico excesivo.
+  const STALE_2M = 2 * 60 * 1000;
+  const { data: projects = [] } = useQuery({ queryKey: ['projects'],  queryFn: () => base44.entities.Project.list('-updated_date', 300),  staleTime: STALE_2M });
+  const { data: invoices = [] } = useQuery({ queryKey: ['invoices'],  queryFn: () => base44.entities.Invoice.list('-created_date', 500),  staleTime: STALE_2M });
+  const { data: quotes = [] }   = useQuery({ queryKey: ['quotes'],    queryFn: () => base44.entities.Quote.list('-created_date', 300),    staleTime: STALE_2M });
 
   return (
     <div className="space-y-6">

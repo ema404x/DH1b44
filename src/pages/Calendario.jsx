@@ -88,9 +88,23 @@ export default function Calendario() {
   const queryClient = useQueryClient();
   const { filterByUser, isSuperAdmin, employeeRole } = useCurrentUser();
 
-  const { data: rawOrders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list() });
-  const { data: rawInformes = [] } = useQuery({ queryKey: ['informes'], queryFn: () => base44.entities.Informe.list() });
-  const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list() });
+  // Keys distintas para no colisionar con el caché del Dashboard (que pide con límite y orden)
+  // staleTime alto porque el calendario tolera datos con pocos minutos de desfase
+  const { data: rawOrders = [] } = useQuery({
+    queryKey: ['workorders-calendario'],
+    queryFn: () => base44.entities.WorkOrder.filter({ scheduled_date: { $exists: true } }, '-scheduled_date', 500),
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: rawInformes = [] } = useQuery({
+    queryKey: ['informes-calendario'],
+    queryFn: () => base44.entities.Informe.filter({ fecha_limite: { $exists: true } }, '-fecha_limite', 200),
+    staleTime: 5 * 60 * 1000,
+  });
+  const { data: assets = [] } = useQuery({
+    queryKey: ['assets'],
+    queryFn: () => base44.entities.Asset.list('-updated_date', 200),
+    staleTime: 10 * 60 * 1000,
+  });
 
   // Filtrar OT por usuario actual — jefe de sitio solo ve las suyas
   const orders = filterByUser(rawOrders, ['assigned_to', 'assigned_name']);
