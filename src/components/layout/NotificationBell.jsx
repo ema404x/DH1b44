@@ -38,11 +38,11 @@ export default function NotificationBell() {
     queryFn: () => base44.entities.Notification.list('-created_date', 30),
   });
 
-  const STALE = 1000 * 60 * 15;
-  const { data: orders    = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 200), staleTime: STALE });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),  staleTime: STALE });
-  const { data: assets    = [] } = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 100),     staleTime: STALE });
-  const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),   staleTime: STALE });
+  const STALE = 1000 * 60 * 2; // 2 min
+  const { data: orders    = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 200), staleTime: STALE, refetchOnWindowFocus: true });
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),  staleTime: STALE, refetchOnWindowFocus: true });
+  const { data: assets    = [] } = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 100),     staleTime: STALE, refetchOnWindowFocus: true });
+  const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),   staleTime: STALE, refetchOnWindowFocus: true });
 
   const markReadMutation = useMutation({
     mutationFn: (id) => base44.entities.Notification.update(id, { read: true }),
@@ -65,6 +65,18 @@ export default function NotificationBell() {
   const allNotifs = [...systemAlerts, ...notifications];
   const unread = allNotifs.filter(n => !n.read).length;
 
+  const handleOpen = () => {
+    const newOpen = !open;
+    setOpen(newOpen);
+    if (newOpen) {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['workorders'] });
+      qc.invalidateQueries({ queryKey: ['materials'] });
+      qc.invalidateQueries({ queryKey: ['assets'] });
+      qc.invalidateQueries({ queryKey: ['invoices'] });
+    }
+  };
+
   const handleClick = (n) => {
     const isSystem = typeof n.id === 'string' && systemAlertPaths[n.id];
     if (isSystem) { navigate(systemAlertPaths[n.id]); setOpen(false); }
@@ -75,7 +87,7 @@ export default function NotificationBell() {
     <div className="relative">
       {/* Bell button */}
       <button
-        onClick={() => setOpen(!open)}
+        onClick={handleOpen}
         className={cn(
           'relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-200',
           open ? 'bg-primary/15 text-primary' : 'text-slate-400 hover:bg-white/8 hover:text-slate-200'
