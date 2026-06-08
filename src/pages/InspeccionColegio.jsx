@@ -382,6 +382,7 @@ export default function InspeccionColegioPage() {
             informe={inspeccionActiva.informe_generado}
             establecimiento={inspeccionActiva.establecimiento}
             fecha={inspeccionActiva.fecha_inspeccion}
+            secciones={inspeccionActiva.secciones || []}
           />
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm text-amber-800 font-medium mb-2">¿Querés revisar o actualizar secciones?</p>
