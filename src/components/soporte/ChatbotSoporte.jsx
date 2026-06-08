@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useLocation } from 'react-router-dom';
 import {
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// ── Constantes estáticas (no se recrean) ─────────────────────────────────────
+// ── Constantes estáticas ──────────────────────────────────────────────────────
 const RUTA_MODULO = {
   '/': 'Dashboard', '/proyectos': 'Proyectos', '/ordenes': 'Órdenes de Trabajo',
   '/activos': 'Pendientes SAP', '/inventario': 'Inventario/Pañol',
@@ -46,8 +46,8 @@ const DESCRIPCION_ROL = {
 };
 
 const SUGERENCIAS_POR_MODULO = {
-  'Pendientes SAP':           { categoria: '📋 Pendientes SAP',   preguntas: ['¿Cómo importo pendientes desde SAP?','¿Cómo asigno un jefe de sitio?'] },
-  'Órdenes de Trabajo':       { categoria: '🔧 Órdenes de trabajo',preguntas: ['¿Cómo creo una orden de trabajo?','¿Cómo registro materiales en una OT?'] },
+  'Pendientes SAP':           { categoria: '📋 Pendientes SAP',    preguntas: ['¿Cómo importo pendientes desde SAP?','¿Cómo asigno un jefe de sitio?'] },
+  'Órdenes de Trabajo':       { categoria: '🔧 Órdenes de trabajo', preguntas: ['¿Cómo creo una orden de trabajo?','¿Cómo registro materiales en una OT?'] },
   'Inspecciones de Colegios': { categoria: '🏫 Inspecciones',       preguntas: ['¿Cómo hago una inspección de colegio?','¿Cómo genero el informe con IA?'] },
   'Inventario/Pañol':         { categoria: '📦 Inventario',         preguntas: ['¿Cómo registro entrada de materiales?','¿Cómo configuro alertas de stock bajo?'] },
   'Presupuestos':             { categoria: '📄 Presupuestos',       preguntas: ['¿Cómo creo un presupuesto de obra?','¿Qué es el preciario ministerial?'] },
@@ -72,42 +72,36 @@ function buildContextoRol(user, moduloActual, empleadoInfo) {
   return `[CONTEXTO INTERNO]\nUsuario: ${nombre} | Rol: ${rol} | ${desc}${moduloActual ? ` | Módulo actual: ${moduloActual}.` : ''}\nAdaptá respuestas al rol. No menciones restricciones de acceso.`;
 }
 
-// Modo reflexiva: carga datos mínimos con filtros eficientes
 async function buildContextoReflexivo(user) {
   const nombre = user?.full_name || user?.email || 'el usuario';
   const primerNombre = nombre.split(' ')[0];
   const resumenParts = [];
-
   try {
-    // Solo cargamos lo esencial: 20 registros max por entidad, campos relevantes
     const [pendientes, ots, emergencias] = await Promise.all([
       base44.entities.Pendiente.filter({ estado: 'pendiente' }, '-created_date', 20),
       base44.entities.WorkOrder.filter({ status: 'en_progreso' }, '-created_date', 15),
       base44.entities.Emergencia.filter({ estado: 'activa' }, '-created_date', 5),
     ]);
-
-    const misPend = pendientes.filter(p =>
-      p.jefe_sitio?.toLowerCase().includes(primerNombre.toLowerCase()) ||
-      p.inspector?.toLowerCase().includes(primerNombre.toLowerCase())
-    );
-    const vencidos = misPend.filter(p => p.fecha_limite && new Date(p.fecha_limite) < new Date()).length;
-    const hoy = new Date(); const en7d = new Date(hoy); en7d.setDate(hoy.getDate() + 7);
-    const proximos = misPend.filter(p => p.fecha_limite && new Date(p.fecha_limite) >= hoy && new Date(p.fecha_limite) <= en7d).length;
-
-    if (misPend.length > 0) resumenParts.push(`Pendientes de ${primerNombre}: ${misPend.length} sin resolver, ${vencidos} vencidos, ${proximos} vencen en 7 días.`);
-
-    const misOTs = ots.filter(o => o.assigned_name?.toLowerCase().includes(primerNombre.toLowerCase()));
-    const urgentes = misOTs.filter(o => o.priority === 'urgente').length;
-    if (misOTs.length > 0) resumenParts.push(`OTs en progreso de ${primerNombre}: ${misOTs.length}${urgentes > 0 ? `, ${urgentes} urgentes` : ''}.`);
-
-    if (emergencias.length > 0) resumenParts.push(`Emergencias activas en el sistema: ${emergencias.length}.`);
-  } catch {}
-
+    const q = primerNombre.toLowerCase();
+    const misPend = pendientes.filter(p => p.jefe_sitio?.toLowerCase().includes(q) || p.inspector?.toLowerCase().includes(q));
+    if (misPend.length > 0) {
+      const vencidos = misPend.filter(p => p.fecha_limite && new Date(p.fecha_limite) < new Date()).length;
+      const hoy = new Date(); const en7d = new Date(hoy); en7d.setDate(hoy.getDate() + 7);
+      const proximos = misPend.filter(p => { if (!p.fecha_limite) return false; const d = new Date(p.fecha_limite); return d >= hoy && d <= en7d; }).length;
+      resumenParts.push(`Pendientes de ${primerNombre}: ${misPend.length} sin resolver, ${vencidos} vencidos, ${proximos} vencen en 7 días.`);
+    }
+    const misOTs = ots.filter(o => o.assigned_name?.toLowerCase().includes(q));
+    if (misOTs.length > 0) {
+      const urgentes = misOTs.filter(o => o.priority === 'urgente').length;
+      resumenParts.push(`OTs en progreso de ${primerNombre}: ${misOTs.length}${urgentes > 0 ? `, ${urgentes} urgentes` : ''}.`);
+    }
+    if (emergencias.length > 0) resumenParts.push(`Emergencias activas: ${emergencias.length}.`);
+  } catch { /* silencioso — funciona sin datos */ }
   const resumen = resumenParts.join('\n');
   return `[MODO REFLEXIVA]\nUsuario: ${nombre}.\n${resumen ? `Datos del sistema:\n${resumen}\n` : ''}Saludalo por su nombre, analizá su situación con los datos reales, y dale un plan concreto de 3 acciones para hoy. Sé cálido y directo.`;
 }
 
-// ── Sub-componentes ───────────────────────────────────────────────────────────
+// ── Sub-componentes puros ─────────────────────────────────────────────────────
 function TypingIndicator() {
   return (
     <div className="flex justify-start">
@@ -121,7 +115,8 @@ function TypingIndicator() {
   );
 }
 
-function MessageBubble({ msg }) {
+// Memoizado para evitar re-renders en cada token de streaming
+const MessageBubble = React.memo(function MessageBubble({ msg }) {
   const isUser = msg.role === 'user';
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
@@ -144,7 +139,7 @@ function MessageBubble({ msg }) {
       </div>
     </motion.div>
   );
-}
+});
 
 export function AlicePageButton({ onClick }) {
   return (
@@ -161,16 +156,17 @@ export function AlicePageButton({ onClick }) {
 export default function ChatbotSoporte() {
   const location = useLocation();
   const moduloActual = RUTA_MODULO[location.pathname] || null;
-  const prevModuloRef = useRef(moduloActual);
+  const prevModuloRef  = useRef(moduloActual);
 
-  const [open, setOpen]     = useState(false);
+  const [open,   setOpen]   = useState(false);
   const [hidden, setHidden] = useState(false);
+  const openRef = useRef(false); // ref para closures estables — evita stale closure en subscripción
 
   // Draggable
-  const [pos, setPos] = useState(null);
-  const dragging    = useRef(false);
-  const didDrag     = useRef(false);
-  const dragOffset  = useRef({ x: 0, y: 0 });
+  const [pos, setPos]   = useState(null);
+  const dragging   = useRef(false);
+  const didDrag    = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
 
   const handleDragStart = useCallback((e) => {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -178,7 +174,7 @@ export default function ChatbotSoporte() {
     const rect = e.currentTarget.getBoundingClientRect();
     dragOffset.current = { x: clientX - rect.left, y: clientY - rect.top };
     dragging.current = true;
-    didDrag.current = false;
+    didDrag.current  = false;
     e.preventDefault();
   }, []);
 
@@ -186,11 +182,11 @@ export default function ChatbotSoporte() {
     const onMove = (e) => {
       if (!dragging.current) return;
       didDrag.current = true;
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      const cy = e.touches ? e.touches[0].clientY : e.clientY;
       setPos({
-        x: Math.max(0, Math.min(clientX - dragOffset.current.x, window.innerWidth - 56)),
-        y: Math.max(0, Math.min(clientY - dragOffset.current.y, window.innerHeight - 56)),
+        x: Math.max(0, Math.min(cx - dragOffset.current.x, window.innerWidth - 56)),
+        y: Math.max(0, Math.min(cy - dragOffset.current.y, window.innerHeight - 56)),
       });
     };
     const onUp = () => { dragging.current = false; };
@@ -207,29 +203,40 @@ export default function ChatbotSoporte() {
   }, []);
 
   // Chat state
-  const [conversation,      setConversation]      = useState(null);
-  const [messages,          setMessages]          = useState([]);
-  const [input,             setInput]             = useState('');
-  const [sending,           setSending]           = useState(false);
-  const [showSugerencias,   setShowSugerencias]   = useState(false);
-  const [categoriaActiva,   setCategoriaActiva]   = useState(0);
-  const [unread,            setUnread]            = useState(0);
-  const [currentUser,       setCurrentUser]       = useState(null);
-  const [empleadoInfo,      setEmpleadoInfo]      = useState(null);
-  const [loadingReflexiva,  setLoadingReflexiva]  = useState(false);
-  const [uploadingPhoto,    setUploadingPhoto]    = useState(false);
-  const [criticalAlerts,    setCriticalAlerts]    = useState(0);
-  const messagesEndRef = useRef(null);
-  const inputRef       = useRef(null);
-  const fileInputRef   = useRef(null);
-  const lastVisibleCount = useRef(0);
-  const initDone       = useRef(false); // evitar doble init
+  const [conversation,     setConversation]     = useState(null);
+  const [messages,         setMessages]         = useState([]);
+  const [input,            setInput]            = useState('');
+  const [sending,          setSending]          = useState(false);
+  const [showSugerencias,  setShowSugerencias]  = useState(false);
+  const [categoriaActiva,  setCategoriaActiva]  = useState(0);
+  const [unread,           setUnread]           = useState(0);
+  const [currentUser,      setCurrentUser]      = useState(null);
+  const [empleadoInfo,     setEmpleadoInfo]     = useState(null);
+  const [loadingReflexiva, setLoadingReflexiva] = useState(false);
+  const [uploadingPhoto,   setUploadingPhoto]   = useState(false);
+  const [criticalAlerts,   setCriticalAlerts]   = useState(0);
+  const [initError,        setInitError]        = useState(false); // permite reintentar
+  const [userReady,        setUserReady]        = useState(false); // true cuando ambos (user+emp) cargaron
 
-  const isThinking    = messages.length > 0 && messages[messages.length - 1]?.role === 'user';
-  const rolEfectivo   = empleadoInfo?.employee_role?.toLowerCase().trim() || (currentUser?.role === 'admin' ? 'admin' : 'user');
-  const sugerencias   = getSugerenciasParaRol(rolEfectivo);
+  const messagesEndRef   = useRef(null);
+  const inputRef         = useRef(null);
+  const fileInputRef     = useRef(null);
+  const lastBotCount     = useRef(0);
+  const initInProgress   = useRef(false); // guard contra doble init concurrente
+  // prompt pendiente cuando se llama ayudaPagina ANTES de que conv exista
+  const pendingPromptRef = useRef(null);
 
-  // Cargar usuario y empleado UNA SOLA VEZ — en paralelo
+  const conversationRef = useRef(null); // ref estable para callbacks sin stale closure
+  useEffect(() => { conversationRef.current = conversation; }, [conversation]);
+
+  const isThinking  = messages.length > 0 && messages[messages.length - 1]?.role === 'user';
+  const rolEfectivo = useMemo(
+    () => empleadoInfo?.employee_role?.toLowerCase().trim() || (currentUser?.role === 'admin' ? 'admin' : 'user'),
+    [empleadoInfo, currentUser]
+  );
+  const sugerencias = useMemo(() => getSugerenciasParaRol(rolEfectivo), [rolEfectivo]);
+
+  // ── Carga inicial: usuario + empleado en paralelo ─────────────────────────
   useEffect(() => {
     Promise.all([
       base44.auth.me().catch(() => null),
@@ -237,98 +244,118 @@ export default function ChatbotSoporte() {
     ]).then(([u, emp]) => {
       setCurrentUser(u);
       setEmpleadoInfo(emp);
+      setUserReady(true);
     });
   }, []);
 
-  // Cargar alertas críticas UNA SOLA VEZ cuando tengamos usuario
+  // Alertas críticas — solo una vez, solo con usuario válido
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser?.id) return;
     base44.entities.AlertaLog.filter({ leida: false, nivel: 'critical' }, '-fecha_alerta', 5)
       .then(alertas => {
-        if (alertas.length > 0) {
-          setCriticalAlerts(alertas.length);
-          setUnread(alertas.length);
-        }
+        if (alertas.length > 0) { setCriticalAlerts(alertas.length); setUnread(alertas.length); }
       })
       .catch(() => {});
-  }, [currentUser?.id]); // solo cuando cambia el usuario
+  }, [currentUser?.id]);
 
-  // Inicializar conversación cuando se abre por primera vez
-  useEffect(() => {
-    if (!open || conversation || currentUser === null || initDone.current) return;
-    initDone.current = true;
-    const init = async () => {
+  // ── Inicialización de conversación ───────────────────────────────────────
+  // FIX: initInProgress guard (no initDone) — permite reintentar tras error
+  const initConversation = useCallback(async (user, empInfo, modulo) => {
+    if (initInProgress.current || conversationRef.current) return;
+    initInProgress.current = true;
+    setInitError(false);
+    try {
+      const rol = empInfo?.employee_role?.toLowerCase().trim() || (user?.role === 'admin' ? 'admin' : 'user');
       const conv = await base44.agents.createConversation({
         agent_name: 'soporte_app',
-        metadata: { name: 'Soporte', user_role: rolEfectivo },
+        metadata: { name: 'Soporte', user_role: rol },
       });
-      const contexto = buildContextoRol(currentUser, moduloActual, empleadoInfo);
+      const contexto = buildContextoRol(user, modulo, empInfo);
       await base44.agents.addMessage(conv, { role: 'user', content: contexto });
       setConversation(conv);
       setMessages([]);
-    };
-    init();
-  }, [open, currentUser]);
+      // FIX: si había un prompt pendiente (ej: ayudaPagina llamado antes de conv), enviarlo ahora
+      if (pendingPromptRef.current) {
+        const prompt = pendingPromptRef.current;
+        pendingPromptRef.current = null;
+        await base44.agents.addMessage(conv, { role: 'user', content: prompt });
+      }
+    } catch {
+      setInitError(true);
+      initInProgress.current = false; // permite reintentar
+    }
+  }, []);
+
+  // FIX: disparar init cuando: se abre el panel Y el usuario ya cargó Y no hay conv
+  useEffect(() => {
+    if (open && userReady && currentUser && !conversationRef.current && !initInProgress.current) {
+      initConversation(currentUser, empleadoInfo, moduloActual);
+    }
+  }, [open, userReady, currentUser, empleadoInfo, initConversation]);
 
   useEffect(() => {
     if (open) {
+      openRef.current = true;
       setUnread(0);
       setTimeout(() => inputRef.current?.focus(), 150);
+    } else {
+      openRef.current = false;
     }
   }, [open]);
 
-  // Suscripción a la conversación
+  // ── Suscripción — FIX: usa openRef en lugar de `open` para evitar stale closure ──
   useEffect(() => {
     if (!conversation?.id) return;
     const unsub = base44.agents.subscribeToConversation(conversation.id, (data) => {
       const allMsgs = data.messages || [];
-      const visible = allMsgs.filter((m, i) =>
-        !(i === 0 && m.role === 'user') &&
+      const visible = allMsgs.filter((m, idx) =>
+        !(idx === 0 && m.role === 'user') &&
         !(m.role === 'user' && INTERNAL_PREFIXES.some(p => m.content?.startsWith(p)))
       );
       setMessages(visible);
-      if (!open) {
+      // FIX: usa openRef.current (siempre fresco) en lugar del stale `open`
+      if (!openRef.current) {
         const botCount = visible.filter(m => m.role === 'assistant').length;
-        if (botCount > lastVisibleCount.current) {
-          setUnread(u => u + (botCount - lastVisibleCount.current));
-          lastVisibleCount.current = botCount;
+        if (botCount > lastBotCount.current) {
+          setUnread(u => u + (botCount - lastBotCount.current));
+          lastBotCount.current = botCount;
         }
       } else {
-        lastVisibleCount.current = visible.filter(m => m.role === 'assistant').length;
+        lastBotCount.current = visible.filter(m => m.role === 'assistant').length;
       }
     });
     return unsub;
-  }, [conversation?.id, open]);
+  }, [conversation?.id]); // FIX: ya NO depende de `open` — usa ref
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
 
-  // Cambio de módulo: mostrar burbuja + notificar a Alice solo si tiene conversación activa
+  // Cambio de módulo: mostrar burbuja + notificar a Alice
   useEffect(() => {
-    if (prevModuloRef.current !== moduloActual) {
-      setHidden(false);
-      prevModuloRef.current = moduloActual;
-      if (conversation && currentUser && moduloActual) {
-        base44.agents.addMessage(conversation, {
-          role: 'user',
-          content: `[CONTEXTO ACTUALIZADO]\nMódulo actual: "${moduloActual}".`,
-        }).catch(() => {});
-      }
+    if (prevModuloRef.current === moduloActual) return;
+    prevModuloRef.current = moduloActual;
+    setHidden(false);
+    if (conversationRef.current && currentUser && moduloActual) {
+      base44.agents.addMessage(conversationRef.current, {
+        role: 'user',
+        content: `[CONTEXTO ACTUALIZADO]\nMódulo actual: "${moduloActual}".`,
+      }).catch(() => {});
     }
-  }, [moduloActual, conversation, currentUser]);
+  }, [moduloActual, currentUser]);
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleClose = useCallback(() => { setOpen(false); setHidden(true); }, []);
 
-  const handleSend = async (text, fileUrls) => {
+  const handleSend = useCallback(async (text, fileUrls) => {
     const msg = (text || input).trim();
-    if ((!msg && !fileUrls) || sending || !conversation) return;
+    const conv = conversationRef.current;
+    if ((!msg && !fileUrls) || sending || !conv) return;
     setInput('');
     setShowSugerencias(false);
     setSending(true);
     try {
-      await base44.agents.addMessage(conversation, {
+      await base44.agents.addMessage(conv, {
         role: 'user',
         content: msg || '(imagen adjunta)',
         ...(fileUrls ? { file_urls: fileUrls } : {}),
@@ -336,33 +363,41 @@ export default function ChatbotSoporte() {
     } finally {
       setSending(false);
     }
-  };
+  }, [input, sending]);
 
-  const handleAyudaPagina = async () => {
-    if (!moduloActual || !conversation) return;
+  // FIX: si no hay conv todavía, guarda el prompt para enviarlo cuando esté lista
+  const handleAyudaPagina = useCallback(async () => {
+    if (!moduloActual) return;
     setOpen(true);
     const prompt = `[AYUDA PÁGINA]\nMódulo "${moduloActual}": explicá en 3-4 puntos sus funciones principales. Sé directo y práctico.`;
+    const conv = conversationRef.current;
+    if (!conv) {
+      // La conv se está creando; guardar prompt para envío post-init
+      pendingPromptRef.current = prompt;
+      return;
+    }
     setSending(true);
     try {
-      await base44.agents.addMessage(conversation, { role: 'user', content: prompt });
+      await base44.agents.addMessage(conv, { role: 'user', content: prompt });
     } finally {
       setSending(false);
     }
-  };
+  }, [moduloActual]);
 
-  const handleModoReflexiva = async () => {
-    if (!conversation || !currentUser) return;
+  const handleModoReflexiva = useCallback(async () => {
+    const conv = conversationRef.current;
+    if (!conv || !currentUser) return;
     setLoadingReflexiva(true);
     setShowSugerencias(false);
     try {
       const contexto = await buildContextoReflexivo(currentUser);
-      await base44.agents.addMessage(conversation, { role: 'user', content: contexto });
+      await base44.agents.addMessage(conv, { role: 'user', content: contexto });
     } finally {
       setLoadingReflexiva(false);
     }
-  };
+  }, [currentUser]);
 
-  const handlePhotoUpload = async (e) => {
+  const handlePhotoUpload = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 8 * 1024 * 1024) { alert('La imagen supera el límite de 8 MB.'); e.target.value = ''; return; }
@@ -372,26 +407,34 @@ export default function ChatbotSoporte() {
       await handleSend('(foto adjunta para consulta)', [file_url]);
     } catch { alert('No se pudo subir la imagen. Intentá de nuevo.'); }
     finally { setUploadingPhoto(false); e.target.value = ''; }
-  };
+  }, [handleSend]);
 
-  const handleReset = () => {
+  // FIX: reset completo y limpio — resetea todos los guards
+  const handleReset = useCallback(() => {
     setConversation(null);
+    conversationRef.current = null;
     setMessages([]);
     setShowSugerencias(false);
-    lastVisibleCount.current = 0;
-    initDone.current = false;
-  };
+    setInitError(false);
+    lastBotCount.current = 0;
+    initInProgress.current = false;
+    pendingPromptRef.current = null;
+    // Reinicia init inmediatamente si el panel está abierto
+    if (openRef.current && currentUser) {
+      initConversation(currentUser, empleadoInfo, moduloActual);
+    }
+  }, [currentUser, empleadoInfo, moduloActual, initConversation]);
 
-  const handleAccionRapida = (tipo) => {
+  const handleAccionRapida = useCallback((tipo) => {
     const mensajes = {
       ot:         '¿Cómo creo una orden de trabajo nueva?',
       pendiente:  '¿Cómo creo un nuevo pendiente SAP manualmente?',
       emergencia: '¿Cómo registro una emergencia?',
     };
     handleSend(mensajes[tipo]);
-  };
+  }, [handleSend]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   const bubbleStyle = pos
     ? { position: 'fixed', left: pos.x, top: pos.y, bottom: 'auto', right: 'auto' }
     : { position: 'fixed', bottom: 24, right: 24 };
@@ -464,7 +507,7 @@ export default function ChatbotSoporte() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                {moduloActual && messages.length === 0 && (
+                {moduloActual && messages.length === 0 && !initError && (
                   <button onClick={handleAyudaPagina}
                     className="h-7 px-2 rounded-lg flex items-center gap-1 hover:bg-white/20 transition-colors text-white/80 hover:text-white text-[10px] font-medium">
                     <HelpCircle className="h-3 w-3" />
@@ -486,13 +529,26 @@ export default function ChatbotSoporte() {
 
             {/* Mensajes */}
             <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
-              {!conversation && (
+
+              {/* FIX: pantalla de error con botón de reintento */}
+              {initError && (
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
+                  <AlertTriangle className="h-8 w-8 text-amber-400" />
+                  <p className="text-sm text-muted-foreground">No se pudo conectar con Alice.<br />Verificá tu conexión e intentá de nuevo.</p>
+                  <button onClick={handleReset}
+                    className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+                    Reintentar
+                  </button>
+                </div>
+              )}
+
+              {!initError && !conversation && (
                 <div className="flex justify-center items-center h-full">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               )}
 
-              {conversation && messages.length === 0 && (
+              {!initError && conversation && messages.length === 0 && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3 py-2">
                   <div className="text-center space-y-2">
                     <div className="h-12 w-12 mx-auto rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -514,7 +570,7 @@ export default function ChatbotSoporte() {
                   )}
 
                   <button onClick={handleModoReflexiva} disabled={loadingReflexiva}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-pink-500/30 bg-pink-500/5 hover:bg-pink-500/10 transition-all">
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-pink-500/30 bg-pink-500/5 hover:bg-pink-500/10 transition-all disabled:opacity-60">
                     <div className="h-8 w-8 rounded-lg bg-pink-500/15 border border-pink-500/25 flex items-center justify-center flex-shrink-0">
                       {loadingReflexiva ? <Loader2 className="h-4 w-4 text-pink-400 animate-spin" /> : <Heart className="h-4 w-4 text-pink-400" />}
                     </div>
@@ -528,9 +584,9 @@ export default function ChatbotSoporte() {
                     <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide px-1">Acciones rápidas</p>
                     <div className="grid grid-cols-3 gap-1.5">
                       {[
-                        { tipo: 'ot',         icon: <Wrench className="h-4 w-4 text-primary" />,          label: 'Nueva OT' },
-                        { tipo: 'pendiente',  icon: <ClipboardList className="h-4 w-4 text-amber-400" />, label: 'Pendiente SAP' },
-                        { tipo: 'emergencia', icon: <AlertTriangle className="h-4 w-4 text-red-400" />,   label: 'Emergencia' },
+                        { tipo: 'ot',         icon: <Wrench className="h-4 w-4 text-primary" />,           label: 'Nueva OT' },
+                        { tipo: 'pendiente',  icon: <ClipboardList className="h-4 w-4 text-amber-400" />,  label: 'Pendiente SAP' },
+                        { tipo: 'emergencia', icon: <AlertTriangle className="h-4 w-4 text-red-400" />,    label: 'Emergencia' },
                       ].map(({ tipo, icon, label }) => (
                         <button key={tipo} onClick={() => handleAccionRapida(tipo)}
                           className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-all text-center">
@@ -570,12 +626,12 @@ export default function ChatbotSoporte() {
                 </motion.div>
               )}
 
-              {messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
+              {messages.map((msg, i) => <MessageBubble key={`${msg.role}-${i}`} msg={msg} />)}
               {(isThinking || loadingReflexiva || uploadingPhoto) && <TypingIndicator />}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Chips de sugerencias rápidas */}
+            {/* Chips de sugerencias */}
             {messages.length > 0 && messages.length < 6 && !isThinking && !loadingReflexiva && (
               <div className="px-3 pb-1 flex-shrink-0">
                 <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
@@ -599,19 +655,21 @@ export default function ChatbotSoporte() {
             <div className="px-3 pb-3 pt-1 border-t border-border flex-shrink-0">
               <div className="flex gap-2 items-end">
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-                <button onClick={() => fileInputRef.current?.click()} disabled={!conversation || uploadingPhoto}
+                <button onClick={() => fileInputRef.current?.click()} disabled={!conversation || uploadingPhoto || initError}
                   title="Adjuntar foto"
                   className="h-9 w-9 rounded-xl flex-shrink-0 flex items-center justify-center border border-border hover:bg-muted transition-colors disabled:opacity-40">
                   {uploadingPhoto ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : <ImageIcon className="h-4 w-4 text-muted-foreground" />}
                 </button>
                 <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                  placeholder="Escribí tu pregunta..." disabled={!conversation || sending || loadingReflexiva}
+                  placeholder={initError ? 'Error de conexión — reintentá' : 'Escribí tu pregunta...'}
+                  disabled={!conversation || sending || loadingReflexiva || initError}
                   rows={1}
                   className="flex-1 text-sm bg-muted rounded-xl px-3 py-2.5 outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring disabled:opacity-50 resize-none leading-snug max-h-24 overflow-y-auto"
                   style={{ scrollbarWidth: 'none' }} />
                 <Button size="icon" className="h-9 w-9 rounded-xl flex-shrink-0"
-                  onClick={() => handleSend()} disabled={!input.trim() || !conversation || sending || loadingReflexiva}>
+                  onClick={() => handleSend()}
+                  disabled={!input.trim() || !conversation || sending || loadingReflexiva || initError}>
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
