@@ -159,7 +159,11 @@ export default function InspeccionColegioPage() {
     // Limpiar informe anterior para forzar re-render completo al recibir el nuevo
     setInspeccionActiva(prev => ({ ...prev, informe_generado: null, estado: 'generando' }));
     try {
-      await updateMutation.mutateAsync({ id: inspeccionActiva.id, data: { estado: 'generando' } });
+      // Guardar secciones actuales + estado en la DB antes de invocar la función
+      await updateMutation.mutateAsync({
+        id: inspeccionActiva.id,
+        data: { estado: 'generando', secciones: inspeccionActiva.secciones, informe_generado: null }
+      });
       const res = await base44.functions.invoke('generarInformeInspeccion', { inspeccion_id: inspeccionActiva.id });
       const informe = res.data.informe;
       setInspeccionActiva(prev => ({ ...prev, informe_generado: informe, estado: 'completado' }));
