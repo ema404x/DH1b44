@@ -123,14 +123,21 @@ Para cada problema urgente o importante, indicá:
 - **Responsable sugerido:** Jefe de sitio / Contratista especializado / Inspección técnica ministerial
 - **Estimación de recursos:** si podés estimarlo con el preciario disponible, indicalo
 
-## 8. Materiales y Trabajos según Preciario Ministerial
-Basándote en los problemas detectados y el preciario disponible, completá la siguiente tabla. Incluí TODOS los ítems necesarios para resolver los problemas identificados:
+## 8. Cuadro de Valores y Trabajos — Preciario Ministerial
+Esta es la tabla más importante del informe. Debe ser COMPLETA y DETALLADA. Para CADA problema o trabajo detectado, asigná el ítem de preciario correspondiente y estimá la cantidad real necesaria. Si hay varios problemas que usan el mismo ítem, sumá las cantidades o poné filas separadas por sector.
 
-| Código | Descripción del ítem | Unidad | Cantidad est. | Sección | Observación |
-|--------|---------------------|--------|---------------|---------|-------------|
-| ... | ... | ... | ... | ... | ... |
+| N° | Sección / Sector | Trabajo a realizar | Código Preciario | Descripción ítem preciario | Unidad | Cant. estimada | Urgencia |
+|----|------------------|--------------------|-----------------|---------------------------|--------|---------------|---------|
+| 1 | ... | ... | ... | ... | ... | ... | 🔴 URGENTE |
+| ... | ... | ... | ... | ... | ... | ... | ... |
 
-Si no encontrás el código exacto en el preciario, usá el más cercano e indicalo en la columna Observación. Si no se detectaron trabajos, escribí "No se requieren trabajos en este período."
+**SUBTOTALES POR TIPO DE TRABAJO:**
+Al final de la tabla, agregá una fila de subtotal agrupando por categoría:
+| — | TOTAL DE ÍTEMS RELEVADOS | — | — | — | — | [suma] ítems | — |
+
+Si no encontrás el código exacto en el preciario, usá el más cercano e indicalo con un asterisco (*) en la columna Código. Si no se detectaron trabajos, escribí "Sin trabajos requeridos en este período."
+
+**IMPORTANTE:** Esta tabla debe tener MÍNIMO una fila por cada problema detectado en la sección anterior. No puede estar vacía si hay problemas detectados.
 
 ## 9. Registro Fotográfico
 Creá un registro detallado de las fotos tomadas:

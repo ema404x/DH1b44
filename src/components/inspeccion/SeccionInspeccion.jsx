@@ -12,18 +12,86 @@ export default function SeccionInspeccion({ seccion, onChange }) {
   const [recording, setRecording] = useState(false);
   const [noSupport, setNoSupport] = useState(false);
   const recognitionRef = useRef(null);
+  const isRecordingRef = useRef(false); // ref para evitar closures stale
   const fileInputRef = useRef(null);
   const transcripcionAcumuladaRef = useRef(seccion.transcripcion || '');
 
-  // Mantener ref sincronizada con la prop
+  // Mantener ref sincronizada con la prop (solo cuando no está grabando)
   useEffect(() => {
-    transcripcionAcumuladaRef.current = seccion.transcripcion || '';
+    if (!isRecordingRef.current) {
+      transcripcionAcumuladaRef.current = seccion.transcripcion || '';
+    }
   }, [seccion.transcripcion]);
 
   // Detener reconocimiento al desmontar
   useEffect(() => {
-    return () => { recognitionRef.current?.stop(); };
+    return () => {
+      isRecordingRef.current = false;
+      recognitionRef.current?.stop();
+    };
   }, []);
+
+  const createRecognition = () => {
+    const SpeechRecognition = getSpeechRecognition();
+    if (!SpeechRecognition) return null;
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'es-AR';
+    recognition.continuous = true;
+    recognition.interimResults = true; // resultados parciales para mayor fluidez
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (e) => {
+      // Solo tomar resultados finales para acumular
+      let nuevasPalabras = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          nuevasPalabras += e.results[i][0].transcript + ' ';
+        }
+      }
+      if (nuevasPalabras.trim()) {
+        const base = transcripcionAcumuladaRef.current;
+        const updated = base ? base.trimEnd() + ' ' + nuevasPalabras.trim() : nuevasPalabras.trim();
+        transcripcionAcumuladaRef.current = updated;
+        onChange({ transcripcion: updated });
+      }
+    };
+
+    recognition.onerror = (e) => {
+      // 'no-speech' y 'audio-capture' son temporales, reiniciar si sigue grabando
+      if (isRecordingRef.current && (e.error === 'no-speech' || e.error === 'audio-capture')) {
+        setTimeout(() => {
+          if (isRecordingRef.current) {
+            try { recognition.start(); } catch (_) {}
+          }
+        }, 300);
+      } else if (e.error !== 'aborted') {
+        isRecordingRef.current = false;
+        setRecording(false);
+      }
+    };
+
+    recognition.onend = () => {
+      // Si todavía queremos grabar, reiniciar automáticamente
+      if (isRecordingRef.current) {
+        setTimeout(() => {
+          if (isRecordingRef.current) {
+            try {
+              const newRec = createRecognition();
+              if (newRec) {
+                recognitionRef.current = newRec;
+                newRec.start();
+              }
+            } catch (_) {}
+          }
+        }, 200);
+      } else {
+        setRecording(false);
+      }
+    };
+
+    return recognition;
+  };
 
   const startRecording = () => {
     const SpeechRecognition = getSpeechRecognition();
@@ -31,33 +99,19 @@ export default function SeccionInspeccion({ seccion, onChange }) {
       setNoSupport(true);
       return;
     }
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'es-AR';
-    recognition.continuous = true;
-    recognition.interimResults = false;
-
-    recognition.onresult = (e) => {
-      const nuevasPalabras = Array.from(e.results)
-        .slice(e.resultIndex)
-        .map(r => r[0].transcript)
-        .join(' ');
-      const base = transcripcionAcumuladaRef.current;
-      const updated = base ? base + ' ' + nuevasPalabras : nuevasPalabras;
-      transcripcionAcumuladaRef.current = updated;
-      onChange({ transcripcion: updated });
-    };
-
-    recognition.onerror = () => setRecording(false);
-    recognition.onend = () => setRecording(false);
-
-    recognition.start();
-    recognitionRef.current = recognition;
+    isRecordingRef.current = true;
     setRecording(true);
+    const recognition = createRecognition();
+    if (recognition) {
+      recognitionRef.current = recognition;
+      recognition.start();
+    }
   };
 
   const stopRecording = () => {
-    recognitionRef.current?.stop();
+    isRecordingRef.current = false;
     setRecording(false);
+    recognitionRef.current?.stop();
   };
 
   const handlePhotos = async (e) => {
@@ -114,15 +168,21 @@ export default function SeccionInspeccion({ seccion, onChange }) {
           {/* Audio */}
           <div className="pt-3">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Grabación de voz</p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 flex-wrap">
               {!recording ? (
                 <Button size="sm" variant="outline" onClick={startRecording} className="gap-2">
                   <Mic className="h-4 w-4 text-red-500" /> Grabar
                 </Button>
               ) : (
-                <Button size="sm" variant="destructive" onClick={stopRecording} className="gap-2 animate-pulse">
-                  <Square className="h-4 w-4" /> Detener
+                <Button size="sm" variant="destructive" onClick={stopRecording} className="gap-2">
+                  <Square className="h-4 w-4" /> Detener grabación
                 </Button>
+              )}
+              {recording && (
+                <span className="flex items-center gap-1.5 text-xs text-red-500 font-medium">
+                  <span className="h-2 w-2 rounded-full bg-red-500 animate-blink inline-block" />
+                  Grabando... (hablá con normalidad, se reinicia automáticamente)
+                </span>
               )}
               {noSupport && <span className="flex items-center gap-1.5 text-xs text-destructive"><AlertCircle className="h-3 w-3" /> Tu navegador no soporta reconocimiento de voz. Usá Chrome.</span>}
             </div>
