@@ -78,14 +78,16 @@ Por cada sección COMPLETADA:
 - **Hallazgos detectados:** lista numerada con ubicación exacta (local N°, sector) + 🔴 URGENTE / 🟠 IMPORTANTE / 🟡 MODERADO / 🟢 LEVE
 
 ## 4. Cuadro Consolidado de Hallazgos
-Generá una tabla Markdown completa con TODOS los problemas detectados en el recorrido, ordenados de mayor a menor urgencia. El formato EXACTO de la tabla debe ser:
+GENERA ÚNICAMENTE UNA TABLA MARKDOWN con esta estructura exacta (no escribas texto antes ni después de la tabla):
 
-| N° | Sección | Problema | Ubicación | Urgencia | Acción Requerida |
-| :--- | :--- | :--- | :--- | :---: | :--- |
-| 1 | [nombre sección] | [descripción breve del problema] | [local N° / sector] | 🔴 URGENTE | [acción concreta] |
-| 2 | ... | ... | ... | 🟠 IMPORTANTE | ... |
+| N° | Sección | Problema detectado | Ubicación | Urgencia | Acción requerida |
+| :---: | :--- | :--- | :--- | :---: | :--- |
+| 1 | [sección] | [problema concreto] | [local/sector] | 🔴 URGENTE | [acción] |
+| 2 | [sección] | [problema concreto] | [local/sector] | 🟠 IMPORTANTE | [acción] |
+| 3 | [sección] | [problema concreto] | [local/sector] | 🟡 MODERADO | [acción] |
+| 4 | [sección] | [problema concreto] | [local/sector] | 🟢 LEVE | [acción] |
 
-OBLIGATORIO: esta sección debe ser exclusivamente la tabla, sin texto adicional antes ni después. Incluí CADA problema mencionado en las transcripciones como una fila separada.
+Reglas para esta sección: (a) una fila por cada problema individual detectado; (b) ordenado de mayor a menor urgencia; (c) la fila de separador con :--- es OBLIGATORIA después del encabezado; (d) ningún texto fuera de la tabla.
 
 ## 5. Plan de Acción
 | N° | Problema | Acción | Plazo | Responsable | Cód. Preciario |
