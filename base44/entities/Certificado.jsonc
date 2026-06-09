@@ -176,6 +176,19 @@
     "notas": {
       "type": "string"
     },
+    "firma_jefe_sitio_url": {
+      "type": "string",
+      "description": "URL de la firma digital del jefe de sitio (solo certificados de obra)"
+    },
+    "firmado_por_jefe": {
+      "type": "string",
+      "description": "Nombre del jefe de sitio que firm\u00f3"
+    },
+    "fecha_firma_jefe": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que el jefe de sitio firm\u00f3"
+    },
     "firma_gerente_url": {
       "type": "string",
       "description": "URL de la firma digital del gerente aprobador"

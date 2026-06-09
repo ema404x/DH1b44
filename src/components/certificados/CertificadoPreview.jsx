@@ -166,22 +166,44 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
           </div>
         )}
 
-        {/* Firma aprobada */}
-        {(form.firma_gerente_url || form.estado === 'aprobado') && (
-          <div className="border border-emerald-200 bg-emerald-50/30 rounded-xl p-4 flex items-center gap-4">
-            <img
-              src={form.firma_gerente_url || 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/317004861_FirmaRaulGArcia.jpg'}
-              alt="Firma Arq. Raúl García"
-              className="h-14 object-contain border rounded bg-white p-1"
-            />
-            <div>
-              <p className="text-xs font-bold text-foreground">{form.aprobado_por || 'Arq. Raúl García'}</p>
-              <p className="text-xs text-muted-foreground">Gerente de Contratos</p>
-              <p className="text-xs text-muted-foreground">Mejores Hospitales S.A.</p>
-              {form.fecha_aprobacion && (
-                <p className="text-xs text-emerald-600 font-medium mt-1">✓ Aprobado</p>
-              )}
-            </div>
+        {/* Firmas — jefe de sitio (obra) + gerente (aprobación) */}
+        {(form.firma_jefe_sitio_url || form.firma_gerente_url || form.estado === 'aprobado') && (
+          <div className="flex flex-wrap gap-4 pt-2">
+            {/* Firma del jefe de sitio (solo certificados de obra) */}
+            {form.firma_jefe_sitio_url && (
+              <div className="border border-blue-200 bg-blue-50/30 rounded-xl p-4 flex items-center gap-4 flex-1 min-w-[200px]">
+                <img
+                  src={form.firma_jefe_sitio_url}
+                  alt="Firma Jefe de Sitio"
+                  className="h-14 object-contain border rounded bg-white p-1"
+                />
+                <div>
+                  <p className="text-xs font-bold text-foreground">{form.firmado_por_jefe || 'Jefe de Sitio'}</p>
+                  <p className="text-xs text-muted-foreground">Jefe de Sitio</p>
+                  {form.fecha_firma_jefe && (
+                    <p className="text-xs text-blue-600 font-medium mt-1">✓ Firmado</p>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Firma del gerente (aprobación) */}
+            {(form.firma_gerente_url || form.estado === 'aprobado') && (
+              <div className="border border-emerald-200 bg-emerald-50/30 rounded-xl p-4 flex items-center gap-4 flex-1 min-w-[200px]">
+                <img
+                  src={form.firma_gerente_url || 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/317004861_FirmaRaulGArcia.jpg'}
+                  alt="Firma Arq. Raúl García"
+                  className="h-14 object-contain border rounded bg-white p-1"
+                />
+                <div>
+                  <p className="text-xs font-bold text-foreground">{form.aprobado_por || 'Arq. Raúl García'}</p>
+                  <p className="text-xs text-muted-foreground">Gerente de Contratos</p>
+                  <p className="text-xs text-muted-foreground">Mejores Hospitales S.A.</p>
+                  {form.fecha_aprobacion && (
+                    <p className="text-xs text-emerald-600 font-medium mt-1">✓ Aprobado</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

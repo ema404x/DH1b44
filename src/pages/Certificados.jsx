@@ -15,6 +15,7 @@ import AbonoMaestroPanel from '@/components/certificados/AbonoMaestroPanel';
 import AbonoManualForm from '@/components/certificados/AbonoManualForm';
 import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import FirmaJefeSitioModal from '@/components/certificados/FirmaJefeSitioModal';
 
 // view: 'list' | 'upload' | 'edit' | 'preview' | 'manual'
 export default function Certificados() {
@@ -26,6 +27,7 @@ export default function Certificados() {
   const [extracted, setExtracted] = useState(null);
   const [editing, setEditing] = useState(null);
   const [previewing, setPreviewing] = useState(null);
+  const [pendingFirmaData, setPendingFirmaData] = useState(null); // datos del cert esperando firma jefe
   const queryClient = useQueryClient();
   const { user } = useCurrentUser();
 
@@ -126,8 +128,23 @@ export default function Certificados() {
   };
 
   const handleSave = (formData) => {
-    // Siempre crea nuevo (nunca pasa ID al mutationFn para que no haga update)
+    // Para certificados de OBRA: pedir firma del jefe de sitio antes de emitir
+    if (formData.tipo === 'obra') {
+      setPendingFirmaData(formData);
+      return;
+    }
     saveMutation.mutate(formData);
+  };
+
+  const handleFirmaJefe = (firmaUrl, nombreJefe) => {
+    const dataConFirma = {
+      ...pendingFirmaData,
+      firma_jefe_sitio_url: firmaUrl,
+      firmado_por_jefe: nombreJefe,
+      fecha_firma_jefe: new Date().toISOString(),
+    };
+    setPendingFirmaData(null);
+    saveMutation.mutate(dataConFirma);
   };
 
   const detectarComuna = (cert) => {
@@ -215,6 +232,14 @@ export default function Certificados() {
 
   return (
     <div className="space-y-6">
+      {/* Modal de firma del jefe de sitio — solo para certificados de obra */}
+      <FirmaJefeSitioModal
+        open={!!pendingFirmaData}
+        onClose={() => setPendingFirmaData(null)}
+        onFirmado={handleFirmaJefe}
+        user={user}
+      />
+
       <PageHeader
         title="Certificados"
         subtitle="Gestión de certificados manuales y automáticos"
