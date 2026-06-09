@@ -196,18 +196,15 @@ export default function InspeccionColegioPage() {
     setGenerando(true);
     setInspeccionActiva(prev => ({ ...prev, informe_generado: null, estado: 'generando' }));
 
-    // 1. Persistir secciones y limpiar informe viejo
+    // 1. Persistir secciones y marcar como generando
     await base44.entities.InspeccionColegio.update(inspeccionId, {
       estado: 'generando', secciones: seccionesActuales, informe_generado: '',
     });
 
-    // 2. Disparar generación (fire-and-forget en el backend)
-    await base44.functions.invoke('generarInformeInspeccion', { inspeccion_id: inspeccionId });
-
-    // 3. Polling cada 5s hasta que el informe aparezca en la DB
+    // 2. Iniciar polling ANTES de llamar a la función (la llamada puede tardar o dar timeout)
     stopPolling();
     let intentos = 0;
-    const MAX_INTENTOS = 36; // 3 minutos máximo
+    const MAX_INTENTOS = 24; // 2 minutos máximo
 
     pollingRef.current = setInterval(async () => {
       intentos++;
@@ -234,6 +231,28 @@ export default function InspeccionColegioPage() {
         // seguir intentando
       }
     }, 5000);
+
+    // 3. Llamar a la función (sin await — el polling maneja el resultado)
+    base44.functions.invoke('generarInformeInspeccion', { inspeccion_id: inspeccionId })
+      .then(res => {
+        // Si la función respondió con el informe directamente (caso rápido), procesar de inmediato
+        const informe = res?.data?.informe;
+        if (informe && informe.length > 50) {
+          stopPolling();
+          setGenerando(false);
+          setInspeccionActiva(prev => ({
+            ...prev,
+            secciones: seccionesActuales,
+            informe_generado: informe,
+            estado: 'completado',
+          }));
+          queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+          toast.success('Informe generado correctamente');
+        }
+      })
+      .catch(() => {
+        // Si da timeout HTTP, el polling igual encontrará el informe en la DB
+      });
   };
 
   const seccionesCompletadas = inspeccionActiva?.secciones?.filter(s => s.completada).length || 0;
