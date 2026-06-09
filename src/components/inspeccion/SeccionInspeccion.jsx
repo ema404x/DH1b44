@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Trash2, ChevronDown, ChevronUp, CheckCircle2, Camera, AlertCircle } from 'lucide-react';
+import { Mic, Square, Trash2, ChevronDown, ChevronUp, CheckCircle2, Camera, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { base44 } from '@/api/base44Client';
@@ -114,12 +114,22 @@ export default function SeccionInspeccion({ seccion, onChange }) {
     recognitionRef.current?.stop();
   };
 
+  const [subiendoFotos, setSubiendoFotos] = useState(false);
+
   const handlePhotos = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-    const urls = await Promise.all(files.map(file => base44.integrations.Core.UploadFile({ file }).then(r => r.file_url)));
-    onChange({ fotos: [...(seccion.fotos || []), ...urls] });
-    e.target.value = '';
+    setSubiendoFotos(true);
+    try {
+      const urls = await Promise.all(
+        files.map(file => base44.integrations.Core.UploadFile({ file }).then(r => r.file_url))
+      );
+      const fotosActuales = seccion.fotos || [];
+      onChange({ fotos: [...fotosActuales, ...urls] });
+    } finally {
+      setSubiendoFotos(false);
+      e.target.value = '';
+    }
   };
 
   const removePhoto = (idx) => {
@@ -226,11 +236,14 @@ export default function SeccionInspeccion({ seccion, onChange }) {
                 </div>
               ))}
               <button
-                onClick={() => fileInputRef.current?.click()}
-                className="h-20 w-20 rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                onClick={() => !subiendoFotos && fileInputRef.current?.click()}
+                disabled={subiendoFotos}
+                className="h-20 w-20 rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Camera className="h-5 w-5" />
-                <span className="text-[10px]">Agregar</span>
+                {subiendoFotos
+                  ? <><Loader2 className="h-5 w-5 animate-spin" /><span className="text-[10px]">Subiendo...</span></>
+                  : <><Camera className="h-5 w-5" /><span className="text-[10px]">Agregar</span></>
+                }
               </button>
               <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
             </div>

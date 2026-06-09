@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ClipboardCheck, Plus, ArrowLeft, Loader2, Sparkles, School, Calendar, User, ChevronRight, Trash2 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ClipboardCheck, Plus, ArrowLeft, Loader2, Sparkles, School, Calendar, User, ChevronRight, Trash2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -27,10 +27,10 @@ const SECCIONES_DEFAULT = [
 ];
 
 const STATUS_LABELS = {
-  borrador: { label: 'Borrador', color: 'bg-slate-100 text-slate-600' },
-  en_progreso: { label: 'En progreso', color: 'bg-blue-100 text-blue-700' },
-  generando: { label: 'Generando...', color: 'bg-amber-100 text-amber-700' },
-  completado: { label: 'Completado', color: 'bg-emerald-100 text-emerald-700' },
+  borrador:    { label: 'Borrador',     color: 'bg-slate-100 text-slate-600' },
+  en_progreso: { label: 'En progreso',  color: 'bg-blue-100 text-blue-700' },
+  generando:   { label: 'Generando...', color: 'bg-amber-100 text-amber-700' },
+  completado:  { label: 'Completado',   color: 'bg-emerald-100 text-emerald-700' },
 };
 
 function buildSecciones() {
@@ -48,12 +48,11 @@ export default function InspeccionColegioPage() {
   const { user } = useAuth();
   const { filterByUser } = useCurrentUser();
   const queryClient = useQueryClient();
-  const [vista, setVista] = useState('lista'); // 'lista' | 'nueva' | 'editar'
+
+  const [vista, setVista] = useState('lista');
   const [inspeccionActiva, setInspeccionActiva] = useState(null);
   const [generando, setGenerando] = useState(false);
   const [guardando, setGuardando] = useState(false);
-
-  // Form nueva inspección
   const [formNueva, setFormNueva] = useState({
     establecimiento: '',
     direccion: '',
@@ -61,23 +60,30 @@ export default function InspeccionColegioPage() {
     fecha_inspeccion: format(new Date(), 'yyyy-MM-dd'),
   });
 
+  // Ref para debounce de guardado de secciones — evita race conditions
+  const saveTimerRef = useRef(null);
+  const pendingSaveRef = useRef(null);
+
+  // ── Queries ──────────────────────────────────────────────────────────
   const { data: rawInspecciones = [], isLoading } = useQuery({
     queryKey: ['inspecciones'],
     queryFn: () => base44.entities.InspeccionColegio.list('-created_date', 50),
+    staleTime: 0,
   });
   const inspecciones = filterByUser(rawInspecciones, ['jefe_sitio', 'created_by']);
 
   const { data: locations = [] } = useQuery({
     queryKey: ['locationData'],
     queryFn: () => base44.entities.LocationData.list('-created_date', 500),
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: direccionesData = [] } = useQuery({
     queryKey: ['direcciones'],
     queryFn: () => base44.entities.Direccion.list('-created_date', 500),
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Mapa de id -> direccion de calle
   const direccionMap = useMemo(() => {
     const map = {};
     direccionesData.forEach(d => { map[d.id] = d.direccion; });
@@ -89,19 +95,16 @@ export default function InspeccionColegioPage() {
     [locations]
   );
 
-  // Lista de direcciones de calle únicas para el datalist
   const direccionesList = useMemo(() =>
     [...new Set(direccionesData.map(d => d.direccion).filter(Boolean))].sort(),
     [direccionesData]
   );
 
-  // Obtener dirección de calle a partir de un LocationData
   const getDireccionCalle = (loc) => {
     if (loc?.direccion_id && direccionMap[loc.direccion_id]) return direccionMap[loc.direccion_id];
     return '';
   };
 
-  // Auto-completar dirección al seleccionar establecimiento
   const handleEstablecimientoChange = (val) => {
     setFormNueva(p => {
       const match = locations.find(l => l.establecimiento === val);
@@ -110,77 +113,119 @@ export default function InspeccionColegioPage() {
     });
   };
 
-  const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.InspeccionColegio.create(data),
-    onSuccess: (nueva) => {
-      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
-      setInspeccionActiva(nueva);
-      setVista('editar');
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.InspeccionColegio.update(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspecciones'] }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.InspeccionColegio.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inspecciones'] }),
-  });
-
-  const handleCrearNueva = () => {
-    if (!formNueva.establecimiento) return toast.error('Ingresá el establecimiento');
-    createMutation.mutate({
-      ...formNueva,
-      titulo: formNueva.titulo || `Inspección ${formNueva.establecimiento} - ${format(new Date(), 'dd/MM/yyyy')}`,
-      jefe_sitio: user?.full_name || user?.email || 'Jefe de sitio',
-      estado: 'en_progreso',
-      secciones: buildSecciones(),
-    });
-  };
-
-  const handleSeccionChange = async (seccionId, cambios) => {
-    const secciones = inspeccionActiva.secciones.map(s =>
-      s.id === seccionId ? { ...s, ...cambios } : s
-    );
-    const updated = { ...inspeccionActiva, secciones };
-    setInspeccionActiva(updated);
+  // ── Guardar secciones con debounce (300ms) para evitar race conditions ──
+  const flushSave = useCallback(async (inspeccionId, secciones) => {
     setGuardando(true);
     try {
-      await updateMutation.mutateAsync({ id: updated.id, data: { secciones } });
+      await base44.entities.InspeccionColegio.update(inspeccionId, { secciones });
+    } catch {
+      toast.error('Error al guardar los cambios');
     } finally {
       setGuardando(false);
     }
+  }, []);
+
+  const handleSeccionChange = useCallback((seccionId, cambios) => {
+    setInspeccionActiva(prev => {
+      if (!prev) return prev;
+      const secciones = prev.secciones.map(s =>
+        s.id === seccionId ? { ...s, ...cambios } : s
+      );
+      const updated = { ...prev, secciones };
+
+      // Debounce del guardado — cancela el timer anterior y crea uno nuevo
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      pendingSaveRef.current = { id: updated.id, secciones };
+      saveTimerRef.current = setTimeout(() => {
+        if (pendingSaveRef.current) {
+          flushSave(pendingSaveRef.current.id, pendingSaveRef.current.secciones);
+          pendingSaveRef.current = null;
+        }
+      }, 400);
+
+      return updated;
+    });
+  }, [flushSave]);
+
+  // Flush pendiente al desmontar
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (pendingSaveRef.current) {
+        base44.entities.InspeccionColegio.update(pendingSaveRef.current.id, { secciones: pendingSaveRef.current.secciones });
+      }
+    };
+  }, []);
+
+  // ── Crear nueva inspección ───────────────────────────────────────────
+  const handleCrearNueva = async () => {
+    if (!formNueva.establecimiento) return toast.error('Ingresá el establecimiento');
+    try {
+      const nueva = await base44.entities.InspeccionColegio.create({
+        ...formNueva,
+        titulo: formNueva.titulo || `Inspección ${formNueva.establecimiento} - ${format(new Date(), 'dd/MM/yyyy')}`,
+        jefe_sitio: user?.full_name || user?.email || 'Jefe de sitio',
+        estado: 'en_progreso',
+        secciones: buildSecciones(),
+      });
+      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+      setInspeccionActiva(nueva);
+      setVista('editar');
+    } catch {
+      toast.error('Error al crear la inspección');
+    }
   };
 
+  // ── Eliminar ─────────────────────────────────────────────────────────
+  const handleEliminar = async (id) => {
+    if (!confirm('¿Eliminar esta inspección?')) return;
+    await base44.entities.InspeccionColegio.delete(id);
+    queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+  };
+
+  // ── Generar / Regenerar informe ──────────────────────────────────────
   const handleGenerarInforme = async () => {
+    // Flush inmediato de cualquier save pendiente antes de generar
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     const seccionesActuales = inspeccionActiva.secciones;
+
     setGenerando(true);
     setInspeccionActiva(prev => ({ ...prev, informe_generado: null, estado: 'generando' }));
+
     try {
-      // 1. Persistir secciones + limpiar informe viejo en la DB
+      // 1. Persistir secciones frescos + limpiar informe viejo en la DB de forma atómica
       await base44.entities.InspeccionColegio.update(inspeccionActiva.id, {
         estado: 'generando',
         secciones: seccionesActuales,
         informe_generado: '',
       });
-      // 2. Invocar la función — el backend leerá los datos recién guardados
-      const res = await base44.functions.invoke('generarInformeInspeccion', { inspeccion_id: inspeccionActiva.id });
+
+      // 2. Llamar al backend — leerá los datos recién persistidos
+      const res = await base44.functions.invoke('generarInformeInspeccion', {
+        inspeccion_id: inspeccionActiva.id,
+      });
+
       const informe = res.data?.informe;
-      if (!informe) throw new Error('No se recibió el informe del servidor');
-      // 3. Actualizar estado local directamente con el nuevo informe + secciones actuales
+      if (!informe) throw new Error('El servidor no devolvió el informe');
+
+      // 3. Actualizar estado local con el nuevo informe y secciones sincronizadas
       setInspeccionActiva(prev => ({
         ...prev,
         secciones: seccionesActuales,
         informe_generado: informe,
         estado: 'completado',
       }));
+
       queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
       toast.success('Informe generado correctamente');
     } catch (e) {
       toast.error('Error al generar el informe: ' + (e.message || 'desconocido'));
-      setInspeccionActiva(prev => ({ ...prev, secciones: seccionesActuales, estado: 'en_progreso' }));
+      setInspeccionActiva(prev => ({
+        ...prev,
+        secciones: seccionesActuales,
+        informe_generado: null,
+        estado: 'en_progreso',
+      }));
     } finally {
       setGenerando(false);
     }
@@ -189,7 +234,7 @@ export default function InspeccionColegioPage() {
   const seccionesCompletadas = inspeccionActiva?.secciones?.filter(s => s.completada).length || 0;
   const totalSecciones = inspeccionActiva?.secciones?.length || 0;
 
-  // ── LISTA ────────────────────────────────────────────────────────────
+  // ── LISTA ─────────────────────────────────────────────────────────────
   if (vista === 'lista') return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -210,10 +255,8 @@ export default function InspeccionColegioPage() {
       ) : inspecciones.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
           <ClipboardCheck className="h-16 w-16 text-muted-foreground/30" />
-          <div>
-            <p className="font-semibold text-lg">Sin inspecciones aún</p>
-            <p className="text-sm text-muted-foreground mt-1">Creá una nueva inspección para comenzar el recorrido</p>
-          </div>
+          <p className="font-semibold text-lg">Sin inspecciones aún</p>
+          <p className="text-sm text-muted-foreground">Creá una nueva inspección para comenzar el recorrido</p>
           <Button onClick={() => setVista('nueva')} className="gap-2">
             <Plus className="h-4 w-4" /> Nueva inspección
           </Button>
@@ -225,8 +268,10 @@ export default function InspeccionColegioPage() {
             const completadas = insp.secciones?.filter(s => s.completada).length || 0;
             const total = insp.secciones?.length || 0;
             return (
-              <div key={insp.id} className="rounded-xl border bg-card p-4 hover:shadow-md transition-shadow cursor-pointer group"
-                onClick={() => { setInspeccionActiva(insp); setVista('editar'); }}>
+              <div key={insp.id}
+                className="rounded-xl border bg-card p-4 hover:shadow-md transition-shadow cursor-pointer group"
+                onClick={() => { setInspeccionActiva(insp); setVista('editar'); }}
+              >
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{insp.titulo || insp.establecimiento}</p>
@@ -254,7 +299,7 @@ export default function InspeccionColegioPage() {
                     {insp.informe_generado ? 'Ver informe' : 'Continuar recorrido'} <ChevronRight className="h-3 w-3" />
                   </span>
                   <button
-                    onClick={e => { e.stopPropagation(); if (confirm('¿Eliminar esta inspección?')) deleteMutation.mutate(insp.id); }}
+                    onClick={e => { e.stopPropagation(); handleEliminar(insp.id); }}
                     className="text-muted-foreground hover:text-destructive transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -268,7 +313,7 @@ export default function InspeccionColegioPage() {
     </div>
   );
 
-  // ── NUEVA ────────────────────────────────────────────────────────────
+  // ── NUEVA ─────────────────────────────────────────────────────────────
   if (vista === 'nueva') return (
     <div className="max-w-xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
@@ -278,15 +323,8 @@ export default function InspeccionColegioPage() {
       <div className="rounded-xl border bg-card p-6 space-y-4">
         <div>
           <label className="text-sm font-medium mb-1.5 block">Establecimiento *</label>
-          <Input
-            list="establecimientos-list"
-            placeholder="Nombre del colegio"
-            value={formNueva.establecimiento}
-            onChange={e => handleEstablecimientoChange(e.target.value)}
-          />
-          <datalist id="establecimientos-list">
-            {establecimientos.map(e => <option key={e} value={e} />)}
-          </datalist>
+          <Input list="establecimientos-list" placeholder="Nombre del colegio" value={formNueva.establecimiento} onChange={e => handleEstablecimientoChange(e.target.value)} />
+          <datalist id="establecimientos-list">{establecimientos.map(e => <option key={e} value={e} />)}</datalist>
         </div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">Dirección</label>
@@ -297,7 +335,6 @@ export default function InspeccionColegioPage() {
             onChange={e => {
               const val = e.target.value;
               setFormNueva(p => {
-                // si eligen una dirección conocida, buscar si hay un establecimiento asociado
                 const dirObj = direccionesData.find(d => d.direccion === val);
                 if (dirObj) {
                   const locMatch = locations.find(l => l.direccion_id === dirObj.id);
@@ -307,118 +344,120 @@ export default function InspeccionColegioPage() {
               });
             }}
           />
-          <datalist id="direcciones-list">
-            {direccionesList.map(d => <option key={d} value={d} />)}
-          </datalist>
+          <datalist id="direcciones-list">{direccionesList.map(d => <option key={d} value={d} />)}</datalist>
         </div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">Título del informe</label>
-          <Input
-            placeholder="Se genera automáticamente si lo dejás vacío"
-            value={formNueva.titulo}
-            onChange={e => setFormNueva(p => ({ ...p, titulo: e.target.value }))}
-          />
+          <Input placeholder="Se genera automáticamente si lo dejás vacío" value={formNueva.titulo} onChange={e => setFormNueva(p => ({ ...p, titulo: e.target.value }))} />
         </div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">Fecha</label>
-          <Input
-            type="date"
-            value={formNueva.fecha_inspeccion}
-            onChange={e => setFormNueva(p => ({ ...p, fecha_inspeccion: e.target.value }))}
-          />
+          <Input type="date" value={formNueva.fecha_inspeccion} onChange={e => setFormNueva(p => ({ ...p, fecha_inspeccion: e.target.value }))} />
         </div>
-        <Button className="w-full gap-2" onClick={handleCrearNueva} disabled={createMutation.isPending}>
-          {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <School className="h-4 w-4" />}
-          Iniciar recorrido
+        <Button className="w-full gap-2" onClick={handleCrearNueva}>
+          <School className="h-4 w-4" /> Iniciar recorrido
         </Button>
       </div>
     </div>
   );
 
   // ── EDITAR ────────────────────────────────────────────────────────────
-  if (vista === 'editar' && inspeccionActiva) return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => setVista('lista')}><ArrowLeft className="h-4 w-4" /></Button>
-          <div>
-            <h2 className="font-bold text-lg leading-tight">{inspeccionActiva.titulo || inspeccionActiva.establecimiento}</h2>
-            <p className="text-xs text-muted-foreground">{inspeccionActiva.establecimiento} · {inspeccionActiva.jefe_sitio}</p>
+  if (vista === 'editar' && inspeccionActiva) {
+    const tieneInforme = Boolean(inspeccionActiva.informe_generado);
+
+    return (
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setVista('lista')}><ArrowLeft className="h-4 w-4" /></Button>
+            <div>
+              <h2 className="font-bold text-lg leading-tight">{inspeccionActiva.titulo || inspeccionActiva.establecimiento}</h2>
+              <p className="text-xs text-muted-foreground">{inspeccionActiva.establecimiento} · {inspeccionActiva.jefe_sitio}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {guardando && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" /> Guardando...
+              </span>
+            )}
+            <Button
+              onClick={handleGenerarInforme}
+              disabled={generando || seccionesCompletadas === 0}
+              className="gap-2"
+            >
+              {generando
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Generando informe...</>
+                : tieneInforme
+                  ? <><RefreshCw className="h-4 w-4" /> Regenerar informe</>
+                  : <><Sparkles className="h-4 w-4" /> Generar informe con IA</>
+              }
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {guardando && <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Guardando...</span>}
-          <Button
-            onClick={handleGenerarInforme}
-            disabled={generando || seccionesCompletadas === 0}
-            className="gap-2"
-          >
-            {generando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {generando ? 'Generando informe...' : 'Generar informe con IA'}
-          </Button>
-        </div>
-      </div>
 
-      {/* Progreso */}
-      <div className="rounded-xl border bg-card px-5 py-4">
-        <div className="flex justify-between text-sm mb-2">
-          <span className="font-medium">Progreso del recorrido</span>
-          <span className="text-muted-foreground">{seccionesCompletadas} de {totalSecciones} secciones</span>
-        </div>
-        <div className="h-2 bg-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary rounded-full transition-all duration-500"
-            style={{ width: `${totalSecciones > 0 ? (seccionesCompletadas / totalSecciones) * 100 : 0}%` }}
-          />
-        </div>
-        {seccionesCompletadas === totalSecciones && totalSecciones > 0 && (
-          <p className="text-xs text-emerald-600 font-medium mt-2">✓ Todas las secciones revisadas. Podés generar el informe.</p>
+        {/* Pantalla de generación */}
+        {generando && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-6 py-8 flex flex-col items-center gap-3 text-center">
+            <Loader2 className="h-10 w-10 text-amber-500 animate-spin" />
+            <p className="font-semibold text-amber-800">Generando informe técnico con IA...</p>
+            <p className="text-sm text-amber-700">Esto puede demorar entre 30 y 60 segundos. No cierres esta pantalla.</p>
+          </div>
         )}
-      </div>
 
-      {/* Secciones */}
-      {!inspeccionActiva.informe_generado && (
-        <div className="space-y-2">
-          {(inspeccionActiva.secciones || []).map(seccion => (
-            <SeccionInspeccion
-              key={seccion.id}
-              seccion={seccion}
-              onChange={(cambios) => handleSeccionChange(seccion.id, cambios)}
-            />
-          ))}
-        </div>
-      )}
+        {/* Progreso */}
+        {!generando && (
+          <div className="rounded-xl border bg-card px-5 py-4">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="font-medium">Progreso del recorrido</span>
+              <span className="text-muted-foreground">{seccionesCompletadas} de {totalSecciones} secciones</span>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-500"
+                style={{ width: `${totalSecciones > 0 ? (seccionesCompletadas / totalSecciones) * 100 : 0}%` }}
+              />
+            </div>
+            {seccionesCompletadas === totalSecciones && totalSecciones > 0 && (
+              <p className="text-xs text-emerald-600 font-medium mt-2">✓ Todas las secciones revisadas. Podés generar el informe.</p>
+            )}
+          </div>
+        )}
 
-      {/* Informe generado */}
-      {inspeccionActiva.informe_generado && (
-        <div className="space-y-4">
+        {/* Informe generado */}
+        {!generando && tieneInforme && (
           <InformeViewer
+            key={inspeccionActiva.informe_generado.slice(0, 40)}
             informe={inspeccionActiva.informe_generado}
             establecimiento={inspeccionActiva.establecimiento}
             fecha={inspeccionActiva.fecha_inspeccion}
             secciones={inspeccionActiva.secciones || []}
           />
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm text-amber-800 font-medium mb-2">¿Querés revisar o actualizar secciones?</p>
-            <div className="space-y-2">
-              {(inspeccionActiva.secciones || []).map(seccion => (
-                <SeccionInspeccion
-                  key={seccion.id}
-                  seccion={seccion}
-                  onChange={(cambios) => handleSeccionChange(seccion.id, cambios)}
-                />
-              ))}
-            </div>
-            <Button className="mt-3 gap-2" onClick={handleGenerarInforme} disabled={generando}>
-              {generando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              Regenerar informe
-            </Button>
+        )}
+
+        {/* Secciones — siempre visibles para editar */}
+        {!generando && (
+          <div className="space-y-2">
+            {tieneInforme && (
+              <div className="flex items-center gap-2 px-1">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground font-medium">Secciones del recorrido — editá y regenerá el informe</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+            )}
+            {(inspeccionActiva.secciones || []).map(seccion => (
+              <SeccionInspeccion
+                key={seccion.id}
+                seccion={seccion}
+                onChange={(cambios) => handleSeccionChange(seccion.id, cambios)}
+              />
+            ))}
           </div>
-        </div>
-      )}
-    </div>
-  );
+        )}
+      </div>
+    );
+  }
 
   return null;
 }
