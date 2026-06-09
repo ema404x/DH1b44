@@ -78,8 +78,14 @@ Por cada sección COMPLETADA:
 - **Hallazgos detectados:** lista numerada con ubicación exacta (local N°, sector) + 🔴 URGENTE / 🟠 IMPORTANTE / 🟡 MODERADO / 🟢 LEVE
 
 ## 4. Cuadro Consolidado de Hallazgos
+Generá una tabla Markdown completa con TODOS los problemas detectados en el recorrido, ordenados de mayor a menor urgencia. El formato EXACTO de la tabla debe ser:
+
 | N° | Sección | Problema | Ubicación | Urgencia | Acción Requerida |
-Incluí TODOS los problemas detectados, ordenados de mayor a menor urgencia.
+| :--- | :--- | :--- | :--- | :---: | :--- |
+| 1 | [nombre sección] | [descripción breve del problema] | [local N° / sector] | 🔴 URGENTE | [acción concreta] |
+| 2 | ... | ... | ... | 🟠 IMPORTANTE | ... |
+
+OBLIGATORIO: esta sección debe ser exclusivamente la tabla, sin texto adicional antes ni después. Incluí CADA problema mencionado en las transcripciones como una fila separada.
 
 ## 5. Plan de Acción
 | N° | Problema | Acción | Plazo | Responsable | Cód. Preciario |
