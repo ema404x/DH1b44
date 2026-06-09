@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Brain, Upload, CheckCircle2, Sparkles, Clock, Shield, TrendingUp, Loader2, Zap, ChevronRight } from 'lucide-react';
+import { Brain, Upload, CheckCircle2, Sparkles, Clock, Shield, TrendingUp, Loader2, Zap, ChevronRight, PenTool } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,7 @@ import ImportStepResult from '@/components/importar/ImportStepResult';
 import ImportadorJefesSitio from '@/components/informacion-general/ImportadorJefesSitio';
 import AsignadorJefesEscuelas from '@/components/informacion-general/AsignadorJefesEscuelas';
 import AliceImportAssistant from '@/components/importar/AliceImportAssistant';
+import GestorFirmasJefes from '@/components/importar/GestorFirmasJefes';
 
 const MODULES = [
   { key: 'InformePlaneacion', label: 'Informes de Planificación', icon: 'ScrollText', color: 'from-cyan-500', hint: 'Mes, descripción, proveedor, estado...' },
@@ -276,7 +277,7 @@ export default function ImportarDatos() {
         <div className="max-w-7xl mx-auto px-6 py-6">
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-6">
-            <TabsList className="bg-slate-800/50 border border-slate-700/50 backdrop-blur-xl grid w-full grid-cols-3">
+            <TabsList className="bg-slate-800/50 border border-slate-700/50 backdrop-blur-xl grid w-full grid-cols-4">
               <TabsTrigger value="general" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
                 <Brain className="h-4 w-4 mr-2" /> Importación
               </TabsTrigger>
@@ -285,6 +286,9 @@ export default function ImportarDatos() {
               </TabsTrigger>
               <TabsTrigger value="escuelas" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
                 <Upload className="h-4 w-4 mr-2" /> Escuelas
+              </TabsTrigger>
+              <TabsTrigger value="firmas" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+                <PenTool className="h-4 w-4 mr-2" /> Firmas
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -296,6 +300,9 @@ export default function ImportarDatos() {
           </motion.div>}
           {activeTab === 'escuelas' && <motion.div key={`escuelas-${refreshKey}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <AsignadorJefesEscuelas onSuccess={() => setRefreshKey(k => k + 1)} />
+          </motion.div>}
+          {activeTab === 'firmas' && <motion.div key={`firmas-${refreshKey}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <GestorFirmasJefes />
           </motion.div>}
 
           {/* Footer */}
