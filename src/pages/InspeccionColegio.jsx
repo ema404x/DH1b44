@@ -155,28 +155,32 @@ export default function InspeccionColegioPage() {
   };
 
   const handleGenerarInforme = async () => {
+    const seccionesActuales = inspeccionActiva.secciones;
     setGenerando(true);
-    // Limpiar informe anterior para forzar re-render completo al recibir el nuevo
     setInspeccionActiva(prev => ({ ...prev, informe_generado: null, estado: 'generando' }));
     try {
-      // 1. Guardar secciones actuales + limpiar informe viejo en la DB
+      // 1. Persistir secciones + limpiar informe viejo en la DB
       await base44.entities.InspeccionColegio.update(inspeccionActiva.id, {
         estado: 'generando',
-        secciones: inspeccionActiva.secciones,
-        informe_generado: null,
+        secciones: seccionesActuales,
+        informe_generado: '',
       });
-      // 2. Invocar la función con los datos frescos ya persistidos
+      // 2. Invocar la función — el backend leerá los datos recién guardados
       const res = await base44.functions.invoke('generarInformeInspeccion', { inspeccion_id: inspeccionActiva.id });
-      const informe = res.data.informe;
-      // 3. Refrescar desde la DB para que fotos y texto queden 100% sincronizados
-      const fresco = await base44.entities.InspeccionColegio.get(inspeccionActiva.id);
-      setInspeccionActiva({ ...fresco, informe_generado: informe });
-      // 4. Invalidar caché de lista
+      const informe = res.data?.informe;
+      if (!informe) throw new Error('No se recibió el informe del servidor');
+      // 3. Actualizar estado local directamente con el nuevo informe + secciones actuales
+      setInspeccionActiva(prev => ({
+        ...prev,
+        secciones: seccionesActuales,
+        informe_generado: informe,
+        estado: 'completado',
+      }));
       queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
       toast.success('Informe generado correctamente');
-    } catch {
-      toast.error('Error al generar el informe');
-      setInspeccionActiva(prev => ({ ...prev, estado: 'completado' }));
+    } catch (e) {
+      toast.error('Error al generar el informe: ' + (e.message || 'desconocido'));
+      setInspeccionActiva(prev => ({ ...prev, secciones: seccionesActuales, estado: 'en_progreso' }));
     } finally {
       setGenerando(false);
     }
