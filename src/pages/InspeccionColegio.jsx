@@ -179,25 +179,61 @@ export default function InspeccionColegioPage() {
     queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
   };
 
+  const pollingRef = useRef(null);
+
+  const stopPolling = () => {
+    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+  };
+
+  // Limpiar polling al desmontar
+  useEffect(() => () => stopPolling(), []);
+
   const handleGenerarInforme = async () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     const seccionesActuales = inspeccionActiva.secciones;
+    const inspeccionId = inspeccionActiva.id;
+
     setGenerando(true);
     setInspeccionActiva(prev => ({ ...prev, informe_generado: null, estado: 'generando' }));
-    try {
-      await base44.entities.InspeccionColegio.update(inspeccionActiva.id, {
-        estado: 'generando', secciones: seccionesActuales, informe_generado: '',
-      });
-      const res = await base44.functions.invoke('generarInformeInspeccion', { inspeccion_id: inspeccionActiva.id });
-      const informe = res.data?.informe;
-      if (!informe) throw new Error('Sin respuesta del servidor');
-      setInspeccionActiva(prev => ({ ...prev, secciones: seccionesActuales, informe_generado: informe, estado: 'completado' }));
-      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
-      toast.success('Informe generado correctamente');
-    } catch (e) {
-      toast.error('Error: ' + (e.message || 'desconocido'));
-      setInspeccionActiva(prev => ({ ...prev, secciones: seccionesActuales, informe_generado: null, estado: 'en_progreso' }));
-    } finally { setGenerando(false); }
+
+    // 1. Persistir secciones y limpiar informe viejo
+    await base44.entities.InspeccionColegio.update(inspeccionId, {
+      estado: 'generando', secciones: seccionesActuales, informe_generado: '',
+    });
+
+    // 2. Disparar generación (fire-and-forget en el backend)
+    await base44.functions.invoke('generarInformeInspeccion', { inspeccion_id: inspeccionId });
+
+    // 3. Polling cada 5s hasta que el informe aparezca en la DB
+    stopPolling();
+    let intentos = 0;
+    const MAX_INTENTOS = 36; // 3 minutos máximo
+
+    pollingRef.current = setInterval(async () => {
+      intentos++;
+      try {
+        const fresca = await base44.entities.InspeccionColegio.get(inspeccionId);
+        if (fresca?.informe_generado && fresca.informe_generado.length > 50) {
+          stopPolling();
+          setGenerando(false);
+          setInspeccionActiva(prev => ({
+            ...prev,
+            secciones: seccionesActuales,
+            informe_generado: fresca.informe_generado,
+            estado: 'completado',
+          }));
+          queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+          toast.success('Informe generado correctamente');
+        } else if (intentos >= MAX_INTENTOS) {
+          stopPolling();
+          setGenerando(false);
+          toast.error('Tiempo de espera agotado. Intentá regenerar el informe.');
+          setInspeccionActiva(prev => ({ ...prev, secciones: seccionesActuales, informe_generado: null, estado: 'en_progreso' }));
+        }
+      } catch {
+        // seguir intentando
+      }
+    }, 5000);
   };
 
   const seccionesCompletadas = inspeccionActiva?.secciones?.filter(s => s.completada).length || 0;
