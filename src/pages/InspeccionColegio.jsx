@@ -159,14 +159,19 @@ export default function InspeccionColegioPage() {
     // Limpiar informe anterior para forzar re-render completo al recibir el nuevo
     setInspeccionActiva(prev => ({ ...prev, informe_generado: null, estado: 'generando' }));
     try {
-      // Guardar secciones actuales + estado en la DB antes de invocar la función
-      await updateMutation.mutateAsync({
-        id: inspeccionActiva.id,
-        data: { estado: 'generando', secciones: inspeccionActiva.secciones, informe_generado: null }
+      // 1. Guardar secciones actuales + limpiar informe viejo en la DB
+      await base44.entities.InspeccionColegio.update(inspeccionActiva.id, {
+        estado: 'generando',
+        secciones: inspeccionActiva.secciones,
+        informe_generado: null,
       });
+      // 2. Invocar la función con los datos frescos ya persistidos
       const res = await base44.functions.invoke('generarInformeInspeccion', { inspeccion_id: inspeccionActiva.id });
       const informe = res.data.informe;
-      setInspeccionActiva(prev => ({ ...prev, informe_generado: informe, estado: 'completado' }));
+      // 3. Refrescar desde la DB para que fotos y texto queden 100% sincronizados
+      const fresco = await base44.entities.InspeccionColegio.get(inspeccionActiva.id);
+      setInspeccionActiva({ ...fresco, informe_generado: informe });
+      // 4. Invalidar caché de lista
       queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
       toast.success('Informe generado correctamente');
     } catch {
