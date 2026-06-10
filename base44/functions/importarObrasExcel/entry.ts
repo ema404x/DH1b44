@@ -58,11 +58,8 @@ Deno.serve(async (req) => {
   // 7=Nº ORDEN SAP, 8=ESTADO SAP, 9=DETALLE, 11=PLAZO, 12=AI(inicio), 13=AR(fin),
   // 14=%AVANCE ACUM, 19=JEFE SITIO, 20=INSPECTOR, 21=SUPERVISOR
 
-  let imported = 0;
-  let errors = 0;
-  const errorDetails = [];
-
-  // Empezar desde fila 2 (índice 2) que son los datos reales
+  // ── Parsear todas las filas válidas ─────────────────────────────────────────
+  const projects = [];
   for (let i = 2; i < raw.length; i++) {
     const row = raw[i];
     if (!row || row.length < 4) continue;
@@ -70,7 +67,6 @@ Deno.serve(async (req) => {
     const titulo = row[3] ? String(row[3]).trim() : null;
     const comuna = row[0] ? String(row[0]).trim() : null;
 
-    // Saltar filas sin título o sin comuna válida (8A, 8B, 10A)
     if (!titulo) continue;
     if (!comuna || !['8A', '8B', '10A'].includes(comuna)) continue;
 
@@ -88,7 +84,7 @@ Deno.serve(async (req) => {
     const direccion = row[1] ? String(row[1]).trim() : null;
     const establecimiento = row[2] ? String(row[2]).trim() : null;
 
-    const project = {
+    projects.push({
       name: titulo,
       code: nroOrden || null,
       type: 'obra_nueva',
@@ -101,7 +97,7 @@ Deno.serve(async (req) => {
       address: direccion || null,
       client_name: establecimiento || null,
       notes: [
-        comuna ? `Comuna: ${comuna}` : null,
+        `Comuna: ${comuna}`,
         jefeSitio ? `Jefe de Sitio: ${jefeSitio}` : null,
         inspector ? `Inspector: ${inspector}` : null,
         supervisor ? `Supervisor: ${supervisor}` : null,
@@ -109,16 +105,33 @@ Deno.serve(async (req) => {
         estadoSap ? `Estado SAP: ${estadoSap}` : null,
         detalle ? `Detalle: ${detalle}` : null,
       ].filter(Boolean).join(' | '),
-    };
+    });
+  }
 
+  // ── Insertar en batches de 100 (paralelo dentro de cada batch) ───────────────
+  const BATCH_SIZE = 100;
+  let imported = 0;
+  let errors = 0;
+  const errorDetails = [];
+
+  for (let b = 0; b < projects.length; b += BATCH_SIZE) {
+    const batch = projects.slice(b, b + BATCH_SIZE);
     try {
-      await base44.entities.Project.create(project);
-      imported++;
+      await base44.asServiceRole.entities.Project.bulkCreate(batch);
+      imported += batch.length;
     } catch (err) {
-      errors++;
-      errorDetails.push(`Fila ${i + 1} (${titulo.slice(0, 40)}): ${err.message}`);
+      // Si falla el batch completo, intentar uno a uno para rescatar los válidos
+      for (let j = 0; j < batch.length; j++) {
+        try {
+          await base44.asServiceRole.entities.Project.create(batch[j]);
+          imported++;
+        } catch (e2) {
+          errors++;
+          errorDetails.push(`Fila ${b + j + 3}: ${batch[j].name?.slice(0, 40)} — ${e2.message}`);
+        }
+      }
     }
   }
 
-  return Response.json({ imported, errors, errorDetails: errorDetails.slice(0, 10) });
+  return Response.json({ imported, errors, errorDetails: errorDetails.slice(0, 20) });
 });

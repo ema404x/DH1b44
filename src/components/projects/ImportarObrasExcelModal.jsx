@@ -100,8 +100,11 @@ export default function ImportarObrasExcelModal({ onClose, onImported }) {
           {step === 'importing' && (
             <div className="flex flex-col items-center gap-4 py-12">
               <Loader2 className="h-10 w-10 text-primary animate-spin" />
-              <p className="font-medium text-white">Importando obras...</p>
-              <p className="text-sm text-slate-400">Esto puede tardar unos segundos</p>
+              <p className="font-medium text-white">Importando obras en lotes...</p>
+              <p className="text-sm text-slate-400 text-center">
+                Procesando en batches de 100 registros.<br />
+                Para planillas de 2000+ obras, puede tardar 30–60 segundos.
+              </p>
             </div>
           )}
 
