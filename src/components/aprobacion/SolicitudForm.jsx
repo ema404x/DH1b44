@@ -6,8 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Upload, X, FileText, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function SolicitudForm({ solicitud, user, onSaved, onCancel }) {
+  const { displayName } = useCurrentUser();
   const isEdit = !!solicitud;
   const [form, setForm] = useState({
     titulo: solicitud?.titulo || '',
@@ -54,7 +56,7 @@ export default function SolicitudForm({ solicitud, user, onSaved, onCancel }) {
         monto_solicitado: parseFloat(form.monto_solicitado) || 0,
         porcentaje_avance: parseFloat(form.porcentaje_avance) || 0,
         numero: solicitud?.numero || numero,
-        jefe_sitio: user?.full_name || user?.email || '',
+        jefe_sitio: displayName,
         jefe_sitio_email: user?.email || '',
         estado: asDraft ? 'borrador' : 'enviada',
         historial: [
@@ -62,7 +64,7 @@ export default function SolicitudForm({ solicitud, user, onSaved, onCancel }) {
           {
             fecha: new Date().toISOString(),
             estado: asDraft ? 'borrador' : 'enviada',
-            usuario: user?.full_name || user?.email,
+            usuario: displayName,
             comentario: asDraft ? 'Guardado como borrador' : 'Solicitud enviada para aprobación',
           }
         ]
