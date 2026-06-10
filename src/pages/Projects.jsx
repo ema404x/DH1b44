@@ -271,29 +271,29 @@ export default function Projects() {
     setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map(p => p.id)));
   };
 
-  const deleteIds = async (ids) => {
+  const deleteIds = async (ids, deleteAll = false) => {
     setDeleting(true);
-    setDeletingProgress(0);
-    let ok = 0, fail = 0;
-    const BATCH = 20;
-    for (let i = 0; i < ids.length; i += BATCH) {
-      const batch = ids.slice(i, i + BATCH);
-      const results = await Promise.allSettled(batch.map(id => base44.entities.Project.delete(id)));
-      ok += results.filter(r => r.status === 'fulfilled').length;
-      fail += results.filter(r => r.status === 'rejected').length;
-      setDeletingProgress(Math.round(((i + batch.length) / ids.length) * 100));
+    setDeletingProgress(10); // feedback inmediato
+    try {
+      const payload = deleteAll ? {} : { ids };
+      const res = await base44.functions.invoke('eliminarTodasObras', payload);
+      const { deleted, errors } = res.data;
+      setDeletingProgress(100);
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setSelected(new Set());
+      toast.success(`${deleted} obras eliminadas${errors > 0 ? ` (${errors} con error)` : ''}`);
+    } catch (err) {
+      toast.error('Error al eliminar: ' + (err.message || 'intente nuevamente'));
+    } finally {
+      setDeleting(false);
+      setDeletingProgress(0);
+      setConfirmDelete(false);
+      setConfirmDeleteAll(false);
     }
-    queryClient.invalidateQueries({ queryKey: ['projects'] });
-    setSelected(new Set());
-    setDeleting(false);
-    setDeletingProgress(0);
-    setConfirmDelete(false);
-    setConfirmDeleteAll(false);
-    toast.success(`${ok} obras eliminadas${fail > 0 ? ` (${fail} con error)` : ''}`);
   };
 
-  const handleBulkDelete = () => deleteIds([...selected]);
-  const handleDeleteAll = () => deleteIds(projects.map(p => p.id));
+  const handleBulkDelete = () => deleteIds([...selected], false);
+  const handleDeleteAll = () => deleteIds([], true);
 
   // CSS variable para el grid
   const colsVar = 'repeat(1,28px) 48px 1fr 1fr 2fr 80px 90px 110px 70px 70px 100px 120px 120px 32px';
