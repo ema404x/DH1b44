@@ -33,16 +33,22 @@ const typeLabels = {
 
 export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [data, setData] = useState({ ...order });
-
-  // Sync local state when the order prop changes (new order opened or fresh server data)
-  const prevOrderId = React.useRef(order.id);
-  React.useEffect(() => {
-    prevOrderId.current = order.id;
-    setData({ ...order });
-  }, [order.id]); // solo re-sincronizar cuando cambia la OT seleccionada
   const [qrOpen, setQrOpen] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const queryClient = useQueryClient();
+
+  // Fetch fresco desde el servidor al abrir — garantiza que se ven todos los campos guardados
+  const { data: freshOrder, isLoading: loadingFresh } = useQuery({
+    queryKey: ['workorder-detail', order.id],
+    queryFn: () => base44.entities.WorkOrder.filter({ id: order.id }).then(r => r[0] || order),
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
+  // Sincronizar estado local cuando llega la data fresca del servidor
+  React.useEffect(() => {
+    if (freshOrder) setData({ ...freshOrder });
+  }, [freshOrder]);
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
@@ -83,6 +89,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     mutationFn: (d) => base44.entities.WorkOrder.update(order.id, d),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
       toast.success('Orden de trabajo guardada');
     },
   });
@@ -154,9 +161,14 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
         if (saveMutation.isPending) return;
         onClose();
       }} />
-      <div className="w-full max-w-2xl bg-card shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-2xl bg-card shadow-2xl flex flex-col overflow-hidden relative">
         {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-border bg-gradient-to-r from-primary/5 to-transparent">
+          {loadingFresh && (
+            <div className="absolute top-2 right-14 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Cargando datos...
+            </div>
+          )}
           <div className="flex-1 min-w-0 pr-4">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               {data.code && <span className="text-xs font-mono text-muted-foreground">{data.code}</span>}
