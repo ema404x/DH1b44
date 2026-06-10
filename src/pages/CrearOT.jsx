@@ -113,6 +113,7 @@ export default function CrearOT() {
   const [materials, setMaterials] = useState([]);
   const [photos, setPhotos] = useState([]);
   const [requirePhotos, setRequirePhotos] = useState(false);
+  const [autoJefeSitio, setAutoJefeSitio] = useState('');
 
   // Audio (Web Speech API — transcripción en tiempo real)
   const [recording, setRecording] = useState(false);
@@ -145,6 +146,13 @@ export default function CrearOT() {
   });
   const activeLocations = locations;
 
+  // Para cruzar jefe de sitio por nombre de establecimiento
+  const { data: locationData = [] } = useQuery({
+    queryKey: ['location-data-ot'],
+    queryFn: () => base44.entities.LocationData.list('establecimiento', 2000),
+    staleTime: 300000,
+  });
+
   // ── Mutation ─────────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
@@ -165,7 +173,19 @@ export default function CrearOT() {
     setSelectedLocation(loc);
     setLocationSearch(loc.name);
     setShowSuggestions(false);
-  }, []);
+
+    // Auto-asignar jefe de sitio: buscar en LocationData por nombre de establecimiento
+    const match = locationData.find(ld =>
+      ld.establecimiento?.toLowerCase().trim() === loc.name?.toLowerCase().trim() ||
+      ld.establecimiento?.toLowerCase().trim() === loc.address?.toLowerCase().trim()
+    );
+    if (match?.jefe_sitio) {
+      toast.info(`Jefe de sitio asignado: ${match.jefe_sitio}`);
+      setAutoJefeSitio(match.jefe_sitio);
+    } else {
+      setAutoJefeSitio('');
+    }
+  }, [locationData]);
 
   const handleClearLocation = useCallback(() => {
     setSelectedLocation(null);
@@ -291,20 +311,27 @@ export default function CrearOT() {
 
   // Crear
   const handleCreate = () => {
+    // Nombre legible de la ubicación: preferir address, caer en name — nunca vacío
+    const locationLabel = selectedLocation
+      ? (selectedLocation.address?.trim() || selectedLocation.name?.trim() || '')
+      : '';
+
     createMutation.mutate({
       title: title.trim(),
       type,
       priority,
       description,
-      status: 'pendiente',
+      status: autoJefeSitio ? 'asignada' : 'pendiente',
       scheduled_date: scheduledDate || undefined,
       materials_used: materials.filter(m => m.material_name.trim()),
       require_photos: requirePhotos,
       photos,
       location_qr_id: selectedLocation?.id || '',
       location_qr_name: selectedLocation?.name || '',
-      location: selectedLocation?.address || selectedLocation?.name || '',
+      location: locationLabel,
       project_name: selectedLocation?.project_name || '',
+      // Jefe de sitio auto-asignado desde LocationData
+      assigned_name: autoJefeSitio || undefined,
     });
   };
 
@@ -322,6 +349,7 @@ export default function CrearOT() {
     setMaterials([]);
     setPhotos([]);
     setRequirePhotos(false);
+    setAutoJefeSitio('');
   };
 
   // ── Validaciones por paso ────────────────────────────────────────────────────
@@ -499,6 +527,14 @@ export default function CrearOT() {
                     </p>
                     {selectedLocation.address && <p className="text-muted-foreground text-xs flex items-center gap-1"><MapPin className="h-3 w-3" />{selectedLocation.address}</p>}
                     {selectedLocation.project_name && <p className="text-muted-foreground text-xs">Proyecto: {selectedLocation.project_name}</p>}
+                    {autoJefeSitio && (
+                      <p className="text-emerald-400 text-xs flex items-center gap-1 font-semibold mt-1">
+                        <CheckCircle2 className="h-3 w-3" /> Jefe de sitio: {autoJefeSitio}
+                      </p>
+                    )}
+                    {selectedLocation && !autoJefeSitio && (
+                      <p className="text-amber-400/80 text-xs mt-1">Sin jefe de sitio vinculado a esta ubicación</p>
+                    )}
                   </div>
                 )}
 
@@ -714,6 +750,7 @@ export default function CrearOT() {
               <SummaryRow label="Tipo" value={TYPES.find(t => t.value === type)?.label} />
               <SummaryRow label="Prioridad" value={priority.charAt(0).toUpperCase() + priority.slice(1)} />
               {selectedLocation && <SummaryRow label="Establecimiento" value={selectedLocation.name} />}
+              {autoJefeSitio && <SummaryRow label="Jefe de sitio (auto)" value={autoJefeSitio} />}
               {scheduledDate && <SummaryRow label="Fecha programada" value={scheduledDate} />}
               {materials.filter(m => m.material_name.trim()).length > 0 && (
                 <SummaryRow label="Materiales" value={`${materials.filter(m => m.material_name.trim()).length} ítem(s)`} />
