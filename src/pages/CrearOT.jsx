@@ -114,11 +114,18 @@ export default function CrearOT() {
   const [photos, setPhotos] = useState([]);
   const [requirePhotos, setRequirePhotos] = useState(false);
 
-  // Audio
+  // Audio (Web Speech API — transcripción en tiempo real)
   const [recording, setRecording] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const mediaRecorderRef = useRef(null);
-  const chunksRef = useRef([]);
+  const [noSpeechSupport, setNoSpeechSupport] = useState(false);
+  const recognitionRef = useRef(null);
+  const isRecordingRef = useRef(false);
+  const descAcumuladaRef = useRef('');
+
+  // Cleanup al desmontar
+  useEffect(() => () => {
+    isRecordingRef.current = false;
+    recognitionRef.current?.stop();
+  }, []);
 
   // Photo upload
   const fileRef = useRef();
@@ -204,54 +211,67 @@ export default function CrearOT() {
     setMaterials(prev => prev.filter((_, i) => i !== idx));
 
   // Audio
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Detectar el mime type soportado
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : MediaRecorder.isTypeSupported('audio/mp4')
-        ? 'audio/mp4'
-        : '';
-      const mr = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      chunksRef.current = [];
-      mr.ondataavailable = e => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        if (chunksRef.current.length === 0) {
-          toast.error('No se capturó audio. Intentá nuevamente.');
-          setTranscribing(false);
-          return;
-        }
-        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' });
-        setTranscribing(true);
-        try {
-          const { file_url } = await base44.integrations.Core.UploadFile({ file: blob });
-          const text = await base44.integrations.Core.TranscribeAudio({ audio_url: file_url });
-          if (text) {
-            setDescription(prev => prev ? prev + ' ' + text : text);
-            toast.success('Audio transcripto correctamente');
-          } else {
-            toast.error('No se detectó texto en el audio');
+  const createRecognition = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return null;
+    const r = new SR();
+    r.lang = 'es-AR';
+    r.continuous = true;
+    r.interimResults = true;
+    r.maxAlternatives = 1;
+
+    r.onresult = (e) => {
+      let nuevas = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) nuevas += e.results[i][0].transcript + ' ';
+      }
+      if (nuevas.trim()) {
+        const base = descAcumuladaRef.current;
+        const updated = base ? base.trimEnd() + ' ' + nuevas.trim() : nuevas.trim();
+        descAcumuladaRef.current = updated;
+        setDescription(updated);
+      }
+    };
+
+    r.onerror = (e) => {
+      if (isRecordingRef.current && (e.error === 'no-speech' || e.error === 'audio-capture')) {
+        setTimeout(() => { if (isRecordingRef.current) { try { r.start(); } catch (_) {} } }, 300);
+      } else if (e.error !== 'aborted') {
+        isRecordingRef.current = false;
+        setRecording(false);
+      }
+    };
+
+    r.onend = () => {
+      if (isRecordingRef.current) {
+        setTimeout(() => {
+          if (isRecordingRef.current) {
+            const newR = createRecognition();
+            if (newR) { recognitionRef.current = newR; newR.start(); }
           }
-        } catch (err) {
-          toast.error('No se pudo transcribir el audio: ' + (err?.message || 'error desconocido'));
-        }
-        setTranscribing(false);
-      };
-      mr.start(250); // timeslice de 250ms para asegurar chunks en todos los navegadores
-      mediaRecorderRef.current = mr;
-      setRecording(true);
-    } catch (err) {
-      toast.error('No se pudo acceder al micrófono: ' + (err?.message || ''));
-    }
+        }, 200);
+      } else {
+        setRecording(false);
+      }
+    };
+
+    return r;
+  };
+
+  const startRecording = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setNoSpeechSupport(true); return; }
+    descAcumuladaRef.current = description; // sincronizar con el texto actual
+    isRecordingRef.current = true;
+    setRecording(true);
+    const r = createRecognition();
+    if (r) { recognitionRef.current = r; r.start(); }
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    isRecordingRef.current = false;
     setRecording(false);
+    recognitionRef.current?.stop();
   };
 
   // Fotos
@@ -559,24 +579,31 @@ export default function CrearOT() {
                 rows={4}
                 className="w-full rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground text-sm px-3 py-3 resize-none focus:outline-none focus:ring-1 focus:ring-ring"
               />
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {recording ? (
                   <button
                     onClick={stopRecording}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/20 border border-red-500/50 text-red-400 font-semibold text-xs animate-pulse"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/20 border border-red-500/50 text-red-400 font-semibold text-xs"
                   >
                     <MicOff className="h-3.5 w-3.5" /> Detener
-                    <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
                   </button>
                 ) : (
                   <button
                     onClick={startRecording}
-                    disabled={transcribing}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/30 text-primary font-semibold text-xs hover:bg-primary/20 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/30 text-primary font-semibold text-xs hover:bg-primary/20 transition-colors"
                   >
-                    {transcribing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mic className="h-3.5 w-3.5" />}
-                    {transcribing ? 'Transcribiendo...' : 'Dictar instrucciones'}
+                    <Mic className="h-3.5 w-3.5" /> Dictar instrucciones
                   </button>
+                )}
+                {recording && (
+                  <span className="text-xs text-red-400 font-medium flex items-center gap-1.5">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Escuchando — hablá con normalidad
+                  </span>
+                )}
+                {noSpeechSupport && (
+                  <span className="text-xs text-destructive">Usá Chrome para grabación de voz</span>
                 )}
               </div>
             </FieldGroup>
