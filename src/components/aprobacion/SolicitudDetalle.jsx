@@ -96,8 +96,17 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
 
   const puedeAprobar = user?.email?.toLowerCase() === 'rgarciamejores@gmail.com';
 
+  // Para certificados de obra, verificar que el jefe ya firmó
+  const esCertificadoObra = certificado?.tipo === 'obra';
+  const jefeFirmo = !!certificado?.firma_jefe_sitio_url;
+  const bloqueadoPorFirmaJefe = esCertificadoObra && !jefeFirmo;
+
   const handleAprobar = () => {
     if (!puedeAprobar) { toast.error('Solo Raúl García puede aprobar certificados'); return; }
+    if (bloqueadoPorFirmaJefe) {
+      toast.error('El jefe de sitio debe firmar el certificado primero antes de que pueda aprobarse');
+      return;
+    }
     setShowFirmaModal(true);
   };
 
@@ -329,12 +338,45 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
         </Card>
       )}
 
+      {/* Estado de firma del jefe de sitio (solo para obra) */}
+      {esCertificadoObra && (
+        <Card className={jefeFirmo ? 'border-emerald-200 bg-emerald-50/20' : 'border-amber-200 bg-amber-50/20'}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${jefeFirmo ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+                  {jefeFirmo
+                    ? <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    : <Clock className="h-4 w-4 text-amber-600" />
+                  }
+                </div>
+                <div>
+                  <p className={`text-sm font-semibold ${jefeFirmo ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {jefeFirmo ? 'Paso 1: Jefe de sitio firmó ✓' : 'Paso 1: Esperando firma del jefe de sitio'}
+                  </p>
+                  {jefeFirmo && certificado.firmado_por_jefe && (
+                    <p className="text-xs text-muted-foreground">{certificado.firmado_por_jefe}</p>
+                  )}
+                  {!jefeFirmo && (
+                    <p className="text-xs text-amber-600">El certificado debe ser firmado por el jefe antes de poder ser aprobado</p>
+                  )}
+                </div>
+              </div>
+              {jefeFirmo && certificado.firma_jefe_sitio_url && (
+                <img src={certificado.firma_jefe_sitio_url} alt="Firma jefe" className="h-12 object-contain border rounded bg-white p-1 flex-shrink-0" />
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Panel admin para revisar */}
       {isAdmin && (solicitud.estado === 'enviada' || solicitud.estado === 'en_revision') && (
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="pb-2 pt-4 px-4">
             <CardTitle className="text-sm flex items-center gap-2">
-              <MessageSquare className="h-3.5 w-3.5 text-primary" /> Revisión y aprobación
+              <MessageSquare className="h-3.5 w-3.5 text-primary" />
+              {esCertificadoObra ? 'Paso 2: Aprobación gerencial' : 'Revisión y aprobación'}
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-4">
@@ -378,12 +420,16 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
               </Button>
               <Button
                 size="sm"
-                className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
                 onClick={handleAprobar}
-                disabled={updateMutation.isPending || aprobando || !puedeAprobar}
-                title={!puedeAprobar ? 'Solo Raúl García puede aprobar' : ''}
+                disabled={updateMutation.isPending || aprobando || !puedeAprobar || bloqueadoPorFirmaJefe}
+                title={
+                  !puedeAprobar ? 'Solo Raúl García puede aprobar' :
+                  bloqueadoPorFirmaJefe ? 'El jefe de sitio debe firmar primero' : ''
+                }
               >
-                <CheckSquare className="h-4 w-4" /> Aprobar
+                <CheckSquare className="h-4 w-4" />
+                {bloqueadoPorFirmaJefe ? 'Esperando firma jefe' : 'Aprobar'}
               </Button>
             </div>
           </CardContent>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Plus, Eye, Trash2, Loader2, CheckCircle2, Clock } from 'lucide-react';
+import { FileText, Plus, Eye, Trash2, Loader2, CheckCircle2, Clock, PenTool } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
@@ -91,7 +91,19 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                       <span>Aprobado por {c.aprobado_por}</span>
                     </div>
                   )}
-                  {c.estado === 'emitido' && (
+                  {c.estado === 'emitido' && c.tipo === 'obra' && !c.firma_jefe_sitio_url && (
+                    <div className="flex items-center gap-1.5 text-xs text-amber-500 mt-1">
+                      <PenTool className="h-3 w-3" />
+                      <span>Pendiente firma del jefe de sitio</span>
+                    </div>
+                  )}
+                  {c.estado === 'emitido' && c.tipo === 'obra' && c.firma_jefe_sitio_url && (
+                    <div className="flex items-center gap-1.5 text-xs text-blue-500 mt-1">
+                      <Clock className="h-3 w-3" />
+                      <span>Firmado por jefe — pendiente aprobación gerencial</span>
+                    </div>
+                  )}
+                  {c.estado === 'emitido' && c.tipo !== 'obra' && (
                     <div className="flex items-center gap-1.5 text-xs text-blue-500 mt-1">
                       <Clock className="h-3 w-3" />
                       <span>Pendiente de aprobación</span>
