@@ -216,18 +216,18 @@ export default function CrearOT() {
     if (!SR) return null;
     const r = new SR();
     r.lang = 'es-AR';
-    r.continuous = true;
-    r.interimResults = true;
+    r.continuous = false; // una sesión por vez — evita duplicados
+    r.interimResults = false; // solo resultados finales
     r.maxAlternatives = 1;
 
     r.onresult = (e) => {
-      let nuevas = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) nuevas += e.results[i][0].transcript + ' ';
-      }
-      if (nuevas.trim()) {
-        const base = descAcumuladaRef.current;
-        const updated = base ? base.trimEnd() + ' ' + nuevas.trim() : nuevas.trim();
+      const transcript = Array.from(e.results)
+        .map(res => res[0].transcript)
+        .join(' ')
+        .trim();
+      if (transcript) {
+        const base = descAcumuladaRef.current.trimEnd();
+        const updated = base ? base + ' ' + transcript : transcript;
         descAcumuladaRef.current = updated;
         setDescription(updated);
       }
