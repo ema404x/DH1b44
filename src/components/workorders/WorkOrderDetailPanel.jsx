@@ -4,12 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  X, Save, Loader2, MapPin, FileText, CheckSquare, Camera,
+  X, Save, Loader2, MapPin, CheckSquare, Camera,
   Package, Clock, DollarSign, Download, AlertTriangle, Navigation,
-  Layers, ClipboardX, Wrench, Zap, ClipboardList, User, RefreshCw,
-  CheckCircle2, Circle
+  Layers, ClipboardX, User, RefreshCw, QrCode, FileText, Calendar,
+  ChevronDown, ChevronUp, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import WorkOrderQRButton from './WorkOrderQRButton';
@@ -25,19 +24,19 @@ import WorkOrderIncompleteReason from './WorkOrderIncompleteReason';
 import { exportWorkOrderPDF } from '@/utils/exportWorkOrderPDF';
 
 const PRIORITY_CONFIG = {
-  baja:    { label: 'Baja',     color: 'bg-slate-500/20 text-slate-300 border-slate-500/40' },
-  media:   { label: 'Media',    color: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
-  alta:    { label: 'Alta',     color: 'bg-orange-500/20 text-orange-300 border-orange-500/40' },
-  urgente: { label: '🚨 Urgente', color: 'bg-red-500/20 text-red-300 border-red-500/40' },
+  baja:    { label: 'Baja',      color: 'bg-slate-600/40 text-slate-300 border-slate-500/60' },
+  media:   { label: 'Media',     color: 'bg-blue-600/30 text-blue-300 border-blue-500/60' },
+  alta:    { label: '! Alta',    color: 'bg-orange-600/30 text-orange-300 border-orange-500/60' },
+  urgente: { label: '!! Urgente',color: 'bg-red-600/30 text-red-300 border-red-500/60' },
 };
 
 const STATUS_CONFIG = {
-  pendiente:   { label: 'Pendiente',   color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' },
-  asignada:    { label: 'Asignada',    color: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
-  en_progreso: { label: 'En Progreso', color: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
-  en_espera:   { label: 'En Espera',   color: 'bg-slate-500/20 text-slate-300 border-slate-500/40' },
-  completada:  { label: 'Completada',  color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
-  cancelada:   { label: 'Cancelada',   color: 'bg-red-500/20 text-red-300 border-red-500/40' },
+  pendiente:   { label: 'Pendiente',   color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/50' },
+  asignada:    { label: 'Asignada',    color: 'bg-blue-500/20 text-blue-300 border-blue-500/50' },
+  en_progreso: { label: 'En Progreso', color: 'bg-purple-500/20 text-purple-300 border-purple-500/50' },
+  en_espera:   { label: 'En Espera',   color: 'bg-slate-500/20 text-slate-300 border-slate-500/50' },
+  completada:  { label: '✓ Completada',color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50' },
+  cancelada:   { label: 'Cancelada',   color: 'bg-red-500/20 text-red-300 border-red-500/50' },
 };
 
 const TYPE_LABELS = {
@@ -49,13 +48,23 @@ const TYPE_LABELS = {
   emergencia: 'Emergencia',
 };
 
+const TABS = [
+  { key: 'trabajo',    label: 'Trabajo' },
+  { key: 'materiales', label: 'Materiales' },
+  { key: 'horas',      label: 'Horas' },
+  { key: 'media',      label: 'Media' },
+  { key: 'costos',     label: 'Costos' },
+  { key: 'incompleto', label: 'Incompleto', accent: true },
+];
+
 export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [data, setData] = useState({ ...order });
+  const [activeTab, setActiveTab] = useState('trabajo');
   const [qrOpen, setQrOpen] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const queryClient = useQueryClient();
 
-  // ── Fetch fresco desde el servidor — siempre al abrir ──────────────────────
+  // ── Fetch fresco desde el servidor ────────────────────────────────────────
   const { data: freshOrder, isLoading: loadingFresh, refetch } = useQuery({
     queryKey: ['workorder-detail', order.id],
     queryFn: async () => {
@@ -70,7 +79,6 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     if (freshOrder) setData({ ...freshOrder });
   }, [freshOrder]);
 
-  // ── Employees ──────────────────────────────────────────────────────────────
   const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
     queryFn: () => base44.entities.Employee.list('full_name', 200),
@@ -78,14 +86,12 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   });
   const activeEmployees = employees.filter(e => e.status === 'activo' || !e.status);
 
-  // ── Time logs ──────────────────────────────────────────────────────────────
   const { data: timeLogs = [] } = useQuery({
     queryKey: ['timelogs', order.id],
     queryFn: () => base44.entities.TimeLog.filter({ work_order_id: order.id }),
     enabled: !!order.id,
   });
 
-  // ── Mutations ──────────────────────────────────────────────────────────────
   const saveMutation = useMutation({
     mutationFn: (d) => base44.entities.WorkOrder.update(order.id, d),
     onSuccess: () => {
@@ -95,9 +101,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     },
   });
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
   const set = useCallback((key, val) => setData(prev => ({ ...prev, [key]: val })), []);
-
   const saveTimerRef = useRef(null);
   const latestDataRef = useRef(data);
   useEffect(() => { latestDataRef.current = data; }, [data]);
@@ -141,7 +145,6 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     }
   };
 
-  // ── Validation ─────────────────────────────────────────────────────────────
   const checklist = data.checklist || [];
   const pendingTasks = checklist.filter(t => !t.completed);
   const checklistBlocked = checklist.length > 0 && pendingTasks.length > 0;
@@ -163,346 +166,328 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const priorityCfg = PRIORITY_CONFIG[data.priority] || PRIORITY_CONFIG.media;
 
   return (
-    <div className="fixed inset-0 z-50 flex">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="flex-1 bg-black/60 backdrop-blur-sm" onClick={() => { if (!saveMutation.isPending) onClose(); }} />
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={() => { if (!saveMutation.isPending) onClose(); }}
+      />
 
-      {/* Panel */}
-      <div className="w-full max-w-2xl bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl flex flex-col overflow-hidden border-l border-slate-700/50">
+      {/* Modal card */}
+      <div className="relative w-full max-w-xl bg-[#0f1117] rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[92vh] border border-slate-700/40">
 
-        {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div className="relative bg-gradient-to-r from-purple-900/40 via-slate-900/60 to-slate-900 border-b border-slate-700/50 p-5">
-          {/* Sync indicator */}
-          {loadingFresh && (
-            <div className="absolute top-3 right-12 flex items-center gap-1.5 text-xs text-slate-400">
-              <Loader2 className="h-3 w-3 animate-spin" /> Sincronizando...
-            </div>
-          )}
-
+        {/* ── HEADER con gradiente ─────────────────────────────────────── */}
+        <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-500 px-5 pt-5 pb-4 flex-shrink-0">
           <button
-            onClick={() => refetch()}
-            title="Recargar desde servidor"
-            className="absolute top-3 right-14 text-slate-500 hover:text-slate-300 transition-colors"
+            onClick={onClose}
+            className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loadingFresh ? 'animate-spin' : ''}`} />
-          </button>
-
-          <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors p-1">
             <X className="h-5 w-5" />
           </button>
 
-          {/* Icon + Title */}
-          <div className="flex items-start gap-4 pr-16">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/30">
-              <Wrench className="h-6 w-6 text-white" />
+          {loadingFresh && (
+            <button onClick={() => refetch()} className="absolute top-4 right-11 text-white/50 hover:text-white/80">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            </button>
+          )}
+
+          <div className="flex items-center gap-3 pr-8">
+            <div className="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <FileText className="h-5 w-5 text-white" />
             </div>
-            <div className="flex-1 min-w-0">
-              {data.code && (
-                <p className="text-xs font-mono text-slate-500 mb-0.5">{data.code}</p>
-              )}
-              <h2 className="text-lg font-bold text-white leading-tight">{data.title}</h2>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold ${priorityCfg.color}`}>
-                  {priorityCfg.label}
-                </span>
-                <span className="text-xs px-2.5 py-1 rounded-full border border-slate-600/50 bg-slate-700/30 text-slate-300">
-                  {TYPE_LABELS[data.type] || data.type}
-                </span>
-                <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${statusCfg.color}`}>
-                  {statusCfg.label}
-                </span>
-              </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base font-bold text-white leading-tight truncate">{data.title}</h2>
+              {data.code && <p className="text-xs text-white/60 mt-0.5">ID: {data.code}</p>}
             </div>
           </div>
 
-          {/* Meta info chips */}
-          <div className="flex items-center gap-3 mt-3 text-xs text-slate-400 flex-wrap">
-            {data.location && (
-              <span className="flex items-center gap-1.5 bg-slate-800/60 rounded-lg px-2.5 py-1 border border-slate-700/50">
-                <MapPin className="h-3 w-3 text-primary" /> {data.location}
-              </span>
-            )}
-            {data.location_qr_name && data.location_qr_name !== data.location && (
-              <span className="flex items-center gap-1.5 bg-slate-800/60 rounded-lg px-2.5 py-1 border border-slate-700/50">
-                <Zap className="h-3 w-3 text-yellow-400" /> {data.location_qr_name}
-              </span>
-            )}
-            {data.assigned_name && (
-              <span className="flex items-center gap-1.5 bg-slate-800/60 rounded-lg px-2.5 py-1 border border-slate-700/50">
-                <User className="h-3 w-3 text-emerald-400" /> {data.assigned_name}
-              </span>
-            )}
-            {data.scheduled_date && (
-              <span className="flex items-center gap-1.5 bg-slate-800/60 rounded-lg px-2.5 py-1 border border-slate-700/50">
-                <Clock className="h-3 w-3 text-blue-400" /> {data.scheduled_date}
-              </span>
-            )}
+          {/* Badges */}
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            <span className={`text-xs px-3 py-1 rounded-full border font-medium ${priorityCfg.color}`}>
+              {priorityCfg.label}
+            </span>
+            <span className="text-xs px-3 py-1 rounded-full border border-white/20 bg-white/10 text-white/80">
+              Tipo: {TYPE_LABELS[data.type] || data.type}
+            </span>
+            <span className={`text-xs px-3 py-1 rounded-full border font-medium ${statusCfg.color}`}>
+              {statusCfg.label}
+            </span>
           </div>
         </div>
 
-        {/* ── Quick fields ────────────────────────────────────────────────── */}
-        <div className="px-5 py-3 bg-slate-900/80 border-b border-slate-700/50">
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <p className="text-[10px] uppercase text-slate-500 font-semibold mb-1.5 tracking-wide">Estado</p>
-              <Select value={data.status} onValueChange={handleStatusChange}>
-                <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(STATUS_CONFIG).map(([val, cfg]) => (
-                    <SelectItem key={val} value={val} disabled={val === 'completada' && checklistBlocked} className="text-xs">
-                      {cfg.label}{val === 'completada' && checklistBlocked ? ' 🔒' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {checklistBlocked && (
-                <p className="text-[9px] text-orange-400 flex items-center gap-0.5 mt-0.5">
-                  <AlertTriangle className="h-2.5 w-2.5" />{pendingTasks.length} tarea(s)
-                </p>
-              )}
-            </div>
-            <div>
-              <p className="text-[10px] uppercase text-slate-500 font-semibold mb-1.5 tracking-wide">Asignado</p>
-              <Select value={data.assigned_name || '__none__'} onValueChange={v => set('assigned_name', v === '__none__' ? '' : v)}>
-                <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white">
-                  <SelectValue placeholder="Sin asignar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— Sin asignar —</SelectItem>
-                  {activeEmployees.map(e => (
-                    <SelectItem key={e.id} value={e.full_name} className="text-xs">{e.full_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase text-slate-500 font-semibold mb-1.5 tracking-wide">Fecha</p>
-              <Input
-                type="date"
-                value={data.scheduled_date || ''}
-                onChange={e => set('scheduled_date', e.target.value)}
-                className="h-8 text-xs bg-slate-800 border-slate-700 text-white"
-              />
-            </div>
+        {/* ── TABS ────────────────────────────────────────────────────────── */}
+        <div className="flex items-center gap-1 px-4 pt-3 pb-2 flex-shrink-0 overflow-x-auto scrollbar-none">
+          {TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`text-xs px-3.5 py-1.5 rounded-full font-medium whitespace-nowrap transition-all border
+                ${activeTab === tab.key
+                  ? tab.accent
+                    ? 'bg-orange-500/20 border-orange-500/60 text-orange-300'
+                    : 'bg-indigo-600/30 border-indigo-500/60 text-indigo-200'
+                  : 'border-slate-700/50 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── META CHIPS ───────────────────────────────────────────────────── */}
+        <div className="px-4 pb-3 flex flex-wrap gap-2 flex-shrink-0">
+          {data.location && (
+            <span className="flex items-center gap-1.5 text-xs bg-slate-800/60 border border-slate-700/50 rounded-full px-3 py-1 text-slate-300">
+              <MapPin className="h-3 w-3 text-slate-400" /> {data.location}
+            </span>
+          )}
+          {data.assigned_name && (
+            <span className="flex items-center gap-1.5 text-xs bg-slate-800/60 border border-slate-700/50 rounded-full px-3 py-1 text-slate-300">
+              <User className="h-3 w-3 text-slate-400" /> {data.assigned_name}
+            </span>
+          )}
+          {data.scheduled_date && (
+            <span className="flex items-center gap-1.5 text-xs bg-slate-800/60 border border-slate-700/50 rounded-full px-3 py-1 text-slate-300">
+              <Calendar className="h-3 w-3 text-slate-400" /> {data.scheduled_date}
+            </span>
+          )}
+        </div>
+
+        {/* ── QUICK STATUS / ASSIGN ────────────────────────────────────────── */}
+        <div className="px-4 pb-3 grid grid-cols-3 gap-2 flex-shrink-0">
+          <div>
+            <p className="text-[10px] uppercase text-slate-500 font-semibold mb-1 tracking-wide">Estado</p>
+            <Select value={data.status} onValueChange={handleStatusChange}>
+              <SelectTrigger className="h-8 text-xs bg-slate-800/80 border-slate-700 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(STATUS_CONFIG).map(([val, cfg]) => (
+                  <SelectItem key={val} value={val} disabled={val === 'completada' && checklistBlocked} className="text-xs">
+                    {cfg.label}{val === 'completada' && checklistBlocked ? ' 🔒' : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase text-slate-500 font-semibold mb-1 tracking-wide">Asignado</p>
+            <Select value={data.assigned_name || '__none__'} onValueChange={v => set('assigned_name', v === '__none__' ? '' : v)}>
+              <SelectTrigger className="h-8 text-xs bg-slate-800/80 border-slate-700 text-white">
+                <SelectValue placeholder="Sin asignar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— Sin asignar —</SelectItem>
+                {activeEmployees.map(e => (
+                  <SelectItem key={e.id} value={e.full_name} className="text-xs">{e.full_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase text-slate-500 font-semibold mb-1 tracking-wide">Fecha</p>
+            <Input
+              type="date"
+              value={data.scheduled_date || ''}
+              onChange={e => set('scheduled_date', e.target.value)}
+              className="h-8 text-xs bg-slate-800/80 border-slate-700 text-white"
+            />
           </div>
         </div>
 
-        {/* ── Tabs body ───────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto">
-          <Tabs defaultValue="trabajo" className="h-full flex flex-col">
-            <TabsList className="mx-4 mt-3 flex-shrink-0 grid grid-cols-6 h-8 bg-slate-800/60 border border-slate-700/50">
-              <TabsTrigger value="trabajo" className="text-[10px] gap-1 data-[state=active]:bg-slate-700 data-[state=active]:text-white text-slate-400">
-                <CheckSquare className="h-3 w-3" />Trabajo
-              </TabsTrigger>
-              <TabsTrigger value="materiales" className="text-[10px] gap-1 data-[state=active]:bg-slate-700 data-[state=active]:text-white text-slate-400">
-                <Package className="h-3 w-3" />Mat.
-              </TabsTrigger>
-              <TabsTrigger value="horas" className="text-[10px] gap-1 data-[state=active]:bg-slate-700 data-[state=active]:text-white text-slate-400">
-                <Clock className="h-3 w-3" />Horas
-              </TabsTrigger>
-              <TabsTrigger value="media" className="text-[10px] gap-1 data-[state=active]:bg-slate-700 data-[state=active]:text-white text-slate-400">
-                <Camera className="h-3 w-3" />Media
-              </TabsTrigger>
-              <TabsTrigger value="costos" className="text-[10px] gap-1 data-[state=active]:bg-slate-700 data-[state=active]:text-white text-slate-400">
-                <DollarSign className="h-3 w-3" />Costos
-              </TabsTrigger>
-              <TabsTrigger value="incompleto" className="text-[10px] gap-1 data-[state=active]:bg-slate-700 data-[state=active]:text-white text-slate-400">
-                <ClipboardX className="h-3 w-3 text-red-400" /><span className="text-red-400">Inc.</span>
-              </TabsTrigger>
-            </TabsList>
+        {/* ── TAB CONTENT ─────────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-3">
 
-            {/* ── TRABAJO ─────────────────────────────────────────────────── */}
-            <TabsContent value="trabajo" className="flex-1 overflow-y-auto p-5 space-y-5 mt-0">
-
-              {/* Descripción / Instrucciones */}
+          {/* TRABAJO */}
+          {activeTab === 'trabajo' && (
+            <>
               {data.description && (
-                <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <ClipboardList className="h-4 w-4 text-primary" />
-                    <p className="text-xs font-semibold uppercase text-slate-400 tracking-wide">Instrucciones</p>
-                  </div>
-                  <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{data.description}</p>
+                <div className="bg-white rounded-xl p-4">
+                  <p className="text-sm font-semibold text-slate-800 mb-1.5">Instrucciones</p>
+                  <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{data.description}</p>
                 </div>
               )}
 
-              {/* Checklist */}
-              <WorkOrderChecklist checklist={data.checklist || []} onChange={val => saveField('checklist', val)} />
+              <div className="bg-white rounded-xl p-4">
+                <p className="text-sm font-semibold text-slate-800 mb-2">Checklist</p>
+                <WorkOrderChecklist checklist={data.checklist || []} onChange={val => saveField('checklist', val)} />
+              </div>
 
-              {/* Horas */}
-              <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Clock className="h-4 w-4 text-blue-400" />
-                  <p className="text-xs font-semibold uppercase text-slate-400 tracking-wide">Tiempo</p>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Horas estimadas</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-xl p-4">
+                  <p className="text-sm font-semibold text-slate-800 mb-2">Horas estimadas/reales</p>
+                  <div className="flex gap-2">
                     <Input
                       type="number"
+                      placeholder="0 h"
                       value={data.estimated_hours || ''}
                       onChange={e => set('estimated_hours', parseFloat(e.target.value))}
-                      className="bg-slate-800 border-slate-700 text-white text-sm h-9"
+                      className="text-sm bg-slate-50 border-slate-200 text-slate-800 h-9"
                     />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">Horas reales</p>
                     <Input
                       type="number"
+                      placeholder="Reales"
                       value={data.actual_hours || ''}
                       onChange={e => set('actual_hours', parseFloat(e.target.value))}
-                      className="bg-slate-800 border-slate-700 text-white text-sm h-9"
+                      className="text-sm bg-slate-50 border-slate-200 text-slate-800 h-9"
                     />
                   </div>
                 </div>
+
+                <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700/40">
+                  <p className="text-sm font-semibold text-slate-200 mb-2">Notas</p>
+                  <textarea
+                    className="w-full bg-transparent text-sm text-slate-400 placeholder:text-slate-500 resize-none focus:outline-none min-h-[48px]"
+                    placeholder="No resita contrado"
+                    value={data.notes || ''}
+                    onChange={e => set('notes', e.target.value)}
+                  />
+                </div>
               </div>
 
-              {/* GPS */}
               {data.gps_status && (
-                <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Navigation className="h-4 w-4 text-emerald-400" />
-                    <p className="text-xs font-semibold uppercase text-slate-400 tracking-wide">Ubicación GPS de campo</p>
-                  </div>
+                <div className="bg-white rounded-xl p-4">
+                  <p className="text-sm font-semibold text-slate-800 mb-2">GPS</p>
                   {data.gps_status === 'capturado' ? (
-                    <div className="space-y-1.5">
-                      <p className="text-sm font-medium text-emerald-300">
+                    <div className="space-y-1">
+                      <p className="text-sm text-slate-700 flex items-center gap-1.5">
+                        <MapPin className="h-4 w-4 text-slate-400" />
                         {data.gps_latitude?.toFixed(6)}, {data.gps_longitude?.toFixed(6)}
                       </p>
-                      <div className="flex items-center gap-3 text-xs text-emerald-500">
-                        {data.gps_accuracy && <span>Precisión: {data.gps_accuracy}m</span>}
-                        {data.gps_timestamp && <span>{new Date(data.gps_timestamp).toLocaleString('es-AR')}</span>}
-                      </div>
                       <a
                         href={`https://www.google.com/maps?q=${data.gps_latitude},${data.gps_longitude}`}
                         target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-primary underline flex items-center gap-1 mt-1"
+                        className="text-xs text-indigo-600 underline"
                       >
-                        <MapPin className="h-3 w-3" /> Ver en Google Maps
+                        Ver en Google Maps
                       </a>
                     </div>
                   ) : (
-                    <p className="text-sm text-amber-400 flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                    <p className="text-sm text-slate-500 flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4 text-amber-400" />
                       {data.gps_status === 'denegado' ? 'Permiso denegado' : 'No disponible'}
                     </p>
                   )}
                 </div>
               )}
 
-              {/* Notas */}
-              <div>
-                <p className="text-xs font-semibold uppercase text-slate-400 tracking-wide mb-2">Notas</p>
+              <div className="bg-white rounded-xl p-4">
+                <p className="text-sm font-semibold text-slate-800 mb-2">Notas</p>
                 <textarea
-                  className="w-full rounded-xl border border-slate-700/50 bg-slate-800/40 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 min-h-[70px] resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-                  placeholder="Notas del trabajo..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-400 min-h-[80px]"
+                  placeholder="Notas en secuentnado"
                   value={data.notes || ''}
                   onChange={e => set('notes', e.target.value)}
                 />
               </div>
-            </TabsContent>
+            </>
+          )}
 
-            {/* ── MATERIALES ──────────────────────────────────────────────── */}
-            <TabsContent value="materiales" className="flex-1 overflow-y-auto p-5 mt-0">
+          {/* MATERIALES */}
+          {activeTab === 'materiales' && (
+            <div className="bg-white rounded-xl p-4">
               <WorkOrderMaterials
                 materials={data.materials_used || []}
                 faltantes={data.materiales_faltantes || []}
                 onChangeMaterials={val => saveField('materials_used', val)}
                 onChangeFaltantes={val => saveField('materiales_faltantes', val)}
               />
-            </TabsContent>
+            </div>
+          )}
 
-            {/* ── HORAS ───────────────────────────────────────────────────── */}
-            <TabsContent value="horas" className="flex-1 overflow-y-auto p-5 mt-0">
+          {/* HORAS */}
+          {activeTab === 'horas' && (
+            <div className="bg-white rounded-xl p-4">
               <WorkOrderTimeLogs workOrderId={order.id} workOrderTitle={order.title} />
-            </TabsContent>
+            </div>
+          )}
 
-            {/* ── MEDIA ───────────────────────────────────────────────────── */}
-            <TabsContent value="media" className="flex-1 overflow-y-auto p-5 space-y-5 mt-0">
-              {/* Fotos de referencia de creación */}
-              {(data.photos || []).length === 0 && !data.signature_url && (
-                <div className="text-center py-8 text-slate-500 text-sm">
-                  <Camera className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  No hay fotos todavía
-                </div>
-              )}
-              <WorkOrderPhotos photos={data.photos || []} onChange={val => saveField('photos', val)} />
-              <hr className="border-slate-700/50" />
-              <WorkOrderSignature
-                signatureUrl={data.signature_url}
-                signatureName={data.signature_name}
-                onChange={({ signatureUrl, signatureName }) => {
-                  saveFields({ signature_url: signatureUrl, signature_name: signatureName });
-                }}
-              />
-            </TabsContent>
+          {/* MEDIA */}
+          {activeTab === 'media' && (
+            <div className="space-y-3">
+              <div className="bg-white rounded-xl p-4">
+                <WorkOrderPhotos photos={data.photos || []} onChange={val => saveField('photos', val)} />
+              </div>
+              <div className="bg-white rounded-xl p-4">
+                <WorkOrderSignature
+                  signatureUrl={data.signature_url}
+                  signatureName={data.signature_name}
+                  onChange={({ signatureUrl, signatureName }) => {
+                    saveFields({ signature_url: signatureUrl, signature_name: signatureName });
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
-            {/* ── COSTOS ──────────────────────────────────────────────────── */}
-            <TabsContent value="costos" className="flex-1 overflow-y-auto p-5 mt-0">
+          {/* COSTOS */}
+          {activeTab === 'costos' && (
+            <div className="bg-white rounded-xl p-4">
               <WorkOrderCostSummary
                 materials={data.materials_used || []}
                 timeLogs={timeLogs}
                 estimatedHours={data.estimated_hours}
                 actualHours={data.actual_hours}
               />
-            </TabsContent>
+            </div>
+          )}
 
-            {/* ── INCOMPLETO ──────────────────────────────────────────────── */}
-            <TabsContent value="incompleto" className="flex-1 overflow-y-auto p-5 mt-0">
+          {/* INCOMPLETO */}
+          {activeTab === 'incompleto' && (
+            <div className="bg-white rounded-xl p-4">
               <WorkOrderIncompleteReason
                 motivos={data.motivos_incompleto || []}
                 onChange={val => saveField('motivos_incompleto', val)}
               />
-            </TabsContent>
-          </Tabs>
+            </div>
+          )}
         </div>
 
-        {/* ── Footer ──────────────────────────────────────────────────────── */}
-        <div className="p-4 border-t border-slate-700/50 bg-slate-900/80 flex gap-2 flex-wrap justify-between">
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className="border-slate-700 bg-slate-800 text-slate-300 hover:text-white"
-              title="Exportar PDF"
-              onClick={() => exportWorkOrderPDF(data, timeLogs)}
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="border-slate-700 bg-slate-800 text-slate-300 hover:text-white"
-              title="Guardar como plantilla"
-              onClick={handleSaveAsTemplate}
-              disabled={savingTemplate}
-            >
-              {savingTemplate ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}
-            </Button>
-            <WorkOrderQRButton order={data} variant="outline" size="icon" onShowQR={() => setQrOpen(true)} className="border-slate-700 bg-slate-800 text-slate-300 hover:text-white" />
-          </div>
-          <div className="flex gap-2 flex-1 justify-end">
-            {onDelete && <DeleteWorkOrderButton order={data} onDelete={onDelete} />}
-            <Button
-              variant="outline"
-              className="border-slate-700 bg-slate-800 text-slate-300 hover:text-white"
-              onClick={onClose}
-            >
-              Cerrar
-            </Button>
-            <Button
-              className="gap-2 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/30"
-              onClick={save}
-              disabled={saveMutation.isPending || (data.status === 'completada' && !canComplete)}
-              title={checklistBlocked ? `${pendingTasks.length} tarea(s) pendiente(s)` : photosBlocked ? 'Falta foto' : ''}
-            >
-              {saveMutation.isPending
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> Guardando...</>
-                : <><Save className="h-4 w-4" /> Guardar</>
-              }
-            </Button>
-          </div>
+        {/* ── FOOTER ──────────────────────────────────────────────────────── */}
+        <div className="px-4 py-3 border-t border-slate-700/50 bg-[#0f1117] flex items-center gap-2 flex-shrink-0">
+          {/* Left actions */}
+          <button
+            onClick={() => exportWorkOrderPDF(data, timeLogs)}
+            className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-2 transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" /> PDF
+          </button>
+          <button
+            onClick={handleSaveAsTemplate}
+            disabled={savingTemplate}
+            className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
+          >
+            {savingTemplate ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />} Plantilla
+          </button>
+          <button
+            onClick={() => setQrOpen(true)}
+            className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-2 transition-colors"
+          >
+            <QrCode className="h-3.5 w-3.5" /> QR
+          </button>
+
+          <div className="flex-1" />
+
+          {/* Right actions */}
+          {onDelete && (
+            <DeleteWorkOrderButton order={data} onDelete={onDelete} />
+          )}
+          <button
+            onClick={onClose}
+            className="text-xs text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg px-4 py-2 transition-colors"
+          >
+            Cerrar
+          </button>
+          <button
+            onClick={save}
+            disabled={saveMutation.isPending || (data.status === 'completada' && !canComplete)}
+            className="flex items-center gap-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-4 py-2 transition-colors disabled:opacity-50"
+          >
+            {saveMutation.isPending
+              ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Guardando</>
+              : <><Save className="h-3.5 w-3.5" /> Guardar</>
+            }
+          </button>
         </div>
       </div>
 
