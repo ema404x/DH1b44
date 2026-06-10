@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2, Wand2, Layers } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2, Wand2, Layers, Send, Loader2 } from 'lucide-react';
 import HistorialAcumulados from './HistorialAcumulados';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
@@ -23,7 +23,7 @@ function Field({ label, children }) {
   );
 }
 
-export default function CertificadoEditor({ initialData, onSave, onCancel, onPreview, saving }) {
+export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCancel, onPreview, saving, emitting }) {
   const [masivoPct, setMasivoPct] = useState('');
 
   const [form, setForm] = useState(() => {
@@ -318,8 +318,17 @@ export default function CertificadoEditor({ initialData, onSave, onCancel, onPre
           }>
             {form.tipo === 'abono_mensual' ? 'Abono Mensual' : form.tipo === 'informe' ? 'Informe' : 'Obra'}
           </Badge>
-          <Button variant="outline" className="gap-2" onClick={() => onPreview({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo })}><Eye className="h-4 w-4" />Vista previa</Button>
-          <Button className="gap-2" onClick={() => onSave({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo })} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Guardando...' : 'Guardar'}</Button>
+          <Button variant="outline" className="gap-2" onClick={() => onPreview({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo })}>
+            <Eye className="h-4 w-4" />Vista previa
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={() => onDraft({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo })} disabled={saving || emitting}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? 'Guardando...' : 'Guardar borrador'}
+          </Button>
+          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => onEmitir({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo })} disabled={saving || emitting}>
+            {emitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {emitting ? 'Emitiendo...' : 'Emitir certificado'}
+          </Button>
         </div>
       </div>
 

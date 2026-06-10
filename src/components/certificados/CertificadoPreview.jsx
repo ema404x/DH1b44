@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Download, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Send, Loader2 } from 'lucide-react';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
@@ -13,7 +13,7 @@ const parseMonto = (v) => {
   return isNaN(n) ? 0 : n;
 };
 
-export default function CertificadoPreview({ form, onBack, onSave, saving }) {
+export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
   const [exporting, setExporting] = useState(false);
 
   const subtotal = (form.items || []).reduce((a, i) => {
@@ -52,10 +52,10 @@ export default function CertificadoPreview({ form, onBack, onSave, saving }) {
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             Descargar PDF
           </Button>
-          {onSave && (
-            <Button size="sm" onClick={() => onSave(form)} disabled={saving} className="gap-2">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Emitir Certificado
+          {onEmitir && (
+            <Button size="sm" onClick={() => onEmitir(form)} disabled={saving} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Emitir certificado
             </Button>
           )}
         </div>
