@@ -306,15 +306,23 @@ export async function exportCertificadoPDF(form) {
   doc.text(fmt(pdfTotalNeto), W - M - 1, y + 7, { align: 'right' });
   y += 18;
 
-  // Bloque de firmas — jefe de sitio (izquierda) + gerente (derecha si hay)
-  const FIRMA_W = 55;
-  const FIRMA_H = 40;
-  const hasFirmaJefe = !!firmaJefeBase64;
+  // ── Bloque de firmas profesional ─────────────────────────────────────────────
+  const hasFirmaJefe    = !!firmaJefeBase64;
   const hasFirmaGerente = !!firmaBase64;
 
   if (hasFirmaJefe || hasFirmaGerente) {
-    const totalFirmasH = FIRMA_H + 16;
-    if (y + totalFirmasH > SAFE_BOTTOM) {
+    const BLOCK_W  = 70;   // ancho de cada bloque de firma
+    const IMG_H    = 22;   // alto del área de la imagen
+    const BLOCK_H  = IMG_H + 20; // alto total del bloque (imagen + línea + texto)
+    const GAP      = 20;   // espacio entre bloques
+
+    // cuántos bloques hay para centrarlos
+    const count    = (hasFirmaJefe ? 1 : 0) + (hasFirmaGerente ? 1 : 0);
+    const totalW   = count * BLOCK_W + (count - 1) * GAP;
+    const startX   = (W - totalW) / 2;
+
+    const neededH  = BLOCK_H + 14; // + margen superior
+    if (y + neededH > SAFE_BOTTOM) {
       drawFooter(pageNum, '??');
       doc.addPage();
       pageNum++;
@@ -322,29 +330,101 @@ export async function exportCertificadoPDF(form) {
       y = 26;
     }
 
-    const drawFirmaBloque = (base64, nombre, cargo, x) => {
-      doc.setDrawColor(200, 210, 230);
-      doc.setLineWidth(0.2);
-      doc.roundedRect(x, y, FIRMA_W, FIRMA_H + 12, 1.5, 1.5, 'S');
-      doc.addImage(base64, 'PNG', x + 2, y + 1, FIRMA_W - 4, FIRMA_H - 2);
-      doc.setDrawColor(150, 170, 200);
-      doc.setLineWidth(0.3);
-      doc.line(x + 3, y + FIRMA_H + 0.5, x + FIRMA_W - 3, y + FIRMA_H + 0.5);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(15, 28, 46);
-      doc.text(nombre, x + 3, y + FIRMA_H + 5.5);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(80, 90, 110);
-      doc.text(cargo, x + 3, y + FIRMA_H + 10);
+    y += 8; // margen antes de las firmas
+
+    // Línea separadora sutil
+    doc.setDrawColor(210, 218, 230);
+    doc.setLineWidth(0.25);
+    doc.line(M, y - 4, W - M, y - 4);
+
+    // Etiqueta centrada "FIRMAS Y APROBACIÓN"
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(100, 115, 140);
+    doc.text('FIRMAS Y APROBACIÓN', W / 2, y, { align: 'center' });
+    y += 5;
+
+    const drawFirmaBloque = (base64, nombre, cargo, cargo2, sello, x) => {
+      const bx = x;
+      const by = y;
+
+      // Fondo muy suave
+      doc.setFillColor(248, 250, 253);
+      doc.roundedRect(bx, by, BLOCK_W, BLOCK_H, 2, 2, 'F');
+
+      // Borde
+      doc.setDrawColor(190, 205, 225);
+      doc.setLineWidth(0.25);
+      doc.roundedRect(bx, by, BLOCK_W, BLOCK_H, 2, 2, 'S');
+
+      // Imagen de la firma centrada en su área
+      const imgX = bx + (BLOCK_W - (BLOCK_W - 10)) / 2;
+      doc.addImage(base64, 'PNG', imgX, by + 2, BLOCK_W - 10, IMG_H - 2, undefined, 'FAST');
+
+      // Línea divisoria bajo la firma
+      const lineY = by + IMG_H + 1;
+      doc.setDrawColor(170, 190, 215);
+      doc.setLineWidth(0.4);
+      doc.line(bx + 5, lineY, bx + BLOCK_W - 5, lineY);
+
+      // Nombre
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(15, 28, 46);
+      doc.text(nombre, bx + BLOCK_W / 2, lineY + 5.5, { align: 'center' });
+
+      // Cargo
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(80, 95, 120);
+      doc.text(cargo, bx + BLOCK_W / 2, lineY + 10, { align: 'center' });
+
+      if (cargo2) {
+        doc.text(cargo2, bx + BLOCK_W / 2, lineY + 14, { align: 'center' });
+      }
+
+      // Sello / badge de estado (ej: "✓ Firmado")
+      if (sello) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(5.5);
+        doc.setTextColor(30, 130, 80);
+        doc.text(sello, bx + BLOCK_W / 2, by + BLOCK_H - 2, { align: 'center' });
+      }
     };
 
+    let firmaIdx = 0;
     if (hasFirmaJefe) {
-      drawFirmaBloque(firmaJefeBase64, form.firmado_por_jefe || 'Jefe de Sitio', 'Jefe de Sitio', M);
+      const bx = startX + firmaIdx * (BLOCK_W + GAP);
+      const fechaJefe = form.fecha_firma_jefe
+        ? new Date(form.fecha_firma_jefe).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : null;
+      drawFirmaBloque(
+        firmaJefeBase64,
+        form.firmado_por_jefe || 'Jefe de Sitio',
+        'Jefe de Sitio',
+        fechaJefe ? `Firmado: ${fechaJefe}` : null,
+        '✓ Conforme',
+        bx
+      );
+      firmaIdx++;
     }
     if (hasFirmaGerente) {
-      const gerenteX = hasFirmaJefe ? M + FIRMA_W + 10 : M;
-      drawFirmaBloque(firmaBase64, form.aprobado_por || 'Arq. Raúl García', 'Gerente de Contratos · Mejores Hospitales S.A.', gerenteX);
+      const bx = startX + firmaIdx * (BLOCK_W + GAP);
+      const fechaGerente = form.fecha_aprobacion
+        ? new Date(form.fecha_aprobacion).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : null;
+      drawFirmaBloque(
+        firmaBase64,
+        form.aprobado_por || 'Arq. Raúl García',
+        'Gerente de Contratos',
+        'Mejores Hospitales S.A.',
+        fechaGerente ? `✓ Aprobado: ${fechaGerente}` : '✓ Aprobado',
+        bx
+      );
+      firmaIdx++;
     }
 
-    y += FIRMA_H + 16;
+    y += BLOCK_H + 6;
   }
 
   // Footers finales
