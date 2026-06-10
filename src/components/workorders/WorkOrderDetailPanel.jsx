@@ -34,14 +34,12 @@ const typeLabels = {
 export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [data, setData] = useState({ ...order });
 
-  // Sync local state when parent order prop changes (e.g. after external invalidation)
+  // Sync local state when the order prop changes (new order opened or fresh server data)
   const prevOrderId = React.useRef(order.id);
   React.useEffect(() => {
-    if (order.id !== prevOrderId.current) {
-      prevOrderId.current = order.id;
-      setData({ ...order });
-    }
-  }, [order]);
+    prevOrderId.current = order.id;
+    setData({ ...order });
+  }, [order.id]); // solo re-sincronizar cuando cambia la OT seleccionada
   const [qrOpen, setQrOpen] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const queryClient = useQueryClient();

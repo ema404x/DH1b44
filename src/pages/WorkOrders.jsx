@@ -290,13 +290,17 @@ export default function WorkOrders() {
 
       <HistorialEstablecimiento open={historialOpen} onOpenChange={setHistorialOpen} />
 
-      {selectedOrder && (
-        <WorkOrderDetailPanel
-          order={selectedOrder}
-          onClose={() => setSelectedOrder(null)}
-          onDelete={canDelete ? deleteMutation.mutate : undefined}
-        />
-      )}
+      {selectedOrder && (() => {
+        // Siempre pasar el objeto más fresco del cache — si la query se actualizó, el panel lo recibe
+        const freshOrder = orders.find(o => o.id === selectedOrder.id) || selectedOrder;
+        return (
+          <WorkOrderDetailPanel
+            order={freshOrder}
+            onClose={() => setSelectedOrder(null)}
+            onDelete={canDelete ? deleteMutation.mutate : undefined}
+          />
+        );
+      })()}
 
       {qrOrder && (
         <QRCodeModal
