@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  X, Save, Loader2, MapPin, CheckSquare, Camera,
-  Package, Clock, DollarSign, Download, AlertTriangle, Navigation,
-  Layers, ClipboardX, User, RefreshCw, QrCode, FileText, Calendar,
+  X, Save, Loader2, MapPin, CheckSquare, Camera, Package,
+  Download, AlertTriangle, Navigation, Layers, ClipboardX,
+  User, RefreshCw, QrCode, FileText, Calendar, ChevronDown,
+  CheckCircle2, Circle, Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DeleteWorkOrderButton from './DeleteWorkOrderButton';
@@ -15,28 +15,26 @@ import WorkOrderChecklist from './WorkOrderChecklist';
 import WorkOrderPhotos from './WorkOrderPhotos';
 import WorkOrderSignature from './WorkOrderSignature';
 import WorkOrderMaterials from './WorkOrderMaterials';
-import WorkOrderTimeLogs from './WorkOrderTimeLogs';
-import WorkOrderCostSummary from './WorkOrderCostSummary';
 import WorkOrderIncompleteReason from './WorkOrderIncompleteReason';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { exportWorkOrderPDF } from '@/utils/exportWorkOrderPDF';
 
-// ── Config ─────────────────────────────────────────────────────────────────
+// ── Config ──────────────────────────────────────────────────────────────────
 
 const PRIORITY_CFG = {
-  baja:    { label: 'Baja',       cls: 'bg-slate-700/60 text-slate-300 border-slate-600' },
-  media:   { label: 'Media',      cls: 'bg-blue-900/60 text-blue-300 border-blue-700' },
-  alta:    { label: '⚠ Alta',     cls: 'bg-orange-900/60 text-orange-300 border-orange-700' },
-  urgente: { label: '🚨 Urgente', cls: 'bg-red-900/60 text-red-300 border-red-700' },
+  baja:    { label: 'Baja',       dot: 'bg-slate-400',  pill: 'bg-slate-700/60 text-slate-300 border-slate-600' },
+  media:   { label: 'Media',      dot: 'bg-blue-400',   pill: 'bg-blue-900/50 text-blue-300 border-blue-700' },
+  alta:    { label: 'Alta',       dot: 'bg-orange-400', pill: 'bg-orange-900/50 text-orange-300 border-orange-700' },
+  urgente: { label: 'Urgente',    dot: 'bg-red-500 animate-pulse', pill: 'bg-red-900/50 text-red-300 border-red-700' },
 };
 
 const STATUS_CFG = {
-  pendiente:   { label: 'Pendiente',    cls: 'bg-yellow-900/50 text-yellow-300 border-yellow-700' },
-  asignada:    { label: 'Asignada',     cls: 'bg-blue-900/50 text-blue-300 border-blue-700' },
-  en_progreso: { label: 'En Progreso',  cls: 'bg-violet-900/50 text-violet-300 border-violet-700' },
-  en_espera:   { label: 'En Espera',    cls: 'bg-slate-700/50 text-slate-300 border-slate-600' },
-  completada:  { label: '✓ Completada', cls: 'bg-emerald-900/50 text-emerald-300 border-emerald-700' },
-  cancelada:   { label: 'Cancelada',    cls: 'bg-red-900/50 text-red-300 border-red-700' },
+  pendiente:   { label: 'Pendiente',    color: 'text-yellow-300', bg: 'bg-yellow-900/30 border-yellow-700/50' },
+  asignada:    { label: 'Asignada',     color: 'text-blue-300',   bg: 'bg-blue-900/30 border-blue-700/50' },
+  en_progreso: { label: 'En Progreso',  color: 'text-violet-300', bg: 'bg-violet-900/30 border-violet-700/50' },
+  en_espera:   { label: 'En Espera',    color: 'text-slate-300',  bg: 'bg-slate-700/30 border-slate-600/50' },
+  completada:  { label: 'Completada',   color: 'text-emerald-300',bg: 'bg-emerald-900/30 border-emerald-700/50' },
+  cancelada:   { label: 'Cancelada',    color: 'text-red-300',    bg: 'bg-red-900/30 border-red-700/50' },
 };
 
 const TYPE_LABELS = {
@@ -48,34 +46,62 @@ const TYPE_LABELS = {
   emergencia: 'Emergencia',
 };
 
-const TABS = [
-  { key: 'trabajo',    label: 'Trabajo',    icon: CheckSquare },
-  { key: 'materiales', label: 'Materiales', icon: Package },
-  { key: 'horas',      label: 'Horas',      icon: Clock },
-  { key: 'media',      label: 'Media',      icon: Camera },
-  { key: 'costos',     label: 'Costos',     icon: DollarSign },
-  { key: 'incompleto', label: 'Incompleto', icon: ClipboardX, accent: true },
-];
-
-// ── Card section wrapper ────────────────────────────────────────────────────
-function Section({ title, children, className = '' }) {
+// ── Collapsible section ──────────────────────────────────────────────────────
+function CollapseSection({ icon: Icon, title, badge, defaultOpen = true, accent, children }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className={`bg-slate-800/50 border border-slate-700/60 rounded-xl p-4 ${className}`}>
-      {title && <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">{title}</p>}
-      {children}
+    <div className={`rounded-xl border overflow-hidden transition-all ${accent ? 'border-orange-700/40' : 'border-slate-700/50'}`}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`w-full flex items-center justify-between px-4 py-3 transition-colors ${
+          accent ? 'bg-orange-900/20 hover:bg-orange-900/30' : 'bg-slate-800/60 hover:bg-slate-800/90'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <Icon className={`h-3.5 w-3.5 ${accent ? 'text-orange-400' : 'text-slate-400'}`} />
+          <span className={`text-xs font-semibold uppercase tracking-wider ${accent ? 'text-orange-300' : 'text-slate-300'}`}>{title}</span>
+          {badge != null && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${accent ? 'bg-orange-500/20 text-orange-300' : 'bg-indigo-500/20 text-indigo-300'}`}>
+              {badge}
+            </span>
+          )}
+        </div>
+        <ChevronDown className={`h-3.5 w-3.5 text-slate-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="bg-slate-900/40 px-4 py-3">{children}</div>}
     </div>
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────
+// ── Progress ring (mini) ─────────────────────────────────────────────────────
+function MiniRing({ value, total, color = '#6366f1' }) {
+  if (!total) return null;
+  const pct = Math.round((value / total) * 100);
+  const r = 14, circ = 2 * Math.PI * r;
+  const dash = (pct / 100) * circ;
+  return (
+    <svg width="36" height="36" className="-rotate-90">
+      <circle cx="18" cy="18" r={r} fill="none" stroke="#1e293b" strokeWidth="3" />
+      <circle cx="18" cy="18" r={r} fill="none" stroke={color} strokeWidth="3"
+        strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+        style={{ transition: 'stroke-dasharray 0.5s ease' }}
+      />
+      <text x="18" y="18" textAnchor="middle" dominantBaseline="central"
+        className="rotate-90 fill-white text-[9px] font-bold"
+        transform="rotate(90, 18, 18)" style={{ fontSize: 9 }}>
+        {pct}%
+      </text>
+    </svg>
+  );
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
 export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [data, setData] = useState({ ...order });
-  const [activeTab, setActiveTab] = useState('trabajo');
   const [qrOpen, setQrOpen] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const queryClient = useQueryClient();
 
-  // Fresh fetch on open
   const { data: freshOrder, isLoading: loadingFresh, refetch } = useQuery({
     queryKey: ['workorder-detail', order.id],
     queryFn: async () => {
@@ -94,18 +120,12 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   });
   const activeEmployees = employees.filter(e => e.status === 'activo' || !e.status);
 
-  const { data: timeLogs = [] } = useQuery({
-    queryKey: ['timelogs', order.id],
-    queryFn: () => base44.entities.TimeLog.filter({ work_order_id: order.id }),
-    enabled: !!order.id,
-  });
-
   const saveMutation = useMutation({
     mutationFn: (d) => base44.entities.WorkOrder.update(order.id, d),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
-      toast.success('Orden guardada');
+      toast.success('Guardado');
     },
   });
 
@@ -120,7 +140,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       const next = { ...p, [k]: v };
       latestRef.current = next;
       clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => saveMutation.mutate(next), 300);
+      saveTimerRef.current = setTimeout(() => saveMutation.mutate(next), 400);
       return next;
     });
   }, [saveMutation]);
@@ -130,7 +150,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       const next = { ...p, ...fields };
       latestRef.current = next;
       clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => saveMutation.mutate(next), 300);
+      saveTimerRef.current = setTimeout(() => saveMutation.mutate(next), 400);
       return next;
     });
   }, [saveMutation]);
@@ -152,121 +172,130 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   };
 
   const checklist = data.checklist || [];
-  const pendingTasks = checklist.filter(t => !t.completed);
-  const checklistBlocked = checklist.length > 0 && pendingTasks.length > 0;
+  const doneCount = checklist.filter(t => t.completed).length;
+  const checklistBlocked = checklist.length > 0 && doneCount < checklist.length;
   const photosBlocked = data.require_photos && (data.photos || []).length === 0;
   const canComplete = !checklistBlocked && !photosBlocked;
-
-  const save = () => {
-    if (checklistBlocked) { toast.warning(`Faltan ${pendingTasks.length} tarea(s)`); return; }
-    if (photosBlocked) { toast.warning('Falta foto obligatoria'); return; }
-    saveMutation.mutate(data);
-  };
 
   const pCfg = PRIORITY_CFG[data.priority] || PRIORITY_CFG.media;
   const sCfg = STATUS_CFG[data.status] || STATUS_CFG.pendiente;
 
+  const save = () => {
+    if (checklistBlocked) { toast.warning(`Faltan ${checklist.length - doneCount} tarea(s)`); return; }
+    if (photosBlocked) { toast.warning('Falta foto obligatoria'); return; }
+    saveMutation.mutate(data);
+  };
+
   return (
     <>
-      {/* ── Overlay ──────────────────────────────────────────────────────── */}
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={() => { if (!saveMutation.isPending) onClose(); }} />
+
+        {/* Panel */}
         <div
-          className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-          onClick={() => { if (!saveMutation.isPending) onClose(); }}
-        />
-
-        {/* ── Modal ──────────────────────────────────────────────────────── */}
-        {/* Mobile: sheet desde abajo (rounded-t-2xl). Desktop: card centrada */}
-        <div className="relative z-10 w-full sm:max-w-xl sm:mx-4 bg-[#10131c] sm:rounded-2xl rounded-t-2xl shadow-2xl border border-slate-700/50 flex flex-col overflow-hidden"
-          style={{ maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - 8px)', height: '94dvh' }}
+          className="relative z-10 w-full sm:max-w-lg sm:mx-4 bg-[#0d1117] sm:rounded-2xl rounded-t-2xl shadow-2xl border border-white/8 flex flex-col overflow-hidden"
+          style={{ height: '93dvh', maxHeight: 'calc(100dvh - 12px)' }}
         >
-
-          {/* ── HEADER ─────────────────────────────────────────────────── */}
+          {/* ── HEADER ───────────────────────────────────────────────────── */}
           <div className="flex-shrink-0 relative overflow-hidden"
-            style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #2563eb 100%)' }}
+            style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #1e3a5f 100%)' }}
           >
-            {/* Decorative circles */}
-            <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5" />
-            <div className="absolute -bottom-4 -left-4 w-20 h-20 rounded-full bg-white/5" />
+            {/* BG blobs */}
+            <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-indigo-500/10 -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-blue-500/10 translate-y-1/2 -translate-x-1/2 blur-xl pointer-events-none" />
 
-            <div className="relative px-5 pt-5 pb-4">
-              {/* Top row: icon + title + close */}
-              <div className="flex items-start gap-3 pr-10">
-                <div className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <FileText className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-white/50 font-mono mb-0.5 truncate">{data.code || `OT-${order.id?.slice(-6)}`}</p>
-                  <h2 className="text-base sm:text-lg font-bold text-white leading-snug">{data.title}</h2>
-                </div>
-              </div>
+            <div className="relative px-5 pt-5 pb-4 pr-14">
+              {/* Code + title */}
+              <p className="text-[10px] text-white/40 font-mono mb-1 tracking-widest">
+                {data.code || `OT-${order.id?.slice(-6)?.toUpperCase()}`}
+              </p>
+              <h2 className="text-base sm:text-[17px] font-bold text-white leading-snug mb-3 line-clamp-2">
+                {data.title}
+              </h2>
 
-              {/* Badges */}
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${pCfg.cls}`}>{pCfg.label}</span>
-                <span className="text-xs px-2.5 py-0.5 rounded-full border border-white/20 bg-white/10 text-white/80">
+              {/* Pill badges */}
+              <div className="flex flex-wrap gap-1.5">
+                {/* Priority */}
+                <span className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full border font-medium ${pCfg.pill}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${pCfg.dot}`} />
+                  {pCfg.label}
+                </span>
+                {/* Type */}
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full border border-white/15 bg-white/8 text-white/70 font-medium">
                   {TYPE_LABELS[data.type] || data.type}
                 </span>
-                <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${sCfg.cls}`}>{sCfg.label}</span>
+                {/* Status */}
+                <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-semibold ${sCfg.color} ${sCfg.bg}`}>
+                  {sCfg.label}
+                </span>
               </div>
 
-              {/* Meta chips */}
-              <div className="flex flex-wrap gap-1.5 mt-2">
+              {/* Meta row */}
+              <div className="flex flex-wrap gap-2 mt-2.5">
                 {data.location && (
-                  <span className="flex items-center gap-1 text-xs text-white/70 bg-white/10 rounded-full px-2.5 py-0.5">
-                    <MapPin className="h-3 w-3" />{data.location}
+                  <span className="flex items-center gap-1 text-[11px] text-white/55">
+                    <MapPin className="h-3 w-3 text-white/30 flex-shrink-0" />
+                    {data.location}
                   </span>
                 )}
                 {data.assigned_name && (
-                  <span className="flex items-center gap-1 text-xs text-white/70 bg-white/10 rounded-full px-2.5 py-0.5">
-                    <User className="h-3 w-3" />{data.assigned_name}
+                  <span className="flex items-center gap-1 text-[11px] text-white/55">
+                    <User className="h-3 w-3 text-white/30 flex-shrink-0" />
+                    {data.assigned_name}
                   </span>
                 )}
                 {data.scheduled_date && (
-                  <span className="flex items-center gap-1 text-xs text-white/70 bg-white/10 rounded-full px-2.5 py-0.5">
-                    <Calendar className="h-3 w-3" />{data.scheduled_date}
+                  <span className="flex items-center gap-1 text-[11px] text-white/55">
+                    <Calendar className="h-3 w-3 text-white/30 flex-shrink-0" />
+                    {data.scheduled_date}
                   </span>
                 )}
               </div>
             </div>
 
-            {/* Close + refresh */}
-            <button onClick={onClose} className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors p-1">
-              <X className="h-5 w-5" />
+            {/* Close */}
+            <button onClick={onClose}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all">
+              <X className="h-4 w-4" />
             </button>
             {loadingFresh && (
-              <button onClick={() => refetch()} className="absolute top-4 right-11 text-white/40 hover:text-white/70 p-1">
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-              </button>
+              <div className="absolute top-4 right-14">
+                <RefreshCw className="h-3.5 w-3.5 text-white/30 animate-spin" />
+              </div>
             )}
           </div>
 
-          {/* ── QUICK FIELDS ───────────────────────────────────────────── */}
-          <div className="flex-shrink-0 px-4 py-3 border-b border-slate-700/50 bg-slate-900/60 grid grid-cols-3 gap-2">
+          {/* ── QUICK CONTROLS ───────────────────────────────────────────── */}
+          <div className="flex-shrink-0 grid grid-cols-3 gap-2 px-4 py-3 bg-slate-900/80 border-b border-white/6">
             <div>
-              <p className="text-[10px] uppercase text-slate-500 font-semibold mb-1 tracking-wide">Estado</p>
-              <Select value={data.status} onValueChange={v => { if (v === 'completada' && !canComplete) return; set('status', v); }}>
-                <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white">
+              <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Estado</p>
+              <Select value={data.status} onValueChange={v => { if (v === 'completada' && !canComplete) { toast.warning('Completá el checklist primero'); return; } set('status', v); }}>
+                <SelectTrigger className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {Object.entries(STATUS_CFG).map(([val, cfg]) => (
-                    <SelectItem key={val} value={val} disabled={val === 'completada' && checklistBlocked} className="text-xs">
-                      {cfg.label}{val === 'completada' && checklistBlocked ? ' 🔒' : ''}
+                    <SelectItem key={val} value={val} className="text-xs">
+                      <span className={cfg.color}>{cfg.label}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {checklistBlocked && <p className="text-[9px] text-orange-400 mt-0.5 flex items-center gap-0.5"><AlertTriangle className="h-2.5 w-2.5" />{pendingTasks.length} pendiente(s)</p>}
+              {checklistBlocked && (
+                <p className="text-[9px] text-orange-400 mt-1 flex items-center gap-0.5">
+                  <AlertTriangle className="h-2.5 w-2.5" />{doneCount}/{checklist.length} hechas
+                </p>
+              )}
             </div>
             <div>
-              <p className="text-[10px] uppercase text-slate-500 font-semibold mb-1 tracking-wide">Asignado</p>
+              <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Asignado</p>
               <Select value={data.assigned_name || '__none__'} onValueChange={v => set('assigned_name', v === '__none__' ? '' : v)}>
-                <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white">
-                  <SelectValue placeholder="Sin asignar" />
+                <SelectTrigger className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg">
+                  <SelectValue placeholder="—" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">— Sin asignar —</SelectItem>
+                  <SelectItem value="__none__" className="text-xs">Sin asignar</SelectItem>
                   {activeEmployees.map(e => (
                     <SelectItem key={e.id} value={e.full_name} className="text-xs">{e.full_name}</SelectItem>
                   ))}
@@ -274,200 +303,159 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
               </Select>
             </div>
             <div>
-              <p className="text-[10px] uppercase text-slate-500 font-semibold mb-1 tracking-wide">Fecha</p>
-              <Input type="date" value={data.scheduled_date || ''} onChange={e => set('scheduled_date', e.target.value)}
-                className="h-8 text-xs bg-slate-800 border-slate-700 text-white" />
+              <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Fecha</p>
+              <Input type="date" value={data.scheduled_date || ''}
+                onChange={e => set('scheduled_date', e.target.value)}
+                className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg px-2" />
             </div>
           </div>
 
-          {/* ── TABS ───────────────────────────────────────────────────── */}
-          <div className="flex-shrink-0 px-4 pt-3 pb-2 overflow-x-auto scrollbar-none">
-            <div className="flex gap-1 min-w-max">
-              {TABS.map(({ key, label, icon: Icon, accent }) => {
-                const active = activeTab === key;
-                return (
-                  <button key={key} onClick={() => setActiveTab(key)}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium whitespace-nowrap transition-all border
-                      ${active
-                        ? accent
-                          ? 'bg-orange-500/20 border-orange-500/60 text-orange-300'
-                          : 'bg-indigo-600/30 border-indigo-500/50 text-indigo-200'
-                        : 'border-slate-700/60 text-slate-500 hover:text-slate-300 hover:border-slate-600'
-                      }`}
-                  >
-                    <Icon className="h-3 w-3" />
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* ── BODY ─────────────────────────────────────────────────────── */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
 
-          {/* ── CONTENT ────────────────────────────────────────────────── */}
-          <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-3">
+            {/* ── Instrucciones ── */}
+            {data.description && (
+              <CollapseSection icon={FileText} title="Instrucciones" defaultOpen>
+                <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{data.description}</p>
+              </CollapseSection>
+            )}
 
-            {/* TRABAJO */}
-            {activeTab === 'trabajo' && (
-              <>
-                {data.description && (
-                  <Section title="Instrucciones">
-                    <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{data.description}</p>
-                  </Section>
-                )}
-
-                <Section title="Checklist">
-                  <WorkOrderChecklist checklist={data.checklist || []} onChange={val => saveField('checklist', val)} />
-                </Section>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Section title="Horas">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <p className="text-[10px] text-slate-500 mb-1">Estimadas</p>
-                        <Input type="number" placeholder="0" value={data.estimated_hours || ''}
-                          onChange={e => set('estimated_hours', parseFloat(e.target.value))}
-                          className="h-9 text-sm bg-slate-800 border-slate-700 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-500 mb-1">Reales</p>
-                        <Input type="number" placeholder="0" value={data.actual_hours || ''}
-                          onChange={e => set('actual_hours', parseFloat(e.target.value))}
-                          className="h-9 text-sm bg-slate-800 border-slate-700 text-white" />
-                      </div>
-                    </div>
-                  </Section>
-
-                  {data.gps_status && (
-                    <Section title="GPS">
-                      {data.gps_status === 'capturado' ? (
-                        <div className="space-y-1">
-                          <p className="text-sm text-emerald-300 flex items-center gap-1.5">
-                            <Navigation className="h-3.5 w-3.5" />
-                            {data.gps_latitude?.toFixed(5)}, {data.gps_longitude?.toFixed(5)}
-                          </p>
-                          <a href={`https://www.google.com/maps?q=${data.gps_latitude},${data.gps_longitude}`}
-                            target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-indigo-400 underline">
-                            Ver en Maps
-                          </a>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-slate-500 flex items-center gap-1.5">
-                          <AlertTriangle className="h-4 w-4 text-amber-400" />
-                          {data.gps_status === 'denegado' ? 'Permiso denegado' : 'No disponible'}
-                        </p>
-                      )}
-                    </Section>
-                  )}
+            {/* ── Checklist ── */}
+            <CollapseSection
+              icon={CheckSquare}
+              title="Checklist"
+              badge={checklist.length > 0 ? `${doneCount}/${checklist.length}` : null}
+              defaultOpen
+            >
+              {checklist.length > 0 && (
+                <div className="mb-3 flex items-center gap-3">
+                  <MiniRing value={doneCount} total={checklist.length} color={doneCount === checklist.length ? '#10b981' : '#6366f1'} />
+                  <div>
+                    <p className="text-xs font-semibold text-slate-200">{doneCount === checklist.length ? '¡Todo completado!' : `${checklist.length - doneCount} tarea(s) pendiente(s)`}</p>
+                    <p className="text-[10px] text-slate-500">{Math.round((doneCount / checklist.length) * 100)}% del trabajo listo</p>
+                  </div>
                 </div>
+              )}
+              <WorkOrderChecklist checklist={checklist} onChange={val => saveField('checklist', val)} />
+            </CollapseSection>
 
-                <Section title="Notas">
-                  <textarea
-                    className="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500 min-h-[80px]"
-                    placeholder="Agregar notas..."
-                    value={data.notes || ''}
-                    onChange={e => set('notes', e.target.value)}
-                  />
-                </Section>
-              </>
+            {/* ── GPS ── */}
+            {data.gps_status && (
+              <CollapseSection icon={Navigation} title="Ubicación GPS" defaultOpen={false}>
+                {data.gps_status === 'capturado' ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-emerald-300 font-mono">{data.gps_latitude?.toFixed(5)}, {data.gps_longitude?.toFixed(5)}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Precisión: {data.gps_accuracy ? `±${Math.round(data.gps_accuracy)}m` : 'N/D'}</p>
+                    </div>
+                    <a href={`https://www.google.com/maps?q=${data.gps_latitude},${data.gps_longitude}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="text-[11px] bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/40 rounded-lg px-3 py-1.5 transition-colors">
+                      Ver mapa
+                    </a>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500 flex items-center gap-1.5">
+                    <AlertTriangle className="h-4 w-4 text-amber-400" />
+                    {data.gps_status === 'denegado' ? 'Permiso denegado' : 'No disponible'}
+                  </p>
+                )}
+              </CollapseSection>
             )}
 
-            {activeTab === 'materiales' && (
-              <Section>
-                <WorkOrderMaterials
-                  materials={data.materials_used || []}
-                  faltantes={data.materiales_faltantes || []}
-                  onChangeMaterials={val => saveField('materials_used', val)}
-                  onChangeFaltantes={val => saveField('materiales_faltantes', val)}
-                />
-              </Section>
-            )}
+            {/* ── Materiales ── */}
+            <CollapseSection
+              icon={Package}
+              title="Materiales"
+              badge={(data.materials_used || []).length || null}
+              defaultOpen={false}
+            >
+              <WorkOrderMaterials
+                materials={data.materials_used || []}
+                faltantes={data.materiales_faltantes || []}
+                onChangeMaterials={val => saveField('materials_used', val)}
+                onChangeFaltantes={val => saveField('materiales_faltantes', val)}
+              />
+            </CollapseSection>
 
-            {activeTab === 'horas' && (
-              <Section>
-                <WorkOrderTimeLogs workOrderId={order.id} workOrderTitle={order.title} />
-              </Section>
-            )}
-
-            {activeTab === 'media' && (
-              <>
-                <Section title="Fotos">
-                  <WorkOrderPhotos photos={data.photos || []} onChange={val => saveField('photos', val)} />
-                </Section>
-                <Section title="Firma">
+            {/* ── Media ── */}
+            <CollapseSection
+              icon={Camera}
+              title="Fotos & Firma"
+              badge={(data.photos || []).length || null}
+              defaultOpen={false}
+            >
+              <div className="space-y-4">
+                <WorkOrderPhotos photos={data.photos || []} onChange={val => saveField('photos', val)} />
+                <div className="border-t border-slate-700/50 pt-4">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Firma de conformidad</p>
                   <WorkOrderSignature
                     signatureUrl={data.signature_url}
                     signatureName={data.signature_name}
                     onChange={({ signatureUrl, signatureName }) =>
                       saveFields({ signature_url: signatureUrl, signature_name: signatureName })}
                   />
-                </Section>
-              </>
-            )}
+                </div>
+              </div>
+            </CollapseSection>
 
-            {activeTab === 'costos' && (
-              <Section>
-                <WorkOrderCostSummary
-                  materials={data.materials_used || []}
-                  timeLogs={timeLogs}
-                  estimatedHours={data.estimated_hours}
-                  actualHours={data.actual_hours}
-                />
-              </Section>
-            )}
+            {/* ── Notas ── */}
+            <CollapseSection icon={Zap} title="Notas" defaultOpen={false}>
+              <textarea
+                className="w-full bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500/50 min-h-[90px]"
+                placeholder="Agregar observaciones..."
+                value={data.notes || ''}
+                onChange={e => set('notes', e.target.value)}
+              />
+            </CollapseSection>
 
-            {activeTab === 'incompleto' && (
-              <Section>
-                <WorkOrderIncompleteReason
-                  motivos={data.motivos_incompleto || []}
-                  onChange={val => saveField('motivos_incompleto', val)}
-                />
-              </Section>
-            )}
+            {/* ── Incompleto ── */}
+            <CollapseSection icon={ClipboardX} title="Motivos Incompleto" accent defaultOpen={false}>
+              <WorkOrderIncompleteReason
+                motivos={data.motivos_incompleto || []}
+                onChange={val => saveField('motivos_incompleto', val)}
+              />
+            </CollapseSection>
+
           </div>
 
-          {/* ── FOOTER ─────────────────────────────────────────────────── */}
-          <div className="flex-shrink-0 px-4 py-3 border-t border-slate-700/50 bg-slate-900/80">
-            {/* Mobile: 2 rows. Desktop: 1 row */}
+          {/* ── FOOTER ───────────────────────────────────────────────────── */}
+          <div className="flex-shrink-0 border-t border-white/6 bg-slate-900/90 px-4 py-3">
             <div className="flex items-center justify-between gap-2">
-              {/* Tool buttons */}
-              <div className="flex items-center gap-1.5">
-                <button onClick={() => exportWorkOrderPDF(data, timeLogs)}
-                  title="Exportar PDF"
-                  className="flex items-center gap-1 text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg px-2.5 py-1.5 transition-colors">
+              {/* Tools */}
+              <div className="flex items-center gap-1">
+                <button onClick={() => exportWorkOrderPDF(data, [])} title="PDF"
+                  className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors">
                   <Download className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">PDF</span>
                 </button>
-                <button onClick={handleSaveAsTemplate} disabled={savingTemplate} title="Guardar como plantilla"
-                  className="flex items-center gap-1 text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg px-2.5 py-1.5 transition-colors disabled:opacity-40">
+                <button onClick={handleSaveAsTemplate} disabled={savingTemplate} title="Guardar plantilla"
+                  className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors disabled:opacity-40">
                   {savingTemplate ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />}
-                  <span className="hidden sm:inline">Plantilla</span>
                 </button>
-                <button onClick={() => setQrOpen(true)} title="Código QR"
-                  className="flex items-center gap-1 text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg px-2.5 py-1.5 transition-colors">
+                <button onClick={() => setQrOpen(true)} title="QR"
+                  className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors">
                   <QrCode className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">QR</span>
                 </button>
+                {onDelete && <DeleteWorkOrderButton order={data} onDelete={onDelete} />}
               </div>
 
-              {/* Action buttons */}
+              {/* Save */}
               <div className="flex items-center gap-2">
-                {onDelete && <DeleteWorkOrderButton order={data} onDelete={onDelete} />}
                 <button onClick={onClose}
-                  className="text-xs text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg px-3 sm:px-4 py-2 transition-colors">
+                  className="text-xs text-slate-400 hover:text-white px-3 py-2 rounded-lg border border-white/10 hover:border-white/20 transition-colors">
                   Cerrar
                 </button>
                 <button onClick={save}
-                  disabled={saveMutation.isPending || (data.status === 'completada' && !canComplete)}
-                  className="flex items-center gap-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-3 sm:px-4 py-2 transition-colors disabled:opacity-50 shadow-lg shadow-indigo-900/40">
+                  disabled={saveMutation.isPending}
+                  className="flex items-center gap-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-lg px-4 py-2 transition-all disabled:opacity-50 shadow-lg shadow-indigo-950/50">
                   {saveMutation.isPending
-                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span className="hidden sm:inline">Guardando...</span></>
-                    : <><Save className="h-3.5 w-3.5" /><span>Guardar</span></>}
+                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Guardando</>
+                    : <><Save className="h-3.5 w-3.5" />Guardar</>
+                  }
                 </button>
               </div>
             </div>
           </div>
-
         </div>
       </div>
 
