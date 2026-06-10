@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import FirmaGerenteModal from '@/components/aprobacion/FirmaGerenteModal';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 const estadoConfig = {
   borrador:    { label: 'Borrador',     color: 'bg-slate-100 text-slate-600 border-slate-300' },
@@ -83,13 +84,15 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
     }
   });
 
+  const { displayName } = useCurrentUser();
+
   const handleMarcarRevision = () => {
     if (solicitud.estado !== 'enviada') return;
     updateMutation.mutate({
       estado: 'en_revision',
       historial: [
         ...(solicitud.historial || []),
-        { fecha: new Date().toISOString(), estado: 'en_revision', usuario: user?.full_name || user?.email, comentario: 'Tomada para revisión' }
+        { fecha: new Date().toISOString(), estado: 'en_revision', usuario: displayName, comentario: 'Tomada para revisión' }
       ]
     });
   };
@@ -139,7 +142,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
 
   const handleRechazar = () => {
     if (!motivo.trim()) { toast.error('Ingresá el motivo de rechazo'); return; }
-    const nombreGerente = user?.full_name || user?.email || 'Gerente';
+    const nombreGerente = displayName;
     updateMutation.mutate({
       aprobado_por: nombreGerente,
       aprobado_por_email: user?.email,

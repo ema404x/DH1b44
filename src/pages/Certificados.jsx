@@ -29,7 +29,7 @@ export default function Certificados() {
   const [previewing, setPreviewing] = useState(null);
   const [pendingFirmaData, setPendingFirmaData] = useState(null); // datos del cert esperando firma jefe
   const queryClient = useQueryClient();
-  const { user } = useCurrentUser();
+  const { user, displayName } = useCurrentUser();
 
   const { filterByUser } = useCurrentUser();
 
@@ -88,7 +88,7 @@ export default function Certificados() {
         numero,
         titulo: `Certificado N°${cert.numero} — ${cert.contratista || cert.emprendimiento || ''}`,
         establecimiento: cert.emprendimiento || cert.obra_servicio || '',
-        jefe_sitio: user?.full_name || user?.email || '',
+        jefe_sitio: displayName,
         jefe_sitio_email: user?.email || '',
         descripcion_trabajo: cert.obra_servicio || '',
         monto_solicitado: cert.subtotal || cert.monto_contratado || 0,
@@ -99,7 +99,7 @@ export default function Certificados() {
         historial: [{
           fecha: new Date().toISOString(),
           estado: 'enviada',
-          usuario: user?.full_name || user?.email || '',
+          usuario: displayName,
           comentario: 'Certificado emitido — enviado automáticamente para aprobación',
         }]
       });
