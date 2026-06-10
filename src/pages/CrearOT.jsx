@@ -207,28 +207,45 @@ export default function CrearOT() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      // Detectar el mime type soportado
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : '';
+      const mr = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       chunksRef.current = [];
-      mr.ondataavailable = e => chunksRef.current.push(e.data);
+      mr.ondataavailable = e => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        if (chunksRef.current.length === 0) {
+          toast.error('No se capturó audio. Intentá nuevamente.');
+          setTranscribing(false);
+          return;
+        }
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' });
         setTranscribing(true);
         try {
           const { file_url } = await base44.integrations.Core.UploadFile({ file: blob });
           const text = await base44.integrations.Core.TranscribeAudio({ audio_url: file_url });
-          setDescription(prev => prev ? prev + ' ' + text : text);
-          toast.success('Audio transcripto correctamente');
-        } catch {
-          toast.error('No se pudo transcribir el audio');
+          if (text) {
+            setDescription(prev => prev ? prev + ' ' + text : text);
+            toast.success('Audio transcripto correctamente');
+          } else {
+            toast.error('No se detectó texto en el audio');
+          }
+        } catch (err) {
+          toast.error('No se pudo transcribir el audio: ' + (err?.message || 'error desconocido'));
         }
         setTranscribing(false);
       };
-      mr.start();
+      mr.start(250); // timeslice de 250ms para asegurar chunks en todos los navegadores
       mediaRecorderRef.current = mr;
       setRecording(true);
-    } catch {
-      toast.error('No se pudo acceder al micrófono');
+    } catch (err) {
+      toast.error('No se pudo acceder al micrófono: ' + (err?.message || ''));
     }
   };
 
