@@ -273,8 +273,10 @@ export default function Projects() {
     setDeleting(true);
     const ids = [...selected];
     let ok = 0, fail = 0;
-    for (let i = 0; i < ids.length; i += 10) {
-      const batch = ids.slice(i, i + 10);
+    // Batches de 20 en paralelo — mucho más rápido que secuencial
+    const BATCH = 20;
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const batch = ids.slice(i, i + BATCH);
       const results = await Promise.allSettled(batch.map(id => base44.entities.Project.delete(id)));
       ok += results.filter(r => r.status === 'fulfilled').length;
       fail += results.filter(r => r.status === 'rejected').length;
