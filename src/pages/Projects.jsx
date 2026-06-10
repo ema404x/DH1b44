@@ -183,7 +183,9 @@ export default function Projects() {
   const [showObrasImporter, setShowObrasImporter] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [deletingProgress, setDeletingProgress] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState(1);
   const queryClient = useQueryClient();
@@ -269,22 +271,29 @@ export default function Projects() {
     setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map(p => p.id)));
   };
 
-  const handleBulkDelete = async () => {
+  const deleteIds = async (ids) => {
     setDeleting(true);
-    const ids = [...selected];
+    setDeletingProgress(0);
     let ok = 0, fail = 0;
-    // Batches de 20 en paralelo — mucho más rápido que secuencial
     const BATCH = 20;
     for (let i = 0; i < ids.length; i += BATCH) {
       const batch = ids.slice(i, i + BATCH);
       const results = await Promise.allSettled(batch.map(id => base44.entities.Project.delete(id)));
       ok += results.filter(r => r.status === 'fulfilled').length;
       fail += results.filter(r => r.status === 'rejected').length;
+      setDeletingProgress(Math.round(((i + batch.length) / ids.length) * 100));
     }
     queryClient.invalidateQueries({ queryKey: ['projects'] });
-    setSelected(new Set()); setDeleting(false); setConfirmDelete(false);
+    setSelected(new Set());
+    setDeleting(false);
+    setDeletingProgress(0);
+    setConfirmDelete(false);
+    setConfirmDeleteAll(false);
     toast.success(`${ok} obras eliminadas${fail > 0 ? ` (${fail} con error)` : ''}`);
   };
+
+  const handleBulkDelete = () => deleteIds([...selected]);
+  const handleDeleteAll = () => deleteIds(projects.map(p => p.id));
 
   // CSS variable para el grid
   const colsVar = 'repeat(1,28px) 48px 1fr 1fr 2fr 80px 90px 110px 70px 70px 100px 120px 120px 32px';
@@ -324,6 +333,11 @@ export default function Projects() {
               {canCreate && (
                 <Button size="sm" className="text-xs h-7 gap-1 bg-primary hover:bg-primary/90" onClick={() => { setEditing(null); setDialogOpen(true); }}>
                   <Plus className="h-3 w-3" /> Nueva obra
+                </Button>
+              )}
+              {canDelete && projects.length > 0 && (
+                <Button size="sm" variant="ghost" className="text-xs h-7 gap-1 text-red-400 hover:text-red-300 hover:bg-red-500/10" onClick={() => setConfirmDeleteAll(true)}>
+                  <Trash2 className="h-3 w-3" /> Eliminar todo
                 </Button>
               )}
             </>
@@ -467,10 +481,10 @@ export default function Projects() {
         />
       )}
 
-      {/* Confirmación borrado masivo */}
+      {/* Confirmación borrado masivo (seleccionados) */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/70" onClick={() => setConfirmDelete(false)} />
+          <div className="absolute inset-0 bg-black/70" onClick={() => !deleting && setConfirmDelete(false)} />
           <div className="relative bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -481,11 +495,60 @@ export default function Projects() {
                 <p className="text-xs text-slate-400">Esta acción no se puede deshacer</p>
               </div>
             </div>
+            {deleting && (
+              <div className="mb-4">
+                <div className="flex justify-between text-xs text-slate-400 mb-1">
+                  <span>Eliminando...</span><span>{deletingProgress}%</span>
+                </div>
+                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-red-500 rounded-full transition-all duration-300" style={{ width: `${deletingProgress}%` }} />
+                </div>
+              </div>
+            )}
             <div className="flex gap-2 justify-end mt-4">
               <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)} disabled={deleting}>Cancelar</Button>
               <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={deleting} className="gap-1.5">
                 {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                {deleting ? 'Eliminando...' : `Eliminar ${selected.size}`}
+                {deleting ? `Eliminando... ${deletingProgress}%` : `Eliminar ${selected.size}`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmación eliminar TODO */}
+      {confirmDeleteAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/80" onClick={() => !deleting && setConfirmDeleteAll(false)} />
+          <div className="relative bg-slate-900 border border-red-500/50 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white">Eliminar TODAS las obras</h3>
+                <p className="text-xs text-slate-400">Se borrarán <span className="text-red-400 font-semibold">{projects.length.toLocaleString()} obras</span> — sin excepción</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mb-4 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              ⚠️ Esta acción es irreversible. Todos los registros de la planilla serán eliminados permanentemente.
+            </p>
+            {deleting && (
+              <div className="mb-4">
+                <div className="flex justify-between text-xs text-slate-400 mb-1">
+                  <span>Eliminando en lotes...</span><span>{deletingProgress}%</span>
+                </div>
+                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-red-500 rounded-full transition-all duration-300" style={{ width: `${deletingProgress}%` }} />
+                </div>
+                <p className="text-xs text-slate-500 mt-1 text-center">No cierres esta ventana</p>
+              </div>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setConfirmDeleteAll(false)} disabled={deleting}>Cancelar</Button>
+              <Button variant="destructive" size="sm" onClick={handleDeleteAll} disabled={deleting} className="gap-1.5">
+                {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                {deleting ? `${deletingProgress}% completado` : `Sí, eliminar todo (${projects.length})`}
               </Button>
             </div>
           </div>
