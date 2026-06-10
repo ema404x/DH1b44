@@ -1,13 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, CheckSquare, Camera, Image, X, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Camera, Image, X, Loader2, CheckCircle2, Circle } from 'lucide-react';
 
 export default function WorkOrderChecklist({ checklist = [], onChange }) {
   const [newTask, setNewTask] = useState('');
   const [uploadingId, setUploadingId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
   const fileRefs = useRef({});
 
   const addTask = () => {
@@ -22,6 +21,7 @@ export default function WorkOrderChecklist({ checklist = [], onChange }) {
 
   const removeTask = (id) => {
     onChange(checklist.filter(t => t.id !== id));
+    if (expandedId === id) setExpandedId(null);
   };
 
   const updateNotes = (id, notes) => {
@@ -40,112 +40,156 @@ export default function WorkOrderChecklist({ checklist = [], onChange }) {
     onChange(checklist.map(t => t.id === id ? { ...t, photo_url: null } : t));
   };
 
-  const completed = checklist.filter(t => t.completed).length;
-  const pct = checklist.length > 0 ? Math.round((completed / checklist.length) * 100) : 0;
+  const done = checklist.filter(t => t.completed).length;
+  const pct = checklist.length > 0 ? Math.round((done / checklist.length) * 100) : 0;
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <CheckSquare className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold">Lista de Tareas</span>
-          {checklist.length > 0 && (
-            <span className="text-xs text-muted-foreground">{completed}/{checklist.length} ({pct}%)</span>
-          )}
-        </div>
-      </div>
 
+      {/* Progress bar */}
       {checklist.length > 0 && (
-        <div className="w-full bg-muted rounded-full h-2">
-          <div
-            className={`h-2 rounded-full transition-all ${pct === 100 ? 'bg-emerald-500' : 'bg-primary'}`}
-            style={{ width: `${pct}%` }}
-          />
+        <div className="space-y-1">
+          <div className="flex justify-between text-[10px] text-slate-500">
+            <span>{done} de {checklist.length} completadas</span>
+            <span className={pct === 100 ? 'text-emerald-400 font-bold' : ''}>{pct}%</span>
+          </div>
+          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
         </div>
       )}
 
+      {/* Task cards */}
       <div className="space-y-2">
-        {checklist.map(task => (
-          <div key={task.id} className={`rounded-xl border p-3 space-y-2 transition-colors ${task.completed ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-muted/30 border-border'}`}>
-            {/* Fila principal */}
-            <div className="flex items-center gap-3">
-              <Checkbox
-                checked={task.completed}
-                onCheckedChange={() => toggleTask(task.id)}
-                className="flex-shrink-0 h-5 w-5"
-              />
-              <span className={`flex-1 text-sm font-medium ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
-                {task.task}
-              </span>
-              {/* Botón adjuntar foto */}
-              <button
-                className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors"
-                title="Adjuntar foto de ejemplo"
-                onClick={() => fileRefs.current[task.id]?.click()}
-                disabled={uploadingId === task.id}
-              >
-                {uploadingId === task.id
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                  : task.photo_url
-                    ? <Image className="h-4 w-4 text-primary" />
-                    : <Camera className="h-4 w-4" />
-                }
-              </button>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                ref={el => fileRefs.current[task.id] = el}
-                onChange={e => uploadPhoto(task.id, e.target.files[0])}
-              />
-              <Button
-                variant="ghost" size="icon"
-                className="h-6 w-6 text-destructive flex-shrink-0 opacity-60 hover:opacity-100"
-                onClick={() => removeTask(task.id)}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-
-            {/* Foto adjunta */}
-            {task.photo_url && (
-              <div className="relative inline-block">
-                <img
-                  src={task.photo_url}
-                  alt="foto tarea"
-                  className="h-24 w-auto rounded-lg border border-border object-cover"
-                />
+        {checklist.map(task => {
+          const expanded = expandedId === task.id;
+          return (
+            <div
+              key={task.id}
+              className={`rounded-xl border transition-all duration-200 overflow-hidden ${
+                task.completed
+                  ? 'border-emerald-700/40 bg-emerald-950/30'
+                  : 'border-slate-700/50 bg-slate-800/40'
+              }`}
+            >
+              {/* Main row — tall touch target */}
+              <div className="flex items-center gap-3 px-3 py-3 min-h-[52px]">
+                {/* Big tap checkbox */}
                 <button
-                  onClick={() => removePhoto(task.id)}
-                  className="absolute -top-1.5 -right-1.5 bg-destructive text-white rounded-full h-4 w-4 flex items-center justify-center"
+                  onClick={() => toggleTask(task.id)}
+                  className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full transition-all active:scale-90"
                 >
-                  <X className="h-2.5 w-2.5" />
+                  {task.completed
+                    ? <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+                    : <Circle className="h-6 w-6 text-slate-500" />
+                  }
+                </button>
+
+                {/* Task text */}
+                <span
+                  className={`flex-1 text-sm leading-tight cursor-pointer select-none ${
+                    task.completed ? 'line-through text-slate-500' : 'text-slate-100 font-medium'
+                  }`}
+                  onClick={() => setExpandedId(expanded ? null : task.id)}
+                >
+                  {task.task}
+                </span>
+
+                {/* Photo indicator */}
+                {task.photo_url && (
+                  <div className="w-7 h-7 rounded-md overflow-hidden border border-slate-600 flex-shrink-0">
+                    <img src={task.photo_url} alt="" className="w-full h-full object-cover" />
+                  </div>
+                )}
+
+                {/* Expand toggle */}
+                <button
+                  onClick={() => setExpandedId(expanded ? null : task.id)}
+                  className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
+                >
+                  <svg className={`h-3.5 w-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
               </div>
-            )}
 
-            {/* Nota opcional */}
-            <Input
-              placeholder="Nota o comentario de esta tarea (opcional)..."
-              value={task.notes || ''}
-              onChange={e => updateNotes(task.id, e.target.value)}
-              className="text-xs h-7 bg-transparent border-border/50 placeholder:text-muted-foreground/50"
-            />
-          </div>
-        ))}
+              {/* Expanded area */}
+              {expanded && (
+                <div className="px-3 pb-3 space-y-2.5 border-t border-slate-700/40 pt-3">
+                  {/* Notes */}
+                  <Input
+                    placeholder="Nota de esta tarea (opcional)..."
+                    value={task.notes || ''}
+                    onChange={e => updateNotes(task.id, e.target.value)}
+                    className="h-9 text-xs bg-slate-900/60 border-slate-700/50 text-slate-200 placeholder:text-slate-600"
+                  />
+
+                  {/* Photo row */}
+                  <div className="flex items-center gap-2">
+                    {task.photo_url ? (
+                      <div className="relative">
+                        <img src={task.photo_url} alt="" className="h-20 w-28 rounded-lg object-cover border border-slate-600" />
+                        <button
+                          onClick={() => removePhoto(task.id)}
+                          className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full h-5 w-5 flex items-center justify-center shadow-lg"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="h-20 w-28 rounded-lg border-2 border-dashed border-slate-600 hover:border-indigo-500/50 flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition-colors active:scale-95"
+                        onClick={() => fileRefs.current[task.id]?.click()}
+                        disabled={uploadingId === task.id}
+                      >
+                        {uploadingId === task.id
+                          ? <Loader2 className="h-5 w-5 animate-spin" />
+                          : <>
+                            <Camera className="h-5 w-5" />
+                            <span className="text-[10px]">Foto</span>
+                          </>
+                        }
+                      </button>
+                    )}
+
+                    <input type="file" accept="image/*" className="hidden"
+                      ref={el => fileRefs.current[task.id] = el}
+                      onChange={e => uploadPhoto(task.id, e.target.files[0])} />
+
+                    {/* Delete */}
+                    <button
+                      onClick={() => removeTask(task.id)}
+                      className="ml-auto h-9 w-9 flex items-center justify-center rounded-xl bg-red-950/40 border border-red-900/40 text-red-400 hover:bg-red-900/50 transition-colors active:scale-90"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      <div className="flex gap-2">
+      {/* Add task */}
+      <div className="flex gap-2 pt-1">
         <Input
-          placeholder="Agregar tarea al checklist..."
+          placeholder="Nueva tarea..."
           value={newTask}
           onChange={e => setNewTask(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addTask()}
-          className="text-sm"
+          className="h-10 text-sm bg-slate-800/60 border-slate-700/50 text-white placeholder:text-slate-600"
         />
-        <Button size="sm" onClick={addTask} disabled={!newTask.trim()}>
+        <button
+          onClick={addTask}
+          disabled={!newTask.trim()}
+          className="h-10 w-10 flex items-center justify-center flex-shrink-0 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl transition-colors active:scale-90"
+        >
           <Plus className="h-4 w-4" />
-        </Button>
+        </button>
       </div>
     </div>
   );
