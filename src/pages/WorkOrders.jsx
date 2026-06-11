@@ -35,10 +35,9 @@ function WorkOrderCard({ order, onOpen, onShowQR }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -5 }}
-      className={`group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border rounded-lg p-4 cursor-pointer transition-all ${isOverdue ? 'border-red-500/30 bg-red-500/5' : 'border-slate-700/50'}`}
+      className={`group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border rounded-lg p-4 cursor-pointer transition-all hover:-translate-y-1 ${isOverdue ? 'border-red-500/30 bg-red-500/5' : 'border-slate-700/50'}`}
       onClick={() => onOpen(order)}
     >
       <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
@@ -136,7 +135,7 @@ export default function WorkOrders() {
 
   const container = {
     hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.05 } }
+    show: { opacity: 1, transition: { staggerChildren: Math.min(0.05, 2 / Math.max(filtered.length, 1)) } }
   };
 
   return (

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, User, Zap, Wrench, QrCode } from 'lucide-react';
@@ -80,7 +80,13 @@ function KanbanCard({ order, index, onOpen, onShowQR }) {
   );
 }
 
+const KANBAN_VISIBLE_LIMIT = 40; // máximo de cards visibles por columna
+
 function KanbanColumn({ col, orders, onOpen, onShowQR }) {
+  const [showAll, setShowAll] = React.useState(false);
+  const visible = showAll ? orders : orders.slice(0, KANBAN_VISIBLE_LIMIT);
+  const hidden = orders.length - KANBAN_VISIBLE_LIMIT;
+
   return (
     <div className={`flex flex-col min-w-[240px] w-[240px] bg-slate-900/50 rounded-xl border-t-2 ${col.color} flex-shrink-0`}>
       {/* Column header */}
@@ -96,11 +102,11 @@ function KanbanColumn({ col, orders, onOpen, onShowQR }) {
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`flex-1 p-2 space-y-2 min-h-[120px] transition-colors rounded-b-xl ${
+            className={`flex-1 p-2 space-y-2 min-h-[120px] transition-colors rounded-b-xl overflow-y-auto max-h-[70vh] ${
               snapshot.isDraggingOver ? 'bg-primary/5' : ''
             }`}
           >
-            {orders.map((order, index) => (
+            {visible.map((order, index) => (
               <KanbanCard
                 key={order.id}
                 order={order}
@@ -114,6 +120,14 @@ function KanbanColumn({ col, orders, onOpen, onShowQR }) {
               <div className="flex items-center justify-center h-20 text-xs text-muted-foreground/50 border border-dashed border-border/50 rounded-lg">
                 Sin órdenes
               </div>
+            )}
+            {!showAll && hidden > 0 && (
+              <button
+                onClick={() => setShowAll(true)}
+                className="w-full text-xs text-slate-400 hover:text-white py-2 border border-dashed border-slate-700 rounded-lg transition-colors"
+              >
+                + {hidden} más...
+              </button>
             )}
           </div>
         )}
