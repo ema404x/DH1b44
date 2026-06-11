@@ -13,7 +13,6 @@ import SeccionInspeccion from '@/components/inspeccion/SeccionInspeccion';
 import InformeViewer from '@/components/inspeccion/InformeViewer';
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { useAuth } from '@/lib/AuthContext';
 
 const SECCIONES_DEFAULT = [
   'Fachada y accesos', 'Aulas', 'Baños', 'Cocina / Comedor',
@@ -104,7 +103,6 @@ function InspeccionCard({ insp, onOpen, onDelete }) {
 
 // ── Componente principal ───────────────────────────────────────────────────
 export default function InspeccionColegioPage() {
-  const { user } = useAuth();
   const { filterByUser, displayName } = useCurrentUser();
   const queryClient = useQueryClient();
 
