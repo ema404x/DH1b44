@@ -231,27 +231,43 @@ export default function Certificados() {
 
   if (view === 'edit') {
     return (
-      <CertificadoEditor
-        initialData={extracted}
-        onDraft={handleDraft}
-        onEmitir={handleEmitir}
-        onCancel={() => { setView('list'); setExtracted(null); setEditing(null); }}
-        onPreview={handlePreview}
-        saving={draftMutation.isPending}
-        emitting={emitirMutation.isPending}
-      />
+      <>
+        <FirmaJefeSitioModal
+          open={!!pendingFirmaData}
+          onClose={() => setPendingFirmaData(null)}
+          onFirmado={handleFirmaJefe}
+          user={user}
+        />
+        <CertificadoEditor
+          initialData={extracted}
+          onDraft={handleDraft}
+          onEmitir={handleEmitir}
+          onCancel={() => { setView('list'); setExtracted(null); setEditing(null); }}
+          onPreview={handlePreview}
+          saving={draftMutation.isPending}
+          emitting={emitirMutation.isPending}
+        />
+      </>
     );
   }
 
   if (view === 'preview') {
     const fromList = previewing?.estado === 'aprobado' && !editing;
     return (
-      <CertificadoPreview
-        form={previewing}
-        onBack={() => fromList ? setView('list') : setView('edit')}
-        onEmitir={handleEmitir}
-        saving={emitirMutation.isPending}
-      />
+      <>
+        <FirmaJefeSitioModal
+          open={!!pendingFirmaData}
+          onClose={() => setPendingFirmaData(null)}
+          onFirmado={handleFirmaJefe}
+          user={user}
+        />
+        <CertificadoPreview
+          form={previewing}
+          onBack={() => fromList ? setView('list') : setView('edit')}
+          onEmitir={handleEmitir}
+          saving={emitirMutation.isPending}
+        />
+      </>
     );
   }
 
