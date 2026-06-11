@@ -223,6 +223,7 @@ export default function Certificados() {
           onClose={() => setPendingFirmaData(null)}
           onFirmado={handleFirmaJefe}
           user={user}
+          displayName={displayName}
         />
         <AbonoManualForm
           onSave={handleEmitir}
@@ -252,6 +253,7 @@ export default function Certificados() {
           onClose={() => setPendingFirmaData(null)}
           onFirmado={handleFirmaJefe}
           user={user}
+          displayName={displayName}
         />
         <CertificadoEditor
           initialData={extracted}
@@ -275,6 +277,7 @@ export default function Certificados() {
           onClose={() => setPendingFirmaData(null)}
           onFirmado={handleFirmaJefe}
           user={user}
+          displayName={displayName}
         />
         <CertificadoPreview
           form={previewing}
@@ -294,6 +297,7 @@ export default function Certificados() {
         onClose={() => setPendingFirmaData(null)}
         onFirmado={handleFirmaJefe}
         user={user}
+        displayName={displayName}
       />
 
       <PageHeader

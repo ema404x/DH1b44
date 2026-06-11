@@ -168,27 +168,28 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
 
         {/* Firmas — jefe de sitio (obra) + gerente (aprobación) */}
         {(form.firma_jefe_sitio_url || form.firma_gerente_url || form.estado === 'aprobado') && (
-          <div className="border-t pt-6 mt-2">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground text-center mb-4">
+          <div className="border-t pt-6 mt-4">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground text-center mb-5">
               Firmas y Aprobación
             </p>
-            <div className="flex flex-wrap justify-center gap-6">
+            <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto">
               {/* Firma del jefe de sitio */}
               {form.firma_jefe_sitio_url && (
-                <div className="flex flex-col items-center w-52">
-                  <div className="w-full bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center p-2" style={{ height: 72 }}>
+                <div className="flex flex-col rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+                  <div className="bg-muted/30 flex items-center justify-center px-4 py-3" style={{ minHeight: 88 }}>
                     <img
                       src={form.firma_jefe_sitio_url}
                       alt="Firma Jefe de Sitio"
-                      className="max-h-full max-w-full object-contain"
+                      className="max-h-16 max-w-full object-contain"
                     />
                   </div>
-                  <div className="w-full border-t border-slate-300 mt-2 pt-2 text-center">
+                  <div className="border-t border-border px-3 py-2.5 text-center bg-background">
                     <p className="text-xs font-bold text-foreground leading-tight">{form.firmado_por_jefe || 'Jefe de Sitio'}</p>
-                    <p className="text-[11px] text-muted-foreground">Jefe de Sitio</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Jefe de Sitio</p>
                     {form.fecha_firma_jefe && (
-                      <p className="text-[10px] text-blue-600 font-semibold mt-0.5">
-                        ✓ Firmado {new Date(form.fecha_firma_jefe).toLocaleDateString('es-AR')}
+                      <p className="text-[10px] text-blue-500 font-semibold mt-1 flex items-center justify-center gap-1">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500" />
+                        {new Date(form.fecha_firma_jefe).toLocaleDateString('es-AR')}
                       </p>
                     )}
                   </div>
@@ -196,21 +197,21 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
               )}
               {/* Firma del gerente */}
               {(form.firma_gerente_url || form.estado === 'aprobado') && (
-                <div className="flex flex-col items-center w-52">
-                  <div className="w-full bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center p-2" style={{ height: 72 }}>
+                <div className="flex flex-col rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+                  <div className="bg-muted/30 flex items-center justify-center px-4 py-3" style={{ minHeight: 88 }}>
                     <img
                       src={form.firma_gerente_url || 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/3f708fc7a_firmaRaul2_page-0001.jpg'}
                       alt="Firma Gerente"
-                      className="max-h-full max-w-full object-contain"
+                      className="max-h-16 max-w-full object-contain"
                     />
                   </div>
-                  <div className="w-full border-t border-slate-300 mt-2 pt-2 text-center">
+                  <div className="border-t border-border px-3 py-2.5 text-center bg-background">
                     <p className="text-xs font-bold text-foreground leading-tight">{form.aprobado_por || 'Arq. Raúl García'}</p>
-                    <p className="text-[11px] text-muted-foreground">Gerente de Contratos</p>
-                    <p className="text-[11px] text-muted-foreground">Mejores Hospitales S.A.</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Gerente de Contratos</p>
                     {form.fecha_aprobacion && (
-                      <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">
-                        ✓ Aprobado {new Date(form.fecha_aprobacion).toLocaleDateString('es-AR')}
+                      <p className="text-[10px] text-emerald-500 font-semibold mt-1 flex items-center justify-center gap-1">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        {new Date(form.fecha_aprobacion).toLocaleDateString('es-AR')}
                       </p>
                     )}
                   </div>

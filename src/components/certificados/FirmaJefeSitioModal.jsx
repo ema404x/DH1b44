@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, PenTool, Trash2, CheckCircle2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user }) {
+export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, displayName }) {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [hasFirma, setHasFirma] = useState(false);
@@ -21,6 +21,8 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user }) 
   });
 
   const empleado = empleados[0];
+  // Nombre a mostrar: prioridad al displayName del hook (nombre en ficha empleado), luego full_name de la ficha, luego plataforma
+  const nombreFirmante = displayName || empleado?.full_name || user?.full_name || user?.email || 'Jefe de Sitio';
   const firmaGuardada = empleado?.firma_url;
   const mostrarCanvas = !firmaGuardada || redibujar;
 
@@ -104,13 +106,20 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user }) 
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <PenTool className="h-4 w-4 text-primary" /> Firma del Jefe de Sitio
+            <PenTool className="h-4 w-4 text-primary" /> Firma Digital
           </DialogTitle>
         </DialogHeader>
 
-        <p className="text-xs text-muted-foreground">
-          Para emitir este certificado de obra, necesitás firmar digitalmente como responsable del sitio.
-        </p>
+        {/* Identidad del firmante */}
+        <div className="flex items-center gap-3 bg-muted/40 border border-border rounded-lg px-4 py-3">
+          <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+            <span className="text-sm font-bold text-primary">{nombreFirmante.charAt(0).toUpperCase()}</span>
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground truncate">{nombreFirmante}</p>
+            <p className="text-xs text-muted-foreground">Jefe de Sitio · Certificado de Obra</p>
+          </div>
+        </div>
 
         {loadingFirma ? (
           <div className="flex items-center justify-center py-8">
@@ -119,10 +128,14 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user }) 
         ) : (
           <div className="space-y-4">
             {firmaGuardada && !redibujar ? (
-              <div className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase">Tu firma registrada</p>
-                <div className="border rounded-lg bg-white p-3 flex items-center justify-center">
-                  <img src={firmaGuardada} alt="Firma guardada" className="h-20 object-contain" />
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Firma registrada</p>
+                <div className="border border-border rounded-xl bg-white flex items-center justify-center p-4 shadow-sm" style={{ minHeight: 80 }}>
+                  <img src={firmaGuardada} alt="Firma guardada" className="max-h-16 object-contain" />
+                </div>
+                <div className="border-t border-border/60 pt-1 text-center">
+                  <p className="text-xs font-semibold text-foreground">{nombreFirmante}</p>
+                  <p className="text-[10px] text-muted-foreground">Jefe de Sitio</p>
                 </div>
                 <button
                   onClick={() => setRedibujar(true)}
@@ -134,8 +147,8 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user }) 
             ) : (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground uppercase">
-                    {firmaGuardada ? 'Dibujá una nueva firma' : 'Dibujá tu firma'}
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {firmaGuardada ? 'Nueva firma' : 'Dibujá tu firma'}
                   </label>
                   <div className="flex items-center gap-2">
                     {hasFirma && (
@@ -145,17 +158,17 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user }) 
                     )}
                     {firmaGuardada && (
                       <button onClick={() => setRedibujar(false)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-                        ← Usar firma guardada
+                        ← Usar guardada
                       </button>
                     )}
                   </div>
                 </div>
-                <div className="border-2 border-dashed border-border rounded-lg overflow-hidden bg-white" style={{ touchAction: 'none' }}>
+                <div className="relative rounded-xl overflow-hidden shadow-sm" style={{ touchAction: 'none' }}>
                   <canvas
                     ref={canvasRef}
                     width={400}
                     height={160}
-                    className="w-full cursor-crosshair"
+                    className="w-full cursor-crosshair border-2 border-dashed border-border rounded-xl"
                     onMouseDown={startDraw}
                     onMouseMove={draw}
                     onMouseUp={stopDraw}
@@ -164,6 +177,11 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user }) 
                     onTouchMove={draw}
                     onTouchEnd={stopDraw}
                   />
+                  {!hasFirma && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <p className="text-xs text-slate-300 select-none">Firmá aquí →</p>
+                    </div>
+                  )}
                 </div>
                 <p className="text-[10px] text-muted-foreground">
                   {firmaGuardada ? 'Esta nueva firma reemplazará la guardada.' : 'Esta firma quedará guardada para futuras emisiones.'}
@@ -178,7 +196,7 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user }) 
           <Button
             onClick={handleConfirm}
             disabled={uploading || loadingFirma || (mostrarCanvas && !hasFirma)}
-            className="gap-2"
+            className="gap-2 bg-primary"
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
             Firmar y emitir
