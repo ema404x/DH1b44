@@ -22,6 +22,8 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user }) {
   });
 
   const empleado = empleados[0];
+  // Nombre siempre desde ficha de empleado, nunca del username de plataforma
+  const nombreFirmante = empleado?.full_name || user?.full_name || user?.email || 'Gerente';
   const firmaGuardada = empleado?.firma_url;
   const mostrarCanvas = !firmaGuardada || redibujar;
 
@@ -96,7 +98,9 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user }) {
         }
       }
 
-      onFirmada(firmaUrl, user?.full_name || user?.email);
+      // Usar el nombre de la ficha de empleado (full_name en el módulo de Empleados)
+      // Si no está vinculado como empleado, caer en full_name de plataforma como último recurso
+      onFirmada(firmaUrl, nombreFirmante);
     } finally {
       setUploading(false);
     }
@@ -110,6 +114,19 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user }) {
             <PenTool className="h-4 w-4 text-primary" /> Confirmar aprobación
           </DialogTitle>
         </DialogHeader>
+
+        {/* Identidad del firmante */}
+        {!loadingFirma && (
+          <div className="flex items-center gap-3 bg-muted/40 border border-border rounded-lg px-4 py-3">
+            <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+              <span className="text-sm font-bold text-primary">{nombreFirmante.charAt(0).toUpperCase()}</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">{nombreFirmante}</p>
+              <p className="text-xs text-muted-foreground">Gerente de Contratos</p>
+            </div>
+          </div>
+        )}
 
         {loadingFirma ? (
           <div className="flex items-center justify-center py-8">
