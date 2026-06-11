@@ -49,9 +49,14 @@ export function useCurrentUser() {
     if (!employeeRole) return list;
     // Solo restringir si es un rol de campo explícito
     if (!FIELD_ROLES.includes(employeeRole?.toLowerCase?.())) return list;
-    const name  = currentUser.full_name?.toLowerCase() || '';
+
+    // IMPORTANTE: usar employeeName (ficha de empleado) como fuente principal de nombre.
+    // Caer en full_name de plataforma solo si no hay ficha vinculada.
+    const employeeNameLower = employeeName?.toLowerCase() || '';
+    const platformNameLower = currentUser.full_name?.toLowerCase() || '';
     const email = currentUser.email?.toLowerCase() || '';
     const userId = currentUser.id || '';
+
     return list.filter(item => {
       // Ver registros creados por él (por ID de usuario de plataforma)
       if (userId && item.created_by_id && item.created_by_id === userId) return true;
@@ -60,7 +65,11 @@ export function useCurrentUser() {
       // Ver registros donde aparece su nombre o email en los campos indicados
       return fields.some(field => {
         const val = (item[field] || '').toLowerCase();
-        return (name && val.includes(name)) || (email && val === email);
+        // Comparar contra nombre de ficha de empleado primero, luego nombre de plataforma
+        const matchEmployee = employeeNameLower && val.includes(employeeNameLower);
+        const matchPlatform = platformNameLower && val.includes(platformNameLower);
+        const matchEmail    = email && val === email;
+        return matchEmployee || matchPlatform || matchEmail;
       });
     });
   }

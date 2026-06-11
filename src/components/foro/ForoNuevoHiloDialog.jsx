@@ -151,7 +151,8 @@ export default function ForoNuevoHiloDialog({ open, onClose, onCrear, categorias
       categoria_nombre: cat?.nombre || "",
       tipo,
       encuesta,
-      autor_nombre: user?.full_name || user?.email || "Usuario",
+      // displayName viene del hook useCurrentUser del padre — prioriza nombre de ficha de empleado
+      autor_nombre: user?.displayName || user?.full_name || user?.email || "Usuario",
       autor_id: user?.id,
       reacciones: {},
       fijado: false,

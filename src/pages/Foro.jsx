@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { useAuth } from "@/lib/AuthContext";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 
 export default function Foro() {
-  const { user } = useAuth();
+  const { user, displayName } = useCurrentUser();
+  // Enriquecer el objeto user con displayName para que los componentes hijos lo usen
+  const userConNombre = user ? { ...user, displayName } : user;
   const qc = useQueryClient();
 
   const [hiloActivo, setHiloActivo] = useState(null);
@@ -58,23 +60,23 @@ export default function Foro() {
             tipo: 'anuncio',
             hilo_id: hiloCreado.id,
             hilo_titulo: hiloCreado.titulo,
-            actor_nombre: user?.full_name || user?.email,
-            leida: false,
-          })
-        ));
-      }
-      // Notificar menciones
-      if (hiloCreado.menciones?.length) {
-        const mencionados = usuarios.filter(u =>
-          hiloCreado.menciones.some(m => (u.full_name || "").toLowerCase().includes(m.toLowerCase()))
-        );
-        await Promise.all(mencionados.map(u =>
-          base44.entities.ForoNotificacion.create({
-            usuario_id: u.id,
-            tipo: 'mencion',
-            hilo_id: hiloCreado.id,
-            hilo_titulo: hiloCreado.titulo,
-            actor_nombre: user?.full_name || user?.email,
+            actor_nombre: displayName || user?.full_name || user?.email,
+              leida: false,
+              })
+            ));
+            }
+            // Notificar menciones
+            if (hiloCreado.menciones?.length) {
+            const mencionados = usuarios.filter(u =>
+              hiloCreado.menciones.some(m => (u.full_name || "").toLowerCase().includes(m.toLowerCase()))
+            );
+            await Promise.all(mencionados.map(u =>
+              base44.entities.ForoNotificacion.create({
+                usuario_id: u.id,
+                tipo: 'mencion',
+                hilo_id: hiloCreado.id,
+                hilo_titulo: hiloCreado.titulo,
+                actor_nombre: displayName || user?.full_name || user?.email,
             leida: false,
           })
         ));
@@ -132,7 +134,7 @@ export default function Foro() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         <ForoHiloDetalle
           hilo={hiloActivoData}
-          user={user}
+          user={userConNombre}
           onVolver={() => setHiloActivo(null)}
           onEliminarHilo={(id) => eliminarHiloMut.mutate(id)}
           usuarios={usuarios}
@@ -175,7 +177,7 @@ export default function Foro() {
             onSeleccionar={setCategoriaActiva}
             onNueva={() => setNuevaCatOpen(true)}
             conteosPorCategoria={conteosPorCategoria}
-            user={user}
+            user={userConNombre}
           />
         </div>
 
@@ -251,7 +253,7 @@ export default function Foro() {
         onCrear={(data) => crearHiloMut.mutate(data)}
         categorias={categorias}
         usuarios={usuarios}
-        user={user}
+        user={userConNombre}
         loading={crearHiloMut.isPending}
       />
 

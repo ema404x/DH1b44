@@ -21,7 +21,7 @@ const estadoConfig = {
   rechazada:   { label: 'Rechazada',    color: 'bg-red-100 text-red-700 border-red-300' },
 };
 
-export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, onSaved }) {
+export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, onSaved, displayName: displayNameProp }) {
   const qc = useQueryClient();
   const [comentario, setComentario] = useState(solicitud.comentarios_admin || '');
   const [motivo, setMotivo] = useState('');
@@ -84,7 +84,9 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
     }
   });
 
-  const { displayName } = useCurrentUser();
+  const { displayName: displayNameHook, employeeRole } = useCurrentUser();
+  // Priorizar displayName pasado como prop (desde la página padre), luego el del hook
+  const displayName = displayNameProp || displayNameHook;
 
   const handleMarcarRevision = () => {
     if (solicitud.estado !== 'enviada') return;
@@ -97,7 +99,12 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
     });
   };
 
-  const puedeAprobar = user?.email?.toLowerCase() === 'rgarciamejores@gmail.com';
+  // Puede aprobar: gerentes/admins con rol de gerencia o superAdmin general
+  // Se mantiene compatibilidad con email específico como respaldo de seguridad
+  const puedeAprobar = 
+    user?.email?.toLowerCase() === 'rgarciamejores@gmail.com' ||
+    ['gerente', 'gerencia', 'admin', 'administrativo'].includes(employeeRole?.toLowerCase?.()) ||
+    isAdmin;
 
   // Para certificados de obra, verificar que el jefe ya firmó
   const esCertificadoObra = certificado?.tipo === 'obra';
@@ -445,6 +452,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
         onClose={() => setShowFirmaModal(false)}
         onFirmada={confirmarAprobacion}
         user={user}
+        displayName={displayName}
       />
 
       {/* Historial */}

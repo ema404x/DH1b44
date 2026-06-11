@@ -30,7 +30,7 @@ const tabsJefe = [
 ];
 
 export default function AprobacionCertificados() {
-  const { user, isAdmin, isSuperAdmin } = useCurrentUser();
+  const { user, isAdmin, isSuperAdmin, displayName } = useCurrentUser();
   const qc = useQueryClient();
   const [view, setView] = useState('list'); // 'list' | 'form' | 'detalle'
   const [selected, setSelected] = useState(null);
@@ -104,6 +104,7 @@ export default function AprobacionCertificados() {
           solicitud={selected}
           isAdmin={isSuperAdmin}
           user={user}
+          displayName={displayName}
           onClose={() => setView('list')}
           onSaved={handleSaved}
         />

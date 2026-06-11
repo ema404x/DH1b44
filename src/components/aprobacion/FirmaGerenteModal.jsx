@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, PenTool, Trash2, CheckCircle2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function FirmaGerenteModal({ open, onClose, onFirmada, user }) {
+export default function FirmaGerenteModal({ open, onClose, onFirmada, user, displayName: displayNameProp }) {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [hasFirma, setHasFirma] = useState(false);
@@ -22,8 +22,10 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user }) {
   });
 
   const empleado = empleados[0];
-  // Nombre siempre desde ficha de empleado, nunca del username de plataforma
-  const nombreFirmante = empleado?.full_name || user?.full_name || user?.email || 'Gerente';
+  // Prioridad: 1) prop displayName (nombre de ficha, ya resuelto por el padre)
+  //            2) full_name de la ficha de empleado cargada localmente
+  //            3) full_name de la plataforma como último recurso
+  const nombreFirmante = displayNameProp || empleado?.full_name || user?.full_name || user?.email || 'Gerente';
   const firmaGuardada = empleado?.firma_url;
   const mostrarCanvas = !firmaGuardada || redibujar;
 
