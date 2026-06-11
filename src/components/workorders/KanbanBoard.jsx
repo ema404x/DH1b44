@@ -22,7 +22,7 @@ const priorityColors = {
 };
 
 function KanbanCard({ order, index, onOpen, onShowQR }) {
-  const isOverdue = order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status);
+  const isOverdue = (() => { try { return order.scheduled_date && order.scheduled_date.length >= 10 && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
 
   return (
     <Draggable draggableId={order.id} index={index}>

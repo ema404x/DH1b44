@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Camera, Upload, X, Loader2, ZoomIn } from 'lucide-react';
+import { Camera, Image, X, Loader2, ZoomIn } from 'lucide-react';
 
 export default function WorkOrderPhotos({ photos = [], onChange }) {
   const fileRef = useRef();
+  const cameraRef = useRef();
   const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState(null); // url
 
@@ -57,42 +58,42 @@ export default function WorkOrderPhotos({ photos = [], onChange }) {
               </div>
             ))}
 
-            {/* Upload tile */}
-            <button
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="aspect-square rounded-xl border-2 border-dashed border-slate-600/60 hover:border-indigo-500/50 bg-slate-800/20 hover:bg-slate-800/40 flex flex-col items-center justify-center gap-1.5 text-slate-500 hover:text-slate-300 transition-all active:scale-95 disabled:opacity-50"
-            >
-              {uploading
-                ? <Loader2 className="h-6 w-6 animate-spin" />
-                : <>
-                  <Camera className="h-6 w-6" />
-                  <span className="text-[10px] font-medium">Agregar</span>
-                </>
-              }
-            </button>
           </div>
         )}
 
-        {/* Empty state + upload CTA */}
-        {photos.length === 0 && (
+        {/* Botones cámara / galería */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => cameraRef.current?.click()}
+            disabled={uploading}
+            className="flex flex-col items-center justify-center gap-1.5 h-14 rounded-xl border-2 border-dashed border-indigo-500/40 text-indigo-400 bg-indigo-500/5 hover:bg-indigo-500/10 active:bg-indigo-500/20 transition-all disabled:opacity-40 font-medium"
+          >
+            {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+            <span className="text-xs">Cámara</span>
+          </button>
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
-            className="w-full h-28 rounded-xl border-2 border-dashed border-slate-600/50 hover:border-indigo-500/40 bg-slate-800/20 hover:bg-slate-800/40 flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-slate-300 transition-all active:scale-[0.98] disabled:opacity-50"
+            className="flex flex-col items-center justify-center gap-1.5 h-14 rounded-xl border-2 border-dashed border-slate-600/60 text-slate-400 hover:border-slate-500 hover:text-slate-300 active:bg-slate-800/40 transition-all disabled:opacity-40"
           >
-            {uploading
-              ? <><Loader2 className="h-7 w-7 animate-spin" /><span className="text-xs">Subiendo...</span></>
-              : <><Camera className="h-7 w-7" /><span className="text-xs font-medium">Tocar para agregar fotos</span></>
-            }
+            <Image className="h-5 w-5" />
+            <span className="text-xs">Galería</span>
           </button>
+        </div>
+
+        {uploading && (
+          <p className="text-center text-xs text-slate-500 flex items-center justify-center gap-1.5">
+            <Loader2 className="h-3 w-3 animate-spin" /> Subiendo fotos...
+          </p>
         )}
 
         {photos.length > 0 && !uploading && (
           <p className="text-center text-[10px] text-slate-600">{photos.length} foto{photos.length !== 1 ? 's' : ''}</p>
         )}
 
-        <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden"
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
+          onChange={e => handleFiles(e.target.files)} />
+        <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
           onChange={e => handleFiles(e.target.files)} />
       </div>
 

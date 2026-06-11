@@ -113,11 +113,16 @@ export default function WorkOrders() {
   });
 
   const visibleOrders = useMemo(() =>
-    filterByUser(orders, ['assigned_name', 'assigned_to', 'created_by', 'location'])
+    filterByUser(orders, ['assigned_name', 'assigned_to', 'created_by'])
   , [orders, filterByUser]);
 
   const filtered = useMemo(() => visibleOrders.filter(o => {
-    const matchSearch = !search || o.title?.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchSearch = !q || 
+      o.title?.toLowerCase().includes(q) ||
+      o.location?.toLowerCase().includes(q) ||
+      o.assigned_name?.toLowerCase().includes(q) ||
+      o.code?.toLowerCase().includes(q);
     const matchStatus = statusTab === 'all' || o.status === statusTab;
     return matchSearch && matchStatus;
   }), [visibleOrders, search, statusTab]);

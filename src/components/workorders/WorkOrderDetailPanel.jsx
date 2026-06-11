@@ -141,7 +141,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       const next = { ...p, [k]: v };
       latestRef.current = next;
       clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => saveMutation.mutate(next), 400);
+      saveTimerRef.current = setTimeout(() => saveMutation.mutate(latestRef.current), 400);
       return next;
     });
   }, [saveMutation]);
@@ -151,7 +151,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       const next = { ...p, ...fields };
       latestRef.current = next;
       clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => saveMutation.mutate(next), 400);
+      saveTimerRef.current = setTimeout(() => saveMutation.mutate(latestRef.current), 400);
       return next;
     });
   }, [saveMutation]);

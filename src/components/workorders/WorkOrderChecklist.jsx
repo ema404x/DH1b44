@@ -149,13 +149,13 @@ export default function WorkOrderChecklist({ checklist = [], onChange }) {
                           ? <Loader2 className="h-5 w-5 animate-spin" />
                           : <>
                             <Camera className="h-5 w-5" />
-                            <span className="text-[10px]">Foto</span>
+                            <span className="text-[10px]">Cámara/Foto</span>
                           </>
                         }
                       </button>
                     )}
 
-                    <input type="file" accept="image/*" className="hidden"
+                    <input type="file" accept="image/*" capture="environment" className="hidden"
                       ref={el => fileRefs.current[task.id] = el}
                       onChange={e => uploadPhoto(task.id, e.target.files[0])} />
 

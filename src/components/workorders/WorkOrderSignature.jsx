@@ -63,13 +63,14 @@ export default function WorkOrderSignature({ signatureUrl, signatureName, onChan
   const saveSignature = async () => {
     if (!hasDrawn) return;
     setSaving(true);
-    const canvas = canvasRef.current;
-    canvas.toBlob(async (blob) => {
+    try {
+      const blob = await new Promise(resolve => canvasRef.current.toBlob(resolve, 'image/png'));
       const file = new File([blob], 'firma.png', { type: 'image/png' });
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       onChange({ signatureUrl: file_url, signatureName: name });
+    } finally {
       setSaving(false);
-    });
+    }
   };
 
   return (

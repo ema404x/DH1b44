@@ -19,10 +19,20 @@ const priorityConfig = {
 export default function ModoCampo({ currentUser, onOpenOrder }) {
   const qc = useQueryClient();
 
-  const { data: orders = [] } = useQuery({
+  const { data: allOrders = [] } = useQuery({
     queryKey: ['workorders-campo'],
-    queryFn: () => base44.entities.WorkOrder.filter({ assigned_name: currentUser?.full_name }),
+    queryFn: () => base44.entities.WorkOrder.list('-created_date', 200),
     enabled: !!currentUser?.full_name,
+  });
+
+  // Filtrar localmente para ser insensible a capitalización
+  const orders = allOrders.filter(o => {
+    if (!currentUser?.full_name) return false;
+    const name = currentUser.full_name.toLowerCase().trim();
+    return (
+      o.assigned_name?.toLowerCase().trim() === name ||
+      o.assigned_to?.toLowerCase().trim() === name
+    );
   });
 
   const updateMutation = useMutation({
