@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
-import { Download, Copy, CheckCircle2, Loader2, FileText, Camera, X, ZoomIn } from 'lucide-react';
+import { Download, Copy, CheckCircle2, Loader2, FileText, Camera, X, ZoomIn, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
+import GenerarOTsModal from './GenerarOTsModal';
 
 export default function InformeViewer({ informe, establecimiento, fecha, secciones = [] }) {
   const [exportando, setExportando] = useState(false);
   const [lightbox, setLightbox] = useState(null);
+  const [modalOTs, setModalOTs] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(informe);
@@ -563,7 +565,18 @@ export default function InformeViewer({ informe, establecimiento, fecha, seccion
             {exportando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             {exportando ? 'Generando PDF...' : 'Descargar PDF'}
           </Button>
+          <Button size="sm" onClick={() => setModalOTs(true)}
+            className="gap-1.5 text-xs bg-emerald-700 hover:bg-emerald-600 text-white border-0 shadow">
+            <Wrench className="h-3.5 w-3.5" /> Generar OTs
+          </Button>
         </div>
+
+        <GenerarOTsModal
+          open={modalOTs}
+          onClose={() => setModalOTs(false)}
+          informe={informe}
+          establecimiento={establecimiento}
+        />
       </div>
 
       {/* Visor del informe */}
