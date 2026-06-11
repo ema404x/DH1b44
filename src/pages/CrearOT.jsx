@@ -146,7 +146,13 @@ export default function CrearOT() {
   });
   const activeLocations = locations;
 
-  // Para cruzar jefe de sitio por nombre de establecimiento
+  // Para cruzar jefe de sitio por dirección
+  const { data: direcciones = [] } = useQuery({
+    queryKey: ['direcciones-ot'],
+    queryFn: () => base44.entities.Direccion.list('direccion', 2000),
+    staleTime: 300000,
+  });
+
   const { data: locationData = [] } = useQuery({
     queryKey: ['location-data-ot'],
     queryFn: () => base44.entities.LocationData.list('establecimiento', 2000),
@@ -171,21 +177,30 @@ export default function CrearOT() {
 
   const handleSelectLocation = useCallback((loc) => {
     setSelectedLocation(loc);
-    setLocationSearch(loc.name);
+    setLocationSearch(loc.address?.trim() || loc.name?.trim() || '');
     setShowSuggestions(false);
 
-    // Auto-asignar jefe de sitio: buscar en LocationData por nombre de establecimiento
-    const match = locationData.find(ld =>
-      ld.establecimiento?.toLowerCase().trim() === loc.name?.toLowerCase().trim() ||
-      ld.establecimiento?.toLowerCase().trim() === loc.address?.toLowerCase().trim()
+    // Auto-asignar jefe de sitio:
+    // 1. Buscar por dirección en Direccion (más confiable)
+    // 2. Fallback: buscar en LocationData por establecimiento o dirección
+    const locAddr = loc.address?.toLowerCase().trim() || '';
+    const locName = loc.name?.toLowerCase().trim() || '';
+
+    const dirMatch = direcciones.find(d =>
+      (locAddr && d.direccion?.toLowerCase().trim() === locAddr) ||
+      (locName && d.direccion?.toLowerCase().trim() === locName)
     );
-    if (match?.jefe_sitio) {
-      toast.info(`Jefe de sitio asignado: ${match.jefe_sitio}`);
-      setAutoJefeSitio(match.jefe_sitio);
-    } else {
-      setAutoJefeSitio('');
-    }
-  }, [locationData]);
+
+    const ldMatch = !dirMatch && locationData.find(ld =>
+      (locName && ld.establecimiento?.toLowerCase().trim() === locName) ||
+      (locAddr && ld.establecimiento?.toLowerCase().trim() === locAddr) ||
+      (locAddr && ld.direccion?.toLowerCase().trim() === locAddr)
+    );
+
+    const jefe = dirMatch?.jefe_sitio || ldMatch?.jefe_sitio || '';
+    setAutoJefeSitio(jefe);
+    if (jefe) toast.info(`Jefe de sitio asignado: ${jefe}`);
+  }, [direcciones, locationData]);
 
   const handleClearLocation = useCallback(() => {
     setSelectedLocation(null);
@@ -341,10 +356,13 @@ export default function CrearOT() {
     setCreatedOT(null);
     setShowQR(false);
     setSelectedLocation(null);
+    setLocationSearch('');       // ← fix: limpiar el input de búsqueda
+    setShowSuggestions(false);
     setTitle('');
     setType('mantenimiento_correctivo');
     setPriority('media');
     setDescription('');
+    descAcumuladaRef.current = '';
     setScheduledDate('');
     setMaterials([]);
     setPhotos([]);
@@ -477,7 +495,10 @@ export default function CrearOT() {
                     value={locationSearch}
                     onChange={e => {
                       setLocationSearch(e.target.value);
-                      setSelectedLocation(null);
+                      if (selectedLocation) {
+                        setSelectedLocation(null);
+                        setAutoJefeSitio('');
+                      }
                       setShowSuggestions(true);
                     }}
                     onFocus={() => setShowSuggestions(true)}
