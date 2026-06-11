@@ -18,6 +18,7 @@ import WorkOrderMaterials from './WorkOrderMaterials';
 import WorkOrderIncompleteReason from './WorkOrderIncompleteReason';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { exportWorkOrderPDF } from '@/utils/exportWorkOrderPDF';
+import LocationEditor from './LocationEditor';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -312,6 +313,26 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
 
           {/* ── BODY ─────────────────────────────────────────────────────── */}
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
+
+            {/* ── Sin ubicación — editor destacado ── */}
+            {(!data.location || data.location.trim() === '') && (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-950/20 overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-900/30 border-b border-amber-500/20">
+                  <MapPin className="h-3.5 w-3.5 text-amber-400" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-amber-300">Asignar ubicación</span>
+                </div>
+                <div className="px-4 py-3">
+                  <LocationEditor
+                    currentLocation={data.location || ''}
+                    currentAssigned={data.assigned_name || ''}
+                    onSave={(fields) => {
+                      saveFields(fields);
+                      toast.success('Ubicación asignada correctamente');
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* ── Instrucciones ── */}
             {data.description && (
