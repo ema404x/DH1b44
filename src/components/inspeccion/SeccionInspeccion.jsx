@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Trash2, ChevronDown, ChevronUp, CheckCircle2, Camera, AlertCircle, Loader2, Image } from 'lucide-react';
+import { Mic, Square, Trash2, ChevronDown, ChevronUp, CheckCircle2, Camera, AlertCircle, Loader2, Image, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { base44 } from '@/api/base44Client';
@@ -12,6 +12,7 @@ export default function SeccionInspeccion({ seccion, onChange }) {
   const [recording, setRecording] = useState(false);
   const [noSupport, setNoSupport] = useState(false);
   const [subiendoFotos, setSubiendoFotos] = useState(false);
+  const [lightbox, setLightbox] = useState(null); // URL de foto en pantalla completa
   const recognitionRef = useRef(null);
   const isRecordingRef = useRef(false);
   const fileInputRef = useRef(null);
@@ -29,23 +30,21 @@ export default function SeccionInspeccion({ seccion, onChange }) {
     recognitionRef.current?.stop();
   }, []);
 
+  // ── Web Speech API ──────────────────────────────────────────────────────────
   const createRecognition = () => {
     const SR = getSpeechRecognition();
     if (!SR) return null;
     const r = new SR();
     r.lang = 'es-AR';
-    r.continuous = true;
-    r.interimResults = true;
+    r.continuous = false;
+    r.interimResults = false;
     r.maxAlternatives = 1;
 
     r.onresult = (e) => {
-      let nuevas = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) nuevas += e.results[i][0].transcript + ' ';
-      }
-      if (nuevas.trim()) {
-        const base = transcripcionAcumuladaRef.current;
-        const updated = base ? base.trimEnd() + ' ' + nuevas.trim() : nuevas.trim();
+      const transcript = Array.from(e.results).map(res => res[0].transcript).join(' ').trim();
+      if (transcript) {
+        const base = transcripcionAcumuladaRef.current.trimEnd();
+        const updated = base ? base + ' ' + transcript : transcript;
         transcripcionAcumuladaRef.current = updated;
         onChange({ transcripcion: updated });
       }
@@ -78,6 +77,7 @@ export default function SeccionInspeccion({ seccion, onChange }) {
 
   const startRecording = () => {
     if (!getSpeechRecognition()) { setNoSupport(true); return; }
+    transcripcionAcumuladaRef.current = seccion.transcripcion || '';
     isRecordingRef.current = true;
     setRecording(true);
     const r = createRecognition();
@@ -90,12 +90,15 @@ export default function SeccionInspeccion({ seccion, onChange }) {
     recognitionRef.current?.stop();
   };
 
+  // ── Fotos ───────────────────────────────────────────────────────────────────
   const handlePhotos = async (e) => {
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setSubiendoFotos(true);
     try {
-      const urls = await Promise.all(files.map(f => base44.integrations.Core.UploadFile({ file: f }).then(r => r.file_url)));
+      const urls = await Promise.all(
+        files.map(f => base44.integrations.Core.UploadFile({ file: f }).then(r => r.file_url))
+      );
       onChange({ fotos: [...(seccion.fotos || []), ...urls] });
     } finally {
       setSubiendoFotos(false);
@@ -114,152 +117,212 @@ export default function SeccionInspeccion({ seccion, onChange }) {
   const fotoCount = seccion.fotos?.length || 0;
 
   return (
-    <div className={cn(
-      'rounded-lg border transition-all overflow-hidden',
-      isComplete
-        ? 'border-emerald-700/60 bg-emerald-900/10'
-        : expanded
-          ? 'border-primary/40 bg-card'
-          : 'border-border bg-card hover:border-border/80'
-    )}>
-      {/* Header row */}
-      <button
-        className="w-full flex items-center justify-between px-3.5 py-2.5 text-left gap-3"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-2.5 min-w-0">
-          {/* Status indicator */}
-          <div className={cn(
-            'h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
-            isComplete ? 'border-emerald-500 bg-emerald-500' : 'border-muted-foreground/30'
-          )}>
-            {isComplete && <CheckCircle2 className="h-3 w-3 text-white" />}
-          </div>
-          <span className={cn('text-sm font-medium leading-tight', isComplete && 'text-muted-foreground line-through')}>
-            {seccion.nombre}
-          </span>
-          {recording && (
-            <span className="flex items-center gap-1 text-[10px] text-red-400 font-semibold bg-red-400/10 border border-red-400/30 px-1.5 py-0.5 rounded-full">
-              <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />
-              REC
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {hasContent && !expanded && (
-            <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full max-w-[120px] truncate hidden sm:block">
-              {(seccion.transcripcion || seccion.notas_libres || '').slice(0, 40)}...
-            </span>
-          )}
-          {fotoCount > 0 && (
-            <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-400 bg-blue-400/10 border border-blue-400/20 px-2 py-0.5 rounded-full">
-              <Image className="h-3 w-3" />{fotoCount}
-            </span>
-          )}
-          {expanded ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
-        </div>
-      </button>
-
-      {/* Body */}
-      {expanded && (
-        <div className="border-t border-border/60 px-3.5 pb-3.5 pt-3 space-y-3">
-          {/* Voice recording */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {!recording ? (
-              <Button size="sm" variant="outline" onClick={startRecording} className="gap-1.5 h-7 text-xs border-red-700/40 text-red-400 hover:bg-red-400/10 hover:border-red-400/60">
-                <Mic className="h-3.5 w-3.5" /> Grabar voz
-              </Button>
-            ) : (
-              <Button size="sm" onClick={stopRecording} className="gap-1.5 h-7 text-xs bg-red-600 hover:bg-red-700 text-white border-0">
-                <Square className="h-3.5 w-3.5" /> Detener grabación
-              </Button>
-            )}
-            {recording && (
-              <span className="text-xs text-red-400 font-medium flex items-center gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Escuchando — hablá con normalidad, se reinicia automáticamente
+    <>
+      <div className={cn(
+        'rounded-xl border transition-all overflow-hidden',
+        isComplete
+          ? 'border-emerald-700/60 bg-emerald-900/10'
+          : expanded
+            ? 'border-primary/40 bg-card'
+            : 'border-border bg-card'
+      )}>
+        {/* Header — touch target grande */}
+        <button
+          className="w-full flex items-center justify-between px-4 py-3.5 text-left gap-3 active:bg-accent/50 transition-colors"
+          onClick={() => setExpanded(v => !v)}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Status circle */}
+            <div className={cn(
+              'h-6 w-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
+              isComplete ? 'border-emerald-500 bg-emerald-500' : 'border-muted-foreground/30'
+            )}>
+              {isComplete && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
+            </div>
+            <div className="min-w-0">
+              <span className={cn(
+                'text-sm font-medium leading-tight block',
+                isComplete && 'text-muted-foreground line-through'
+              )}>
+                {seccion.nombre}
               </span>
-            )}
-            {noSupport && (
-              <span className="text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" /> Usá Chrome para grabación de voz
-              </span>
-            )}
+              {/* Badges inline */}
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                {recording && (
+                  <span className="flex items-center gap-1 text-[10px] text-red-400 font-semibold">
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />REC
+                  </span>
+                )}
+                {fotoCount > 0 && (
+                  <span className="flex items-center gap-1 text-[11px] text-blue-400">
+                    <Image className="h-3 w-3" />{fotoCount} foto{fotoCount !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {hasContent && !expanded && (
+                  <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+                    {(seccion.transcripcion || seccion.notas_libres || '').slice(0, 50)}…
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-
-          {/* Transcripción */}
-          <div>
-            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 block">Transcripción / Notas</label>
-            <Textarea
-              placeholder="La transcripción del audio aparecerá aquí, o escribí directamente..."
-              value={seccion.transcripcion || ''}
-              onChange={e => onChange({ transcripcion: e.target.value })}
-              className="min-h-[72px] text-sm resize-none"
-            />
+          <div className="flex items-center gap-2 shrink-0">
+            {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
           </div>
+        </button>
 
-          {/* Notas adicionales */}
-          <div>
-            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 block">Observaciones adicionales</label>
-            <Textarea
-              placeholder="Materiales necesarios, urgencias, recomendaciones..."
-              value={seccion.notas_libres || ''}
-              onChange={e => onChange({ notas_libres: e.target.value })}
-              className="min-h-[52px] text-sm resize-none"
-            />
-          </div>
+        {/* Body */}
+        {expanded && (
+          <div className="border-t border-border/60 px-4 pb-4 pt-3 space-y-4">
 
-          {/* Fotos */}
-          <div>
-            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">Fotografías</label>
-            <div className="flex flex-wrap gap-2">
-              {(seccion.fotos || []).map((url, i) => (
-                <div key={i} className="relative group h-16 w-16">
-                  <img src={url} alt="" className="h-full w-full object-cover rounded-md border border-border" />
-                  <button onClick={() => removePhoto(i)}
-                    className="absolute -top-1.5 -right-1.5 h-4.5 w-4.5 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
-                    <Trash2 className="h-2.5 w-2.5" />
-                  </button>
+            {/* ── Grabación de voz ── */}
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 block">Notas de voz</label>
+              {!recording ? (
+                <button
+                  onClick={startRecording}
+                  className="flex items-center gap-2.5 w-full justify-center h-12 rounded-xl border-2 border-dashed border-red-700/40 text-red-400 hover:border-red-500/60 hover:bg-red-400/5 active:bg-red-400/10 transition-all font-semibold text-sm"
+                >
+                  <Mic className="h-5 w-5" /> Grabar voz
+                </button>
+              ) : (
+                <button
+                  onClick={stopRecording}
+                  className="flex items-center gap-2.5 w-full justify-center h-12 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-semibold text-sm transition-colors"
+                >
+                  <Square className="h-4 w-4" /> Detener grabación
+                  <span className="h-2 w-2 rounded-full bg-white animate-ping ml-1" />
+                </button>
+              )}
+              {recording && (
+                <p className="text-xs text-red-400 font-medium flex items-center gap-1.5 justify-center mt-2">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Escuchando — hablá con normalidad
+                </p>
+              )}
+              {noSupport && (
+                <p className="text-xs text-destructive flex items-center gap-1 justify-center mt-2">
+                  <AlertCircle className="h-3 w-3" /> Usá Chrome para grabación de voz
+                </p>
+              )}
+            </div>
+
+            {/* ── Transcripción ── */}
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">Transcripción / Notas</label>
+              <Textarea
+                placeholder="La transcripción aparece aquí, o escribí directamente..."
+                value={seccion.transcripcion || ''}
+                onChange={e => onChange({ transcripcion: e.target.value })}
+                className="min-h-[80px] text-sm resize-none"
+              />
+            </div>
+
+            {/* ── Observaciones ── */}
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">Observaciones adicionales</label>
+              <Textarea
+                placeholder="Materiales necesarios, urgencias, recomendaciones..."
+                value={seccion.notas_libres || ''}
+                onChange={e => onChange({ notas_libres: e.target.value })}
+                className="min-h-[60px] text-sm resize-none"
+              />
+            </div>
+
+            {/* ── Fotos ── */}
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 block">
+                Fotografías {fotoCount > 0 && `(${fotoCount})`}
+              </label>
+
+              {/* Grid de fotos */}
+              {fotoCount > 0 && (
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {(seccion.fotos || []).map((url, i) => (
+                    <div key={i} className="relative group aspect-[4/3]">
+                      <img
+                        src={url}
+                        alt={`Foto ${i + 1}`}
+                        onClick={() => setLightbox(url)}
+                        className="h-full w-full object-cover rounded-xl border border-border cursor-pointer active:opacity-80 transition-opacity"
+                      />
+                      <button
+                        onClick={() => removePhoto(i)}
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {/* Botón cámara directa */}
-              <button
-                onClick={() => !subiendoFotos && cameraInputRef.current?.click()}
-                disabled={subiendoFotos}
-                className="h-16 w-16 rounded-md border-2 border-dashed border-primary/40 flex flex-col items-center justify-center gap-0.5 text-primary/70 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-40"
-              >
-                {subiendoFotos
-                  ? <><Loader2 className="h-4 w-4 animate-spin" /><span className="text-[9px] mt-0.5">Subiendo</span></>
-                  : <><Camera className="h-4 w-4" /><span className="text-[9px] mt-0.5">Cámara</span></>}
-              </button>
-              {/* Botón galería */}
-              <button
-                onClick={() => !subiendoFotos && fileInputRef.current?.click()}
-                disabled={subiendoFotos}
-                className="h-16 w-16 rounded-md border-2 border-dashed border-border flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground transition-all disabled:opacity-40"
-              >
-                <Image className="h-4 w-4" />
-                <span className="text-[9px] mt-0.5">Galería</span>
-              </button>
+              )}
+
+              {/* Botones de captura */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => !subiendoFotos && cameraInputRef.current?.click()}
+                  disabled={subiendoFotos}
+                  className="flex flex-col items-center justify-center gap-1.5 h-14 rounded-xl border-2 border-dashed border-primary/50 text-primary bg-primary/5 hover:bg-primary/10 active:bg-primary/15 transition-all disabled:opacity-40 font-medium text-sm"
+                >
+                  {subiendoFotos ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                  <span className="text-xs">Cámara</span>
+                </button>
+                <button
+                  onClick={() => !subiendoFotos && fileInputRef.current?.click()}
+                  disabled={subiendoFotos}
+                  className="flex flex-col items-center justify-center gap-1.5 h-14 rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground active:bg-accent/50 transition-all disabled:opacity-40 text-sm"
+                >
+                  <Image className="h-5 w-5" />
+                  <span className="text-xs">Galería</span>
+                </button>
+              </div>
+              {subiendoFotos && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-2">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Subiendo fotos...
+                </p>
+              )}
+
               <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotos} />
               <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
             </div>
-          </div>
 
-          {/* Acción completar */}
-          <div className="flex justify-end pt-1">
-            <Button
-              size="sm"
-              variant={isComplete ? 'outline' : 'default'}
+            {/* ── Marcar completada ── */}
+            <button
               onClick={() => onChange({ completada: !isComplete })}
-              className={cn('gap-1.5 h-7 text-xs', isComplete ? 'border-emerald-700 text-emerald-400 hover:bg-emerald-400/10' : '')}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 h-12 rounded-xl font-semibold text-sm transition-all active:scale-[0.98]',
+                isComplete
+                  ? 'border-2 border-emerald-700/60 bg-emerald-900/20 text-emerald-400 hover:bg-emerald-900/30'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md'
+              )}
             >
-              <CheckCircle2 className="h-3.5 w-3.5" />
+              <CheckCircle2 className="h-4 w-4" />
               {isComplete ? 'Desmarcar sección' : 'Marcar como revisada'}
-            </Button>
+            </button>
           </div>
+        )}
+      </div>
+
+      {/* Lightbox fullscreen */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/10 text-white flex items-center justify-center"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={lightbox}
+            alt="Foto"
+            className="max-w-full max-h-[90dvh] object-contain rounded-xl"
+            onClick={e => e.stopPropagation()}
+          />
         </div>
       )}
-    </div>
+    </>
   );
 }
