@@ -40,8 +40,9 @@ export default function Certificados() {
     refetchOnWindowFocus: true,
   });
 
-  // Para certificados: filtrar por creador (created_by_id) ya que no tienen campo jefe_sitio directo
-  const certificados = filterByUser(rawCertificados, ['contratista_id']);
+  // Filtrar por creador — los jefes de sitio ven sus propios certificados (created_by_id)
+  // No filtrar por contratista_id ya que el jefe no es el contratista
+  const certificados = filterByUser(rawCertificados, []);
 
   // Guardar como borrador (crea o actualiza sin emitir)
   const draftMutation = useMutation({
@@ -61,26 +62,29 @@ export default function Certificados() {
       setExtracted(cert);
       toast.success('Borrador guardado');
     },
+    onError: (error) => {
+      toast.error('Error al guardar borrador: ' + (error?.message || 'Error desconocido'));
+    },
   });
 
   // Emitir: siempre crea un nuevo certificado emitido (invalida borradores anteriores)
   const emitirMutation = useMutation({
     mutationFn: async (data) => {
-      // Si ya existía un borrador previo, eliminarlo para no dejar huérfanos
-      if (editing?.id && editing?.estado === 'borrador') {
-        await base44.entities.Certificado.delete(editing.id);
-      }
-      // Si era aprobado, limpiar solicitudes huérfanas
-      if (editing?.id && editing?.estado === 'aprobado') {
-        await base44.entities.Certificado.delete(editing.id);
-        try {
-          const solicitudes = await base44.entities.SolicitudCertificado.filter({ certificado_id: editing.id });
-          for (const sol of solicitudes) await base44.entities.SolicitudCertificado.delete(sol.id);
-        } catch (_) {}
-      }
+      // Crear primero el certificado emitido — si falla, no tocamos nada
       const { id: _id, ...rest } = data;
       const payload = { ...rest, estado: 'emitido' };
       const cert = await base44.entities.Certificado.create(payload);
+
+      // Ahora que el nuevo cert existe, limpiar el anterior si correspondía
+      if (editing?.id && (editing.estado === 'borrador' || editing.estado === 'aprobado')) {
+        try {
+          await base44.entities.Certificado.delete(editing.id);
+          if (editing.estado === 'aprobado') {
+            const solicitudes = await base44.entities.SolicitudCertificado.filter({ certificado_id: editing.id });
+            for (const sol of solicitudes) await base44.entities.SolicitudCertificado.delete(sol.id);
+          }
+        } catch (_) { /* no bloquear el flujo si falla la limpieza */ }
+      }
 
       // Crear solicitud de aprobación
       const numero = `CERT-${cert.id.slice(-6).toUpperCase()}`;
@@ -113,6 +117,9 @@ export default function Certificados() {
       setExtracted(null);
       setEditing(null);
       setPreviewing(null);
+    },
+    onError: (error) => {
+      toast.error('Error al emitir el certificado: ' + (error?.message || 'Error desconocido'));
     },
   });
 
@@ -159,11 +166,11 @@ export default function Certificados() {
     emitirMutation.mutate(formData);
   };
 
-  const handleFirmaJefe = (firmaUrl, nombreJefe) => {
+  const handleFirmaJefe = (firmaUrl) => {
     const dataConFirma = {
       ...pendingFirmaData,
       firma_jefe_sitio_url: firmaUrl,
-      firmado_por_jefe: nombreJefe,
+      firmado_por_jefe: displayName,
       fecha_firma_jefe: new Date().toISOString(),
     };
     setPendingFirmaData(null);
@@ -210,11 +217,19 @@ export default function Certificados() {
 
   if (view === 'manual') {
     return (
-      <AbonoManualForm
-        onSave={handleEmitir}
-        onCancel={() => setView('list')}
-        saving={emitirMutation.isPending}
-      />
+      <>
+        <FirmaJefeSitioModal
+          open={!!pendingFirmaData}
+          onClose={() => setPendingFirmaData(null)}
+          onFirmado={handleFirmaJefe}
+          user={user}
+        />
+        <AbonoManualForm
+          onSave={handleEmitir}
+          onCancel={() => setView('list')}
+          saving={emitirMutation.isPending}
+        />
+      </>
     );
   }
 

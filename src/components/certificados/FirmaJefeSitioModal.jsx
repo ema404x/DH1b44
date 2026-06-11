@@ -93,7 +93,7 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user }) 
         }
       }
 
-      onFirmado(firmaUrl, user?.full_name || user?.email);
+      onFirmado(firmaUrl);
     } finally {
       setUploading(false);
     }
