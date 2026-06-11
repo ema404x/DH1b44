@@ -1,9 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Trash2, ChevronDown, ChevronUp, CheckCircle2, Camera, AlertCircle, Loader2, Image, X } from 'lucide-react';
+import { Mic, Square, ChevronDown, ChevronUp, CheckCircle2, Camera, AlertCircle, Loader2, Image, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { base44 } from '@/api/base44Client';
 import { cn } from '@/lib/utils';
+
+const URGENCIA_OPTIONS = [
+  { value: 'urgente',    label: 'Urgente',      color: 'bg-red-900/50 text-red-300 border-red-700/60',     dot: 'bg-red-400',     emoji: '🔴' },
+  { value: 'importante', label: 'Importante',   color: 'bg-amber-900/50 text-amber-300 border-amber-700/60', dot: 'bg-amber-400',  emoji: '🟡' },
+  { value: 'leve',       label: 'Leve',         color: 'bg-green-900/50 text-green-300 border-green-700/60', dot: 'bg-green-400',  emoji: '🟢' },
+  { value: 'sin_issues', label: 'Sin problemas', color: 'bg-slate-800 text-slate-400 border-slate-600',     dot: 'bg-slate-500',   emoji: '⚪' },
+];
 
 const getSpeechRecognition = () => window.SpeechRecognition || window.webkitSpeechRecognition || null;
 
@@ -115,6 +122,7 @@ export default function SeccionInspeccion({ seccion, onChange }) {
   const isComplete = seccion.completada;
   const hasContent = seccion.transcripcion || seccion.notas_libres;
   const fotoCount = seccion.fotos?.length || 0;
+  const urgencia = URGENCIA_OPTIONS.find(u => u.value === seccion.urgencia);
 
   return (
     <>
@@ -153,6 +161,11 @@ export default function SeccionInspeccion({ seccion, onChange }) {
                     <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-ping" />REC
                   </span>
                 )}
+                {urgencia && (
+                  <span className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${urgencia.color}`}>
+                    {urgencia.emoji} {urgencia.label}
+                  </span>
+                )}
                 {fotoCount > 0 && (
                   <span className="flex items-center gap-1 text-[11px] text-blue-400">
                     <Image className="h-3 w-3" />{fotoCount} foto{fotoCount !== 1 ? 's' : ''}
@@ -174,6 +187,27 @@ export default function SeccionInspeccion({ seccion, onChange }) {
         {/* Body */}
         {expanded && (
           <div className="border-t border-border/60 px-4 pb-4 pt-3 space-y-4">
+
+            {/* ── Nivel de urgencia ── */}
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2 block">Nivel de urgencia</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {URGENCIA_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => onChange({ urgencia: seccion.urgencia === opt.value ? null : opt.value })}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all',
+                      seccion.urgencia === opt.value
+                        ? opt.color + ' ring-1 ring-current'
+                        : 'border-border text-muted-foreground hover:border-muted-foreground/40'
+                    )}
+                  >
+                    <span>{opt.emoji}</span> {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* ── Grabación de voz ── */}
             <div>

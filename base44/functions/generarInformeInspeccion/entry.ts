@@ -34,8 +34,11 @@ Deno.serve(async (req) => {
   const totalFotos = secciones.reduce((acc, s) => acc + (s.fotos?.length || 0), 0);
   const allFotos = secciones.flatMap(s => s.fotos || []);
 
+  const URGENCIA_MAP = { urgente: '🔴 URGENTE', importante: '🟠 IMPORTANTE', leve: '🟢 LEVE', sin_issues: '⚪ SIN PROBLEMAS' };
+
   const seccionesTexto = secciones.map(s => {
     const partes = [];
+    if (s.urgencia) partes.push(`NIVEL DE URGENCIA (marcado por inspector): ${URGENCIA_MAP[s.urgencia] || s.urgencia}`);
     if (s.transcripcion?.trim()) partes.push(`TRANSCRIPCIÓN:\n${s.transcripcion.trim()}`);
     if (s.notas_libres?.trim()) partes.push(`NOTAS:\n${s.notas_libres.trim()}`);
     partes.push(`Fotos: ${s.fotos?.length || 0} | Estado: ${s.completada ? '✓ COMPLETADA' : '⚠ PENDIENTE'}`);

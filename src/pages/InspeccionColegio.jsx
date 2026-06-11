@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ClipboardList, Plus, ArrowLeft, Loader2, Sparkles, Calendar, User,
   RefreshCw, Building2, MapPin, CheckCircle2, FileText, AlertTriangle,
-  Search, Trash2, Activity, Shield, ChevronRight, X,
+  Search, Trash2, Activity, Shield, ChevronRight, X, GripVertical, PlusCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,8 +12,8 @@ import { toast } from 'sonner';
 import SeccionInspeccion from '@/components/inspeccion/SeccionInspeccion';
 import InformeViewer from '@/components/inspeccion/InformeViewer';
 import { format } from 'date-fns';
-import { useAuth } from '@/lib/AuthContext';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useAuth } from '@/lib/AuthContext';
 
 const SECCIONES_DEFAULT = [
   'Fachada y accesos', 'Aulas', 'Baños', 'Cocina / Comedor',
@@ -105,7 +105,7 @@ function InspeccionCard({ insp, onOpen, onDelete }) {
 // ── Componente principal ───────────────────────────────────────────────────
 export default function InspeccionColegioPage() {
   const { user } = useAuth();
-  const { filterByUser } = useCurrentUser();
+  const { filterByUser, displayName } = useCurrentUser();
   const queryClient = useQueryClient();
 
   const [vista, setVista] = useState('lista');
@@ -117,9 +117,11 @@ export default function InspeccionColegioPage() {
   const [creando, setCreando] = useState(false);
   const [mostrarInforme, setMostrarInforme] = useState(false);
   const [formNueva, setFormNueva] = useState({
-    establecimiento: '', direccion: '', titulo: '',
+    establecimiento: '', direccion: '', titulo: '', comuna: '',
     fecha_inspeccion: format(new Date(), 'yyyy-MM-dd'),
   });
+  const [nuevaSeccionNombre, setNuevaSeccionNombre] = useState('');
+  const [dragSeccion, setDragSeccion] = useState(null);
 
   const saveTimerRef = useRef(null);
   const pendingSaveRef = useRef(null);
@@ -159,8 +161,41 @@ export default function InspeccionColegioPage() {
     setFormNueva(p => {
       const match = locations.find(l => l.establecimiento === val);
       const calle = match ? getDireccionCalle(match) : p.direccion;
-      return { ...p, establecimiento: val, direccion: calle || p.direccion };
+      return { ...p, establecimiento: val, direccion: calle || p.direccion, comuna: match?.comuna || p.comuna };
     });
+  };
+
+  // Reordenamiento de secciones drag & drop (nativo HTML5)
+  const handleDragStart = (e, idx) => { setDragSeccion(idx); e.dataTransfer.effectAllowed = 'move'; };
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    if (dragSeccion === null || dragSeccion === idx) return;
+    setInspeccionActiva(prev => {
+      const secs = [...prev.secciones];
+      const [moved] = secs.splice(dragSeccion, 1);
+      secs.splice(idx, 0, moved);
+      setDragSeccion(idx);
+      return { ...prev, secciones: secs };
+    });
+  };
+  const handleDragEnd = () => {
+    setDragSeccion(null);
+    if (inspeccionActiva) {
+      base44.entities.InspeccionColegio.update(inspeccionActiva.id, { secciones: inspeccionActiva.secciones });
+    }
+  };
+
+  // Agregar sección personalizada
+  const handleAgregarSeccion = () => {
+    const nombre = nuevaSeccionNombre.trim();
+    if (!nombre) return;
+    const nueva = { id: `sec_custom_${Date.now()}`, nombre, transcripcion: '', notas_libres: '', fotos: [], completada: false };
+    setInspeccionActiva(prev => {
+      const secciones = [...prev.secciones, nueva];
+      base44.entities.InspeccionColegio.update(prev.id, { secciones });
+      return { ...prev, secciones };
+    });
+    setNuevaSeccionNombre('');
   };
 
   // KPIs
@@ -224,7 +259,7 @@ export default function InspeccionColegioPage() {
       const nueva = await base44.entities.InspeccionColegio.create({
         ...formNueva,
         titulo: formNueva.titulo || `Inspección ${formNueva.establecimiento} — ${format(new Date(), 'dd/MM/yyyy')}`,
-        jefe_sitio: user?.full_name || user?.email || 'Inspector',
+        jefe_sitio: displayName || 'Inspector',
         estado: 'en_progreso',
         secciones: buildSecciones(),
       });
@@ -503,6 +538,19 @@ export default function InspeccionColegioPage() {
               />
             </div>
           </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Comuna</label>
+            <select
+              value={formNueva.comuna}
+              onChange={e => setFormNueva(p => ({ ...p, comuna: e.target.value }))}
+              className="w-full h-11 text-base rounded-md border border-input bg-transparent px-3 text-foreground"
+            >
+              <option value="">Seleccionar...</option>
+              <option value="8A">8A</option>
+              <option value="8B">8B</option>
+              <option value="10A">10A</option>
+            </select>
+          </div>
         </div>
         <div className="border-t border-border px-4 py-4 bg-muted/20">
           <p className="text-xs text-muted-foreground mb-3">Secciones incluidas:</p>
@@ -564,15 +612,22 @@ export default function InspeccionColegioPage() {
 
             {/* Botón generar — siempre visible */}
             <Button
-              onClick={handleGenerarInforme}
+              onClick={() => {
+                const incompletas = totalSecciones - seccionesCompletadas;
+                if (incompletas > 0 && !confirm(`Hay ${incompletas} sección${incompletas !== 1 ? 'es' : ''} sin revisar. ¿Generar informe de todas formas?`)) return;
+                handleGenerarInforme();
+              }}
               disabled={generando || seccionesCompletadas === 0}
               size="sm"
-              className="gap-1.5 h-9 shrink-0 text-xs"
+              className={`gap-1.5 h-9 shrink-0 text-xs ${pctProgreso < 100 && seccionesCompletadas > 0 ? 'bg-amber-600 hover:bg-amber-700' : ''}`}
             >
               {generando
                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 : tieneInforme ? <RefreshCw className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
               <span className="hidden sm:inline">{tieneInforme ? 'Regenerar' : 'Generar informe'}</span>
+              {pctProgreso < 100 && seccionesCompletadas > 0 && !generando && (
+                <AlertTriangle className="h-3 w-3 ml-0.5" />
+              )}
             </Button>
           </div>
 
@@ -673,13 +728,47 @@ export default function InspeccionColegioPage() {
                   <span className="text-xs font-bold text-primary">{seccionesCompletadas}/{totalSecciones}</span>
                 </div>
               )}
-              {(inspeccionActiva.secciones || []).map(seccion => (
-                <SeccionInspeccion
+              {(inspeccionActiva.secciones || []).map((seccion, idx) => (
+                <div
                   key={seccion.id}
-                  seccion={seccion}
-                  onChange={cambios => handleSeccionChange(seccion.id, cambios)}
-                />
+                  draggable
+                  onDragStart={e => handleDragStart(e, idx)}
+                  onDragOver={e => handleDragOver(e, idx)}
+                  onDragEnd={handleDragEnd}
+                  className={`relative group/drag ${dragSeccion === idx ? 'opacity-50' : ''}`}
+                >
+                  {/* Handle de arrastre */}
+                  <div className="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center opacity-0 group-hover/drag:opacity-40 cursor-grab z-10">
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="pl-0">
+                    <SeccionInspeccion
+                      seccion={seccion}
+                      onChange={cambios => handleSeccionChange(seccion.id, cambios)}
+                    />
+                  </div>
+                </div>
               ))}
+
+              {/* Agregar sección personalizada */}
+              <div className="flex gap-2 pt-1">
+                <Input
+                  placeholder="Agregar sección personalizada..."
+                  value={nuevaSeccionNombre}
+                  onChange={e => setNuevaSeccionNombre(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAgregarSeccion()}
+                  className="h-9 text-sm"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAgregarSeccion}
+                  disabled={!nuevaSeccionNombre.trim()}
+                  className="gap-1 shrink-0"
+                >
+                  <PlusCircle className="h-3.5 w-3.5" /> Agregar
+                </Button>
+              </div>
             </div>
           </div>
         )}

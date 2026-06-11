@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
-import { Download, Copy, CheckCircle2, Loader2, FileText, Camera } from 'lucide-react';
+import { Download, Copy, CheckCircle2, Loader2, FileText, Camera, X, ZoomIn } from 'lucide-react';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 
 export default function InformeViewer({ informe, establecimiento, fecha, secciones = [] }) {
   const [exportando, setExportando] = useState(false);
+  const [lightbox, setLightbox] = useState(null);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(informe);
@@ -585,6 +586,16 @@ export default function InformeViewer({ informe, establecimiento, fecha, seccion
         </div>
       </div>
 
+      {/* Lightbox */}
+      {lightbox && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
+          <button onClick={() => setLightbox(null)} className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/10 text-white flex items-center justify-center">
+            <X className="h-5 w-5" />
+          </button>
+          <img src={lightbox} alt="Foto" className="max-w-full max-h-[90dvh] object-contain rounded-xl" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+
       {/* Galería de fotos inline */}
       {seccionesConFotos.length > 0 && (
         <div className="rounded-xl border border-blue-800/60 bg-blue-950 overflow-hidden">
@@ -599,16 +610,16 @@ export default function InformeViewer({ informe, establecimiento, fecha, seccion
                 <p className="text-xs font-bold text-blue-300 uppercase tracking-wide mb-2">{sec.nombre}</p>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                   {sec.fotos.map((url, i) => (
-                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group relative">
+                    <button key={i} onClick={() => setLightbox(url)} className="group relative">
                       <img
                         src={url}
                         alt={`Foto ${i + 1} - ${sec.nombre}`}
                         className="w-full aspect-[4/3] object-cover rounded-lg border border-blue-800/40 group-hover:border-blue-500 transition-all group-hover:scale-105"
                       />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] text-center py-0.5 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                        Foto {i + 1}
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ZoomIn className="h-5 w-5 text-white drop-shadow" />
                       </div>
-                    </a>
+                    </button>
                   ))}
                 </div>
               </div>
