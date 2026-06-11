@@ -15,6 +15,7 @@ export default function SeccionInspeccion({ seccion, onChange }) {
   const recognitionRef = useRef(null);
   const isRecordingRef = useRef(false);
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const transcripcionAcumuladaRef = useRef(seccion.transcripcion || '');
 
   useEffect(() => {
@@ -221,15 +222,26 @@ export default function SeccionInspeccion({ seccion, onChange }) {
                   </button>
                 </div>
               ))}
+              {/* Botón cámara directa */}
               <button
-                onClick={() => !subiendoFotos && fileInputRef.current?.click()}
+                onClick={() => !subiendoFotos && cameraInputRef.current?.click()}
                 disabled={subiendoFotos}
-                className="h-16 w-16 rounded-md border-2 border-dashed border-border flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:border-primary/50 hover:text-primary transition-all disabled:opacity-40"
+                className="h-16 w-16 rounded-md border-2 border-dashed border-primary/40 flex flex-col items-center justify-center gap-0.5 text-primary/70 hover:border-primary hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-40"
               >
                 {subiendoFotos
                   ? <><Loader2 className="h-4 w-4 animate-spin" /><span className="text-[9px] mt-0.5">Subiendo</span></>
-                  : <><Camera className="h-4 w-4" /><span className="text-[9px] mt-0.5">Agregar</span></>}
+                  : <><Camera className="h-4 w-4" /><span className="text-[9px] mt-0.5">Cámara</span></>}
               </button>
+              {/* Botón galería */}
+              <button
+                onClick={() => !subiendoFotos && fileInputRef.current?.click()}
+                disabled={subiendoFotos}
+                className="h-16 w-16 rounded-md border-2 border-dashed border-border flex flex-col items-center justify-center gap-0.5 text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground transition-all disabled:opacity-40"
+              >
+                <Image className="h-4 w-4" />
+                <span className="text-[9px] mt-0.5">Galería</span>
+              </button>
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotos} />
               <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
             </div>
           </div>
