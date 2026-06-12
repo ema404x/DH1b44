@@ -124,22 +124,24 @@ export async function exportCertificadoPDF(form) {
     doc.text(`CERT N° ${form.numero} · Pág ${pageNum}/${totalPages}`, W - M, H - 3.5, { align: 'right' });
   };
 
+  // Ancho total de tabla = C = 277mm (A4 landscape - 2*10 margins)
+  // Distribuimos: N°(6) + DESC(52) + UM(8) + CANT(10) + IU(22) + IT(22) + AantU(8) + Aant$(22) + PresU(8) + Pres$(22) + AprU(8) + Apr$(22) + SaldoU(8) + Saldo$(21) = 277 ✓
   const TABLE_COLS = (() => {
     const defs = [
-      { w: 7,  label: 'N°',         align: 'right' },
-      { w: 62, label: 'DESCRIPCIÓN', align: 'left'  },
-      { w: 9,  label: 'UM',         align: 'left'  },
-      { w: 12, label: 'CANT.',      align: 'right' },
-      { w: 18, label: 'IMP.UNIT.',  align: 'right' },
-      { w: 18, label: 'IMP.TOTAL',  align: 'right' },
-      { w: 9,  label: 'A.ANT U',    align: 'right' },
-      { w: 18, label: 'A.ANT $',    align: 'right' },
-      { w: 9,  label: 'PRES. U',    align: 'right' },
-      { w: 18, label: 'PRES. $',    align: 'right' },
-      { w: 9,  label: 'A.PR. U',    align: 'right' },
-      { w: 18, label: 'A.PR. $',    align: 'right' },
-      { w: 9,  label: 'SALDO U',    align: 'right' },
-      { w: 18, label: 'SALDO $',    align: 'right' },
+      { w: 6,  label: 'N°',         align: 'right' },
+      { w: 52, label: 'DESCRIPCIÓN', align: 'left'  },
+      { w: 8,  label: 'UM',         align: 'left'  },
+      { w: 10, label: 'CANT.',      align: 'right' },
+      { w: 22, label: 'IMP.UNIT.',  align: 'right' },
+      { w: 22, label: 'IMP.TOTAL',  align: 'right' },
+      { w: 8,  label: 'A.ANT U',   align: 'right' },
+      { w: 22, label: 'A.ANT $',   align: 'right' },
+      { w: 8,  label: 'PRES.U',    align: 'right' },
+      { w: 22, label: 'PRES. $',   align: 'right' },
+      { w: 8,  label: 'A.PR.U',    align: 'right' },
+      { w: 22, label: 'A.PR. $',   align: 'right' },
+      { w: 8,  label: 'SALDO U',   align: 'right' },
+      { w: 21, label: 'SALDO $',   align: 'right' },
     ];
     let cx = M;
     return defs.map(d => { const col = { ...d, x: cx }; cx += d.w; return col; });
@@ -151,7 +153,7 @@ export async function exportCertificadoPDF(form) {
     const ROW_H = 8;
     doc.setFillColor(15, 28, 46);
     doc.rect(M, atY, C, ROW_H, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(6.5); doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(6); doc.setFont('helvetica', 'bold');
     TABLE_COLS.forEach(({ x, w, label, align }) => {
       const cx = align === 'right' ? x + w - 1 : x + 1;
       doc.text(label, cx, atY + 5.5, { align: align === 'right' ? 'right' : 'left' });
@@ -222,13 +224,26 @@ export async function exportCertificadoPDF(form) {
     doc.line(M, y + ROW_H, M + C, y + ROW_H);
 
     const ty = y + ROW_H / 2 + 2;
-    doc.setFontSize(7); doc.setTextColor(40, 40, 40);
+    doc.setTextColor(40, 40, 40);
 
-    doc.setFont('helvetica', 'normal');
+    // Función de formato compacto: elimina símbolo $ y espacios para que quepan en celdas angostas
+    const fmtC = (n) => {
+      if (!n && n !== 0) return '';
+      const abs = Math.abs(n || 0);
+      const sign = n < 0 ? '-' : '';
+      if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toLocaleString('es-AR', { maximumFractionDigits: 2 })}M`;
+      if (abs >= 1_000) return `${sign}${Math.round(abs).toLocaleString('es-AR')}`;
+      return `${sign}${Math.round(abs)}`;
+    };
+
+    // Descripción y N° con fuente normal 6.5pt
+    doc.setFontSize(6.5); doc.setFont('helvetica', 'normal');
     doc.text(String(item.numero || idx + 1), TABLE_COLS[0].x + TABLE_COLS[0].w - 1, ty, { align: 'right' });
     doc.text(descLines, DESCR_COL.x + 1, y + 4.5);
     doc.text(item.um || '', TABLE_COLS[2].x + 1, ty);
 
+    // Columnas numéricas con fuente 6pt para que los montos grandes quepan
+    doc.setFontSize(6);
     const numCell = (val, colIdx, bold = false) => {
       const col = TABLE_COLS[colIdx];
       if (bold) doc.setFont('helvetica', 'bold'); else doc.setFont('helvetica', 'normal');
@@ -236,16 +251,16 @@ export async function exportCertificadoPDF(form) {
     };
 
     numCell(item.cantidad || '', 3);
-    numCell(fmt(item.importe_unitario), 4);
-    numCell(fmt(item.importe_total), 5, true);
+    numCell(fmtC(item.importe_unitario), 4);
+    numCell(fmtC(item.importe_total), 5, true);
     numCell(item.med_acum_anterior_unidad || 0, 6);
-    numCell(fmt(item.med_acum_anterior_importe), 7);
+    numCell(fmtC(item.med_acum_anterior_importe), 7);
     numCell(item.med_presente_unidad || 0, 8);
-    numCell(fmt(item.med_presente_importe), 9);
+    numCell(fmtC(item.med_presente_importe), 9);
     numCell(item.med_acum_presente_unidad || 0, 10);
-    numCell(fmt(item.med_acum_presente_importe), 11);
+    numCell(fmtC(item.med_acum_presente_importe), 11);
     numCell(item.saldo_pendiente_unidad || 0, 12);
-    numCell(fmt(item.saldo_pendiente_importe), 13);
+    numCell(fmtC(item.saldo_pendiente_importe), 13);
 
     y += ROW_H;
   });
@@ -311,17 +326,17 @@ export async function exportCertificadoPDF(form) {
   const hasFirmaGerente = !!firmaBase64;
 
   if (hasFirmaJefe || hasFirmaGerente) {
-    const BLOCK_W  = 70;   // ancho de cada bloque de firma
-    const IMG_H    = 22;   // alto del área de la imagen
-    const BLOCK_H  = IMG_H + 20; // alto total del bloque (imagen + línea + texto)
-    const GAP      = 20;   // espacio entre bloques
+    const BLOCK_W  = 80;   // ancho de cada bloque
+    const IMG_H    = 24;   // alto del área de la imagen
+    const TEXT_H   = 22;   // alto del área de texto bajo la imagen
+    const BLOCK_H  = IMG_H + TEXT_H;
+    const GAP      = 30;   // espacio entre bloques
 
-    // cuántos bloques hay para centrarlos
     const count    = (hasFirmaJefe ? 1 : 0) + (hasFirmaGerente ? 1 : 0);
     const totalW   = count * BLOCK_W + (count - 1) * GAP;
     const startX   = (W - totalW) / 2;
 
-    const neededH  = BLOCK_H + 14; // + margen superior
+    const neededH  = BLOCK_H + 18;
     if (y + neededH > SAFE_BOTTOM) {
       drawFooter(pageNum, '??');
       doc.addPage();
@@ -330,65 +345,65 @@ export async function exportCertificadoPDF(form) {
       y = 26;
     }
 
-    y += 8; // margen antes de las firmas
+    y += 10;
 
-    // Línea separadora sutil
-    doc.setDrawColor(210, 218, 230);
-    doc.setLineWidth(0.25);
-    doc.line(M, y - 4, W - M, y - 4);
+    // Línea separadora
+    doc.setDrawColor(200, 212, 228);
+    doc.setLineWidth(0.3);
+    doc.line(M, y - 5, W - M, y - 5);
 
-    // Etiqueta centrada "FIRMAS Y APROBACIÓN"
+    // Título sección
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(6.5);
     doc.setTextColor(100, 115, 140);
     doc.text('FIRMAS Y APROBACIÓN', W / 2, y, { align: 'center' });
-    y += 5;
+    y += 6;
 
-    const drawFirmaBloque = (base64, nombre, cargo, cargo2, sello, x) => {
-      const bx = x;
+    const drawFirmaBloque = (base64, nombre, cargo, cargo2, sello, bx) => {
       const by = y;
 
-      // Fondo muy suave
+      // Fondo suave
       doc.setFillColor(248, 250, 253);
-      doc.roundedRect(bx, by, BLOCK_W, BLOCK_H, 2, 2, 'F');
+      doc.roundedRect(bx, by, BLOCK_W, BLOCK_H, 2.5, 2.5, 'F');
+      doc.setDrawColor(185, 202, 222);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(bx, by, BLOCK_W, BLOCK_H, 2.5, 2.5, 'S');
 
-      // Borde
-      doc.setDrawColor(190, 205, 225);
-      doc.setLineWidth(0.25);
-      doc.roundedRect(bx, by, BLOCK_W, BLOCK_H, 2, 2, 'S');
+      // Imagen de firma centrada horizontalmente, con padding lateral
+      const imgPad = 8;
+      const imgW = BLOCK_W - imgPad * 2;
+      doc.addImage(base64, 'PNG', bx + imgPad, by + 2, imgW, IMG_H - 3, undefined, 'FAST');
 
-      // Imagen de la firma centrada en su área
-      const imgX = bx + (BLOCK_W - (BLOCK_W - 10)) / 2;
-      doc.addImage(base64, 'PNG', imgX, by + 2, BLOCK_W - 10, IMG_H - 2, undefined, 'FAST');
-
-      // Línea divisoria bajo la firma
-      const lineY = by + IMG_H + 1;
-      doc.setDrawColor(170, 190, 215);
+      // Línea divisoria bajo la imagen
+      const lineY = by + IMG_H;
+      doc.setDrawColor(170, 188, 212);
       doc.setLineWidth(0.4);
-      doc.line(bx + 5, lineY, bx + BLOCK_W - 5, lineY);
+      doc.line(bx + 6, lineY, bx + BLOCK_W - 6, lineY);
 
-      // Nombre
+      // Nombre — bold, 7.5pt
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(15, 28, 46);
-      doc.text(nombre, bx + BLOCK_W / 2, lineY + 5.5, { align: 'center' });
+      doc.text(nombre, bx + BLOCK_W / 2, lineY + 5.5, { align: 'center', maxWidth: BLOCK_W - 4 });
 
-      // Cargo
+      // Cargo 1
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6);
       doc.setTextColor(80, 95, 120);
-      doc.text(cargo, bx + BLOCK_W / 2, lineY + 10, { align: 'center' });
+      doc.text(cargo, bx + BLOCK_W / 2, lineY + 10.5, { align: 'center', maxWidth: BLOCK_W - 4 });
 
+      // Cargo 2 (ej: empresa o fecha)
       if (cargo2) {
-        doc.text(cargo2, bx + BLOCK_W / 2, lineY + 14, { align: 'center' });
+        doc.text(cargo2, bx + BLOCK_W / 2, lineY + 15, { align: 'center', maxWidth: BLOCK_W - 4 });
       }
 
-      // Sello / badge de estado (ej: "✓ Firmado")
+      // Sello
       if (sello) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(5.5);
-        doc.setTextColor(30, 130, 80);
-        doc.text(sello, bx + BLOCK_W / 2, by + BLOCK_H - 2, { align: 'center' });
+        doc.setFillColor(34, 120, 70);
+        doc.setTextColor(34, 120, 70);
+        doc.text(sello, bx + BLOCK_W / 2, by + BLOCK_H - 2.5, { align: 'center' });
       }
     };
 
@@ -421,7 +436,6 @@ export async function exportCertificadoPDF(form) {
         fechaGerente ? `✓ Aprobado: ${fechaGerente}` : '✓ Aprobado',
         bx
       );
-      firmaIdx++;
     }
 
     y += BLOCK_H + 6;
