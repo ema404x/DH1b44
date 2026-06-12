@@ -1,19 +1,63 @@
 import jsPDF from 'jspdf';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
-
-// Parsea montos que pueden venir como string "1.098.000" o número 1098000 o erróneo 1.098
+// Parsea montos con precisión: maneja strings "1.098.000", "1,5", números JS, etc.
+// Regla: si el string tiene MÁS de un punto → son separadores de miles (ej "1.098.000")
+//         si tiene exactamente un punto y parte decimal <= 2 dígitos → puede ser decimal
+//         si tiene exactamente un punto y parte decimal > 2 dígitos → separador de miles
 const parseMonto = (v) => {
   if (v === null || v === undefined || v === '') return 0;
-  if (typeof v === 'number') {
-    // Si el número es sospechosamente pequeño (< 100) para un monto de contrato,
-    // puede ser un error de parseo (ej: 1.098 en lugar de 1098000).
-    // En ese caso NO lo usamos — mejor retornar 0 y dejar que el subtotal tome el control.
-    return v;
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  const s = String(v).trim();
+  if (!s) return 0;
+  // Reemplazar comas decimales por punto temporal
+  // Contar puntos
+  const dots = (s.match(/\./g) || []).length;
+  const commas = (s.match(/,/g) || []).length;
+  let normalized = s;
+  if (dots > 1) {
+    // Múltiples puntos → separadores de miles, posible coma decimal
+    normalized = s.replace(/\./g, '').replace(',', '.');
+  } else if (dots === 1 && commas === 0) {
+    // Un solo punto: verificar si es decimal o miles
+    const afterDot = s.split('.')[1] || '';
+    if (afterDot.length > 2) {
+      // Más de 2 dígitos tras el punto → separador de miles
+      normalized = s.replace('.', '');
+    }
+    // Si <= 2 dígitos → decimal real, dejar como está
+  } else if (commas >= 1) {
+    // Coma: separador de miles o decimal
+    if (dots === 0 && commas === 1) {
+      // Solo una coma → decimal
+      normalized = s.replace(',', '.');
+    } else {
+      // Múltiples comas o coma + punto → coma es decimal, puntos son miles
+      normalized = s.replace(/\./g, '').replace(',', '.');
+    }
   }
-  const clean = String(v).replace(/\./g, '').replace(',', '.');
-  const n = parseFloat(clean);
+  const n = parseFloat(normalized);
   return isNaN(n) ? 0 : n;
+};
+
+// Redondea al entero más cercano para evitar decimales basura de floating point
+const round0 = (n) => Math.round(parseMonto(n));
+
+// Formato moneda ARS sin decimales, sin símbolo $ para tablas
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(round0(n));
+
+// Formato compacto para celdas de tabla: sin $, sin decimales, M para millones
+const fmtC = (v) => {
+  const n = round0(v);
+  if (n === 0) return '0';
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1_000_000) {
+    // Millones con hasta 1 decimal solo si no es entero
+    const mils = abs / 1_000_000;
+    const str = Number.isInteger(mils) ? String(mils) : mils.toFixed(1).replace('.', ',');
+    return `${sign}${str}M`;
+  }
+  return `${sign}${abs.toLocaleString('es-AR')}`;
 };
 const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d || '—'; } };
 
@@ -48,39 +92,34 @@ export async function exportCertificadoPDF(form) {
 
   // Si hay medición: usar med_presente_importe por ítem; si no: usar importe_total
   // Para el subtotal del contrato: suma de importe_total reales (solo los que tienen precio)
-  const subtotalContrato = allItems.reduce((acc, it) => {
-    const total = it.importe_total || (it.cantidad * it.importe_unitario) || 0;
+  const subtotalContrato = Math.round(allItems.reduce((acc, it) => {
+    const total = round0(it.importe_total) || Math.round(parseMonto(it.cantidad) * round0(it.importe_unitario));
     return acc + total;
-  }, 0);
+  }, 0));
 
   const totalPresente = hasMedicion
-    ? allItems.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0)
+    ? Math.round(allItems.reduce((acc, it) => acc + round0(it.med_presente_importe), 0))
     : 0;
 
   const totalSaldo = hasMedicion ? Math.max(0, subtotalContrato - totalPresente) : 0;
-  const anticipo_pct = form.anticipo_pct ?? 0;
-  const fondo_reparo_pct = form.fondo_reparo_pct ?? 0;
+  const anticipo_pct = parseMonto(form.anticipo_pct) ?? 0;
+  const fondo_reparo_pct = parseMonto(form.fondo_reparo_pct) ?? 0;
 
   // Mostrar SIEMPRE todos los ítems
   const itemsToRender = allItems;
 
-  // El subtotal a certificar es lo que el usuario certificó (presente), o el total del contrato
   const pdfSubtotal = hasMedicion ? totalPresente : subtotalContrato;
-  // Base para calcular el % de deducciones: monto_contratado del encabezado si está definido, sino suma de ítems
   const baseDeduccion = parseMonto(form.monto_contratado) > 0 ? parseMonto(form.monto_contratado) : subtotalContrato;
-  // Si hay monto manual guardado (_anticipo_monto / _fondo_reparo_monto), usarlo directamente
-  const pdfAnticipo = form._anticipo_monto != null
-    ? form._anticipo_monto
-    : (anticipo_pct > 0 ? baseDeduccion * (anticipo_pct / 100) : 0);
-  // Fondo de reparo: usar monto contratado del encabezado si está definido, sino suma de ítems
-  const fondoReparoCalculado = form._fondo_reparo_monto != null
-    ? form._fondo_reparo_monto
-    : (fondo_reparo_pct > 0 ? baseDeduccion * (fondo_reparo_pct / 100) : 0);
+  const pdfAnticipo = Math.round(form._anticipo_monto != null
+    ? parseMonto(form._anticipo_monto)
+    : (anticipo_pct > 0 ? baseDeduccion * (anticipo_pct / 100) : 0));
+  const fondoReparoCalculado = Math.round(form._fondo_reparo_monto != null
+    ? parseMonto(form._fondo_reparo_monto)
+    : (fondo_reparo_pct > 0 ? baseDeduccion * (fondo_reparo_pct / 100) : 0));
   const pdfFondoReparo = form.fondo_reparo_aplicar ? fondoReparoCalculado : 0;
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
 
-  // Monto contratado: exactamente lo que el usuario ingresó, parseado correctamente
-  const montoContratado = parseMonto(form.monto_contratado);
+  const montoContratado = Math.round(parseMonto(form.monto_contratado));
 
   const firmaGerenteUrl = form.firma_gerente_url || (form.estado === 'aprobado' ? FIRMA_RAUL_GARCIA_URL : null);
   const firmaJefeUrl = form.firma_jefe_sitio_url || null;
@@ -226,15 +265,20 @@ export async function exportCertificadoPDF(form) {
     const ty = y + ROW_H / 2 + 2;
     doc.setTextColor(40, 40, 40);
 
-    // Función de formato compacto: elimina símbolo $ y espacios para que quepan en celdas angostas
-    const fmtC = (n) => {
-      if (!n && n !== 0) return '';
-      const abs = Math.abs(n || 0);
-      const sign = n < 0 ? '-' : '';
-      if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toLocaleString('es-AR', { maximumFractionDigits: 2 })}M`;
-      if (abs >= 1_000) return `${sign}${Math.round(abs).toLocaleString('es-AR')}`;
-      return `${sign}${Math.round(abs)}`;
-    };
+    // Sanitizar valores numéricos del ítem
+    const iu  = round0(item.importe_unitario);
+    const it  = round0(item.importe_total);
+    const aau = round0(item.med_acum_anterior_unidad);
+    const aa$ = round0(item.med_acum_anterior_importe);
+    const pu  = round0(item.med_presente_unidad);
+    const p$  = round0(item.med_presente_importe);
+    const apu = round0(item.med_acum_presente_unidad);
+    const ap$ = round0(item.med_acum_presente_importe);
+    const su  = round0(item.saldo_pendiente_unidad);
+    const s$  = round0(item.saldo_pendiente_importe);
+    // Cantidad: mostrar con hasta 2 decimales si tiene, si no entero
+    const cant = parseMonto(item.cantidad);
+    const cantStr = cant === 0 ? '' : (Number.isInteger(cant) ? String(cant) : cant.toFixed(2).replace('.', ','));
 
     // Descripción y N° con fuente normal 6.5pt
     doc.setFontSize(6.5); doc.setFont('helvetica', 'normal');
@@ -242,7 +286,7 @@ export async function exportCertificadoPDF(form) {
     doc.text(descLines, DESCR_COL.x + 1, y + 4.5);
     doc.text(item.um || '', TABLE_COLS[2].x + 1, ty);
 
-    // Columnas numéricas con fuente 6pt para que los montos grandes quepan
+    // Columnas numéricas con fuente 6pt
     doc.setFontSize(6);
     const numCell = (val, colIdx, bold = false) => {
       const col = TABLE_COLS[colIdx];
@@ -250,17 +294,17 @@ export async function exportCertificadoPDF(form) {
       doc.text(String(val ?? ''), col.x + col.w - 1, ty, { align: 'right' });
     };
 
-    numCell(item.cantidad || '', 3);
-    numCell(fmtC(item.importe_unitario), 4);
-    numCell(fmtC(item.importe_total), 5, true);
-    numCell(item.med_acum_anterior_unidad || 0, 6);
-    numCell(fmtC(item.med_acum_anterior_importe), 7);
-    numCell(item.med_presente_unidad || 0, 8);
-    numCell(fmtC(item.med_presente_importe), 9);
-    numCell(item.med_acum_presente_unidad || 0, 10);
-    numCell(fmtC(item.med_acum_presente_importe), 11);
-    numCell(item.saldo_pendiente_unidad || 0, 12);
-    numCell(fmtC(item.saldo_pendiente_importe), 13);
+    numCell(cantStr, 3);
+    numCell(fmtC(iu), 4);
+    numCell(fmtC(it), 5, true);
+    numCell(aau || '', 6);
+    numCell(aa$ ? fmtC(aa$) : '', 7);
+    numCell(pu || '', 8);
+    numCell(p$ ? fmtC(p$) : '', 9);
+    numCell(apu || '', 10);
+    numCell(ap$ ? fmtC(ap$) : '', 11);
+    numCell(su || '', 12);
+    numCell(s$ ? fmtC(s$) : '', 13);
 
     y += ROW_H;
   });
