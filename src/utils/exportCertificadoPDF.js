@@ -156,38 +156,53 @@ export async function exportCertificadoPDF(form) {
   };
 
   // Ancho total de tabla = C = 277mm (A4 landscape - 2*10 margins)
-  // Distribuimos: N°(6) + DESC(52) + UM(8) + CANT(10) + IU(22) + IT(22) + AantU(8) + Aant$(22) + PresU(8) + Pres$(22) + AprU(8) + Apr$(22) + SaldoU(8) + Saldo$(21) = 277 ✓
+  // N°(5) + DESC(44) + UM(7) + CANT(8) + IU(21) + IT(21) + AaU(6) + Aa$(21) + PrU(6) + Pr$(21) + ApU(6) + Ap$(21) + SaU(6) + Sa$(21) = 214
+  // 5+44+7+8+21+21+6+21+6+21+6+21+6+21 = 214 → agregar al DESC: 277-214+44 = 107. 
+  // Recuento sin DESC: 5+7+8+21+21+6+21+6+21+6+21+6+21 = 170 → DESC = 277-170 = 107? Demasiado.
+  // Optimizado: 6 cols $ de 20mm + 5 cols U de 6mm + DESC flexible
+  // Fijo: N°5 + UM6 + CANT8 + 6*20(montos)=120 + 5*6(unidades)=30 → sin DESC: 5+6+8+120+30=169 → DESC=108
+  // Mejor usar DESC=48 y expandir montos a 22: 5+48+6+8+22+22+6+22+6+22+6+22+6+22=223 → faltan 54. 
+  // SOLUCIÓN DEFINITIVA: calcular DESC dinámicamente para sumar exactamente C=277
   const TABLE_COLS = (() => {
-    const defs = [
-      { w: 6,  label: 'N°',         align: 'right' },
-      { w: 52, label: 'DESCRIPCIÓN', align: 'left'  },
-      { w: 8,  label: 'UM',         align: 'left'  },
-      { w: 10, label: 'CANT.',      align: 'right' },
-      { w: 22, label: 'IMP.UNIT.',  align: 'right' },
-      { w: 22, label: 'IMP.TOTAL',  align: 'right' },
-      { w: 8,  label: 'A.ANT U',   align: 'right' },
-      { w: 22, label: 'A.ANT $',   align: 'right' },
-      { w: 8,  label: 'PRES.U',    align: 'right' },
-      { w: 22, label: 'PRES. $',   align: 'right' },
-      { w: 8,  label: 'A.PR.U',    align: 'right' },
-      { w: 22, label: 'A.PR. $',   align: 'right' },
-      { w: 8,  label: 'SALDO U',   align: 'right' },
-      { w: 21, label: 'SALDO $',   align: 'right' },
+    // Anchos fijos de todas las columnas excepto descripción
+    const fixed = [
+      { label: 'N°',       align: 'right', numeric: false, w: 6  },
+      { label: 'UM',       align: 'left',  numeric: false, w: 7  },
+      { label: 'CANT.',    align: 'right', numeric: false, w: 9  },
+      { label: 'IMP.UNIT.',align: 'right', numeric: true,  w: 23 },
+      { label: 'IMP.TOT.', align: 'right', numeric: true,  w: 23 },
+      { label: 'A.A.U',   align: 'right', numeric: false, w: 7  },
+      { label: 'A.ANT$',  align: 'right', numeric: true,  w: 23 },
+      { label: 'PR.U',    align: 'right', numeric: false, w: 7  },
+      { label: 'PRES.$',  align: 'right', numeric: true,  w: 23 },
+      { label: 'A.P.U',   align: 'right', numeric: false, w: 7  },
+      { label: 'A.PR.$',  align: 'right', numeric: true,  w: 23 },
+      { label: 'SA.U',    align: 'right', numeric: false, w: 7  },
+      { label: 'SALDO$',  align: 'right', numeric: true,  w: 23 },
+    ];
+    const fixedTotal = fixed.reduce((s, d) => s + d.w, 0); // 6+7+9+23+23+7+23+7+23+7+23+7+23 = 188
+    const descW = C - fixedTotal; // 277 - 188 = 89
+    const allDefs = [
+      { label: 'N°',       align: 'right', numeric: false, w: fixed[0].w },
+      { label: 'DESCRIPCIÓN', align: 'left', numeric: false, w: descW },
+      ...fixed.slice(1),
     ];
     let cx = M;
-    return defs.map(d => { const col = { ...d, x: cx }; cx += d.w; return col; });
+    return allDefs.map(d => { const col = { ...d, x: cx }; cx += d.w; return col; });
   })();
-
-  const DESCR_COL = TABLE_COLS[1];
 
   const drawTableHeader = (atY) => {
     const ROW_H = 8;
     doc.setFillColor(15, 28, 46);
     doc.rect(M, atY, C, ROW_H, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(6); doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(5.5); doc.setFont('helvetica', 'bold');
     TABLE_COLS.forEach(({ x, w, label, align }) => {
-      const cx = align === 'right' ? x + w - 1 : x + 1;
-      doc.text(label, cx, atY + 5.5, { align: align === 'right' ? 'right' : 'left' });
+      const PAD = 1.2;
+      const cx = align === 'right' ? x + w - PAD : x + PAD;
+      // Recortar label si es necesario
+      const maxW = w - PAD * 2;
+      const fitted = doc.splitTextToSize(label, maxW)[0] || label;
+      doc.text(fitted, cx, atY + 5.5, { align: align === 'right' ? 'right' : 'left' });
     });
     return atY + ROW_H;
   };
@@ -236,8 +251,8 @@ export async function exportCertificadoPDF(form) {
 
   doc.setFont('helvetica', 'normal');
   itemsToRender.forEach((item, idx) => {
-    doc.setFontSize(7);
-    const descLines = doc.splitTextToSize(item.descripcion || '', DESCR_COL.w - 2);
+    doc.setFontSize(6);
+    const descLines = doc.splitTextToSize(item.descripcion || '', TABLE_COLS[1].w - 2.4);
     const ROW_H = Math.max(7, descLines.length * 4.2 + 2);
 
     if (y + ROW_H > SAFE_BOTTOM) {
@@ -272,31 +287,48 @@ export async function exportCertificadoPDF(form) {
     const cant = parseMonto(item.cantidad);
     const cantStr = cant === 0 ? '' : (Number.isInteger(cant) ? String(cant) : cant.toFixed(2).replace('.', ','));
 
-    // Descripción y N° con fuente normal 6.5pt
-    doc.setFontSize(6.5); doc.setFont('helvetica', 'normal');
-    doc.text(String(item.numero || idx + 1), TABLE_COLS[0].x + TABLE_COLS[0].w - 1, ty, { align: 'right' });
-    doc.text(descLines, DESCR_COL.x + 1, y + 4.5);
-    doc.text(item.um || '', TABLE_COLS[2].x + 1, ty);
+    const PAD = 1.2; // padding interno por lado para evitar superposición
 
-    // Columnas numéricas con fuente 6pt
-    doc.setFontSize(6);
-    const numCell = (val, colIdx, bold = false) => {
+    // Helper: renderiza texto recortado dentro de los límites de la columna
+    const cell = (text, colIdx, bold = false, fontSize = 6) => {
       const col = TABLE_COLS[colIdx];
+      const str = String(text ?? '');
+      if (!str) return;
+      doc.setFontSize(fontSize);
       if (bold) doc.setFont('helvetica', 'bold'); else doc.setFont('helvetica', 'normal');
-      doc.text(String(val ?? ''), col.x + col.w - 1, ty, { align: 'right' });
+      if (col.align === 'right') {
+        // Recortar para que no supere el límite derecho de la columna
+        const maxW = col.w - PAD * 2;
+        const fitted = doc.splitTextToSize(str, maxW)[0] || str;
+        doc.text(fitted, col.x + col.w - PAD, ty, { align: 'right' });
+      } else {
+        const maxW = col.w - PAD * 2;
+        const fitted = doc.splitTextToSize(str, maxW)[0] || str;
+        doc.text(fitted, col.x + PAD, ty, { align: 'left' });
+      }
     };
 
-    numCell(cantStr, 3);
-    numCell(fmtC(iu), 4);
-    numCell(fmtC(it), 5, true);
-    numCell(aau || '', 6);
-    numCell(aa$ ? fmtC(aa$) : '', 7);
-    numCell(pu || '', 8);
-    numCell(p$ ? fmtC(p$) : '', 9);
-    numCell(apu || '', 10);
-    numCell(ap$ ? fmtC(ap$) : '', 11);
-    numCell(su || '', 12);
-    numCell(s$ ? fmtC(s$) : '', 13);
+    // N° y descripción — fuente 6pt
+    doc.setFontSize(6); doc.setFont('helvetica', 'normal');
+    doc.text(String(item.numero || idx + 1), TABLE_COLS[0].x + TABLE_COLS[0].w - PAD, ty, { align: 'right' });
+    // Descripción con wrap dentro del ancho exacto de la columna
+    doc.setFontSize(6);
+    doc.text(descLines, TABLE_COLS[1].x + PAD, y + 4.2);
+    // UM
+    cell(item.um || '', 2, false, 6);
+    // Cantidad
+    cell(cantStr, 3, false, 6);
+    // Columnas numéricas — fuente 5.5pt para que 1.800.000 siempre quepa en 23mm
+    cell(fmtC(iu),          4, false, 5.5);
+    cell(fmtC(it),          5, true,  5.5);
+    cell(aau || '',         6, false, 5.5);
+    cell(aa$ ? fmtC(aa$) : '', 7, false, 5.5);
+    cell(pu  || '',         8, false, 5.5);
+    cell(p$  ? fmtC(p$)  : '', 9, false, 5.5);
+    cell(apu || '',        10, false, 5.5);
+    cell(ap$ ? fmtC(ap$) : '',11, false, 5.5);
+    cell(su  || '',        12, false, 5.5);
+    cell(s$  ? fmtC(s$)  : '',13, true,  5.5);
 
     y += ROW_H;
   });
