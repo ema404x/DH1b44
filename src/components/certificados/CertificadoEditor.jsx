@@ -7,11 +7,37 @@ import { Textarea } from '@/components/ui/textarea';
 import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2, Wand2, Layers, Send, Loader2 } from 'lucide-react';
 import HistorialAcumulados from './HistorialAcumulados';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Math.round(n || 0));
 const parseMonto = (v) => {
-  const clean = String(v).replace(/\./g, '').replace(',', '.');
-  const n = parseFloat(clean);
+  if (v === null || v === undefined || v === '') return 0;
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  const s = String(v).trim();
+  const dots = (s.match(/\./g) || []).length;
+  const commas = (s.match(/,/g) || []).length;
+  let norm = s;
+  if (dots > 1) { norm = s.replace(/\./g, '').replace(',', '.'); }
+  else if (dots === 1 && commas === 0) { if ((s.split('.')[1] || '').length > 2) norm = s.replace('.', ''); }
+  else if (commas >= 1) { norm = dots === 0 && commas === 1 ? s.replace(',', '.') : s.replace(/\./g, '').replace(',', '.'); }
+  const n = parseFloat(norm);
   return isNaN(n) ? 0 : n;
+};
+const r0 = (n) => Math.round(parseMonto(n));
+
+// Recalcula todos los campos derivados de un ítem de forma determinista
+const recalcItem = (item) => {
+  const it = r0(item.importe_total) || Math.round(r0(item.cantidad) * r0(item.importe_unitario));
+  const aau = r0(item.med_acum_anterior_unidad);
+  const aa$ = r0(item.med_acum_anterior_importe);
+  const pu  = Math.round(parseMonto(item.med_presente_unidad) * 100) / 100;
+  const p$  = r0(item.med_presente_importe);
+  const apu = Math.round((aau + pu) * 100) / 100;
+  const ap$ = r0(aa$ + p$);
+  const su  = Math.max(0, Math.round((r0(item.cantidad) - apu) * 100) / 100);
+  const s$  = Math.max(0, it - ap$);
+  return { ...item, importe_total: it, med_acum_anterior_unidad: aau, med_acum_anterior_importe: aa$,
+    med_presente_unidad: pu, med_presente_importe: p$,
+    med_acum_presente_unidad: apu, med_acum_presente_importe: ap$,
+    saldo_pendiente_unidad: su, saldo_pendiente_importe: s$ };
 };
 
 function Field({ label, children }) {
@@ -28,38 +54,34 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
 
   const [form, setForm] = useState(() => {
     const items = (initialData?.items || []).map((item, i) => {
-      const importe_total = item.importe_total || (item.cantidad * item.importe_unitario) || 0;
-      // Detectar medición: fue marcado explícitamente O el presente difiere del total del ítem
-      // (esto cubre certs cargados desde BD donde _med_editado no se persistió)
+      const importe_total = r0(item.importe_total) || Math.round(r0(item.cantidad) * r0(item.importe_unitario));
       const medEditado = !!item._med_editado
-        || (item.med_presente_importe != null && item.med_presente_importe !== importe_total)
-        || (item.saldo_pendiente_importe != null && item.saldo_pendiente_importe > 0);
-      const acumAnterior = item.med_acum_anterior_importe || 0;
-      const medPresente = medEditado ? (item.med_presente_importe ?? importe_total) : importe_total;
-      const acumPresente = item.med_acum_presente_importe ?? (acumAnterior + medPresente);
-      const saldo_pendiente_importe = medEditado ? Math.max(0, importe_total - acumPresente) : 0;
-      const cantTotal = item.cantidad || 1;
-      const cantAnterior = item.med_acum_anterior_unidad || 0;
-      const cantPresente = medEditado ? (item.med_presente_unidad ?? cantTotal) : cantTotal;
-      const acumPresUnidad = item.med_acum_presente_unidad ?? (cantAnterior + cantPresente);
-      const saldo_pendiente_unidad = medEditado ? Math.max(0, cantTotal - acumPresUnidad) : 0;
-      return {
+        || (item.med_presente_importe != null && r0(item.med_presente_importe) !== importe_total)
+        || (item.saldo_pendiente_importe != null && r0(item.saldo_pendiente_importe) > 0);
+      const cantTotal = r0(item.cantidad) || 1;
+      const cantAnterior = r0(item.med_acum_anterior_unidad);
+      const medPresente = medEditado ? r0(item.med_presente_importe ?? importe_total) : importe_total;
+      const cantPresente = medEditado
+        ? (item.med_presente_unidad != null ? r0(item.med_presente_unidad) : cantTotal)
+        : cantTotal;
+      const raw = {
         numero: i + 1,
         descripcion: item.descripcion || '',
         um: item.um || 'GL',
         cantidad: cantTotal,
-        importe_unitario: item.importe_unitario || 0,
+        importe_unitario: r0(item.importe_unitario),
         importe_total,
         med_acum_anterior_unidad: cantAnterior,
-        med_acum_anterior_importe: acumAnterior,
+        med_acum_anterior_importe: r0(item.med_acum_anterior_importe),
         med_presente_unidad: cantPresente,
         med_presente_importe: medPresente,
-        med_acum_presente_unidad: acumPresUnidad,
-        med_acum_presente_importe: acumPresente,
-        saldo_pendiente_unidad,
-        saldo_pendiente_importe,
+        med_acum_presente_unidad: item.med_acum_presente_unidad ?? (cantAnterior + cantPresente),
+        med_acum_presente_importe: item.med_acum_presente_importe ?? (r0(item.med_acum_anterior_importe) + medPresente),
+        saldo_pendiente_unidad: 0,
+        saldo_pendiente_importe: 0,
         _med_editado: medEditado,
       };
+      return recalcItem(raw);
     });
     return {
       tipo: initialData?.tipo || 'abono_mensual',
@@ -133,34 +155,28 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
 
   const setItem = (i, k, v) => {
     const items = [...form.items];
-    items[i] = { ...items[i], [k]: v };
+    let it = { ...items[i], [k]: v };
 
     if (k === 'cantidad' || k === 'importe_unitario') {
-      items[i].importe_total = items[i].cantidad * items[i].importe_unitario;
-      // Solo actualizar med_presente si no fue editado manualmente antes
-      if (!items[i]._med_editado) {
-        items[i].med_presente_importe = items[i].importe_total;
-        items[i].med_acum_presente_importe = items[i].importe_total;
+      it.importe_total = Math.round(r0(it.cantidad) * r0(it.importe_unitario));
+      if (!it._med_editado) {
+        it.med_presente_importe = it.importe_total;
+        it.med_presente_unidad = r0(it.cantidad);
       }
     }
 
-    // Cuando el usuario edita manualmente el importe del presente, recalcular saldo
     if (k === 'med_presente_importe') {
-      items[i]._med_editado = true;
-      const acumAnterior = items[i].med_acum_anterior_importe || 0;
-      items[i].med_acum_presente_importe = acumAnterior + v;
-      // Si certifica 0, el saldo pendiente = total del ítem (queda todo pendiente)
-      items[i].saldo_pendiente_importe = Math.max(0, (items[i].importe_total || 0) - items[i].med_acum_presente_importe);
-      const cantTotal = items[i].cantidad || 0;
-      const cantAnterior = items[i].med_acum_anterior_unidad || 0;
-      const cantPresente = items[i].importe_total > 0
-        ? Math.round((v / items[i].importe_total) * cantTotal * 100) / 100
+      it._med_editado = true;
+      const pv = r0(v);
+      const cantTotal = r0(it.cantidad);
+      const cantPresente = it.importe_total > 0
+        ? Math.round((pv / it.importe_total) * cantTotal * 100) / 100
         : 0;
-      items[i].med_presente_unidad = cantPresente;
-      items[i].med_acum_presente_unidad = cantAnterior + cantPresente;
-      items[i].saldo_pendiente_unidad = Math.max(0, cantTotal - items[i].med_acum_presente_unidad);
+      it.med_presente_unidad = cantPresente;
+      it.med_presente_importe = pv;
     }
 
+    items[i] = recalcItem(it);
     setForm(f => ({ ...f, items }));
   };
 
@@ -208,17 +224,17 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
 
   const aplicarCantidadMasiva = (cant) => {
     if (cant === '' || cant === null || cant === undefined) return;
+    const nuevaCantidad = r0(cant);
     const newItems = form.items.map(item => {
-      const nuevaCantidad = +cant;
-      const nuevoTotal = nuevaCantidad * (item.importe_unitario || 0);
-      return {
+      const nuevoTotal = Math.round(nuevaCantidad * r0(item.importe_unitario));
+      return recalcItem({
         ...item,
         cantidad: nuevaCantidad,
         importe_total: nuevoTotal,
+        med_presente_unidad: nuevaCantidad,
         med_presente_importe: nuevoTotal,
-        med_acum_presente_importe: nuevoTotal,
         _med_editado: true,
-      };
+      });
     });
     setForm(f => ({ ...f, items: newItems }));
   };
@@ -274,21 +290,12 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
       const importePres = Math.round(itemFull * fraccion);
       acumulado += importePres;
 
-      const acumPresUnidad = (item.med_acum_anterior_unidad || 0) + cantPres;
-      const acumPresImporte = (item.med_acum_anterior_importe || 0) + importePres;
-      const saldoUnidad = Math.max(0, (item.cantidad || 0) - acumPresUnidad);
-      const saldoImporte = Math.max(0, itemFull - acumPresImporte);
-
-      return {
+      return recalcItem({
         ...item,
         med_presente_unidad: cantPres,
         med_presente_importe: importePres,
-        med_acum_presente_unidad: acumPresUnidad,
-        med_acum_presente_importe: acumPresImporte,
-        saldo_pendiente_unidad: saldoUnidad,
-        saldo_pendiente_importe: saldoImporte,
         _med_editado: true,
-      };
+      });
     });
 
     setForm(f => ({ ...f, items: newItems }));
