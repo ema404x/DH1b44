@@ -45,19 +45,11 @@ const round0 = (n) => Math.round(parseMonto(n));
 // Formato moneda ARS sin decimales, sin símbolo $ para tablas
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(round0(n));
 
-// Formato compacto para celdas de tabla: sin $, sin decimales, M para millones
+// Formato compacto para celdas de tabla: sin símbolo $, número completo con separadores de miles
 const fmtC = (v) => {
   const n = round0(v);
   if (n === 0) return '0';
-  const abs = Math.abs(n);
-  const sign = n < 0 ? '-' : '';
-  if (abs >= 1_000_000) {
-    // Millones con hasta 1 decimal solo si no es entero
-    const mils = abs / 1_000_000;
-    const str = Number.isInteger(mils) ? String(mils) : mils.toFixed(1).replace('.', ',');
-    return `${sign}${str}M`;
-  }
-  return `${sign}${abs.toLocaleString('es-AR')}`;
+  return n.toLocaleString('es-AR');
 };
 const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d || '—'; } };
 
