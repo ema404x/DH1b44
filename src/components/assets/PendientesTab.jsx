@@ -32,18 +32,18 @@ import { usePermission } from '@/hooks/usePermission';
 const COMUNAS = ['8A', '8B', '10A'];
 
 const estadoColors = {
-  pendiente: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  asignado: 'bg-blue-100 text-blue-700 border-blue-200',
-  en_progreso: 'bg-purple-100 text-purple-700 border-purple-200',
-  resuelto: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  cancelado: 'bg-gray-100 text-gray-500 border-gray-200',
+  pendiente:   'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  asignado:    'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
+  en_progreso: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  resuelto:    'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  cancelado:   'bg-slate-500/15 text-slate-400 border-slate-500/30',
 };
 
 const prioridadColors = {
-  baja: 'bg-slate-100 text-slate-600',
-  media: 'bg-blue-100 text-blue-700',
-  alta: 'bg-orange-100 text-orange-700',
-  urgente: 'bg-red-100 text-red-700',
+  baja:    'bg-slate-500/15 text-slate-400 border-slate-500/30',
+  media:   'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  alta:    'bg-orange-500/15 text-orange-400 border-orange-500/30',
+  urgente: 'bg-red-500/15 text-red-400 border-red-500/30',
 };
 
 const estadoLabels = {
@@ -246,16 +246,16 @@ export default function PendientesTab() {
       {/* Stats for active commune */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
-          { label: 'Total', value: stats.total, color: 'border-l-slate-400' },
-          { label: 'Sin asignar', value: stats.pendiente, color: 'border-l-yellow-400' },
-          { label: 'En curso', value: stats.asignado, color: 'border-l-blue-500' },
-          { label: 'Resueltos', value: stats.resuelto, color: 'border-l-emerald-500' },
-          { label: 'Vencidos', value: stats.vencidos, color: 'border-l-red-500' },
+          { label: 'Total',       value: stats.total,     accent: 'border-l-slate-400',   val: 'text-foreground' },
+          { label: 'Sin asignar', value: stats.pendiente, accent: 'border-l-amber-400',   val: 'text-amber-400' },
+          { label: 'En curso',    value: stats.asignado,  accent: 'border-l-blue-500',    val: 'text-blue-400' },
+          { label: 'Resueltos',   value: stats.resuelto,  accent: 'border-l-emerald-500', val: 'text-emerald-400' },
+          { label: 'Vencidos',    value: stats.vencidos,  accent: 'border-l-red-500',     val: stats.vencidos > 0 ? 'text-red-400' : 'text-foreground' },
         ].map(s => (
-          <Card key={s.label} className={`border-l-4 ${s.color}`}>
+          <Card key={s.label} className={`border-l-4 ${s.accent} border-border/50`}>
             <CardContent className="pt-4 pb-3">
-              <div className="text-2xl font-bold">{s.value}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
+              <div className={`text-2xl font-bold tabular-nums ${s.val}`}>{s.value}</div>
+              <div className="text-xs text-muted-foreground mt-0.5 font-medium">{s.label}</div>
             </CardContent>
           </Card>
         ))}
@@ -374,11 +374,11 @@ export default function PendientesTab() {
 
       {/* TABLE VIEW */}
       {viewMode === 'table' && (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="rounded-lg border border-border/50 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted border-b">
+              <thead className="bg-muted/30 border-b border-border/50">
+                <tr>
                   {canDelete && <th className="px-3 py-2.5 w-8">
                     <Checkbox
                       checked={selectedIds.size > 0 && selectedIds.size === filtered.length}
@@ -389,22 +389,22 @@ export default function PendientesTab() {
                     />
                   </th>}
                   {[
-                    { key: 'inspector', label: 'INSPECTOR' },
-                    { key: 'sitio', label: 'UBICACIÓN' },
-                    { key: 'establecimiento', label: 'ESTABLECIMIENTO' },
-                    { key: 'descripcion', label: 'TAREAS A REALIZAR' },
-                    { key: 'numero_sap', label: 'N° ORDEN' },
-                    { key: 'fecha_emision_sap', label: 'INICIO' },
-                    { key: 'fecha_limite', label: 'LÍMITE' },
-                    { key: 'clase_orden', label: 'CLASE' },
-                    { key: 'estado', label: 'ESTADO' },
-                    { key: 'jefe_sitio', label: 'JEFE SITIO' },
+                    { key: 'inspector', label: 'Inspector' },
+                    { key: 'sitio', label: 'Ubicación' },
+                    { key: 'establecimiento', label: 'Establecimiento' },
+                    { key: 'descripcion', label: 'Tareas a realizar' },
+                    { key: 'numero_sap', label: 'N° Orden' },
+                    { key: 'fecha_emision_sap', label: 'Inicio' },
+                    { key: 'fecha_limite', label: 'Límite' },
+                    { key: 'clase_orden', label: 'Clase' },
+                    { key: 'estado', label: 'Estado' },
+                    { key: 'jefe_sitio', label: 'Jefe Sitio' },
                     ...(canDelete ? [{ key: '_delete', label: '' }] : []),
                   ].map(col => (
                     <th
                       key={col.key}
                       onClick={col.key === '_delete' ? undefined : () => toggleSort(col.key)}
-                      className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:text-foreground select-none whitespace-nowrap"
+                      className="px-3 py-2.5 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground select-none whitespace-nowrap"
                     >
                       <span className="flex items-center gap-1">
                         {col.label} <SortIcon col={col.key} />
@@ -413,19 +413,19 @@ export default function PendientesTab() {
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/30">
                 {isLoading ? (
                   <tr>
                     <td colSpan={12} className="text-center py-16 text-muted-foreground">
-                      Cargando...
+                      <div className="w-6 h-6 border-2 border-border border-t-primary rounded-full animate-spin mx-auto" />
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={12} className="text-center py-16 text-muted-foreground">
                       <ClipboardList className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                      <p>No hay pendientes en Comuna {activeComuna}</p>
-                      <p className="text-xs mt-1">Importá desde SAP o creá uno manualmente</p>
+                      <p className="font-medium">No hay pendientes en Comuna {activeComuna}</p>
+                      <p className="text-xs mt-1 opacity-70">Importá desde SAP o creá uno manualmente</p>
                     </td>
                   </tr>
                 ) : filtered.map((p, idx) => {
@@ -434,44 +434,48 @@ export default function PendientesTab() {
                     <tr
                       key={p.id}
                       onClick={canEdit ? () => openEdit(p) : undefined}
-                      className={`border-b ${canEdit ? 'cursor-pointer' : ''} hover:bg-muted/70 transition-colors ${selectedIds.has(p.id) ? 'bg-primary/10' : isVencido ? 'bg-red-950/40' : idx % 2 === 0 ? 'bg-card' : 'bg-muted/20'}`}
+                      className={`transition-colors ${canEdit ? 'cursor-pointer' : ''} ${
+                        selectedIds.has(p.id) ? 'bg-primary/10' :
+                        isVencido ? 'bg-red-950/30 hover:bg-red-950/50' :
+                        idx % 2 !== 0 ? 'bg-muted/10 hover:bg-accent/20' : 'hover:bg-accent/20'
+                      }`}
                     >
                       {canDelete && (
-                        <td className="px-3 py-2 w-8" onClick={e => toggleSelectId(p.id, e)}>
+                        <td className="px-3 py-2.5 w-8" onClick={e => toggleSelectId(p.id, e)}>
                           <Checkbox checked={selectedIds.has(p.id)} />
                         </td>
                       )}
-                      <td className="px-3 py-2 text-xs font-medium whitespace-nowrap">{p.inspector || '—'}</td>
-                      <td className="px-3 py-2 text-xs max-w-36 truncate" title={p.sitio}>{p.sitio || '—'}</td>
-                      <td className="px-3 py-2 text-xs max-w-36 truncate" title={p.establecimiento}>{p.establecimiento || '—'}</td>
-                      <td className="px-3 py-2 text-xs max-w-52">
-                        <span className="line-clamp-2 leading-snug" title={p.descripcion}>{p.descripcion}</span>
+                      <td className="px-3 py-2.5 text-xs font-medium whitespace-nowrap text-foreground/90">{p.inspector || '—'}</td>
+                      <td className="px-3 py-2.5 text-xs max-w-36 truncate text-foreground/70" title={p.sitio}>{p.sitio || '—'}</td>
+                      <td className="px-3 py-2.5 text-xs max-w-36 truncate text-foreground/70" title={p.establecimiento}>{p.establecimiento || '—'}</td>
+                      <td className="px-3 py-2.5 text-xs max-w-52">
+                        <span className="line-clamp-2 leading-snug text-foreground/80" title={p.descripcion}>{p.descripcion}</span>
                       </td>
-                      <td className="px-3 py-2 text-xs font-mono whitespace-nowrap">{p.numero_sap || '—'}</td>
-                      <td className="px-3 py-2 text-xs whitespace-nowrap">
+                      <td className="px-3 py-2.5 text-xs font-mono whitespace-nowrap text-primary/80">{p.numero_sap || '—'}</td>
+                      <td className="px-3 py-2.5 text-xs whitespace-nowrap tabular-nums text-foreground/70">
                         {p.fecha_emision_sap ? format(parseLocalDate(p.fecha_emision_sap), 'dd/MM/yy') : '—'}
                       </td>
-                      <td className={`px-3 py-2 text-xs whitespace-nowrap font-medium ${isVencido ? 'text-red-400' : ''}`}>
+                      <td className={`px-3 py-2.5 text-xs whitespace-nowrap tabular-nums font-medium ${isVencido ? 'text-red-400' : 'text-foreground/70'}`}>
                         {p.fecha_limite ? format(parseLocalDate(p.fecha_limite), 'dd/MM/yy') : '—'}
-                        {isVencido && ' ⚠'}
+                        {isVencido && <span className="ml-1 text-red-400">⚠</span>}
                       </td>
-                      <td className="px-3 py-2 text-xs whitespace-nowrap">{p.clase_orden || '—'}</td>
-                      <td className="px-3 py-2">
-                        <Badge variant="outline" className={`text-[10px] border ${estadoColors[p.estado]}`}>
+                      <td className="px-3 py-2.5 text-xs whitespace-nowrap text-foreground/60">{p.clase_orden || '—'}</td>
+                      <td className="px-3 py-2.5">
+                        <Badge variant="outline" className={`text-[10px] border px-1.5 py-0.5 ${estadoColors[p.estado]}`}>
                           {estadoLabels[p.estado]}
                         </Badge>
                       </td>
-                      <td className="px-3 py-2 text-xs whitespace-nowrap">
+                      <td className="px-3 py-2.5 text-xs whitespace-nowrap">
                         {p.jefe_sitio
-                          ? <span className="text-primary font-medium">{p.jefe_sitio}</span>
-                          : <span className="text-yellow-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />Sin asignar</span>
+                          ? <span className="text-primary/90 font-medium">{p.jefe_sitio}</span>
+                          : <span className="text-amber-400/80 flex items-center gap-1"><AlertCircle className="h-3 w-3" />Sin asignar</span>
                         }
                       </td>
                       {canDelete && (
-                        <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                        <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/50 hover:text-destructive hover:bg-destructive/10">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </AlertDialogTrigger>

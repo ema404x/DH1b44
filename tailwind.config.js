@@ -94,4 +94,8 @@ module.exports = {
   	}
   },
   plugins: [require("tailwindcss-animate")],
+  safelist: [
+    'tabular-nums',
+    'border-l-slate-400', 'border-l-amber-400', 'border-l-blue-500', 'border-l-emerald-500', 'border-l-red-500',
+  ],
 }

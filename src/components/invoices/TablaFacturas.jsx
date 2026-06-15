@@ -158,7 +158,7 @@ export default function TablaFacturas({ invoices, isLoading, onEdit, onDelete, o
           )}
         </div>
       ) : (
-        <Card className="border-border/50 overflow-hidden shadow-sm">
+        <div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-muted/30">
@@ -205,10 +205,10 @@ export default function TablaFacturas({ invoices, isLoading, onEdit, onDelete, o
                             {isOverdue && <Badge className="text-xs border px-1.5 py-0 bg-red-500/15 text-red-400 border-red-500/30">Atrasada</Badge>}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-bold text-foreground py-3">
+                        <TableCell className="text-right font-bold text-foreground py-3 tabular-nums">
                           {fmt(invoice.total)}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-xs text-muted-foreground py-3">
+                        <TableCell className="hidden lg:table-cell text-xs text-muted-foreground py-3 tabular-nums">
                           {fmtDate(invoice.due_date)}
                         </TableCell>
                         <TableCell className="py-3" onClick={e => e.stopPropagation()}>
@@ -250,7 +250,7 @@ export default function TablaFacturas({ invoices, isLoading, onEdit, onDelete, o
               </TableBody>
             </Table>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

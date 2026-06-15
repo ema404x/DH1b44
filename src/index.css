@@ -116,6 +116,28 @@
     animation: fadeInUp 0.22s ease both;
   }
 
+  /* Tabular numeric figures — use on any column with numbers */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* Table enhancements — consistent row density */
+  table thead th {
+    font-variant-numeric: tabular-nums;
+  }
+  table tbody td.num,
+  table tfoot td.num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    font-weight: 500;
+  }
+
+  /* Mono code / SAP numbers */
+  .font-mono {
+    font-feature-settings: "zero", "tnum";
+  }
+
   /* Skeleton shimmer */
   @keyframes shimmer {
     0%   { background-position: -400px 0; }

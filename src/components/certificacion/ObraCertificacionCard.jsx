@@ -22,7 +22,7 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
   };
 
   return (
-    <Card className="border-border hover:border-primary/30 transition-colors">
+    <Card className="border-border/50 hover:border-primary/30 hover:shadow-md transition-all duration-200 card-lift">
       <CardContent className="p-4">
         <div className="flex flex-col sm:flex-row sm:items-start gap-3">
           {/* Info principal */}
@@ -88,8 +88,8 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
             {/* Monto y avance */}
             <div className="flex flex-wrap items-center gap-4">
               {obra.monto_contrato > 0 && (
-                <span className="flex items-center gap-1 font-semibold text-primary text-sm">
-                  <DollarSign className="h-3.5 w-3.5" />
+                <span className="flex items-center gap-1 font-semibold text-primary text-sm tabular-nums">
+                  <DollarSign className="h-3.5 w-3.5 shrink-0" />
                   {fmt(obra.monto_contrato)}
                 </span>
               )}
@@ -210,7 +210,7 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
             {obra.jefe_sitio && <p><span className="font-medium text-foreground">Jefe de Sitio:</span> {obra.jefe_sitio}</p>}
             {obra.inspector && <p><span className="font-medium text-foreground">Inspector:</span> {obra.inspector}</p>}
             {obra.plazo_dias > 0 && <p><span className="font-medium text-foreground">Plazo:</span> {obra.plazo_dias} días</p>}
-            {obra.monto_a_cobrar > 0 && <p><span className="font-medium text-foreground">A cobrar:</span> {fmt(obra.monto_a_cobrar)}</p>}
+            {obra.monto_a_cobrar > 0 && <p><span className="font-medium text-foreground">A cobrar:</span> <span className="tabular-nums">{fmt(obra.monto_a_cobrar)}</span></p>}
           </div>
         )}
       </CardContent>
