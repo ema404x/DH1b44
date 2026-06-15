@@ -12,9 +12,9 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
 const ESTADO_CONFIG = {
-  borrador: { label: 'Borrador', color: '#94A3B8', bg: 'bg-slate-100 text-slate-600' },
-  emitido:  { label: 'Emitido',  color: '#3B82F6', bg: 'bg-blue-100 text-blue-700' },
-  aprobado: { label: 'Aprobado', color: '#10B981', bg: 'bg-green-100 text-green-700' },
+  borrador: { label: 'Borrador', color: '#94A3B8', bg: 'bg-slate-500/15 text-slate-400' },
+  emitido:  { label: 'Emitido',  color: '#3B82F6', bg: 'bg-blue-500/15 text-blue-400' },
+  aprobado: { label: 'Aprobado', color: '#10B981', bg: 'bg-emerald-500/15 text-emerald-400' },
 };
 
 export default function CertificadosPanel({ filterCutoff = null }) {
@@ -92,11 +92,11 @@ export default function CertificadosPanel({ filterCutoff = null }) {
         {/* KPIs rápidos */}
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-lg bg-muted/50 p-2.5 text-center">
-            <p className="text-lg font-bold text-emerald-600">{thisMonthCerts.length}</p>
+            <p className="text-lg font-bold text-emerald-400 tabular-nums">{thisMonthCerts.length}</p>
             <p className="text-[10px] text-muted-foreground font-medium">Este mes</p>
           </div>
           <div className="rounded-lg bg-muted/50 p-2.5 text-center">
-            <p className="text-lg font-bold text-blue-600">{emitidos.length}</p>
+            <p className="text-lg font-bold text-blue-400 tabular-nums">{emitidos.length}</p>
             <p className="text-[10px] text-muted-foreground font-medium">Emitidos</p>
           </div>
           <div className="rounded-lg bg-muted/50 p-2.5 text-center">
@@ -107,11 +107,11 @@ export default function CertificadosPanel({ filterCutoff = null }) {
 
         {/* Monto del mes */}
         {totalMes > 0 && (
-          <div className="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2">
-            <TrendingUp className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+          <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
+            <TrendingUp className="h-4 w-4 text-emerald-400 flex-shrink-0" />
             <div>
-              <p className="text-[10px] text-emerald-700 font-medium">Monto certificado este mes</p>
-              <p className="text-sm font-bold text-emerald-800">{fmt(totalMes)}</p>
+              <p className="text-[10px] text-emerald-400/80 font-medium">Monto certificado este mes</p>
+              <p className="text-sm font-bold text-emerald-400 tabular-nums">{fmt(totalMes)}</p>
             </div>
           </div>
         )}
@@ -174,9 +174,9 @@ export default function CertificadosPanel({ filterCutoff = null }) {
             </p>
             <div className="grid grid-cols-3 gap-2">
               {['8A', '8B', '10A'].map(c => (
-                <div key={c} className="rounded-lg bg-violet-50 border border-violet-100 p-2.5 text-center">
-                  <p className="text-lg font-bold text-violet-700">{abonosPorComuna[c]}</p>
-                  <p className="text-[10px] text-violet-600 font-medium">Comuna {c}</p>
+                <div key={c} className="rounded-lg bg-violet-500/10 border border-violet-500/20 p-2.5 text-center">
+                  <p className="text-lg font-bold text-violet-400 tabular-nums">{abonosPorComuna[c]}</p>
+                  <p className="text-[10px] text-violet-400/70 font-medium">C. {c}</p>
                 </div>
               ))}
             </div>

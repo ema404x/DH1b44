@@ -127,6 +127,7 @@ export default function ReporteMensualComparativo() {
   }, []);
 
   const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+  const fmtAxis = (n) => { if (!n) return '$0'; if (Math.abs(n) >= 1_000_000) return `$${(n/1_000_000).toLocaleString('es-AR', { maximumFractionDigits: 1 })}M`; if (Math.abs(n) >= 1_000) return `$${(n/1_000).toLocaleString('es-AR', { maximumFractionDigits: 0 })}K`; return `$${n}`; };
 
   const estadoConfig = {
     listo_certificar: { label: 'Listo', color: 'bg-emerald-500/15 text-emerald-400' },
@@ -211,41 +212,43 @@ export default function ReporteMensualComparativo() {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2 px-2 font-semibold">Obra/Proyecto</th>
-                    <th className="text-right py-2 px-2 font-semibold">Certificado</th>
-                    <th className="text-right py-2 px-2 font-semibold">Facturado</th>
-                    <th className="text-right py-2 px-2 font-semibold">Diferencia</th>
-                    <th className="text-center py-2 px-2 font-semibold">Comp.</th>
-                    <th className="text-center py-2 px-2 font-semibold">Estado</th>
-                    <th className="text-center py-2 px-2 font-semibold">Avance</th>
+              <table className="w-full text-xs min-w-[640px]">
+                <thead className="bg-muted/30 border-b border-border/50">
+                  <tr>
+                    <th className="text-left py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground">Obra / Proyecto</th>
+                    <th className="text-right py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-36">Certificado</th>
+                    <th className="text-right py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-36">Facturado</th>
+                    <th className="text-right py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-36">Diferencia</th>
+                    <th className="text-center py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-20">Comp.</th>
+                    <th className="text-center py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-28">Estado</th>
+                    <th className="text-center py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-20">Avance</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border/30">
                   {reportePorObra.map((row, idx) => {
                     const diff = row.monto_certificado - row.monto_facturado;
                     const compliance = row.monto_certificado > 0 ? Math.round((row.monto_facturado / row.monto_certificado) * 100) : 0;
                     const config = estadoConfig[row.estado_cobro] || estadoConfig.pendiente;
                     
                     return (
-                      <tr key={idx} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                        <td className="py-3 px-2 font-medium truncate">{row.obra}</td>
-                        <td className="text-right py-3 px-2 font-semibold text-emerald-400">{fmt(row.monto_certificado)}</td>
-                        <td className="text-right py-3 px-2 font-semibold text-blue-400">{fmt(row.monto_facturado)}</td>
-                        <td className={`text-right py-3 px-2 font-semibold ${diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {fmt(Math.abs(diff))}
+                      <tr key={idx} className={`hover:bg-accent/20 transition-colors ${idx % 2 !== 0 ? 'bg-muted/10' : ''}`}>
+                        <td className="py-3 px-3 font-medium max-w-xs">
+                          <span className="truncate block" title={row.obra}>{row.obra}</span>
                         </td>
-                        <td className="text-center py-3 px-2">
-                          <span className={`text-xs font-semibold ${compliance >= 100 ? 'text-emerald-400' : compliance >= 75 ? 'text-blue-400' : 'text-amber-400'}`}>
+                        <td className="text-right py-3 px-3 font-semibold text-emerald-400 tabular-nums whitespace-nowrap">{fmt(row.monto_certificado)}</td>
+                        <td className="text-right py-3 px-3 font-semibold text-blue-400 tabular-nums whitespace-nowrap">{fmt(row.monto_facturado)}</td>
+                        <td className={`text-right py-3 px-3 font-semibold tabular-nums whitespace-nowrap ${diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {diff < 0 && <span className="mr-0.5">-</span>}{fmt(Math.abs(diff))}
+                        </td>
+                        <td className="text-center py-3 px-3 tabular-nums">
+                          <span className={`text-xs font-bold ${compliance >= 100 ? 'text-emerald-400' : compliance >= 75 ? 'text-blue-400' : 'text-amber-400'}`}>
                             {compliance}%
                           </span>
                         </td>
-                        <td className="text-center py-3 px-2">
-                          <Badge className={`text-[9px] ${config.color}`}>{config.label}</Badge>
+                        <td className="text-center py-3 px-3">
+                          <Badge className={`text-[9px] whitespace-nowrap ${config.color}`}>{config.label}</Badge>
                         </td>
-                        <td className="text-center py-3 px-2">
+                        <td className="text-center py-3 px-3 tabular-nums">
                           <span className="text-xs font-medium text-muted-foreground">{row.avance}%</span>
                         </td>
                       </tr>
@@ -278,8 +281,11 @@ export default function ReporteMensualComparativo() {
                 />
                 <YAxis 
                   stroke="hsl(var(--muted-foreground))"
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={72}
+                  tickFormatter={fmtAxis}
                 />
                 <Tooltip 
                   formatter={(v) => fmt(v)}

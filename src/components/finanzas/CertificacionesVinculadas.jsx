@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+
 export default function CertificacionesVinculadas({ projectName, clientName }) {
   const { data: certificaciones = [], isLoading } = useQuery({
     queryKey: ['certificaciones-vinculadas', projectName, clientName],
@@ -92,7 +94,7 @@ export default function CertificacionesVinculadas({ projectName, clientName }) {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Monto:</span>
-                    <span className="ml-1 font-semibold">${(cert.monto_a_cobrar || 0).toLocaleString()}</span>
+                    <span className="ml-1 font-semibold tabular-nums">{fmt(cert.monto_a_cobrar)}</span>
                   </div>
                   {cert.fecha_fin_estimada && (
                     <div>

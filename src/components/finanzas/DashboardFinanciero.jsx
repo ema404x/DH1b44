@@ -15,7 +15,7 @@ import { format, parseISO, startOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
-const fmtK = (n) => { if (!n) return '$0'; if (Math.abs(n) >= 1e6) return `$${(n/1e6).toFixed(1)}M`; if (Math.abs(n) >= 1e3) return `$${(n/1e3).toFixed(0)}K`; return `$${n}`; };
+const fmtAxis = (n) => { if (!n) return '$0'; if (Math.abs(n) >= 1_000_000) return `$${(n/1_000_000).toLocaleString('es-AR', { maximumFractionDigits: 1 })}M`; if (Math.abs(n) >= 1_000) return `$${(n/1_000).toLocaleString('es-AR', { maximumFractionDigits: 0 })}K`; return `$${n}`; };
 
 const PIE_COLORS = ['#F59E0B', '#10B981', '#EF4444', '#6B7280'];
 const STATUS_LABELS = { pendiente: 'Pendiente', pagada: 'Pagada', vencida: 'Vencida', cancelada: 'Cancelada' };
@@ -43,7 +43,7 @@ function KpiCard({ title, value, subtitle, icon: Icon, colorCls, borderCls }) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className={`text-xs font-medium mb-1 ${colorCls}`}>{title}</p>
-            <p className="text-xl font-bold text-foreground leading-tight truncate">{value}</p>
+            <p className="text-lg font-bold text-foreground leading-tight tabular-nums">{value}</p>
             {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
           </div>
           <div className={`shrink-0 h-8 w-8 rounded-lg flex items-center justify-center bg-current/10`}>
@@ -194,7 +194,7 @@ export default function DashboardFinanciero() {
                 <BarChart data={monthlyData} barGap={2}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="mes" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={55} />
+                  <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={62} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="facturado" name="Facturado"  fill="hsl(var(--primary))" radius={[3,3,0,0]} opacity={0.7} />

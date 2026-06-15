@@ -7,6 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import StatsCard from '@/components/shared/StatsCard';
 import { TrendingUp } from 'lucide-react';
 
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+const fmtAxis = (n) => { if (!n) return '$0'; if (Math.abs(n) >= 1_000_000) return `$${(n/1_000_000).toLocaleString('es-AR', { maximumFractionDigits: 1 })}M`; if (Math.abs(n) >= 1_000) return `$${(n/1_000).toLocaleString('es-AR', { maximumFractionDigits: 0 })}K`; return `$${n}`; };
+
 export default function GastoMensualAbonosMensuales() {
   const { data: certificados = [] } = useQuery({ 
     queryKey: ['certificados-abonos'], 
@@ -59,14 +62,14 @@ export default function GastoMensualAbonosMensuales() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatsCard 
           title="Gasto Total de Abonos" 
-          value={`$${totalGastos.toLocaleString()}`} 
+          value={fmt(totalGastos)} 
           icon={TrendingUp} 
           color="blue"
           subtitle={`${abonosMensuales.length} certificados`}
         />
         <StatsCard 
           title="Promedio Mensual" 
-          value={`$${promedioMensual.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`} 
+          value={fmt(promedioMensual)} 
           icon={TrendingUp} 
           color="blue"
           subtitle={`${gastosPorMes.length} meses`}
@@ -98,9 +101,9 @@ export default function GastoMensualAbonosMensuales() {
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={gastosPorMes}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="mes" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={68} />
+                  <Tooltip formatter={(v) => [fmt(v), 'Gasto']} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '11px' }} />
                   <Legend />
                   <Line type="monotone" dataKey="gasto" stroke="#3B82F6" name="Gasto ($)" strokeWidth={2} />
                 </LineChart>
@@ -118,9 +121,9 @@ export default function GastoMensualAbonosMensuales() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={gastosPorContratista}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="nombre" angle={-45} textAnchor="end" height={100} />
-                  <YAxis />
-                  <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
+                  <XAxis dataKey="nombre" angle={-45} textAnchor="end" height={100} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={68} />
+                  <Tooltip formatter={(v) => [fmt(v), 'Gasto']} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '11px' }} />
                   <Bar dataKey="total" fill="#06B6D4" name="Gasto ($)" />
                 </BarChart>
               </ResponsiveContainer>
@@ -154,11 +157,11 @@ export default function GastoMensualAbonosMensuales() {
                         <TableCell className="text-sm max-w-xs truncate">{cert.obra_servicio || '-'}</TableCell>
                         <TableCell className="text-sm">{cert.mes_periodo || '-'}</TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${cert.estado === 'aprobado' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${cert.estado === 'aprobado' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-blue-500/15 text-blue-400'}`}>
                             {cert.estado === 'aprobado' ? 'Aprobado' : 'Emitido'}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right font-semibold">${(cert.subtotal || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">{fmt(cert.subtotal)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
