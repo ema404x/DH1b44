@@ -29,9 +29,7 @@ export default function Certificados() {
   const [previewing, setPreviewing] = useState(null);
   const [pendingFirmaData, setPendingFirmaData] = useState(null); // datos del cert esperando firma jefe
   const queryClient = useQueryClient();
-  const { user, displayName } = useCurrentUser();
-
-  const { filterByUser } = useCurrentUser();
+  const { user, displayName, filterByUser } = useCurrentUser();
 
   const { data: rawCertificados = [], isLoading } = useQuery({
     queryKey: ['certificados'],

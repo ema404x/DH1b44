@@ -164,31 +164,34 @@ export async function exportCertificadoPDF(form) {
   // Mejor usar DESC=48 y expandir montos a 22: 5+48+6+8+22+22+6+22+6+22+6+22+6+22=223 → faltan 54. 
   // SOLUCIÓN DEFINITIVA: calcular DESC dinámicamente para sumar exactamente C=277
   const TABLE_COLS = (() => {
-    // Anchos fijos de todas las columnas excepto descripción
-    const fixed = [
-      { label: 'N°',       align: 'right', numeric: false, w: 6  },
-      { label: 'UM',       align: 'left',  numeric: false, w: 7  },
-      { label: 'CANT.',    align: 'right', numeric: false, w: 9  },
-      { label: 'IMP.UNIT.',align: 'right', numeric: true,  w: 23 },
-      { label: 'IMP.TOT.', align: 'right', numeric: true,  w: 23 },
-      { label: 'A.A.U',   align: 'right', numeric: false, w: 7  },
-      { label: 'A.ANT$',  align: 'right', numeric: true,  w: 23 },
-      { label: 'PR.U',    align: 'right', numeric: false, w: 7  },
-      { label: 'PRES.$',  align: 'right', numeric: true,  w: 23 },
-      { label: 'A.P.U',   align: 'right', numeric: false, w: 7  },
-      { label: 'A.PR.$',  align: 'right', numeric: true,  w: 23 },
-      { label: 'SA.U',    align: 'right', numeric: false, w: 7  },
-      { label: 'SALDO$',  align: 'right', numeric: true,  w: 23 },
+    // Anchos fijos de todas las columnas. DESC se calcula dinámicamente para sumar exactamente C=277mm.
+    // Sin DESC: N°(6)+UM(7)+CANT(9)+IU(23)+IT(23)+AAU(7)+AA$(23)+PU(7)+P$(23)+APU(7)+AP$(23)+SU(7)+S$(23) = 188
+    // DESC = 277 - 188 = 89mm
+    const withoutDesc = [
+      { label: 'N°',        align: 'right', w: 6  },
+      { label: 'UM',        align: 'left',  w: 7  },
+      { label: 'CANT.',     align: 'right', w: 9  },
+      { label: 'IMP.UNIT.', align: 'right', w: 23 },
+      { label: 'IMP.TOT.',  align: 'right', w: 23 },
+      { label: 'A.A.U',    align: 'right', w: 7  },
+      { label: 'A.ANT$',   align: 'right', w: 23 },
+      { label: 'PR.U',     align: 'right', w: 7  },
+      { label: 'PRES.$',   align: 'right', w: 23 },
+      { label: 'A.P.U',    align: 'right', w: 7  },
+      { label: 'A.PR.$',   align: 'right', w: 23 },
+      { label: 'SA.U',     align: 'right', w: 7  },
+      { label: 'SALDO$',   align: 'right', w: 23 },
     ];
-    const fixedTotal = fixed.reduce((s, d) => s + d.w, 0); // 6+7+9+23+23+7+23+7+23+7+23+7+23 = 188
-    const descW = C - fixedTotal; // 277 - 188 = 89
+    const fixedTotal = withoutDesc.reduce((s, d) => s + d.w, 0); // = 188
+    const descW = C - fixedTotal; // = 277 - 188 = 89
+    // Insertar DESC en posición 1 (después de N°)
     const allDefs = [
-      { label: 'N°',       align: 'right', numeric: false, w: fixed[0].w },
-      { label: 'DESCRIPCIÓN', align: 'left', numeric: false, w: descW },
-      ...fixed.slice(1),
+      withoutDesc[0], // N°
+      { label: 'DESCRIPCIÓN', align: 'left', w: descW }, // DESC = 89
+      ...withoutDesc.slice(1), // UM en adelante
     ];
     let cx = M;
-    return allDefs.map(d => { const col = { ...d, x: cx }; cx += d.w; return col; });
+    return allDefs.map(d => { const x = cx; cx += d.w; return { ...d, x }; });
   })();
 
   const drawTableHeader = (atY) => {

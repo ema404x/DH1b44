@@ -28,10 +28,16 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
     ? (form.items || []).reduce((a, i) => a + (i.med_presente_importe || 0), 0)
     : 0;
   const pdfSubtotal = hasMedicion ? totalPresente : subtotal;
-  const anticipo_pct = form.anticipo_pct ?? 0;
-  const fondo_reparo_pct = form.fondo_reparo_pct ?? 0;
-  const anticipo = anticipo_pct > 0 ? pdfSubtotal * (anticipo_pct / 100) : 0;
-  const fondoReparo = fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0;
+
+  // Usar los montos ya calculados por el editor si están disponibles (evita divergencia)
+  const anticipo = form._anticipo_monto != null
+    ? parseMonto(form._anticipo_monto)
+    : (form.anticipo_pct > 0 ? pdfSubtotal * ((form.anticipo_pct ?? 0) / 100) : 0);
+  const fondoReparo = form.fondo_reparo_aplicar
+    ? (form._fondo_reparo_monto != null
+        ? parseMonto(form._fondo_reparo_monto)
+        : (form.fondo_reparo_pct > 0 ? pdfSubtotal * ((form.fondo_reparo_pct ?? 0) / 100) : 0))
+    : 0;
   const totalNeto = pdfSubtotal - anticipo - fondoReparo;
 
   const handleExportPDF = async () => {
@@ -146,7 +152,7 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
                 </tr>
               </thead>
               <tbody>
-                {(hasMedicion ? form.items.filter(it => (it.med_presente_importe || 0) > 0) : form.items).map((item, i) => (
+                {(form.items || []).map((item, i) => (
                   <tr key={i} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
                     <td className="px-2 py-1.5 text-muted-foreground">{item.numero || i + 1}</td>
                     <td className="px-2 py-1.5">{item.descripcion}</td>
@@ -230,13 +236,20 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
             </div>
             {anticipo > 0 && (
               <div className="flex justify-between gap-8 text-muted-foreground">
-                <span>Anticipo ({anticipo_pct}%):</span>
+                <span>
+                  {form._anticipo_monto != null
+                    ? 'Anticipo/Desacopio (fijo):'
+                    : `Anticipo (${form.anticipo_pct ?? 0}%):`}
+                </span>
                 <span>-{fmt(anticipo)}</span>
               </div>
             )}
             {fondoReparo > 0 && (
               <div className="flex justify-between gap-8 text-muted-foreground">
-                <span>Fondo de Reparo ({fondo_reparo_pct}%):</span>
+                <span>
+                  {form.fondo_reparo_label || 'Fondo de Reparo'}
+                  {form._fondo_reparo_monto != null ? ' (fijo):' : ` (${form.fondo_reparo_pct ?? 0}%):`}
+                </span>
                 <span>-{fmt(fondoReparo)}</span>
               </div>
             )}
