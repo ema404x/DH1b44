@@ -43,6 +43,23 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.Employee.update(emp.id, { user_id: user.id });
     }
 
+    // ── VALIDACIÓN CRÍTICA: sincronizar full_name de plataforma con nombre real del empleado ──
+    // Si el full_name en la plataforma es un email o difiere del nombre en la ficha,
+    // lo actualizamos para que todo el sistema use siempre el nombre real.
+    const isEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const platformNameIsEmail = isEmailPattern.test((user.full_name || '').trim());
+    const platformNameDiffers = (user.full_name || '').trim() !== (emp.full_name || '').trim();
+
+    if (emp.full_name && (platformNameIsEmail || platformNameDiffers)) {
+      try {
+        await base44.auth.updateMe({ full_name: emp.full_name });
+        console.info(`[vincularEmpleado] full_name actualizado: "${user.full_name}" → "${emp.full_name}"`);
+      } catch (syncErr) {
+        // No bloquear el flujo si falla la sincronización
+        console.warn(`[vincularEmpleado] No se pudo sincronizar full_name: ${syncErr.message}`);
+      }
+    }
+
     // Buscar permisos del rol (case-insensitive para evitar errores de mayúsculas)
     let employeePermissions = null;
     const employeeRole = emp.role || null;

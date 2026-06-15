@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, Building2, User, DollarSign, TrendingUp, Paperclip, Clock, CheckCircle2, XCircle, Eye, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useResolveNames } from '@/hooks/useResolveNames';
 
 const estadoConfig = {
   borrador:    { label: 'Borrador',     color: 'bg-slate-100 text-slate-600 border-slate-300' },
@@ -21,6 +22,7 @@ const prioridadConfig = {
 };
 
 export default function SolicitudCard({ solicitud, onView, onEdit, onDelete, isAdmin }) {
+  const { resolve } = useResolveNames();
   const estado = estadoConfig[solicitud.estado] || estadoConfig.borrador;
   const prioridad = prioridadConfig[solicitud.prioridad] || prioridadConfig.normal;
   const canEdit = !isAdmin && (solicitud.estado === 'borrador' || solicitud.estado === 'rechazada');
@@ -46,7 +48,7 @@ export default function SolicitudCard({ solicitud, onView, onEdit, onDelete, isA
           </span>
           <span className="flex items-center gap-1.5 truncate">
             <User className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{solicitud.jefe_sitio || '—'}</span>
+            <span className="truncate">{resolve(solicitud.jefe_sitio) || '—'}</span>
           </span>
           {solicitud.monto_solicitado > 0 && (
             <span className="flex items-center gap-1.5 font-medium text-foreground">
@@ -77,7 +79,7 @@ export default function SolicitudCard({ solicitud, onView, onEdit, onDelete, isA
         {solicitud.estado === 'aprobada' && solicitud.aprobado_por && (
           <div className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-md px-2.5 py-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" />
-            Aprobado por {solicitud.aprobado_por}
+            Aprobado por {resolve(solicitud.aprobado_por)}
             {solicitud.fecha_aprobacion && <span className="text-muted-foreground ml-1">· {format(new Date(solicitud.fecha_aprobacion), 'dd MMM yy', { locale: es })}</span>}
           </div>
         )}

@@ -6,6 +6,7 @@ import { FileText, Plus, Eye, Trash2, Loader2, CheckCircle2, Clock, PenTool } fr
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
+import { useResolveNames } from '@/hooks/useResolveNames';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -22,6 +23,7 @@ const tipoStyle = {
 };
 
 export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete, emptyLabel }) {
+  const { resolve } = useResolveNames();
   const [exportingPDF, setExportingPDF] = useState(null);
   const [search, setSearch] = useState('');
 
@@ -88,7 +90,7 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                   {c.estado === 'aprobado' && c.aprobado_por && (
                     <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-1">
                       <CheckCircle2 className="h-3 w-3" />
-                      <span>Aprobado por {c.aprobado_por}</span>
+                      <span>Aprobado por {resolve(c.aprobado_por)}</span>
                     </div>
                   )}
                   {c.estado === 'emitido' && c.tipo === 'obra' && !c.firma_jefe_sitio_url && (

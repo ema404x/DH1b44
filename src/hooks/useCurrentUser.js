@@ -1,5 +1,7 @@
 import { useContext } from 'react';
 import { AuthContext } from '@/lib/AuthContext';
+import { resolveDisplayName } from '@/lib/utils';
+import { queryClientInstance } from '@/lib/query-client';
 
 /**
  * Hook que retorna el usuario actual y helpers de permisos.
@@ -74,5 +76,19 @@ export function useCurrentUser() {
     });
   }
 
-  return { currentUser, user: currentUser, isAdmin, isSuperAdmin, employeeRole, employeeName, displayName, loading, filterByUser, userPermissions };
+  /**
+   * Resuelve cualquier string (nombre o email) al nombre real del empleado.
+   * Usa el cache de React Query de 'employees' para la búsqueda — sin llamadas API.
+   * Si el string no es un email, lo retorna tal cual.
+   *
+   * @param {string} nameOrEmail
+   * @param {string} [fallback]
+   * @returns {string}
+   */
+  function resolveUserName(nameOrEmail, fallback) {
+    const employees = queryClientInstance.getQueryData(['employees']) || [];
+    return resolveDisplayName(nameOrEmail, employees, fallback);
+  }
+
+  return { currentUser, user: currentUser, isAdmin, isSuperAdmin, employeeRole, employeeName, displayName, loading, filterByUser, userPermissions, resolveUserName };
 }
