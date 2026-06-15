@@ -95,23 +95,29 @@ function NavItem({ item, collapsed, active, onClick, hasNewMessages }) {
           "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 relative",
           collapsed && "justify-center px-0 mx-1",
           active
-            ? "bg-primary/15 text-white"
-              : "text-white/80 hover:bg-sidebar-accent/70 hover:text-white",
-          isForo && hasNewMessages && !active && "animate-blink"
+            ? "bg-primary/20 text-white shadow-sm shadow-primary/10"
+            : "text-white/70 hover:bg-white/6 hover:text-white",
         )}
       >
         {/* Active indicator bar */}
         {active && (
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-primary rounded-r-full shadow-[0_0_8px_2px_rgba(59,130,246,0.4)]" />
         )}
-        <item.icon className={cn(
-          "flex-shrink-0 transition-transform duration-150",
-          collapsed ? "h-[18px] w-[18px]" : "h-[16px] w-[16px]",
-          active ? "text-primary" : "",
-          isForo && hasNewMessages && !active && "animate-blink"
-        )} />
+        <div className="relative flex-shrink-0">
+          <item.icon className={cn(
+            "transition-transform duration-150",
+            collapsed ? "h-[18px] w-[18px]" : "h-[16px] w-[16px]",
+            active ? "text-primary" : ""
+          )} />
+          {isForo && hasNewMessages && !active && (
+            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
+          )}
+        </div>
         {!collapsed && (
-          <span className="truncate">{item.label}</span>
+          <span className="truncate flex-1">{item.label}</span>
+        )}
+        {!collapsed && isForo && hasNewMessages && !active && (
+          <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse flex-shrink-0" />
         )}
       </Link>
       {/* Tooltip when collapsed */}
@@ -236,9 +242,9 @@ export default function Sidebar() {
         {visibleGroups.map((group) => (
           <div key={group.label}>
             {!collapsed && (
-              <div className="px-3 mb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-sidebar-foreground/30 flex items-center gap-2">
-                <span>{group.label}</span>
-                <div className="flex-1 h-px bg-white/5" />
+              <div className="px-3 mb-1 text-[9px] font-bold uppercase tracking-[0.14em] text-sidebar-foreground/25 flex items-center gap-2">
+                <span className="flex-shrink-0">{group.label}</span>
+                <div className="flex-1 h-px bg-white/6" />
               </div>
             )}
             {collapsed && <div className="h-px bg-white/5 my-2 mx-2" />}
@@ -259,14 +265,17 @@ export default function Sidebar() {
       </nav>
 
       {/* Collapse toggle */}
-      <div className="hidden lg:flex p-3 border-t border-sidebar-border/50">
+      <div className="hidden lg:flex p-3 border-t border-sidebar-border/30">
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sidebar-foreground/40 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground transition-all duration-150 text-xs"
+          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/70 transition-all duration-150 text-xs group"
         >
           {collapsed
-            ? <ChevronRight className="h-4 w-4" />
-            : <><ChevronLeft className="h-4 w-4" /><span>Colapsar</span></>
+            ? <ChevronRight className="h-4 w-4 group-hover:scale-110 transition-transform" />
+            : <>
+                <ChevronLeft className="h-4 w-4 group-hover:scale-110 transition-transform" />
+                <span className="tracking-wide">Colapsar</span>
+              </>
           }
         </button>
       </div>
