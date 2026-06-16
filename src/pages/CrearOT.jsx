@@ -673,6 +673,38 @@ export default function CrearOT() {
               </div>
             </FieldGroup>
 
+            {/* Modo de guardado — OT o Futura Obra */}
+            <div className="rounded-xl border border-border bg-card p-1 flex gap-1">
+              <button
+                onClick={() => setModoGuardado('ot')}
+                className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1 ${
+                  modoGuardado === 'ot'
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Orden de Trabajo
+              </button>
+              <button
+                onClick={() => setModoGuardado('futura_obra')}
+                className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1 ${
+                  modoGuardado === 'futura_obra'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Wrench className="h-4 w-4" />
+                Futura Obra
+              </button>
+            </div>
+            {modoGuardado === 'futura_obra' && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-2.5 text-xs text-amber-300 flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                Se registrará como pendiente en el módulo de Obras, sin generar una OT.
+              </div>
+            )}
+
             {/* Banner 5 Reglas de Oro — solo si es trabajo eléctrico */}
             {esTrabajoElectrico && !dismissedReglasOro && (
               <ReglasOroElectricidad compact onClose={() => setDismissedReglasOro(true)} />
@@ -814,38 +846,6 @@ export default function CrearOT() {
                 <p className="text-xs text-muted-foreground">El operario deberá adjuntar fotos antes de marcar la OT como completada</p>
               </div>
             </label>
-
-            {/* Modo de guardado */}
-            <div className="rounded-xl border border-border bg-card p-1 flex gap-1">
-              <button
-                onClick={() => setModoGuardado('ot')}
-                className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1 ${
-                  modoGuardado === 'ot'
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <ClipboardList className="h-4 w-4" />
-                Orden de Trabajo
-              </button>
-              <button
-                onClick={() => setModoGuardado('futura_obra')}
-                className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1 ${
-                  modoGuardado === 'futura_obra'
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Wrench className="h-4 w-4" />
-                Futura Obra
-              </button>
-            </div>
-            {modoGuardado === 'futura_obra' && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-2.5 text-xs text-amber-300 flex items-center gap-2">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                Se registrará como pendiente en el módulo de Obras, sin generar una OT.
-              </div>
-            )}
 
             {/* Resumen */}
             <div className="rounded-xl border border-border bg-card p-4 space-y-3">

@@ -7,7 +7,7 @@ import {
   X, Save, Loader2, MapPin, CheckSquare, Camera, Package,
   Download, AlertTriangle, Navigation, Layers, ClipboardX,
   User, RefreshCw, QrCode, FileText, Calendar, ChevronDown,
-  CheckCircle2, Circle, Zap,
+  CheckCircle2, Circle, Zap, Wrench,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DeleteWorkOrderButton from './DeleteWorkOrderButton';
@@ -101,6 +101,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [data, setData] = useState({ ...order });
   const [qrOpen, setQrOpen] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [convertingToObra, setConvertingToObra] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: freshOrder, isLoading: loadingFresh, refetch } = useQuery({
@@ -155,6 +156,32 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       return next;
     });
   }, [saveMutation]);
+
+  const handleConvertToObra = async () => {
+    if (!window.confirm('¿Convertir esta OT a Futura Obra? Se creará un pendiente de tipo obra con los datos de esta OT.')) return;
+    setConvertingToObra(true);
+    try {
+      await base44.entities.Pendiente.create({
+        descripcion: data.title,
+        tipo: 'obra',
+        estado: 'pendiente',
+        prioridad: data.priority || 'media',
+        establecimiento: data.location_qr_name || '',
+        sitio: data.location || '',
+        jefe_sitio: data.assigned_name || '',
+        materiales_necesarios: (data.materials_used || []).map(m => m.material_name).filter(Boolean).join(', '),
+        observaciones: data.description || '',
+        fecha_limite: data.scheduled_date || undefined,
+      });
+      queryClient.invalidateQueries({ queryKey: ['pendientes'] });
+      toast.success('OT convertida a Futura Obra correctamente');
+      onClose();
+    } catch {
+      toast.error('Error al convertir la OT');
+    } finally {
+      setConvertingToObra(false);
+    }
+  };
 
   const handleSaveAsTemplate = async () => {
     const nombre = prompt('Nombre de la plantilla:', data.title);
@@ -456,6 +483,11 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                 <button onClick={() => setQrOpen(true)} title="QR"
                   className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors">
                   <QrCode className="h-3.5 w-3.5" />
+                </button>
+                <button onClick={handleConvertToObra} disabled={convertingToObra} title="Convertir a Futura Obra"
+                  className="h-8 px-2 flex items-center gap-1 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/60 transition-colors disabled:opacity-40 text-[10px] font-semibold">
+                  {convertingToObra ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
+                  Obra
                 </button>
                 {onDelete && <DeleteWorkOrderButton order={data} onDelete={onDelete} />}
               </div>
