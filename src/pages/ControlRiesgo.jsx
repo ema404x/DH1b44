@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Search, ShieldAlert, AlertTriangle, CheckCircle2, AlertCircle, Zap, Sparkles, Send, Loader2, X, Bot } from 'lucide-react';
 import MatrizRiesgos from '@/components/riesgo/MatrizRiesgos';
 import ReactMarkdown from 'react-markdown';
+import ReglasOroElectricidad from '@/components/shared/ReglasOroElectricidad';
 
 const NIVEL_CONFIG = {
   aceptable: { label: 'Aceptable', color: 'bg-emerald-500', text: 'text-emerald-900', border: 'border-emerald-400', max: 3 },
@@ -216,6 +217,9 @@ export default function ControlRiesgo() {
           <p className="text-sm text-muted-foreground mt-0.5">Matriz de riesgos por sector — EDUCACION · SALUD · BAPRO</p>
         </div>
       </div>
+
+      {/* 5 Reglas de Oro — Seguridad Eléctrica */}
+      <ReglasOroElectricidad />
 
       {/* Matriz de Riesgos visual */}
       <MatrizRiesgos />

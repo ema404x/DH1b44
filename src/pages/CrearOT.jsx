@@ -17,6 +17,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import OTTemplateSelector from '@/components/workorders/OTTemplateSelector';
+import ReglasOroElectricidad from '@/components/shared/ReglasOroElectricidad';
 
 // ── Constantes ─────────────────────────────────────────────────────────────────
 
@@ -114,6 +115,15 @@ export default function CrearOT() {
   const [photos, setPhotos] = useState([]);
   const [requirePhotos, setRequirePhotos] = useState(false);
   const [autoJefeSitio, setAutoJefeSitio] = useState('');
+
+  // Detectar si es trabajo eléctrico
+  const [dismissedReglasOro, setDismissedReglasOro] = useState(false);
+
+  const esTrabajoElectrico = React.useMemo(() => {
+    const PALABRAS = ['electr', 'tension', 'tensión', 'tablero', 'cable', 'circuito', 'voltaje', 'corriente', 'fusible', 'disyuntor', 'interruptor', 'instalación eléctrica', 'tomacorriente', 'llave térmica'];
+    const texto = (title + ' ' + description).toLowerCase();
+    return PALABRAS.some(p => texto.includes(p)) || type === 'instalacion';
+  }, [title, description, type]);
 
   // Audio (Web Speech API — transcripción en tiempo real)
   const [recording, setRecording] = useState(false);
@@ -368,6 +378,7 @@ export default function CrearOT() {
     setPhotos([]);
     setRequirePhotos(false);
     setAutoJefeSitio('');
+    setDismissedReglasOro(false);
   };
 
   // ── Validaciones por paso ────────────────────────────────────────────────────
@@ -626,6 +637,11 @@ export default function CrearOT() {
                 ))}
               </div>
             </FieldGroup>
+
+            {/* Banner 5 Reglas de Oro — solo si es trabajo eléctrico */}
+            {esTrabajoElectrico && !dismissedReglasOro && (
+              <ReglasOroElectricidad compact onClose={() => setDismissedReglasOro(true)} />
+            )}
 
             {/* Instrucciones */}
             <FieldGroup label="Instrucciones para el operario">
