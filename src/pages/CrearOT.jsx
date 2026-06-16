@@ -115,6 +115,7 @@ export default function CrearOT() {
   const [photos, setPhotos] = useState([]);
   const [requirePhotos, setRequirePhotos] = useState(false);
   const [autoJefeSitio, setAutoJefeSitio] = useState('');
+  const [modoGuardado, setModoGuardado] = useState('ot'); // 'ot' | 'futura_obra'
 
   // Detectar si es trabajo eléctrico
   const [dismissedReglasOro, setDismissedReglasOro] = useState(false);
@@ -177,10 +178,21 @@ export default function CrearOT() {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       queryClient.invalidateQueries({ queryKey: ['workorders-campo'] });
       setCreatedOT(ot);
-      setStep(5); // pantalla de éxito
+      setStep(5);
       toast.success('¡Orden de trabajo creada exitosamente!');
     },
     onError: () => toast.error('Error al crear la OT. Intente nuevamente.'),
+  });
+
+  const createFuturaObraMutation = useMutation({
+    mutationFn: (data) => base44.entities.Pendiente.create(data),
+    onSuccess: (pendiente) => {
+      queryClient.invalidateQueries({ queryKey: ['pendientes'] });
+      setCreatedOT(pendiente);
+      setStep(5);
+      toast.success('¡Futura obra registrada correctamente!');
+    },
+    onError: () => toast.error('Error al registrar la futura obra.'),
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -336,28 +348,41 @@ export default function CrearOT() {
 
   // Crear
   const handleCreate = () => {
-    // Nombre legible de la ubicación: preferir address, caer en name — nunca vacío
     const locationLabel = selectedLocation
       ? (selectedLocation.address?.trim() || selectedLocation.name?.trim() || '')
       : '';
 
-    createMutation.mutate({
-      title: title.trim(),
-      type,
-      priority,
-      description,
-      status: autoJefeSitio ? 'asignada' : 'pendiente',
-      scheduled_date: scheduledDate || undefined,
-      materials_used: materials.filter(m => m.material_name.trim()),
-      require_photos: requirePhotos,
-      photos,
-      location_qr_id: selectedLocation?.id || '',
-      location_qr_name: selectedLocation?.name || '',
-      location: locationLabel,
-      project_name: selectedLocation?.project_name || '',
-      // Jefe de sitio auto-asignado desde LocationData
-      assigned_name: autoJefeSitio || undefined,
-    });
+    if (modoGuardado === 'futura_obra') {
+      createFuturaObraMutation.mutate({
+        descripcion: title.trim(),
+        tipo: 'obra',
+        estado: 'pendiente',
+        prioridad: priority,
+        establecimiento: selectedLocation?.name || '',
+        sitio: locationLabel,
+        jefe_sitio: autoJefeSitio || '',
+        materiales_necesarios: materials.filter(m => m.material_name.trim()).map(m => m.material_name).join(', '),
+        observaciones: description,
+        fecha_limite: scheduledDate || undefined,
+      });
+    } else {
+      createMutation.mutate({
+        title: title.trim(),
+        type,
+        priority,
+        description,
+        status: autoJefeSitio ? 'asignada' : 'pendiente',
+        scheduled_date: scheduledDate || undefined,
+        materials_used: materials.filter(m => m.material_name.trim()),
+        require_photos: requirePhotos,
+        photos,
+        location_qr_id: selectedLocation?.id || '',
+        location_qr_name: selectedLocation?.name || '',
+        location: locationLabel,
+        project_name: selectedLocation?.project_name || '',
+        assigned_name: autoJefeSitio || undefined,
+      });
+    }
   };
 
   // Reset
@@ -379,6 +404,7 @@ export default function CrearOT() {
     setRequirePhotos(false);
     setAutoJefeSitio('');
     setDismissedReglasOro(false);
+    setModoGuardado('ot');
   };
 
   // ── Validaciones por paso ────────────────────────────────────────────────────
@@ -400,8 +426,10 @@ export default function CrearOT() {
             <CheckCircle2 className="h-10 w-10 text-emerald-400" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-foreground">¡OT Creada!</h2>
-            <p className="text-muted-foreground text-sm mt-1 font-medium">{createdOT.title}</p>
+            <h2 className="text-2xl font-bold text-foreground">
+              {modoGuardado === 'futura_obra' ? '¡Futura Obra Registrada!' : '¡OT Creada!'}
+            </h2>
+            <p className="text-muted-foreground text-sm mt-1 font-medium">{createdOT.title || createdOT.descripcion}</p>
             <div className="mt-3 space-y-1 text-xs text-muted-foreground">
               {selectedLocation && (
                 <p className="flex items-center justify-center gap-1">
@@ -412,11 +440,18 @@ export default function CrearOT() {
             </div>
           </div>
           <div className="space-y-2">
-            <Button className="w-full gap-2" onClick={() => setShowQR(true)}>
-              <QrCode className="h-4 w-4" /> Ver QR de la OT
-            </Button>
+            {modoGuardado === 'ot' && (
+              <Button className="w-full gap-2" onClick={() => setShowQR(true)}>
+                <QrCode className="h-4 w-4" /> Ver QR de la OT
+              </Button>
+            )}
+            {modoGuardado === 'futura_obra' && (
+              <Button className="w-full gap-2 bg-amber-500 hover:bg-amber-600 text-white" onClick={() => navigate('/activos')}>
+                <Wrench className="h-4 w-4" /> Ver Pendientes / Obras
+              </Button>
+            )}
             <Button variant="outline" className="w-full" onClick={resetForm}>
-              Crear otra OT
+              {modoGuardado === 'futura_obra' ? 'Registrar otra' : 'Crear otra OT'}
             </Button>
             <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => navigate('/ordenes')}>
               Ir a Órdenes de Trabajo
@@ -780,6 +815,38 @@ export default function CrearOT() {
               </div>
             </label>
 
+            {/* Modo de guardado */}
+            <div className="rounded-xl border border-border bg-card p-1 flex gap-1">
+              <button
+                onClick={() => setModoGuardado('ot')}
+                className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1 ${
+                  modoGuardado === 'ot'
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Orden de Trabajo
+              </button>
+              <button
+                onClick={() => setModoGuardado('futura_obra')}
+                className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all flex flex-col items-center gap-1 ${
+                  modoGuardado === 'futura_obra'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Wrench className="h-4 w-4" />
+                Futura Obra
+              </button>
+            </div>
+            {modoGuardado === 'futura_obra' && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-2.5 text-xs text-amber-300 flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                Se registrará como pendiente en el módulo de Obras, sin generar una OT.
+              </div>
+            )}
+
             {/* Resumen */}
             <div className="rounded-xl border border-border bg-card p-4 space-y-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Resumen de la OT</p>
@@ -820,13 +887,19 @@ export default function CrearOT() {
             </Button>
           ) : (
             <Button
-              className="flex-1 h-12 gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg shadow-emerald-500/30 font-bold text-base"
+              className={`flex-1 h-12 gap-2 font-bold text-base hover:shadow-lg ${
+                modoGuardado === 'futura_obra'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/30'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/30'
+              }`}
               onClick={handleCreate}
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || createFuturaObraMutation.isPending}
             >
-              {createMutation.isPending
-                ? <><Loader2 className="h-5 w-5 animate-spin" /> Creando OT...</>
-                : <><CheckCircle2 className="h-5 w-5" /> Crear Orden de Trabajo</>
+              {(createMutation.isPending || createFuturaObraMutation.isPending)
+                ? <><Loader2 className="h-5 w-5 animate-spin" /> Guardando...</>
+                : modoGuardado === 'futura_obra'
+                  ? <><Wrench className="h-5 w-5" /> Registrar como Futura Obra</>
+                  : <><CheckCircle2 className="h-5 w-5" /> Crear Orden de Trabajo</>
               }
             </Button>
           )}
