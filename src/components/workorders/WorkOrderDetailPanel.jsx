@@ -34,6 +34,7 @@ const STATUS_CFG = {
   asignada:    { label: 'Asignada',     color: 'text-blue-300',   bg: 'bg-blue-900/30 border-blue-700/50' },
   en_progreso: { label: 'En Progreso',  color: 'text-violet-300', bg: 'bg-violet-900/30 border-violet-700/50' },
   en_espera:   { label: 'En Espera',    color: 'text-slate-300',  bg: 'bg-slate-700/30 border-slate-600/50' },
+  obra:        { label: 'Obra',         color: 'text-orange-300', bg: 'bg-orange-900/30 border-orange-700/50' },
   completada:  { label: 'Completada',   color: 'text-emerald-300',bg: 'bg-emerald-900/30 border-emerald-700/50' },
   cancelada:   { label: 'Cancelada',    color: 'text-red-300',    bg: 'bg-red-900/30 border-red-700/50' },
 };

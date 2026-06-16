@@ -49,6 +49,7 @@
         "asignada",
         "en_progreso",
         "en_espera",
+        "obra",
         "completada",
         "cancelada"
       ],
