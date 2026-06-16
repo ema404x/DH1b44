@@ -849,7 +849,8 @@ export default function CrearOT() {
 
             {/* Resumen */}
             <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Resumen de la OT</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Resumen</p>
+              <SummaryRow label="Guardar como" value={modoGuardado === 'futura_obra' ? '🔨 Futura Obra' : '📋 Orden de Trabajo'} />
               <SummaryRow label="Título" value={title} />
               <SummaryRow label="Tipo" value={TYPES.find(t => t.value === type)?.label} />
               <SummaryRow label="Prioridad" value={priority.charAt(0).toUpperCase() + priority.slice(1)} />

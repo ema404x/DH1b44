@@ -159,7 +159,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   }, [saveMutation]);
 
   const handleConvertToObra = async () => {
-    if (!window.confirm('¿Convertir esta OT a Futura Obra? Se creará un pendiente de tipo obra con los datos de esta OT.')) return;
+    if (!window.confirm('¿Convertir esta OT a Futura Obra? Se creará un pendiente de tipo obra y la OT quedará en estado "Obra".')) return;
     setConvertingToObra(true);
     try {
       await base44.entities.Pendiente.create({
@@ -174,10 +174,15 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
         observaciones: data.description || '',
         fecha_limite: data.scheduled_date || undefined,
       });
+      // Actualizar el estado de la OT a 'obra'
+      await base44.entities.WorkOrder.update(order.id, { status: 'obra' });
       queryClient.invalidateQueries({ queryKey: ['pendientes'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
       toast.success('OT convertida a Futura Obra correctamente');
       onClose();
-    } catch {
+    } catch (err) {
+      console.error('Error al convertir OT a Futura Obra:', err);
       toast.error('Error al convertir la OT');
     } finally {
       setConvertingToObra(false);
