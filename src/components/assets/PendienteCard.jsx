@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Pencil, Trash2, User, MapPin, Calendar, AlertCircle, Eye } from 'lucide-react';
+import { Pencil, Trash2, User, MapPin, Calendar, AlertCircle, Eye, Zap, ExternalLink } from 'lucide-react';
 import { differenceInDays, format, parseISO, startOfDay } from 'date-fns';
+import PendienteInlineEdit from '@/components/assets/PendienteInlineEdit';
 
 const tipoIcons = {
   mantenimiento: '🔧',
@@ -21,16 +22,23 @@ const estadoLabels = {
   cancelado: 'Cancelado',
 };
 
-export default function PendienteCard({ pendiente: p, estadoColors, prioridadColors, onEdit, onDelete, canDelete = false }) {
-  // Parsear como fecha local para evitar el desfase de timezone (UTC vs Argentina)
+export default function PendienteCard({ pendiente: p, estadoColors, prioridadColors, onEdit, onDelete, onQuickSave, isSaving, canDelete = false }) {
+  const [showInline, setShowInline] = useState(false);
+
   const fechaLimite = p.fecha_limite ? parseISO(p.fecha_limite) : null;
   const hoy = startOfDay(new Date());
   const isVencido = fechaLimite && startOfDay(fechaLimite) < hoy && p.estado !== 'resuelto' && p.estado !== 'cancelado';
   const diasRestantes = fechaLimite ? differenceInDays(startOfDay(fechaLimite), hoy) : null;
 
+  const handleQuickSave = (changes) => {
+    onQuickSave(p.id, changes);
+    setShowInline(false);
+  };
+
   return (
-    <Card className={`group hover:shadow-md transition-shadow cursor-pointer ${isVencido ? 'border-red-300 bg-red-50/30' : ''}`} onClick={() => onEdit(p)}>
-      <CardContent className="pt-4 pb-4 space-y-3">
+    <Card className={`group transition-shadow ${isVencido ? 'border-red-300 bg-red-50/30' : ''} ${showInline ? 'shadow-md ring-1 ring-primary/30' : 'hover:shadow-md'}`}>
+      {/* Main card body — click to open full modal */}
+      <CardContent className="pt-4 pb-4 space-y-3 cursor-pointer" onClick={() => !showInline && onEdit(p)}>
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -61,13 +69,12 @@ export default function PendienteCard({ pendiente: p, estadoColors, prioridadCol
               <span className="truncate">Inspector: <span className="font-medium text-foreground">{p.inspector}</span></span>
             </div>
           )}
-          {p.jefe_sitio && (
+          {p.jefe_sitio ? (
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <User className="h-3 w-3 flex-shrink-0" />
               <span className="truncate">Jefe: <span className="font-medium text-foreground">{p.jefe_sitio}</span></span>
             </div>
-          )}
-          {!p.jefe_sitio && (
+          ) : (
             <div className="flex items-center gap-1.5 text-yellow-600">
               <AlertCircle className="h-3 w-3 flex-shrink-0" />
               <span>Sin jefe asignado</span>
@@ -95,8 +102,19 @@ export default function PendienteCard({ pendiente: p, estadoColors, prioridadCol
             {p.prioridad}
           </Badge>
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(p)}>
-              <Pencil className="h-3.5 w-3.5" />
+            {/* Quick edit toggle */}
+            <Button
+              variant={showInline ? 'default' : 'ghost'}
+              size="icon"
+              className="h-7 w-7"
+              title="Edición rápida"
+              onClick={() => setShowInline(v => !v)}
+            >
+              <Zap className="h-3.5 w-3.5" />
+            </Button>
+            {/* Full edit */}
+            <Button variant="ghost" size="icon" className="h-7 w-7" title="Editar completo" onClick={() => onEdit(p)}>
+              <ExternalLink className="h-3.5 w-3.5" />
             </Button>
             {canDelete && (
               <AlertDialog>
@@ -120,6 +138,16 @@ export default function PendienteCard({ pendiente: p, estadoColors, prioridadCol
           </div>
         </div>
       </CardContent>
+
+      {/* Inline edit panel */}
+      {showInline && (
+        <PendienteInlineEdit
+          pendiente={p}
+          onSave={handleQuickSave}
+          onClose={() => setShowInline(false)}
+          isSaving={isSaving}
+        />
+      )}
     </Card>
   );
 }

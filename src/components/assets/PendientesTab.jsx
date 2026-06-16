@@ -111,6 +111,17 @@ export default function PendientesTab() {
   const openNew = () => { setSelected(null); setDialogOpen(true); };
   const openEdit = (p) => { setSelected(p); setDialogOpen(true); };
 
+  const quickSaveMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Pendiente.update(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pendientes'] });
+      toast.success('Guardado');
+    },
+    onError: () => toast.error('Error al guardar'),
+  });
+
+  const handleQuickSave = (id, changes) => quickSaveMutation.mutate({ id, data: changes });
+
 
 
   const toggleSelectId = (id, e) => {
@@ -512,6 +523,8 @@ export default function PendientesTab() {
               prioridadColors={prioridadColors}
               onEdit={canEdit ? openEdit : undefined}
               onDelete={(id) => deleteMutation.mutate(id)}
+              onQuickSave={handleQuickSave}
+              isSaving={quickSaveMutation.isPending}
               canDelete={canDelete}
             />
           ))}
