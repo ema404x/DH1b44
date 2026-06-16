@@ -1,41 +1,24 @@
 {
-  "name": "DH1 Software — Mejores ERP",
+  "name": "DH1 ERP — Mejores Hospitales",
   "short_name": "DH1 ERP",
-  "description": "Sistema ERP para gestión de obras, órdenes de trabajo y certificados — Mejores Hospitales S.A.",
+  "description": "ERP para gestión de obras, órdenes de trabajo y certificados.",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "any",
   "background_color": "#0a1628",
   "theme_color": "#1d6bf3",
-  "lang": "es",
-  "categories": ["business", "productivity"],
+  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png",
+      "src": "https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/a578a7498_generated_image.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png",
+      "src": "https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/a578a7498_generated_image.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Nueva Orden de Trabajo",
-      "short_name": "Nueva OT",
-      "description": "Crear una nueva orden de trabajo",
-      "url": "/ordenes",
-      "icons": [{ "src": "https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Dashboard",
-      "short_name": "Panel",
-      "url": "/",
-      "icons": [{ "src": "https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png", "sizes": "96x96" }]
     }
   ]
 }
