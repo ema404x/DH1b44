@@ -150,7 +150,7 @@ export default function PendientesTab() {
 
   const visiblePendientes = useMemo(() =>
     filterByUser(pendientes, ['jefe_sitio', 'jefe_sitio_email', 'inspector', 'created_by'])
-  , [pendientes, isAdmin]);
+  , [pendientes, filterByUser]);
 
   // Stats per commune (for tab badges)
   const statsByComuna = useMemo(() => {

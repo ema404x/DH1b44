@@ -135,28 +135,44 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const set = useCallback((k, v) => setData(p => ({ ...p, [k]: v })), []);
   const saveTimerRef = useRef(null);
   const latestRef = useRef(data);
+  const mountedRef = useRef(true);
   useEffect(() => { latestRef.current = data; }, [data]);
-  useEffect(() => () => clearTimeout(saveTimerRef.current), []);
+  // Cleanup: cancelar timer pendiente y marcar como desmontado al cerrar el panel
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
+  // saveMutationRef evita closures stale en los debounced callbacks
+  const saveMutationRef = useRef(saveMutation);
+  useEffect(() => { saveMutationRef.current = saveMutation; }, [saveMutation]);
 
   const saveField = useCallback((k, v) => {
     setData(p => {
       const next = { ...p, [k]: v };
       latestRef.current = next;
       clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => saveMutation.mutate(latestRef.current), 400);
+      saveTimerRef.current = setTimeout(() => {
+        if (mountedRef.current) saveMutationRef.current.mutate(latestRef.current);
+      }, 400);
       return next;
     });
-  }, [saveMutation]);
+  }, []);
 
   const saveFields = useCallback((fields) => {
     setData(p => {
       const next = { ...p, ...fields };
       latestRef.current = next;
       clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => saveMutation.mutate(latestRef.current), 400);
+      saveTimerRef.current = setTimeout(() => {
+        if (mountedRef.current) saveMutationRef.current.mutate(latestRef.current);
+      }, 400);
       return next;
     });
-  }, [saveMutation]);
+  }, []);
 
   const handleConvertToObra = async () => {
     if (!window.confirm('¿Convertir esta OT a Futura Obra? Se creará un pendiente de tipo obra y la OT quedará en estado "Obra".')) return;
@@ -304,7 +320,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
           <div className="flex-shrink-0 grid grid-cols-3 gap-2 px-4 py-3 bg-slate-900/80 border-b border-white/6">
             <div>
               <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Estado</p>
-              <Select value={data.status} onValueChange={v => { if (v === 'completada' && !canComplete) { toast.warning('Completá el checklist primero'); return; } set('status', v); }}>
+              <Select value={data.status} onValueChange={v => { if (v === 'completada' && !canComplete) { toast.warning('Completá el checklist primero'); return; } saveField('status', v); }}>
                 <SelectTrigger className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg">
                   <SelectValue />
                 </SelectTrigger>
@@ -324,7 +340,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             </div>
             <div>
               <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Asignado</p>
-              <Select value={data.assigned_name || '__none__'} onValueChange={v => set('assigned_name', v === '__none__' ? '' : v)}>
+              <Select value={data.assigned_name || '__none__'} onValueChange={v => saveField('assigned_name', v === '__none__' ? '' : v)}>
                 <SelectTrigger className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg">
                   <SelectValue placeholder="—" />
                 </SelectTrigger>
@@ -339,7 +355,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             <div>
               <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Fecha</p>
               <Input type="date" value={data.scheduled_date || ''}
-                onChange={e => set('scheduled_date', e.target.value)}
+                onChange={e => saveField('scheduled_date', e.target.value)}
                 className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg px-2" />
             </div>
           </div>

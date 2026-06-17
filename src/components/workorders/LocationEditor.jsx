@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { MapPin, Search, X, CheckCircle2, User } from 'lucide-react';
@@ -17,20 +17,16 @@ export default function LocationEditor({ currentLocation, currentAssigned, onSav
   const inputRef = useRef(null);
   const containerRef = useRef(null);
 
-  // Catálogos
-  const { data: locationQRs = [] } = useQuery({
-    queryKey: ['location-qrs-editor'],
-    queryFn: () => base44.entities.LocationQR.list('name', 2000),
-    staleTime: 300_000,
-  });
-  const { data: direcciones = [] } = useQuery({
-    queryKey: ['direcciones-editor'],
-    queryFn: () => base44.entities.Direccion.list('direccion', 2000),
-    staleTime: 300_000,
-  });
+  // LocationData — fuente de verdad de establecimientos (igual que CrearOT e Información General)
   const { data: locationData = [] } = useQuery({
     queryKey: ['location-data-editor'],
-    queryFn: () => base44.entities.LocationData.list('establecimiento', 2000),
+    queryFn: () => base44.entities.LocationData.list('establecimiento', 5000),
+    staleTime: 300_000,
+  });
+  // LocationQR — solo para obtener el QR id
+  const { data: locationQRs = [] } = useQuery({
+    queryKey: ['location-qrs-editor'],
+    queryFn: () => base44.entities.LocationQR.list('name', 5000),
     staleTime: 300_000,
   });
 
@@ -45,31 +41,32 @@ export default function LocationEditor({ currentLocation, currentAssigned, onSav
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const findJefeSitio = useCallback((address, name) => {
-    const addr = (address || '').toLowerCase().trim();
-    const nm   = (name   || '').toLowerCase().trim();
-
-    const dirMatch = direcciones.find(d =>
-      (addr && d.direccion?.toLowerCase().trim() === addr) ||
-      (nm   && d.direccion?.toLowerCase().trim() === nm)
-    );
-    if (dirMatch?.jefe_sitio) return dirMatch.jefe_sitio;
-
-    const ldMatch = locationData.find(ld =>
-      (nm   && ld.establecimiento?.toLowerCase().trim() === nm)   ||
-      (addr && ld.establecimiento?.toLowerCase().trim() === addr) ||
-      (addr && ld.direccion?.toLowerCase().trim() === addr)
-    );
-    return ldMatch?.jefe_sitio || '';
-  }, [direcciones, locationData]);
+  // Lista unificada: base = LocationData, enriquecida con QR id si existe
+  const norm = (s) => (s || '').toLowerCase().trim();
+  const unifiedLocations = useMemo(() =>
+    locationData.map(ld => {
+      const qr = locationQRs.find(q =>
+        norm(q.name) === norm(ld.establecimiento) ||
+        norm(q.address) === norm(ld.direccion)
+      );
+      return {
+        id: qr?.id || ld.id,
+        name: ld.establecimiento || ld.ubic_tecnica || '',
+        address: ld.direccion || '',
+        jefe_sitio: ld.jefe_sitio || '',
+        _hasQR: !!qr,
+      };
+    })
+  , [locationData, locationQRs]);
 
   // Filtro de sugerencias
   const suggestions = query.trim().length >= 2
-    ? locationQRs.filter(loc => {
+    ? unifiedLocations.filter(loc => {
         const q = query.toLowerCase();
         return (
           loc.name?.toLowerCase().includes(q) ||
-          loc.address?.toLowerCase().includes(q)
+          loc.address?.toLowerCase().includes(q) ||
+          loc.jefe_sitio?.toLowerCase().includes(q)
         );
       }).slice(0, 10)
     : [];
@@ -77,10 +74,9 @@ export default function LocationEditor({ currentLocation, currentAssigned, onSav
   const handleSelect = (loc) => {
     const address  = loc.address?.trim() || '';
     const name     = loc.name?.trim()    || '';
-    const location = address ? `${address}, CABA` : name;
-    const jefe     = findJefeSitio(address, name);
+    const location = address || name;
 
-    setSelected({ loc, location, jefe });
+    setSelected({ loc, location, jefe: loc.jefe_sitio || '' });
     setQuery(address || name);
     setShowList(false);
   };
@@ -88,10 +84,10 @@ export default function LocationEditor({ currentLocation, currentAssigned, onSav
   const handleConfirm = () => {
     if (!selected) return;
     onSave({
-      location:        selected.location,
-      location_qr_id:  selected.loc.id,
+      location:         selected.location,
+      location_qr_id:   selected.loc._hasQR ? selected.loc.id : '',
       location_qr_name: selected.loc.name || selected.loc.address || '',
-      assigned_name:   selected.jefe || currentAssigned || '',
+      assigned_name:    selected.jefe || currentAssigned || '',
     });
   };
 
