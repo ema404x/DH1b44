@@ -150,23 +150,48 @@ export default function CrearOT() {
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
-  const { data: locations = [], isLoading: loadingLocations } = useQuery({
-    queryKey: ['locations-crear-ot'],
-    queryFn: () => base44.entities.LocationQR.list('name', 2000),
-    staleTime: 60000,
-  });
-  const activeLocations = locations;
-
-  // Para cruzar jefe de sitio por dirección
-  const { data: direcciones = [] } = useQuery({
-    queryKey: ['direcciones-ot'],
-    queryFn: () => base44.entities.Direccion.list('direccion', 2000),
+  // LocationData es la fuente de verdad de establecimientos (misma que Información General)
+  const { data: locationData = [], isLoading: loadingLocations } = useQuery({
+    queryKey: ['location-data-ot'],
+    queryFn: () => base44.entities.LocationData.list('establecimiento', 5000),
     staleTime: 300000,
   });
 
-  const { data: locationData = [] } = useQuery({
-    queryKey: ['location-data-ot'],
-    queryFn: () => base44.entities.LocationData.list('establecimiento', 2000),
+  // LocationQR — solo para obtener el QR id al seleccionar
+  const { data: locationQRs = [] } = useQuery({
+    queryKey: ['locations-qr-ot'],
+    queryFn: () => base44.entities.LocationQR.list('name', 5000),
+    staleTime: 300000,
+  });
+
+  // Construir lista unificada de ubicaciones para el buscador:
+  // base = LocationData (todos los establecimientos), enriquecida con QR id si existe
+  const activeLocations = useMemo(() => {
+    const norm = s => (s || '').toLowerCase().trim();
+    return locationData.map(ld => {
+      const qr = locationQRs.find(q =>
+        norm(q.name) === norm(ld.establecimiento) ||
+        norm(q.address) === norm(ld.direccion) ||
+        norm(q.name) === norm(ld.ubic_tecnica)
+      );
+      return {
+        id: qr?.id || ld.id,
+        name: ld.establecimiento || ld.ubic_tecnica,
+        address: ld.direccion || '',
+        jefe_sitio: ld.jefe_sitio || '',
+        inspector: ld.inspector || '',
+        comuna: ld.comuna || '',
+        project_name: qr?.project_name || '',
+        _locationDataId: ld.id,
+        _hasQR: !!qr,
+      };
+    });
+  }, [locationData, locationQRs]);
+
+  // Para cruzar jefe de sitio por dirección (fallback)
+  const { data: direcciones = [] } = useQuery({
+    queryKey: ['direcciones-ot'],
+    queryFn: () => base44.entities.Direccion.list('direccion', 2000),
     staleTime: 300000,
   });
 
@@ -202,27 +227,22 @@ export default function CrearOT() {
     setLocationSearch(loc.address?.trim() || loc.name?.trim() || '');
     setShowSuggestions(false);
 
-    // Auto-asignar jefe de sitio:
-    // 1. Buscar por dirección en Direccion (más confiable)
-    // 2. Fallback: buscar en LocationData por establecimiento o dirección
-    const locAddr = loc.address?.toLowerCase().trim() || '';
-    const locName = loc.name?.toLowerCase().trim() || '';
+    // El jefe ya viene normalizado desde LocationData en activeLocations.
+    // Fallback: buscar en Direccion si no viene en el objeto.
+    let jefe = loc.jefe_sitio || '';
+    if (!jefe) {
+      const locAddr = loc.address?.toLowerCase().trim() || '';
+      const locName = loc.name?.toLowerCase().trim() || '';
+      const dirMatch = direcciones.find(d =>
+        (locAddr && d.direccion?.toLowerCase().trim() === locAddr) ||
+        (locName && d.direccion?.toLowerCase().trim() === locName)
+      );
+      jefe = dirMatch?.jefe_sitio || '';
+    }
 
-    const dirMatch = direcciones.find(d =>
-      (locAddr && d.direccion?.toLowerCase().trim() === locAddr) ||
-      (locName && d.direccion?.toLowerCase().trim() === locName)
-    );
-
-    const ldMatch = !dirMatch && locationData.find(ld =>
-      (locName && ld.establecimiento?.toLowerCase().trim() === locName) ||
-      (locAddr && ld.establecimiento?.toLowerCase().trim() === locAddr) ||
-      (locAddr && ld.direccion?.toLowerCase().trim() === locAddr)
-    );
-
-    const jefe = dirMatch?.jefe_sitio || ldMatch?.jefe_sitio || '';
     setAutoJefeSitio(jefe);
     if (jefe) toast.info(`Jefe de sitio asignado: ${jefe}`);
-  }, [direcciones, locationData]);
+  }, [direcciones]);
 
   const handleClearLocation = useCallback(() => {
     setSelectedLocation(null);
@@ -231,13 +251,16 @@ export default function CrearOT() {
     setTimeout(() => locationSearchRef.current?.focus(), 50);
   }, []);
 
-  const filteredSuggestions = useMemo(() =>
-    activeLocations.filter(l =>
-      !locationSearch ||
-      l.name?.toLowerCase().includes(locationSearch.toLowerCase()) ||
-      l.address?.toLowerCase().includes(locationSearch.toLowerCase())
-    ).slice(0, 8)
-  , [activeLocations, locationSearch]);
+  const filteredSuggestions = useMemo(() => {
+    const q = locationSearch.toLowerCase();
+    return activeLocations.filter(l =>
+      !q ||
+      l.name?.toLowerCase().includes(q) ||
+      l.address?.toLowerCase().includes(q) ||
+      l.inspector?.toLowerCase().includes(q) ||
+      l.jefe_sitio?.toLowerCase().includes(q)
+    ).slice(0, 10);
+  }, [activeLocations, locationSearch]);
 
   // Close suggestions on outside click
   useEffect(() => {
