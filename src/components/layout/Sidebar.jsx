@@ -8,6 +8,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { useForoNotificaciones } from '@/hooks/useForoNotificaciones';
+import { useAprobacionPendientes } from '@/hooks/useAprobacionPendientes';
 
 const navGroups = [
   {
@@ -83,9 +84,11 @@ const navGroups = [
   },
 ];
 
-function NavItem({ item, collapsed, active, onClick, hasNewMessages }) {
+function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesAprobacion }) {
   const isForo = item.path === '/foro';
-  
+  const isAprobacion = item.path === '/aprobacion-certificados';
+  const showAprobacionBadge = isAprobacion && pendientesAprobacion > 0 && !active;
+
   return (
     <div className="relative group">
       <Link
@@ -112,12 +115,25 @@ function NavItem({ item, collapsed, active, onClick, hasNewMessages }) {
           {isForo && hasNewMessages && !active && (
             <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
           )}
+          {showAprobacionBadge && (
+            <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_3px_rgba(251,191,36,0.7)]" />
+            </span>
+          )}
         </div>
         {!collapsed && (
           <span className="truncate flex-1">{item.label}</span>
         )}
         {!collapsed && isForo && hasNewMessages && !active && (
           <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse flex-shrink-0" />
+        )}
+        {!collapsed && showAprobacionBadge && (
+          <span className="ml-auto flex items-center gap-1 flex-shrink-0">
+            <span className="text-[10px] font-bold bg-amber-400/20 text-amber-400 border border-amber-400/40 px-1.5 py-0.5 rounded-full leading-none shadow-[0_0_6px_2px_rgba(251,191,36,0.3)] animate-pulse">
+              {pendientesAprobacion}
+            </span>
+          </span>
         )}
       </Link>
       {/* Tooltip when collapsed */}
@@ -139,6 +155,7 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { hasNewMessages, resetNotification } = useForoNotificaciones();
+  const { pendientesAprobacion } = useAprobacionPendientes();
   
   // Resetear notificación cuando se abre el foro
   useEffect(() => {
@@ -257,6 +274,7 @@ export default function Sidebar() {
                   active={isActive(item.path)}
                   onClick={() => setMobileOpen(false)}
                   hasNewMessages={item.path === '/foro' ? hasNewMessages : false}
+                  pendientesAprobacion={pendientesAprobacion}
                 />
               ))}
             </div>
