@@ -349,11 +349,11 @@ export async function exportCertificadoPDF(form) {
   const hasFirmaGerente = !!firmaBase64;
 
   if (hasFirmaJefe || hasFirmaGerente) {
-    const BLOCK_W  = 80;
-    const IMG_H    = 24;
+    const BLOCK_W  = 90;
+    const IMG_H    = 34;
     const TEXT_H   = 22;
     const BLOCK_H  = IMG_H + TEXT_H;
-    const GAP      = 30;
+    const GAP      = 20;
 
     const count    = (hasFirmaJefe ? 1 : 0) + (hasFirmaGerente ? 1 : 0);
     const totalW   = count * BLOCK_W + (count - 1) * GAP;
@@ -406,7 +406,7 @@ export async function exportCertificadoPDF(form) {
       doc.roundedRect(bx, by, BLOCK_W, BLOCK_H, 2.5, 2.5, 'S');
 
       // Imagen de firma respetando aspect ratio
-      const imgPad = 8;
+      const imgPad = 4;
       const maxW = BLOCK_W - imgPad * 2;
       const maxH = IMG_H - 4;
       const dims = _firmaDims[bx];
@@ -421,7 +421,7 @@ export async function exportCertificadoPDF(form) {
       }
       const imgX = bx + (BLOCK_W - drawW) / 2;
       const imgY = by + 2 + (maxH - drawH) / 2;
-      doc.addImage(base64, 'PNG', imgX, imgY, drawW, drawH, undefined, 'FAST');
+      doc.addImage(base64, 'PNG', imgX, imgY, drawW, drawH, undefined, 'NONE');
 
       // Línea divisoria bajo la imagen
       const lineY = by + IMG_H;
