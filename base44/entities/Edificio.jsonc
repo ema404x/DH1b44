@@ -18,6 +18,14 @@
         "Otra"
       ]
     },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Nombre del jefe de sitio responsable"
+    },
+    "location_id": {
+      "type": "string",
+      "description": "ID de la LocationData de origen"
+    },
     "activo": {
       "type": "boolean",
       "default": true

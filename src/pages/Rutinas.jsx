@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, Building2, ClipboardList, Settings, Send } from 'lucide-react';
+import { BookOpen, Building2, ClipboardList, Settings, Send, Zap } from 'lucide-react';
 import CatalogoRutinas from '@/components/rutinas/CatalogoRutinas';
 import AsignacionEdificio from '@/components/rutinas/AsignacionEdificio';
 import TableroOrdenes from '@/components/rutinas/TableroOrdenes';
 import GenerarOTsJefes from '@/components/rutinas/GenerarOTsJefes';
+import SincronizarEdificios from '@/components/rutinas/SincronizarEdificios';
 
 export default function Rutinas() {
   return (
@@ -29,9 +30,10 @@ export default function Rutinas() {
 
       {/* Tabs */}
       <div className="px-6 pt-6">
-        <Tabs defaultValue="tablero">
+        <Tabs defaultValue="sincronizar">
           <TabsList className="mb-6 bg-white/5 border border-white/10 p-1 gap-1">
             {[
+              { value: 'sincronizar', icon: Zap, label: 'Sincronizar' },
               { value: 'tablero', icon: ClipboardList, label: 'Tablero de Órdenes' },
               { value: 'generar-ots', icon: Send, label: 'Generar OTs por Jefe' },
               { value: 'catalogo', icon: BookOpen, label: 'Catálogo' },
@@ -49,6 +51,9 @@ export default function Rutinas() {
             ))}
           </TabsList>
 
+          <TabsContent value="sincronizar">
+            <SincronizarEdificios />
+          </TabsContent>
           <TabsContent value="tablero">
             <TableroOrdenes />
           </TabsContent>
