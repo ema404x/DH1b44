@@ -398,17 +398,11 @@ export async function exportCertificadoPDF(form) {
     const drawFirmaBloque = (base64, nombre, cargo, cargo2, sello, bx) => {
       const by = y;
 
-      // Fondo suave
-      doc.setFillColor(248, 250, 253);
-      doc.roundedRect(bx, by, BLOCK_W, BLOCK_H, 2.5, 2.5, 'F');
-      doc.setDrawColor(185, 202, 222);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(bx, by, BLOCK_W, BLOCK_H, 2.5, 2.5, 'S');
-
+      // Sin fondo ni borde — imagen directa
       // Imagen de firma respetando aspect ratio
-      const imgPad = 2;
+      const imgPad = 0;
       const maxW = BLOCK_W - imgPad * 2;
-      const maxH = IMG_H - 2;
+      const maxH = IMG_H;
       const dims = _firmaDims[bx];
       let drawW = maxW, drawH = maxH;
       if (dims && dims.w && dims.h) {
