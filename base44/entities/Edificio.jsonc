@@ -1,0 +1,29 @@
+{
+  "name": "Edificio",
+  "type": "object",
+  "properties": {
+    "nombre": {
+      "type": "string",
+      "description": "Nombre del edificio / establecimiento"
+    },
+    "direccion": {
+      "type": "string"
+    },
+    "comuna": {
+      "type": "string",
+      "enum": [
+        "8A",
+        "8B",
+        "10A",
+        "Otra"
+      ]
+    },
+    "activo": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "nombre"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "name": "RutinaEdificio",
+  "type": "object",
+  "properties": {
+    "edificio_id": {
+      "type": "string",
+      "description": "ID del Edificio"
+    },
+    "edificio_nombre": {
+      "type": "string",
+      "description": "Nombre del edificio (denormalizado)"
+    },
+    "rutina_id": {
+      "type": "string",
+      "description": "ID de RutinaCatalogo"
+    },
+    "rutina_objeto": {
+      "type": "string",
+      "description": "Nombre de la rutina (denormalizado)"
+    },
+    "rubro_nombre": {
+      "type": "string"
+    },
+    "ciclo": {
+      "type": "string"
+    },
+    "frecuencia_dias": {
+      "type": "number"
+    },
+    "plazo_dias": {
+      "type": "number"
+    },
+    "activa": {
+      "type": "boolean",
+      "default": true
+    },
+    "ultima_ejecucion": {
+      "type": "string",
+      "format": "date"
+    },
+    "proxima_ejecucion": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "edificio_id",
+    "rutina_id"
+  ]
+}

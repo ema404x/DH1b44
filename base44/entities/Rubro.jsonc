@@ -1,0 +1,17 @@
+{
+  "name": "Rubro",
+  "type": "object",
+  "properties": {
+    "nombre": {
+      "type": "string",
+      "description": "Nombre del rubro de mantenimiento"
+    },
+    "orden": {
+      "type": "number",
+      "description": "Orden de visualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "nombre"
+  ]
+}

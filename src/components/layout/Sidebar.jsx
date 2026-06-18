@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -32,6 +32,7 @@ const navGroups = [
       { label: 'Pendientes', icon: ClipboardCheck, path: '/activos' },
       { label: 'Informes', icon: ClipboardCheck, path: '/informes' },
       { label: 'Plan de Infraestructura', icon: Wrench, path: '/calefaccion' },
+      { label: 'Rutinas de Mantenimiento', icon: RefreshCw, path: '/rutinas' },
       { label: 'Inspección de Colegios', icon: ClipboardCheck, path: '/inspeccion-colegio' },
       { label: 'Reportes & KPIs', icon: BarChart2, path: '/reportes' },
       { label: 'Automatizaciones', icon: Zap, path: '/automatizaciones' },
@@ -199,6 +200,7 @@ export default function Sidebar() {
     '/auditoria': 'AuditLog',
     '/seguridad': 'Seguridad',
     '/calefaccion': 'Calefaccion',
+    '/rutinas': 'Rutinas',
     '/foro': null,
     '/tutorial': null,
     '/importar': 'ImportarDatos',

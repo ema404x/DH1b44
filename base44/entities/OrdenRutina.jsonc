@@ -1,0 +1,103 @@
+{
+  "name": "OrdenRutina",
+  "type": "object",
+  "properties": {
+    "rutina_edificio_id": {
+      "type": "string"
+    },
+    "edificio_id": {
+      "type": "string"
+    },
+    "edificio_nombre": {
+      "type": "string"
+    },
+    "rutina_id": {
+      "type": "string"
+    },
+    "rutina_objeto": {
+      "type": "string"
+    },
+    "rubro_nombre": {
+      "type": "string"
+    },
+    "ciclo": {
+      "type": "string"
+    },
+    "plazo_dias": {
+      "type": "number"
+    },
+    "requiere_informe_matriculado": {
+      "type": "boolean",
+      "default": false
+    },
+    "carga_sismesc": {
+      "type": "boolean",
+      "default": false
+    },
+    "acciones": {
+      "type": "string"
+    },
+    "observaciones_tom": {
+      "type": "string"
+    },
+    "fecha_generada": {
+      "type": "string",
+      "format": "date"
+    },
+    "fecha_limite": {
+      "type": "string",
+      "format": "date"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "pendiente",
+        "en_proceso",
+        "ejecutada",
+        "vencida",
+        "derivada_tom"
+      ],
+      "default": "pendiente"
+    },
+    "responsable_id": {
+      "type": "string"
+    },
+    "responsable_nombre": {
+      "type": "string"
+    },
+    "fecha_ejecucion": {
+      "type": "string",
+      "format": "date"
+    },
+    "matricula_profesional": {
+      "type": "string",
+      "description": "Requerido si requiere_informe_matriculado"
+    },
+    "adjuntos": {
+      "type": "array",
+      "description": "Comprobantes SISMESC y otros archivos",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "observaciones": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "edificio_id",
+    "rutina_id",
+    "estado"
+  ]
+}

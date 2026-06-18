@@ -1,0 +1,82 @@
+{
+  "name": "RutinaCatalogo",
+  "type": "object",
+  "properties": {
+    "rubro_id": {
+      "type": "string",
+      "description": "ID del Rubro"
+    },
+    "rubro_nombre": {
+      "type": "string",
+      "description": "Nombre del rubro (denormalizado)"
+    },
+    "item": {
+      "type": "string",
+      "description": "\u00cdtem dentro del rubro"
+    },
+    "objeto": {
+      "type": "string",
+      "description": "Nombre de la rutina / objeto a mantener"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "mantenimiento",
+        "informe"
+      ],
+      "default": "mantenimiento"
+    },
+    "ciclo": {
+      "type": "string",
+      "enum": [
+        "Semanal",
+        "Quincenal",
+        "Mensual",
+        "Bimestral",
+        "Trimestral",
+        "Cuatrimestral",
+        "Semestral",
+        "Anual",
+        "Bienal"
+      ]
+    },
+    "frecuencia_dias": {
+      "type": "number",
+      "description": "D\u00edas entre ejecuciones: 7,15,30,60,90,120,180,365,730"
+    },
+    "estacionalidad": {
+      "type": "string",
+      "description": "Meses en que aplica, ej: 3,4,5,6,7,8,9. Vac\u00edo = todo el a\u00f1o."
+    },
+    "plazo_dias": {
+      "type": "number",
+      "description": "SLA en d\u00edas para ejecutar una vez generada la orden"
+    },
+    "requiere_informe_matriculado": {
+      "type": "boolean",
+      "default": false
+    },
+    "carga_sismesc": {
+      "type": "boolean",
+      "default": false,
+      "description": "Exige adjuntar comprobante en SISMESC"
+    },
+    "acciones": {
+      "type": "string",
+      "description": "Descripci\u00f3n de las acciones a realizar"
+    },
+    "observaciones_tom": {
+      "type": "string",
+      "description": "Cu\u00e1ndo deriva en TOM o tiene tratamiento APH"
+    },
+    "activa": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "rubro_nombre",
+    "objeto",
+    "ciclo"
+  ]
+}
