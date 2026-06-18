@@ -494,7 +494,26 @@ export async function exportWorkOrderPDF(order, timeLogs = []) {
   if (order.signature_url) {
     const sigB64 = await toBase64(order.signature_url);
     if (sigB64) {
-      doc.addImage(sigB64, 'PNG', M + 6, finalSigY + 8, sigW - 12, 12);
+      // Respetar aspect ratio de la firma
+      const maxSigW = sigW - 12;
+      const maxSigH = 14;
+      let drawW = maxSigW, drawH = maxSigH;
+      await new Promise(res => {
+        const img = new Image();
+        img.onload = () => {
+          if (img.naturalWidth && img.naturalHeight) {
+            const r = img.naturalWidth / img.naturalHeight;
+            if (r > maxSigW / maxSigH) { drawW = maxSigW; drawH = maxSigW / r; }
+            else { drawH = maxSigH; drawW = maxSigH * r; }
+          }
+          res();
+        };
+        img.onerror = res;
+        img.src = sigB64;
+      });
+      const sigImgX = M + 6 + (maxSigW - drawW) / 2;
+      const sigImgY = finalSigY + 8 + (maxSigH - drawH) / 2;
+      doc.addImage(sigB64, 'PNG', sigImgX, sigImgY, drawW, drawH);
     }
     doc.setFont('helvetica', 'italic'); doc.setFontSize(6.5); doc.setTextColor(...C.green);
     doc.text('Firmado: ' + (order.signature_name || ''), M + sigW / 2, finalSigY + 23, { align: 'center' });

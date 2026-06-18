@@ -56,6 +56,15 @@ const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split
 const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
 const FIRMA_RAUL_GARCIA_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/3f708fc7a_firmaRaul2_page-0001.jpg';
 
+function getImageDimensions(base64) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => resolve(null);
+    img.src = base64;
+  });
+}
+
 async function loadImageAsBase64(url) {
   try {
     const res = await fetch(url);
@@ -418,6 +427,21 @@ export async function exportCertificadoPDF(form) {
 
     y += 10;
 
+    // Pre-calcular dimensiones reales de cada imagen de firma para respetar aspect ratio
+    const _firmaDims = {};
+    {
+      let idx = 0;
+      if (hasFirmaJefe) {
+        const bx = startX + idx * (BLOCK_W + GAP);
+        _firmaDims[bx] = await getImageDimensions(firmaJefeBase64);
+        idx++;
+      }
+      if (hasFirmaGerente) {
+        const bx = startX + idx * (BLOCK_W + GAP);
+        _firmaDims[bx] = await getImageDimensions(firmaBase64);
+      }
+    }
+
     // Línea separadora
     doc.setDrawColor(200, 212, 228);
     doc.setLineWidth(0.3);
@@ -440,10 +464,23 @@ export async function exportCertificadoPDF(form) {
       doc.setLineWidth(0.3);
       doc.roundedRect(bx, by, BLOCK_W, BLOCK_H, 2.5, 2.5, 'S');
 
-      // Imagen de firma centrada horizontalmente, con padding lateral
+      // Imagen de firma respetando aspect ratio (dimensiones pre-calculadas)
       const imgPad = 8;
-      const imgW = BLOCK_W - imgPad * 2;
-      doc.addImage(base64, 'PNG', bx + imgPad, by + 2, imgW, IMG_H - 3, undefined, 'FAST');
+      const maxW = BLOCK_W - imgPad * 2;
+      const maxH = IMG_H - 4;
+      const dims = _firmaDims[bx]; // pre-calculado antes del loop
+      let drawW = maxW, drawH = maxH;
+      if (dims) {
+        const ratio = dims.w / dims.h;
+        if (ratio > maxW / maxH) {
+          drawW = maxW; drawH = maxW / ratio;
+        } else {
+          drawH = maxH; drawW = maxH * ratio;
+        }
+      }
+      const imgX = bx + (BLOCK_W - drawW) / 2;
+      const imgY = by + 2 + (maxH - drawH) / 2;
+      doc.addImage(base64, 'PNG', imgX, imgY, drawW, drawH, undefined, 'FAST');
 
       // Línea divisoria bajo la imagen
       const lineY = by + IMG_H;
