@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, Building2, ClipboardList, Settings } from 'lucide-react';
+import { BookOpen, Building2, ClipboardList, Settings, Send } from 'lucide-react';
 import CatalogoRutinas from '@/components/rutinas/CatalogoRutinas';
 import AsignacionEdificio from '@/components/rutinas/AsignacionEdificio';
 import TableroOrdenes from '@/components/rutinas/TableroOrdenes';
+import GenerarOTsJefes from '@/components/rutinas/GenerarOTsJefes';
 
 export default function Rutinas() {
   return (
@@ -32,6 +33,7 @@ export default function Rutinas() {
           <TabsList className="mb-6 bg-white/5 border border-white/10 p-1 gap-1">
             {[
               { value: 'tablero', icon: ClipboardList, label: 'Tablero de Órdenes' },
+              { value: 'generar-ots', icon: Send, label: 'Generar OTs por Jefe' },
               { value: 'catalogo', icon: BookOpen, label: 'Catálogo' },
               { value: 'asignacion', icon: Building2, label: 'Asignación por Edificio' },
             ].map(({ value, icon: Icon, label }) => (
@@ -49,6 +51,9 @@ export default function Rutinas() {
 
           <TabsContent value="tablero">
             <TableroOrdenes />
+          </TabsContent>
+          <TabsContent value="generar-ots">
+            <GenerarOTsJefes />
           </TabsContent>
           <TabsContent value="catalogo">
             <CatalogoRutinas />
