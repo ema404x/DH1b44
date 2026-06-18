@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Building2, Search, Filter, MapPin, Users, Brain, Upload, Settings,
-  Zap, TrendingUp, CheckCircle2, AlertTriangle, BarChart3, Sparkles
+  Zap, TrendingUp, CheckCircle2, AlertTriangle, BarChart3, Sparkles, ClipboardList
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import DirectorioJerarquico from '@/components/informacion-general/DirectorioJer
 import ImportadorSimple from '@/components/informacion-general/ImportadorSimple';
 import ImportadorDireccionesJefes from '@/components/informacion-general/ImportadorDireccionesJefes';
 import SincronizarModulos from '@/components/informacion-general/SincronizarModulos';
+import CatalogoRutinas from '@/components/rutinas/CatalogoRutinas';
 
 const COMUNAS = [
   { id: '8A', label: 'Comuna 8A', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
@@ -144,6 +145,7 @@ export default function InformacionGeneral() {
             {[
               { id: 'directorio', label: 'Directorio Jerárquico', icon: MapPin },
               { id: 'importar', label: 'Importar Datos', icon: Brain },
+              { id: 'anexo3', label: 'Anexo 3 — Rutinas', icon: ClipboardList },
             ].map(tab => (
               <motion.button
                 key={tab.id}
@@ -248,6 +250,17 @@ export default function InformacionGeneral() {
                   <DirectorioJerarquico />
                 )}
               </motion.div>
+            </motion.div>
+          )}
+
+          {/* Content Anexo 3 */}
+          {activeTab === 'anexo3' && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-white">Anexo 3 — Catálogo de Rutinas de Mantenimiento</h2>
+                <p className="text-sm text-slate-400 mt-1">PETP · DGMESC · 96 rutinas preventivas organizadas por Rubro {'>'} Ítem {'>'} Objeto</p>
+              </div>
+              <CatalogoRutinas />
             </motion.div>
           )}
 
