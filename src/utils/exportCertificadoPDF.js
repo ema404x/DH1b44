@@ -406,9 +406,9 @@ export async function exportCertificadoPDF(form) {
       doc.roundedRect(bx, by, BLOCK_W, BLOCK_H, 2.5, 2.5, 'S');
 
       // Imagen de firma respetando aspect ratio
-      const imgPad = 4;
+      const imgPad = 2;
       const maxW = BLOCK_W - imgPad * 2;
-      const maxH = IMG_H - 4;
+      const maxH = IMG_H - 2;
       const dims = _firmaDims[bx];
       let drawW = maxW, drawH = maxH;
       if (dims && dims.w && dims.h) {
