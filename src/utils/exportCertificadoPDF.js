@@ -414,8 +414,10 @@ export async function exportCertificadoPDF(form) {
         }
       }
       const imgX = bx + (BLOCK_W - drawW) / 2;
-      const imgY = by + 2 + (maxH - drawH) / 2;
-      doc.addImage(base64, 'PNG', imgX, imgY, drawW, drawH, undefined, 'NONE');
+      const imgY = by + (maxH - drawH) / 2;
+      // Detectar formato real de la imagen desde el base64 header
+      const imgFmt = base64.startsWith('data:image/jpeg') || base64.startsWith('data:image/jpg') ? 'JPEG' : 'PNG';
+      doc.addImage(base64, imgFmt, imgX, imgY, drawW, drawH, undefined, 'NONE');
 
       // Línea divisoria bajo la imagen
       const lineY = by + IMG_H;

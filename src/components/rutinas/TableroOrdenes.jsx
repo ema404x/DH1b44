@@ -140,11 +140,11 @@ export default function TableroOrdenes() {
             </thead>
             <tbody className="divide-y divide-white/5">
               {isLoading ? (
-                <tr><td colSpan={10} className="py-16 text-center">
+                <tr><td colSpan={11} className="py-16 text-center">
                   <RefreshCw className="h-5 w-5 animate-spin text-white/30 mx-auto" />
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={10} className="py-16 text-center text-white/30">
+                <tr><td colSpan={11} className="py-16 text-center text-white/30">
                   <AlertTriangle className="h-8 w-8 mx-auto mb-2 opacity-40" />
                   <p>No hay órdenes que coincidan</p>
                 </td></tr>

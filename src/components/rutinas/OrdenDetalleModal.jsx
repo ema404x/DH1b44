@@ -67,8 +67,13 @@ export default function OrdenDetalleModal({ orden, onClose, onUpdated }) {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       const newAdj = [...adjuntos, { nombre: file.name, url: file_url, tipo: file.type }];
       setAdjuntos(newAdj);
-      // Guardar adjunto inmediatamente
-      await base44.entities.OrdenRutina.update(orden.id, { adjuntos: newAdj });
+      // Guardar adjunto + estado y matrícula actuales para no perder cambios en curso
+      await base44.entities.OrdenRutina.update(orden.id, {
+        adjuntos: newAdj,
+        estado,
+        matricula_profesional: matricula.trim() || undefined,
+        observaciones: observaciones.trim() || undefined,
+      });
       toast.success(`Adjunto "${file.name}" cargado`);
     } finally {
       setUploadingFile(false);
