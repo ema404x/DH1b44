@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Search, RefreshCw, Play, AlertTriangle } from 'lucide-react';
+import { Search, RefreshCw, Play, AlertTriangle, Wrench } from 'lucide-react';
 import { differenceInDays, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import OrdenDetalleModal from './OrdenDetalleModal';
@@ -132,7 +132,7 @@ export default function TableroOrdenes() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/10" style={{ background: 'rgba(212,175,55,0.08)' }}>
-                {['', 'Edificio', 'Rubro', 'Rutina / Objeto', 'Ciclo', 'Generada', 'Límite', 'Estado', 'SISMESC', 'Acciones'].map(h => (
+                {['', 'Edificio', 'Rubro', 'Rutina / Objeto', 'Ciclo', 'Generada', 'Límite', 'Estado', 'OT', 'SISMESC', 'Acciones'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-white/50">{h}</th>
                 ))}
               </tr>
@@ -170,6 +170,12 @@ export default function TableroOrdenes() {
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant="outline" className={`text-[10px] border ${eCfg.cls}`}>{eCfg.label}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {o.work_order_id
+                        ? <span title="OT generada"><Wrench className="h-3.5 w-3.5 text-blue-400 mx-auto" /></span>
+                        : <span className="text-white/15 text-xs">—</span>
+                      }
                     </td>
                     <td className="px-4 py-3 text-center">
                       {o.carga_sismesc && (

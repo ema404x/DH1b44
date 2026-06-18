@@ -91,6 +91,10 @@
         }
       }
     },
+    "work_order_id": {
+      "type": "string",
+      "description": "ID de la WorkOrder generada a partir de esta orden de rutina"
+    },
     "observaciones": {
       "type": "string"
     }

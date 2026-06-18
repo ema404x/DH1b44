@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { X, Upload, Save, CheckCircle2, AlertTriangle, Loader2, FileText, AlertCircle } from 'lucide-react';
+import { X, Upload, Save, CheckCircle2, AlertTriangle, Loader2, FileText, AlertCircle, Wrench, ExternalLink } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 
 const ESTADO_CFG = {
@@ -23,6 +23,56 @@ export default function OrdenDetalleModal({ orden, onClose, onUpdated }) {
   const [observaciones, setObservaciones] = useState(orden.observaciones || '');
   const [adjuntos, setAdjuntos] = useState(orden.adjuntos || []);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [otGenerada, setOtGenerada] = useState(orden.work_order_id || null);
+
+  const generarOTMutation = useMutation({
+    mutationFn: async () => {
+      // Mapear tipo de OT desde rubro
+      const rubroLower = (orden.rubro_nombre || '').toLowerCase();
+      let type = 'mantenimiento_preventivo';
+      if (rubroLower.includes('eléctr') || rubroLower.includes('electr')) type = 'mantenimiento_preventivo';
+      else if (rubroLower.includes('gas') || rubroLower.includes('calef') || rubroLower.includes('refrig')) type = 'mantenimiento_preventivo';
+
+      const title = `[Rutina] ${orden.rutina_objeto} — ${orden.edificio_nombre}`;
+      const description = [
+        `Rutina de mantenimiento preventivo generada automáticamente desde el Módulo de Rutinas (Anexo 3 PETP).`,
+        ``,
+        `Rubro: ${orden.rubro_nombre}`,
+        `Ciclo: ${orden.ciclo}`,
+        `Plazo SLA: ${orden.plazo_dias} días`,
+        `Fecha límite: ${orden.fecha_limite}`,
+        orden.acciones ? `\nAcciones a realizar:\n${orden.acciones}` : '',
+        orden.observaciones_tom ? `\nObservaciones TOM/APH:\n${orden.observaciones_tom}` : '',
+        orden.requiere_informe_matriculado ? `\n⚠ Requiere informe de profesional matriculado.` : '',
+        orden.carga_sismesc ? `⚠ Requiere carga de comprobante en SISMESC.` : '',
+      ].filter(Boolean).join('\n');
+
+      const ot = await base44.entities.WorkOrder.create({
+        title,
+        type,
+        status: 'pendiente',
+        priority: orden.ciclo === 'Mensual' || orden.ciclo === 'Quincenal' ? 'alta' : 'media',
+        description,
+        location: orden.edificio_nombre || '',
+        scheduled_date: orden.fecha_limite || format(new Date(), 'yyyy-MM-dd'),
+        notes: `OrdenRutina ID: ${orden.id}`,
+      });
+
+      // Vincular la OrdenRutina a la OT generada
+      await base44.entities.OrdenRutina.update(orden.id, {
+        estado: 'en_proceso',
+        work_order_id: ot.id,
+      });
+
+      return ot;
+    },
+    onSuccess: (ot) => {
+      setOtGenerada(ot.id);
+      setEstado('en_proceso');
+      toast.success('Orden de trabajo creada y vinculada correctamente');
+    },
+    onError: (err) => toast.error(err.message || 'Error al generar OT'),
+  });
 
   const saveMutation = useMutation({
     mutationFn: async (payload) => {
@@ -210,6 +260,23 @@ export default function OrdenDetalleModal({ orden, onClose, onUpdated }) {
             />
           </div>
 
+          {/* OT vinculada */}
+          {otGenerada && (
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-emerald-300">Orden de trabajo generada</p>
+                <p className="text-[11px] text-emerald-200/60 truncate">ID: {otGenerada}</p>
+              </div>
+              <a
+                href="/ordenes"
+                className="text-xs font-semibold flex items-center gap-1 text-emerald-300 hover:text-emerald-100 transition-colors"
+              >
+                Ver OT <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          )}
+
           {/* Validaciones alertas */}
           {estado === 'ejecutada' && orden.carga_sismesc && adjuntos.length === 0 && (
             <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -227,18 +294,35 @@ export default function OrdenDetalleModal({ orden, onClose, onUpdated }) {
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-white/10 bg-black/20">
-          {/* Derivar a TOM */}
-          {orden.observaciones_tom && estado !== 'derivada_tom' && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEstado('derivada_tom')}
-              className="gap-2 border-purple-500/40 text-purple-300 hover:bg-purple-500/10"
-            >
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Derivar a TOM
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Generar OT */}
+            {!otGenerada && (estado === 'pendiente' || estado === 'en_proceso') && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => generarOTMutation.mutate()}
+                disabled={generarOTMutation.isPending}
+                className="gap-2 border-blue-500/40 text-blue-300 hover:bg-blue-500/10"
+              >
+                {generarOTMutation.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Wrench className="h-3.5 w-3.5" />}
+                Generar OT
+              </Button>
+            )}
+            {/* Derivar a TOM */}
+            {orden.observaciones_tom && estado !== 'derivada_tom' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEstado('derivada_tom')}
+                className="gap-2 border-purple-500/40 text-purple-300 hover:bg-purple-500/10"
+              >
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Derivar a TOM
+              </Button>
+            )}
+          </div>
           <div className="flex gap-2 ml-auto">
             <Button variant="ghost" size="sm" onClick={onClose} className="text-white/50 hover:text-white">Cancelar</Button>
             <Button
