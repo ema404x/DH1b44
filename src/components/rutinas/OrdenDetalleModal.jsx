@@ -41,11 +41,10 @@ export default function OrdenDetalleModal({ orden, onClose, onUpdated }) {
 
       await base44.entities.OrdenRutina.update(orden.id, payload);
 
-      // Si se ejecuta: actualizar la RutinaEdificio
+      // Si se ejecuta: actualizar la RutinaEdificio (usar frecuencia ya denormalizada)
       if (payload.estado === 'ejecutada' && orden.rutina_edificio_id) {
         const hoy = format(new Date(), 'yyyy-MM-dd');
-        const rutinas = await base44.entities.RutinaCatalogo.filter({ id: orden.rutina_id });
-        const frecDias = rutinas[0]?.frecuencia_dias || 30;
+        const frecDias = orden.frecuencia_dias || 30;
         const proxima = format(addDays(new Date(), frecDias), 'yyyy-MM-dd');
         await base44.entities.RutinaEdificio.update(orden.rutina_edificio_id, {
           ultima_ejecucion: hoy,

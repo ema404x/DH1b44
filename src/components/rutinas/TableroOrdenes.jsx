@@ -40,8 +40,9 @@ export default function TableroOrdenes() {
 
   const { data: ordenes = [], isLoading } = useQuery({
     queryKey: ['ordenes-rutina'],
-    queryFn: () => base44.entities.OrdenRutina.list('-fecha_generada', 500),
-    refetchInterval: 30_000,
+    queryFn: () => base44.entities.OrdenRutina.list('-fecha_generada', 300),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   });
 
   const rubros = useMemo(() => [...new Set(ordenes.map(o => o.rubro_nombre).filter(Boolean))].sort(), [ordenes]);

@@ -27,13 +27,14 @@ export default function GenerarOTsJefes() {
       // Solo las que NO tienen OT generada aún
       return [...pendientes, ...vencidas].filter(o => !o.work_order_id);
     },
-    refetchInterval: 60_000,
+    staleTime: 60_000,
   });
 
   // Cargar edificios para obtener jefe de sitio
   const { data: edificios = [] } = useQuery({
     queryKey: ['edificios'],
     queryFn: () => base44.entities.Edificio.list('nombre', 200),
+    staleTime: 300_000,
   });
 
   const edificioMap = useMemo(() => {
