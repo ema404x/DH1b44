@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, Building2, ClipboardList, Settings, Send, Zap } from 'lucide-react';
+import { BookOpen, Building2, ClipboardList, Settings, Send, Zap, Users } from 'lucide-react';
 import CatalogoRutinas from '@/components/rutinas/CatalogoRutinas';
 import AsignacionEdificio from '@/components/rutinas/AsignacionEdificio';
 import TableroOrdenes from '@/components/rutinas/TableroOrdenes';
 import GenerarOTsJefes from '@/components/rutinas/GenerarOTsJefes';
 import SincronizarEdificios from '@/components/rutinas/SincronizarEdificios';
+import TableroJefeSitio from '@/components/rutinas/tablero-jefes/TableroJefeSitio';
 
 export default function Rutinas() {
   return (
@@ -34,10 +35,11 @@ export default function Rutinas() {
           <TabsList className="mb-6 bg-white/5 border border-white/10 p-1 gap-1">
             {[
               { value: 'sincronizar', icon: Zap, label: 'Sincronizar' },
-              { value: 'tablero', icon: ClipboardList, label: 'Tablero de Órdenes' },
-              { value: 'generar-ots', icon: Send, label: 'Generar OTs por Jefe' },
+              { value: 'jefes', icon: Users, label: 'Tablero por Jefe' },
+              { value: 'tablero', icon: ClipboardList, label: 'Tablero General' },
+              { value: 'generar-ots', icon: Send, label: 'Generar OTs' },
               { value: 'catalogo', icon: BookOpen, label: 'Catálogo' },
-              { value: 'asignacion', icon: Building2, label: 'Asignación por Edificio' },
+              { value: 'asignacion', icon: Building2, label: 'Asignación' },
             ].map(({ value, icon: Icon, label }) => (
               <TabsTrigger
                 key={value}
@@ -53,6 +55,9 @@ export default function Rutinas() {
 
           <TabsContent value="sincronizar">
             <SincronizarEdificios />
+          </TabsContent>
+          <TabsContent value="jefes">
+            <TableroJefeSitio />
           </TabsContent>
           <TabsContent value="tablero">
             <TableroOrdenes />
