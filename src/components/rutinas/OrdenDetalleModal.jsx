@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { X, Upload, Save, CheckCircle2, AlertTriangle, Loader2, FileText, AlertCircle, Wrench, ExternalLink } from 'lucide-react';
 import { format, addDays } from 'date-fns';
+import GenerarOTModal from './GenerarOTModal';
 
 const ESTADO_CFG = {
   pendiente:     { label: 'Pendiente',     cls: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' },
@@ -24,55 +25,7 @@ export default function OrdenDetalleModal({ orden, onClose, onUpdated }) {
   const [adjuntos, setAdjuntos] = useState(orden.adjuntos || []);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [otGenerada, setOtGenerada] = useState(orden.work_order_id || null);
-
-  const generarOTMutation = useMutation({
-    mutationFn: async () => {
-      // Mapear tipo de OT desde rubro
-      const rubroLower = (orden.rubro_nombre || '').toLowerCase();
-      let type = 'mantenimiento_preventivo';
-      if (rubroLower.includes('eléctr') || rubroLower.includes('electr')) type = 'mantenimiento_preventivo';
-      else if (rubroLower.includes('gas') || rubroLower.includes('calef') || rubroLower.includes('refrig')) type = 'mantenimiento_preventivo';
-
-      const title = `[Rutina] ${orden.rutina_objeto} — ${orden.edificio_nombre}`;
-      const description = [
-        `Rutina de mantenimiento preventivo generada automáticamente desde el Módulo de Rutinas (Anexo 3 PETP).`,
-        ``,
-        `Rubro: ${orden.rubro_nombre}`,
-        `Ciclo: ${orden.ciclo}`,
-        `Plazo SLA: ${orden.plazo_dias} días`,
-        `Fecha límite: ${orden.fecha_limite}`,
-        orden.acciones ? `\nAcciones a realizar:\n${orden.acciones}` : '',
-        orden.observaciones_tom ? `\nObservaciones TOM/APH:\n${orden.observaciones_tom}` : '',
-        orden.requiere_informe_matriculado ? `\n⚠ Requiere informe de profesional matriculado.` : '',
-        orden.carga_sismesc ? `⚠ Requiere carga de comprobante en SISMESC.` : '',
-      ].filter(Boolean).join('\n');
-
-      const ot = await base44.entities.WorkOrder.create({
-        title,
-        type,
-        status: 'pendiente',
-        priority: orden.ciclo === 'Mensual' || orden.ciclo === 'Quincenal' ? 'alta' : 'media',
-        description,
-        location: orden.edificio_nombre || '',
-        scheduled_date: orden.fecha_limite || format(new Date(), 'yyyy-MM-dd'),
-        notes: `OrdenRutina ID: ${orden.id}`,
-      });
-
-      // Vincular la OrdenRutina a la OT generada
-      await base44.entities.OrdenRutina.update(orden.id, {
-        estado: 'en_proceso',
-        work_order_id: ot.id,
-      });
-
-      return ot;
-    },
-    onSuccess: (ot) => {
-      setOtGenerada(ot.id);
-      setEstado('en_proceso');
-      toast.success('Orden de trabajo creada y vinculada correctamente');
-    },
-    onError: (err) => toast.error(err.message || 'Error al generar OT'),
-  });
+  const [showGenerarOT, setShowGenerarOT] = useState(false);
 
   const saveMutation = useMutation({
     mutationFn: async (payload) => {
@@ -296,17 +249,15 @@ export default function OrdenDetalleModal({ orden, onClose, onUpdated }) {
         <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-white/10 bg-black/20">
           <div className="flex items-center gap-2">
             {/* Generar OT */}
-            {!otGenerada && (estado === 'pendiente' || estado === 'en_proceso') && (
+            {!otGenerada && (estado === 'pendiente' || estado === 'en_proceso' || estado === 'vencida') && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => generarOTMutation.mutate()}
-                disabled={generarOTMutation.isPending}
-                className="gap-2 border-blue-500/40 text-blue-300 hover:bg-blue-500/10"
+                onClick={() => setShowGenerarOT(true)}
+                className="gap-2 border-yellow-500/40 hover:bg-yellow-500/10 font-semibold"
+                style={{ color: '#D4AF37', borderColor: 'rgba(212,175,55,0.4)' }}
               >
-                {generarOTMutation.isPending
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <Wrench className="h-3.5 w-3.5" />}
+                <Wrench className="h-3.5 w-3.5" />
                 Generar OT
               </Button>
             )}
@@ -338,6 +289,18 @@ export default function OrdenDetalleModal({ orden, onClose, onUpdated }) {
           </div>
         </div>
       </div>
+
+      {showGenerarOT && (
+        <GenerarOTModal
+          orden={orden}
+          onClose={() => setShowGenerarOT(false)}
+          onCreated={(ot) => {
+            setOtGenerada(ot.id);
+            setEstado('en_proceso');
+            setShowGenerarOT(false);
+          }}
+        />
+      )}
     </div>
   );
 }
