@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import jsPDF from 'npm:jspdf@4.0.0';
 
 // Feriados fijos argentinos
@@ -375,9 +375,9 @@ Deno.serve(async (req) => {
       }
 
       // Calcular el número de certificado DENTRO del contrato
-      const inicioDate = new Date((abono.fecha_inicio_validez || `${certYear}-${String(certMonth).padStart(2, '0')}-01`) + 'T00:00:00');
-      const certDate = new Date(`${certYear}-${String(certMonth).padStart(2, '0')}-01T00:00:00`);
-      const diffMeses = Math.round((certDate - inicioDate) / (1000 * 60 * 60 * 24 * 30.44));
+      const inicioStr = abono.fecha_inicio_validez || `${certYear}-${String(certMonth).padStart(2, '0')}-01`;
+      const [inicioY, inicioM] = inicioStr.split('-').map(Number);
+      const diffMeses = (certYear - inicioY) * 12 + (certMonth - inicioM);
       const numeroEnContrato = diffMeses + 1;
 
       // Número global de certificado

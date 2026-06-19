@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import ExcelJS from 'npm:exceljs@4.4.0';
 
 // Parsea la hoja PREMOD del Excel del Ministerio y carga los ítems en PrecarioMinisterio

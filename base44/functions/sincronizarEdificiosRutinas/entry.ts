@@ -81,17 +81,21 @@ Deno.serve(async (req) => {
 
       const rutinas = await base44.asServiceRole.entities.RutinaCatalogo.filter({ activa: true });
 
+      // Pre-cargar edificios y asignaciones existentes para evitar N+1 queries
+      const allEdificios = await base44.asServiceRole.entities.Edificio.list();
+      const edificioMap = new Map(allEdificios.map(e => [e.id, e]));
+      const allAsignaciones = await base44.asServiceRole.entities.RutinaEdificio.list('-created_date', 5000);
+      const edificiosConAsig = new Set(allAsignaciones.map(a => a.edificio_id));
+
       let asignacionesCreadas = 0;
       const BATCH = 20;
 
       for (const edificio_id of edificio_ids) {
         // Verificar si ya tiene asignaciones
-        const existing = await base44.asServiceRole.entities.RutinaEdificio.filter({ edificio_id });
-        if (existing.length > 0) continue;
+        if (edificiosConAsig.has(edificio_id)) continue;
 
-        // Obtener datos del edificio
-        const edificios = await base44.asServiceRole.entities.Edificio.filter({ id: edificio_id });
-        const edificio = edificios[0];
+        // Obtener datos del edificio del mapa pre-cargado
+        const edificio = edificioMap.get(edificio_id);
         if (!edificio) continue;
 
         const nuevas = rutinas.map(r => ({

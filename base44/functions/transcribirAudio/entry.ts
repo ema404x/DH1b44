@@ -1,7 +1,5 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import OpenAI from 'npm:openai';
-
-const openai = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY') });
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -12,6 +10,8 @@ Deno.serve(async (req) => {
   const { audio_url } = body;
 
   if (!audio_url) return Response.json({ error: 'audio_url requerido' }, { status: 400 });
+
+  const openai = new OpenAI({ apiKey: Deno.env.get('OPENAI_API_KEY') });
 
   // Descargar el audio
   const audioResponse = await fetch(audio_url);

@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { crypto } from 'https://deno.land/std@0.208.0/crypto/mod.ts';
 
 async function hashData(data) {

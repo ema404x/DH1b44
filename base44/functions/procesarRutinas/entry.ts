@@ -34,15 +34,19 @@ Deno.serve(async (req) => {
     // ── 2. Generar nuevas órdenes ──────────────────────────────────────────
     const rutinaEdificios = await base44.asServiceRole.entities.RutinaEdificio.filter({ activa: true });
 
+    // Pre-cargar catálogo y órdenes pendientes para evitar N+1 queries
+    const allCatalogo = await base44.asServiceRole.entities.RutinaCatalogo.list();
+    const catalogoMap = new Map(allCatalogo.map(r => [r.id, r]));
+    const pendientesExistentes = await base44.asServiceRole.entities.OrdenRutina.filter({ estado: 'pendiente' });
+    const pendientesSet = new Set(pendientesExistentes.map(o => o.rutina_edificio_id));
+
     for (const re of rutinaEdificios) {
       // Verificar si hoy >= proxima_ejecucion
       if (!re.proxima_ejecucion) continue;
       if (re.proxima_ejecucion > hoyStr) continue;
 
       // ── Verificar estacionalidad ──
-      // Buscar la rutina del catálogo para obtener estacionalidad
-      const rutinas = await base44.asServiceRole.entities.RutinaCatalogo.filter({ id: re.rutina_id });
-      const rutina = rutinas[0];
+      const rutina = catalogoMap.get(re.rutina_id);
       if (!rutina) continue;
 
       if (rutina.estacionalidad && rutina.estacionalidad.trim()) {
@@ -61,11 +65,7 @@ Deno.serve(async (req) => {
       }
 
       // ── Verificar que no exista ya una orden pendiente para este par ──
-      const existentes = await base44.asServiceRole.entities.OrdenRutina.filter({
-        rutina_edificio_id: re.id,
-        estado: 'pendiente',
-      });
-      if (existentes.length > 0) continue;
+      if (pendientesSet.has(re.id)) continue;
 
       // ── Calcular fecha_limite ──
       const plazo = re.plazo_dias || rutina.plazo_dias || 15;

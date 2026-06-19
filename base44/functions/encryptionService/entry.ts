@@ -1,18 +1,24 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { crypto } from 'https://deno.land/std@0.208.0/crypto/mod.ts';
 
-const ENCRYPTION_KEY = Deno.env.get('ENCRYPTION_KEY');
-if (!ENCRYPTION_KEY) throw new Error('ENCRYPTION_KEY not set');
+let _key = null;
 
-const key = await crypto.subtle.importKey(
-  'raw',
-  new TextEncoder().encode(ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32)),
-  { name: 'AES-GCM' },
-  false,
-  ['encrypt', 'decrypt']
-);
+async function getKey() {
+  if (_key) return _key;
+  const ENCRYPTION_KEY = Deno.env.get('ENCRYPTION_KEY');
+  if (!ENCRYPTION_KEY) throw new Error('ENCRYPTION_KEY not set');
+  _key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32)),
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt', 'decrypt']
+  );
+  return _key;
+}
 
 async function encryptField(plaintext) {
+  const key = await getKey();
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const data = new TextEncoder().encode(plaintext);
   
@@ -30,6 +36,7 @@ async function encryptField(plaintext) {
 }
 
 async function decryptField(ciphertext) {
+  const key = await getKey();
   const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
   const iv = combined.slice(0, 12);
   const encrypted = combined.slice(12);
