@@ -6,8 +6,8 @@ export const queryClientInstance = new QueryClient({
 			refetchOnWindowFocus: false,
 			refetchOnReconnect: true,        // re-fetch al recuperar conexión
 			retry: 1,
-			staleTime: 1000 * 60 * 10,      // datos frescos por 10 min
-			gcTime: 1000 * 60 * 60,          // mantener en caché 1 hora
+			staleTime: 1000 * 60 * 5,        // datos frescos por 5 min
+			gcTime: 1000 * 60 * 5,           // liberar de RAM tras 5 min sin uso
 			networkMode: 'offlineFirst',     // usa datos en caché si no hay red
 		},
 		mutations: {

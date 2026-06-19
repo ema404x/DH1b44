@@ -169,15 +169,15 @@ export default function Dashboard() {
     return userPermissions[moduleKey]?.read === true;
   }, [user, userPermissions]);
 
-  // Solo fetchar si el usuario tiene acceso al módulo + refresco cada 30s
-  const { data: projects = [] }  = useQuery({ queryKey: ['projects'],   queryFn: () => base44.entities.Project.list('-updated_date', 200),   staleTime: 30000, refetchInterval: 30000, enabled: canRead('Project') });
-  const { data: allOrders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 300),  staleTime: 30000, refetchInterval: 30000, enabled: canRead('WorkOrder') });
-  const { data: clients = [] }   = useQuery({ queryKey: ['clients'],    queryFn: () => base44.entities.Client.list('-updated_date', 200),     staleTime: 60000, refetchInterval: 60000, enabled: canRead('Client') });
-  const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 200),    staleTime: 30000, refetchInterval: 30000, enabled: canRead('Invoice') });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 200),   staleTime: 60000, refetchInterval: 60000, enabled: canRead('Inventory') });
-  const { data: assets = [] }    = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 200),      staleTime: 60000, refetchInterval: 60000, enabled: canRead('Asset') });
-  const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: () => base44.entities.Pendiente.list('-updated_date', 500), staleTime: 30000, refetchInterval: 30000, enabled: canRead('Asset') });
-  const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 100),   staleTime: 60000, refetchInterval: 60000, enabled: canRead('Employee') });
+  // Solo fetchar si el usuario tiene acceso al módulo
+  const { data: projects = [] }  = useQuery({ queryKey: ['projects'],   queryFn: () => base44.entities.Project.list('-updated_date', 100),   staleTime: 60000, refetchInterval: 120000, enabled: canRead('Project') });
+  const { data: allOrders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 150),  staleTime: 60000, refetchInterval: 60000,  enabled: canRead('WorkOrder') });
+  const { data: clients = [] }   = useQuery({ queryKey: ['clients'],    queryFn: () => base44.entities.Client.list('-updated_date', 100),     staleTime: 120000, refetchInterval: 120000, enabled: canRead('Client') });
+  const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),    staleTime: 60000, refetchInterval: 120000, enabled: canRead('Invoice') });
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),   staleTime: 120000, refetchInterval: 120000, enabled: canRead('Inventory') });
+  const { data: assets = [] }    = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 100),      staleTime: 120000, refetchInterval: 120000, enabled: canRead('Asset') });
+  const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: () => base44.entities.Pendiente.list('-updated_date', 200), staleTime: 60000, refetchInterval: 120000, enabled: canRead('Asset') });
+  const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 80),    staleTime: 120000, refetchInterval: 120000, enabled: canRead('Employee') });
 
   // Pendientes filtrados: admin ve todos, jefe de sitio solo los suyos
   const pendientes = useMemo(() => {

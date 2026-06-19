@@ -7,7 +7,9 @@
 const DB_NAME = 'dh1-query-cache';
 const DB_VERSION = 2;
 const STORE = 'queries';
-const MAX_CACHE_AGE_MS = 1000 * 60 * 60 * 24; // 24 horas máximo
+const MAX_CACHE_AGE_MS = 1000 * 60 * 60 * 4;  // 4 horas máximo
+const MAX_ENTRIES = 40;                         // tope de entradas en storage
+const MAX_ARRAY_ITEMS = 150;                    // tope de ítems por lista guardada
 
 // ── IndexedDB setup ──────────────────────────────────────────────────────────
 let _db = null;
@@ -32,13 +34,17 @@ function openCacheDB() {
 export async function saveCacheEntry(queryKey, data) {
   if (!data || (Array.isArray(data) && data.length === 0)) return;
   try {
+    // Acotar listas grandes antes de persistir para no llenar el storage
+    const trimmed = Array.isArray(data) && data.length > MAX_ARRAY_ITEMS
+      ? data.slice(0, MAX_ARRAY_ITEMS)
+      : data;
     const db = await openCacheDB();
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).put({
       queryKey,
-      data,
+      data: trimmed,
       savedAt: Date.now(),
-      count: Array.isArray(data) ? data.length : 1,
+      count: Array.isArray(trimmed) ? trimmed.length : 1,
     });
   } catch (_) { /* fallo silencioso — no afecta operación */ }
 }
@@ -71,12 +77,27 @@ export async function pruneCacheDB() {
     const tx = db.transaction(STORE, 'readwrite');
     const store = tx.objectStore(STORE);
     const index = store.index('savedAt');
+
+    // 1) Borrar entradas más viejas que MAX_CACHE_AGE_MS
     const cutoff = Date.now() - MAX_CACHE_AGE_MS;
     const range = IDBKeyRange.upperBound(cutoff);
     const req = index.openCursor(range);
     req.onsuccess = (e) => {
       const cursor = e.target.result;
       if (cursor) { cursor.delete(); cursor.continue(); }
+    };
+
+    // 2) Si hay más de MAX_ENTRIES, borrar las más viejas hasta quedar dentro del tope
+    const countReq = store.count();
+    countReq.onsuccess = () => {
+      const excess = countReq.result - MAX_ENTRIES;
+      if (excess <= 0) return;
+      const pruneReq = index.openCursor();
+      let deleted = 0;
+      pruneReq.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor && deleted < excess) { cursor.delete(); deleted++; cursor.continue(); }
+      };
     };
   } catch (_) { /* silencioso */ }
 }

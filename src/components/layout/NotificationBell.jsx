@@ -38,11 +38,11 @@ export default function NotificationBell() {
     queryFn: () => base44.entities.Notification.list('-created_date', 30),
   });
 
-  const STALE = 1000 * 60 * 2; // 2 min
-  const { data: orders    = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 200), staleTime: STALE, refetchOnWindowFocus: true });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),  staleTime: STALE, refetchOnWindowFocus: true });
-  const { data: assets    = [] } = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 100),     staleTime: STALE, refetchOnWindowFocus: true });
-  const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),   staleTime: STALE, refetchOnWindowFocus: true });
+  const STALE = 1000 * 60 * 5; // 5 min
+  const { data: orders    = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 80),  staleTime: STALE, refetchOnWindowFocus: false });
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 50),  staleTime: STALE, refetchOnWindowFocus: false });
+  const { data: assets    = [] } = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 50),     staleTime: STALE, refetchOnWindowFocus: false });
+  const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 50),   staleTime: STALE, refetchOnWindowFocus: false });
 
   const markReadMutation = useMutation({
     mutationFn: (id) => base44.entities.Notification.update(id, { read: true }),
