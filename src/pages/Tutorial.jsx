@@ -15,6 +15,7 @@ const CATEGORIES = [
   { id: 'administracion', label: 'Administración' },
   { id: 'campo', label: 'Campo' },
   { id: 'reportes', label: 'Reportes' },
+  { id: 'seguridad', label: 'Seguridad' },
 ];
 
 export default function Tutorial() {
