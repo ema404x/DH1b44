@@ -43,13 +43,11 @@ Deno.serve(async (req) => {
 
     const employeeRole = emp.role || null;
 
-    // Ejecutar actualizaciones y lookup de permisos en paralelo
+    // Actualizar user_id y sincronizar full_name (no bloquea el lookup de permisos)
     const updateTasks = [];
-
     if (emp.user_id !== user.id) {
       updateTasks.push(sb.entities.Employee.update(emp.id, { user_id: user.id }));
     }
-
     const isEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const platformNameIsEmail = isEmailPattern.test((user.full_name || '').trim());
     const platformNameDiffers = (user.full_name || '').trim() !== (emp.full_name || '').trim();
@@ -58,40 +56,22 @@ Deno.serve(async (req) => {
         console.warn(`[vincularEmpleado] No se pudo sincronizar full_name: ${err.message}`);
       }));
     }
-
-    // Buscar permisos por role_name directamente en la query
-    const rolePermsPromise = employeeRole
-      ? sb.entities.RolePermission.filter({ role_name: employeeRole }).catch(() => [])
-      : Promise.resolve([]);
-
-    const [, , allRolePerms] = await Promise.all([
-      ...updateTasks,
-      rolePermsPromise,
-    ]).then(results => {
-      // Promise.all con spread variable: devolver el último resultado (rolePerms)
-      return results;
-    }).catch(async () => {
-      // Fallback si algo falla: aún retornar rolePerms
-      return [null, null, await rolePermsPromise];
-    });
-
-    // Re-ejecutar por simplicidad (el catch de arriba puede confundir)
-    // Mejor: separar updates de rolePerms claramente
     await Promise.allSettled(updateTasks);
-    const rolePermsResult = await rolePermsPromise;
 
+    // Lookup de permisos por rol — tolerante a mayúsculas/minúsculas
     let employeePermissions = null;
-    if (employeeRole && rolePermsResult.length > 0) {
-      const match = rolePermsResult.find(
-        rp => rp.role_name?.toLowerCase().trim() === employeeRole.toLowerCase().trim()
-      );
+    if (employeeRole) {
+      const roleNorm = employeeRole.toLowerCase().trim();
+      let candidates = await sb.entities.RolePermission.filter({ role_name: employeeRole }).catch(() => []);
+      if (!candidates || candidates.length === 0) {
+        // El filtro por role_name puede ser case-sensitive: listar todo y matchear insensible
+        candidates = await sb.entities.RolePermission.list('-created_date', 500).catch(() => []);
+      }
+      const match = candidates.find(rp => rp.role_name?.toLowerCase().trim() === roleNorm);
       if (match) {
         employeePermissions = match.permissions;
       } else {
-        console.warn(
-          `[vincularEmpleado] Rol "${employeeRole}" no tiene RolePermission. ` +
-          `Roles encontrados: ${rolePermsResult.map(r => r.role_name).join(', ')}`
-        );
+        console.warn(`[vincularEmpleado] Rol "${employeeRole}" no tiene RolePermission configurado.`);
       }
     }
 

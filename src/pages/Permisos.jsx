@@ -31,6 +31,7 @@ const MODULES = [
   { key: 'InspeccionColegio', label: 'Inspección de Colegios', group: 'Operaciones' },
   { key: 'InformePlaneacion', label: 'Informe de Planeación', group: 'Operaciones' },
   { key: 'Calefaccion', label: 'Plan de Infraestructura', group: 'Operaciones' },
+  { key: 'Rutinas', label: 'Rutinas de Mantenimiento', group: 'Operaciones' },
   { key: 'Informes', label: 'Informes', group: 'Reportes' },
   { key: 'Reportes', label: 'Reportes & KPIs', group: 'Reportes' },
   { key: 'ControlRiesgo', label: 'Control de Riesgos', group: 'Reportes' },
@@ -145,8 +146,10 @@ function RoleCard({ role, onDelete, onToggle, deleteIsPending }) {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.RolePermission.update(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['rolePermissions'] })
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['rolePermissions'] }),
+    onError: (err) => toast.error('No se pudo guardar el permiso: ' + (err?.message || 'error'))
   });
+  const savingPerm = updateMutation.isPending;
 
   const normalizePerms = (perms = {}) => {
     const normalized = { ...perms };
@@ -197,6 +200,11 @@ function RoleCard({ role, onDelete, onToggle, deleteIsPending }) {
           <Badge variant="outline" className="ml-2 text-xs tabular-nums">
             {totalEnabled}/{totalPossible} permisos
           </Badge>
+          {savingPerm && (
+            <span className="ml-1 inline-flex items-center gap-1 text-[10px] text-primary">
+              <Loader2 className="h-3 w-3 animate-spin" /> Guardando…
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setCollapsed(v => !v)} className="gap-1.5 text-xs h-8">
@@ -262,6 +270,7 @@ function RoleCard({ role, onDelete, onToggle, deleteIsPending }) {
                             <Checkbox
                               checked={modPerms[act] || false}
                               onCheckedChange={() => handleToggle(mod.key, act, modPerms[act])}
+                              disabled={savingPerm}
                               className="mx-auto"
                             />
                           </td>
@@ -269,7 +278,8 @@ function RoleCard({ role, onDelete, onToggle, deleteIsPending }) {
                         <td className="px-3 py-2 text-center">
                           <button
                             onClick={() => handleToggleAll(mod.key, !allEnabled)}
-                            className={`transition-colors ${allEnabled ? 'text-primary' : anyEnabled ? 'text-amber-400' : 'text-muted-foreground/40 hover:text-muted-foreground'}`}
+                            disabled={savingPerm}
+                            className={`transition-colors disabled:opacity-40 ${allEnabled ? 'text-primary' : anyEnabled ? 'text-amber-400' : 'text-muted-foreground/40 hover:text-muted-foreground'}`}
                             title={allEnabled ? 'Desactivar todo' : 'Activar todo'}
                           >
                             {allEnabled
@@ -307,7 +317,8 @@ export default function Permisos() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rolePermissions'] });
       toast.success('Rol eliminado');
-    }
+    },
+    onError: (err) => toast.error('No se pudo eliminar: ' + (err?.message || 'error'))
   });
 
   const createMutation = useMutation({
@@ -317,8 +328,32 @@ export default function Permisos() {
       setShowNew(false);
       setNewRoleName('');
       toast.success('Rol creado');
-    }
+    },
+    onError: (err) => toast.error('No se pudo crear el rol: ' + (err?.message || 'error'))
   });
+
+  const visibleRoles = roles.filter(r => r.role_name !== 'operario_portal');
+
+  const handleSaveAll = async () => {
+    if (visibleRoles.length === 0) return;
+    setSaving(true);
+    try {
+      const rolesPayload = visibleRoles.map(r => ({
+        id: r.id,
+        role_name: r.role_name,
+        description: r.description || '',
+        permissions: r.permissions || {},
+        is_active: r.is_active !== undefined ? r.is_active : true,
+      }));
+      const res = await base44.functions.invoke('saveAccessConfig', { roles: rolesPayload });
+      toast.success(res.data?.message || 'Configuración sincronizada correctamente');
+      queryClient.invalidateQueries({ queryKey: ['rolePermissions'] });
+    } catch (err) {
+      toast.error('Error al sincronizar: ' + (err?.message || 'error desconocido'));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleCreateRole = () => {
     if (!newRoleName.trim()) return;
@@ -332,20 +367,6 @@ export default function Permisos() {
       description: `Rol personalizado: ${newRoleName.trim()}`
     });
   };
-
-  const handleSaveAll = async () => {
-    setSaving(true);
-    try {
-      const res = await base44.functions.invoke('saveAccessConfig', { roles: visibleRoles });
-      toast.success(res.data?.message || 'Configuración guardada correctamente');
-    } catch (err) {
-      toast.error('Error al guardar: ' + err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const visibleRoles = roles.filter(r => r.role_name !== 'operario_portal');
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-64 text-muted-foreground gap-2">
@@ -367,7 +388,7 @@ export default function Permisos() {
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={handleSaveAll} disabled={saving || roles.length === 0} className="gap-2">
+          <Button variant="outline" size="sm" onClick={handleSaveAll} disabled={saving || visibleRoles.length === 0} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Sincronizar
           </Button>
