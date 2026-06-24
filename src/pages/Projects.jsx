@@ -167,7 +167,7 @@ const ProyectoFila = React.memo(function ProyectoFila({ project, selected, onTog
       </div>
     </div>
   );
-}
+});
 
 // ─── Página principal ────────────────────────────────────────────────────────
 
