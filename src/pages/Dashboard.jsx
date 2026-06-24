@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Link } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import RevenueChart from '@/components/dashboard/RevenueChart';
 import OTsPendientesPanel from '@/components/dashboard/OTsPendientesPanel';
 import CertificadosPanel from '@/components/dashboard/CertificadosPanel';
@@ -22,6 +23,7 @@ import EmergenciasWidget from '@/components/dashboard/EmergenciasWidget';
 import KpisJefeSitio from '@/components/dashboard/KpisJefeSitio';
 import AuroraEffect from '@/components/dashboard/AuroraEffect';
 import DashboardFilters from '@/components/dashboard/DashboardFilters';
+import SectionHeader from '@/components/dashboard/SectionHeader';
 import { format, isPast, parseISO, startOfMonth, subMonths, formatDistanceToNow, subDays } from 'date-fns';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { es } from 'date-fns/locale';
@@ -30,6 +32,8 @@ const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency:
 
 const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.1 } } };
 const fadeUp = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 120, damping: 16 } } };
+
+const panel = "rounded-2xl border border-border bg-card shadow-sm p-4";
 
 const STATUS_COLORS = {
   pendiente:   { dot: 'bg-yellow-400', text: 'text-yellow-400' },
@@ -46,46 +50,45 @@ const PRIORITY_COLORS = {
   baja:    'bg-slate-500/20 text-slate-400 border-slate-500/30',
 };
 
-function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, href, alert }) {
-  const COLORS = {
-    blue:    { ring: 'ring-blue-500/30',    icon: 'bg-blue-500/20 text-blue-300',    glow: 'from-blue-500/10' },
-    amber:   { ring: 'ring-amber-500/30',   icon: 'bg-amber-500/20 text-amber-300',  glow: 'from-amber-500/10' },
-    green:   { ring: 'ring-emerald-500/30', icon: 'bg-emerald-500/20 text-emerald-300', glow: 'from-emerald-500/10' },
-    purple:  { ring: 'ring-purple-500/30',  icon: 'bg-purple-500/20 text-purple-300',glow: 'from-purple-500/10' },
-    red:     { ring: 'ring-red-500/30',     icon: 'bg-red-500/20 text-red-300',      glow: 'from-red-500/10' },
-    primary: { ring: 'ring-primary/30',     icon: 'bg-primary/20 text-primary',      glow: 'from-primary/10' },
-  };
-  const cfg = COLORS[color] || COLORS.blue;
+const KPI_COLORS = {
+  blue:    { icon: 'bg-blue-500/15 text-blue-300' },
+  amber:   { icon: 'bg-amber-500/15 text-amber-300' },
+  green:   { icon: 'bg-emerald-500/15 text-emerald-300' },
+  purple:  { icon: 'bg-purple-500/15 text-purple-300' },
+  red:     { icon: 'bg-red-500/15 text-red-300' },
+  primary: { icon: 'bg-primary/15 text-primary' },
+};
 
+function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, href, alert }) {
+  const cfg = KPI_COLORS[color] || KPI_COLORS.blue;
   const inner = (
-    <motion.div variants={fadeUp} whileHover={{ y: -3, transition: { duration: 0.2 } }}>
-      <div className={`relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-xl shadow-xl ring-1 ${cfg.ring} p-5 h-full`}>
-        <div className={`absolute inset-0 bg-gradient-to-br ${cfg.glow} to-transparent opacity-60 pointer-events-none`} />
-        <div className="relative flex items-start justify-between mb-4">
-          <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${cfg.icon}`}>
+    <motion.div variants={fadeUp} whileHover={{ y: -3, transition: { duration: 0.2 } }} className="h-full">
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm p-5 h-full transition-shadow hover:shadow-md">
+        <div className="flex items-start justify-between mb-4">
+          <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", cfg.icon)}>
             <Icon className="h-5 w-5" />
           </div>
           {trend !== undefined && (
-            <span className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border ${trend >= 0 ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' : 'bg-red-500/15 text-red-300 border-red-500/25'}`}>
+            <span className={cn("flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border tabular-nums",
+              trend >= 0 ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' : 'bg-red-500/15 text-red-300 border-red-500/25')}>
               {trend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
               {Math.abs(trend)}%
             </span>
           )}
           {alert && (
-            <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
+            <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-300 border border-red-500/30 tabular-nums">
               <AlertTriangle className="h-3 w-3" /> {alert}
             </span>
           )}
         </div>
-        <div className="relative">
-          <p className="text-3xl font-bold text-white tracking-tight leading-none">{value}</p>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-2">{title}</p>
-          {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+        <div>
+          <p className="text-3xl font-bold text-foreground tabular-nums tracking-tight leading-none">{value}</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-2">{title}</p>
+          {subtitle && <p className="text-xs text-muted-foreground/70 mt-1">{subtitle}</p>}
         </div>
       </div>
     </motion.div>
   );
-
   return href ? <Link to={href} className="block h-full">{inner}</Link> : inner;
 }
 
@@ -98,7 +101,7 @@ function ActivityFeed({ orders }) {
   , [orders]);
 
   if (recent.length === 0) return (
-    <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-500">
+    <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground">
       <Activity className="h-8 w-8 opacity-30" />
       <p className="text-xs">Sin actividad reciente</p>
     </div>
@@ -111,26 +114,26 @@ function ActivityFeed({ orders }) {
         const pc = PRIORITY_COLORS[o.priority] || PRIORITY_COLORS.media;
         const date = o.updated_date || o.created_date;
         return (
-          <div key={o.id} className={`flex items-start gap-3 py-3 ${i < recent.length - 1 ? 'border-b border-white/5' : ''}`}>
+          <div key={o.id} className={cn("flex items-start gap-3 py-3", i < recent.length - 1 && "border-b border-border")}>
             <div className="mt-1 flex-shrink-0 flex flex-col items-center gap-1">
-              <div className={`h-2 w-2 rounded-full ${sc.dot}`} />
-              {i < recent.length - 1 && <div className="w-px flex-1 bg-white/5 h-full min-h-[1rem]" />}
+              <div className={cn("h-2 w-2 rounded-full", sc.dot)} />
+              {i < recent.length - 1 && <div className="w-px flex-1 bg-border h-full min-h-[1rem]" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white/90 truncate leading-tight">{o.title}</p>
+              <p className="text-sm font-medium text-foreground truncate leading-tight">{o.title}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full border capitalize ${pc}`}>{o.priority}</span>
+                <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full border capitalize", pc)}>{o.priority}</span>
                 {o.location_qr_name && (
-                  <span className="flex items-center gap-0.5 text-[10px] text-slate-500">
+                  <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
                     <MapPin className="h-2.5 w-2.5" />{o.location_qr_name}
                   </span>
                 )}
               </div>
             </div>
             <div className="text-right flex-shrink-0">
-              <p className={`text-[10px] font-medium capitalize ${sc.text}`}>{o.status?.replace('_', ' ')}</p>
+              <p className={cn("text-[10px] font-medium capitalize", sc.text)}>{o.status?.replace('_', ' ')}</p>
               {date && (
-                <p className="text-[10px] text-slate-600 mt-0.5">
+                <p className="text-[10px] text-muted-foreground/70 mt-0.5">
                   {formatDistanceToNow(new Date(date), { locale: es, addSuffix: true })}
                 </p>
               )}
@@ -145,15 +148,15 @@ function ActivityFeed({ orders }) {
 function QuickActionCard({ icon: Icon, label, desc, href, color }) {
   return (
     <Link to={href}>
-      <motion.div whileHover={{ y: -2 }} className="flex items-center gap-3 p-3 rounded-xl border border-white/5 bg-white/3 hover:bg-white/8 transition-colors cursor-pointer group">
-        <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
+      <motion.div whileHover={{ y: -2 }} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/40 hover:bg-muted transition-colors cursor-pointer group h-full">
+        <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0", color)}>
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-white group-hover:text-primary transition-colors">{label}</p>
-          <p className="text-[10px] text-slate-500">{desc}</p>
+          <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{label}</p>
+          <p className="text-[10px] text-muted-foreground">{desc}</p>
         </div>
-        <ChevronRight className="h-3.5 w-3.5 text-slate-600 group-hover:text-primary ml-auto flex-shrink-0 transition-colors" />
+        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 group-hover:text-primary ml-auto flex-shrink-0 transition-colors" />
       </motion.div>
     </Link>
   );
@@ -271,25 +274,20 @@ export default function Dashboard() {
   const firstName = user?.full_name?.split(' ')[0] || '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 space-y-6 pb-10">
+    <div className="min-h-screen bg-background space-y-6 pb-10 page-enter">
       <AuroraEffect />
-      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-        <div className="absolute -top-48 -right-48 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute top-1/2 -left-40 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '3s' }} />
-        <div className="absolute -bottom-32 right-1/3 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }} />
-      </div>
 
       {/* ── HEADER ── */}
       <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1">
         <div>
-          <p className="text-slate-400 text-sm flex items-center gap-1.5 mb-1">
+          <p className="text-muted-foreground text-sm flex items-center gap-1.5 mb-1">
             <Calendar className="h-3.5 w-3.5" />
             {format(new Date(), "EEEE d 'de' MMMM, yyyy", { locale: es })}
           </p>
-          <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
             {greeting}{firstName ? `, ${firstName}` : ''} <span className="text-2xl">👋</span>
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-muted-foreground text-sm mt-1">
             {canRead('WorkOrder') && <>{metrics.pendingOrders} OTs pendientes · {metrics.inProgressOrders} en progreso</>}
             {canRead('WorkOrder') && metrics.overdueOrders > 0 && <span className="text-red-400 font-semibold"> · ⚠ {metrics.overdueOrders} vencidas</span>}
           </p>
@@ -297,12 +295,12 @@ export default function Dashboard() {
         {canRead('WorkOrder') && (
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link to="/crear-ot">
-              <Button size="sm" className="gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25 border-0">
+              <Button size="sm" className="gap-1.5">
                 <Zap className="h-3.5 w-3.5" /> Crear OT
               </Button>
             </Link>
             <Link to="/ordenes">
-              <Button size="sm" variant="outline" className="gap-1.5 border-white/10 text-slate-300 hover:text-white">
+              <Button size="sm" variant="outline" className="gap-1.5">
                 <ClipboardList className="h-3.5 w-3.5" /> Ver OTs
               </Button>
             </Link>
@@ -339,129 +337,21 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── KPI GRID (4 cols) ── */}
-      <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="OTs Pendientes"  value={metrics.pendingOrders}         subtitle={`${metrics.completedThisMonth} completadas este mes`}   icon={ClipboardList} color="amber"  alert={metrics.overdueOrders > 0 ? metrics.overdueOrders : undefined} />}
-        {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="En Progreso"     value={metrics.inProgressOrders}      subtitle={`${metrics.efficiency}% de eficiencia total`}           icon={Activity}      color="purple" />}
-        {canRead('Project')    && <KpiCard href="/proyectos"   title="Proyectos"       value={metrics.activeProjects}        subtitle={`${projects.length} en total`}                          icon={FolderKanban}  color="blue"   />}
-        {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos del Mes" value={fmt(metrics.revenueThisMonth)} subtitle={`${fmt(metrics.pendingInvoices)} por cobrar`}         icon={DollarSign}    color="green"  trend={metrics.revenueTrend} />}
-      </motion.div>
-
-      <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"  value={metrics.activeClients}            subtitle={`${clients.length} en total`}                        icon={Users}         color="primary" />}
-        {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"     value={metrics.urgentOrders.length}      subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={metrics.urgentOrders.length > 0 ? 'red' : 'green'} />}
-        {canRead('Asset')     && <KpiCard href="/activos"    title="Pendientes SAP" value={pendientes.filter(p => ['pendiente','asignado','en_progreso'].includes(p.estado)).length} subtitle={`${pendientes.filter(p => p.estado === 'resuelto').length} resueltos`} icon={Wrench} color="amber" alert={pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto').length > 0 ? pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto').length : undefined} />}
-        {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"   value={materials.length}                 subtitle={`${metrics.lowStockItems.length} bajo mínimo`}      icon={Package}       color={metrics.lowStockItems.length > 0 ? 'red' : 'green'} />}
-      </motion.div>
-
-      {/* ── MAIN CONTENT ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Revenue chart — 2/3 */}
-        {canRead('Invoice') && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="xl:col-span-2">
-            <RevenueChart invoices={invoices} />
-          </motion.div>
-        )}
-
-        {/* Activity Feed — 1/3 */}
-        {canRead('WorkOrder') && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-            <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-xl shadow-xl h-full p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-white">Actividad Reciente</h3>
-                </div>
-                <Link to="/ordenes">
-                  <Button variant="ghost" size="sm" className="h-6 text-[11px] text-slate-500 hover:text-white gap-1 px-2">
-                    Ver todas <ArrowRight className="h-3 w-3" />
-                  </Button>
-                </Link>
-              </div>
-              <ActivityFeed orders={orders} />
-            </div>
-          </motion.div>
-        )}
-      </div>
-
-      {/* ── EMERGENCIAS + PROYECTOS ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {canRead('Emergencias') && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="xl:col-span-2">
-            <EmergenciasWidget />
-          </motion.div>
-        )}
-
-        {/* Proyectos en curso */}
-        {canRead('Project') && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }}>
-            <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-xl shadow-xl p-4 h-full">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <FolderKanban className="h-4 w-4 text-blue-400" />
-                  <h3 className="text-sm font-semibold text-white">Proyectos en Curso</h3>
-                </div>
-                <Link to="/proyectos">
-                  <Button variant="ghost" size="sm" className="h-6 text-[11px] text-slate-500 hover:text-white gap-1 px-2">
-                    Ver <ArrowRight className="h-3 w-3" />
-                  </Button>
-                </Link>
-              </div>
-              {metrics.recentProjects.length === 0 ? (
-                <div className="flex items-center justify-center h-24 text-xs text-slate-600">Sin proyectos activos</div>
-              ) : (
-                <div className="space-y-4">
-                  {metrics.recentProjects.map(p => (
-                    <div key={p.id} className="space-y-1.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-white truncate flex-1">{p.name}</p>
-                        <span className="text-xs font-bold text-primary flex-shrink-0">{p.progress || 0}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                        <div className="h-full rounded-full bg-gradient-to-r from-primary to-purple-500 transition-all" style={{ width: `${p.progress || 0}%` }} />
-                      </div>
-                      {p.client_name && <p className="text-[10px] text-slate-600">{p.client_name}</p>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </div>
-
-      {/* ── OTs + CERTIFICADOS ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {canRead('WorkOrder') && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-            <OTsPendientesPanel orders={orders} />
-          </motion.div>
-        )}
-        {canRead('Certificado') && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
-            <CertificadosPanel filterCutoff={filterCutoff} />
-          </motion.div>
-        )}
-      </div>
-
-      {/* ── QUICK ACTIONS (solo módulos accesibles) ── */}
+      {/* ── ACCESOS RÁPIDOS ── */}
       {(() => {
         const actions = [
-          canRead('WorkOrder')         && { href: '/crear-ot',           icon: Zap,          label: 'Crear OT',     desc: 'Orden rápida',    color: 'bg-emerald-500/20 text-emerald-300' },
-          canRead('WorkOrder')         && { href: '/ordenes',            icon: ClipboardList, label: 'OTs',          desc: 'Gestionar',       color: 'bg-amber-500/20 text-amber-300' },
-          canRead('InspeccionColegio') && { href: '/inspeccion-colegio', icon: Target,        label: 'Inspección',   desc: 'Recorrido',       color: 'bg-blue-500/20 text-blue-300' },
-          canRead('Asset')             && { href: '/activos',            icon: ClipboardList, label: 'Pendientes',   desc: 'SAP',             color: 'bg-purple-500/20 text-purple-300' },
-          canRead('Certificado')       && { href: '/certificados',       icon: FileCheck,     label: 'Certificados', desc: 'Emitir',          color: 'bg-teal-500/20 text-teal-300' },
-          canRead('Reportes')          && { href: '/reportes',           icon: BarChart3,     label: 'Reportes',     desc: 'Ver métricas',    color: 'bg-pink-500/20 text-pink-300' },
+          canRead('WorkOrder')         && { href: '/crear-ot',           icon: Zap,          label: 'Crear OT',     desc: 'Orden rápida',    color: 'bg-emerald-500/15 text-emerald-300' },
+          canRead('WorkOrder')         && { href: '/ordenes',            icon: ClipboardList, label: 'OTs',          desc: 'Gestionar',       color: 'bg-amber-500/15 text-amber-300' },
+          canRead('InspeccionColegio') && { href: '/inspeccion-colegio', icon: Target,        label: 'Inspección',   desc: 'Recorrido colegio', color: 'bg-blue-500/15 text-blue-300' },
+          canRead('Asset')             && { href: '/activos',            icon: Wrench,        label: 'Pendientes',   desc: 'Gestión SAP',     color: 'bg-purple-500/15 text-purple-300' },
+          canRead('Certificado')       && { href: '/certificados',       icon: FileCheck,     label: 'Certificados', desc: 'Emitir',          color: 'bg-teal-500/15 text-teal-300' },
+          canRead('Reportes')          && { href: '/reportes',           icon: BarChart3,     label: 'Reportes',     desc: 'Ver métricas',    color: 'bg-pink-500/15 text-pink-300' },
         ].filter(Boolean);
         if (actions.length === 0) return null;
         return (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.58 }}>
-            <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="h-4 w-4 text-amber-400" />
-                <h3 className="text-sm font-semibold text-white">Acciones Rápidas</h3>
-              </div>
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
+            <div className={panel}>
+              <SectionHeader icon={Sparkles} title="Accesos rápidos" subtitle="Tareas frecuentes" />
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                 {actions.map((a, i) => <QuickActionCard key={i} {...a} />)}
               </div>
@@ -470,21 +360,135 @@ export default function Dashboard() {
         );
       })()}
 
-      {/* ── KPIs JEFE SITIO ── */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.62 }}>
-        <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} />
-      </motion.div>
+      {/* ── INDICADORES (KPI GRID) ── */}
+      <div>
+        <SectionHeader title="Indicadores" subtitle="Resumen general del período" />
+        <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="OTs Pendientes"   value={metrics.pendingOrders}          subtitle={`${metrics.completedThisMonth} completadas este mes`}  icon={ClipboardList} color="amber"  alert={metrics.overdueOrders > 0 ? metrics.overdueOrders : undefined} />}
+          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="En Progreso"      value={metrics.inProgressOrders}        subtitle={`${metrics.efficiency}% de eficiencia total`}          icon={Activity}      color="purple" />}
+          {canRead('Project')    && <KpiCard href="/proyectos"   title="Proyectos"        value={metrics.activeProjects}         subtitle={`${projects.length} en total`}                          icon={FolderKanban}  color="blue"   />}
+          {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos del Mes" value={fmt(metrics.revenueThisMonth)} subtitle={`${fmt(metrics.pendingInvoices)} por cobrar`}         icon={DollarSign}    color="green"  trend={metrics.revenueTrend} />}
+        </motion.div>
+        <div className="h-4" />
+        <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={metrics.activeClients}            subtitle={`${clients.length} en total`}                        icon={Users}         color="primary" />}
+          {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={metrics.urgentOrders.length}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={metrics.urgentOrders.length > 0 ? 'red' : 'green'} />}
+          {canRead('Asset')     && <KpiCard href="/activos"    title="Pendientes SAP"  value={pendientes.filter(p => ['pendiente','asignado','en_progreso'].includes(p.estado)).length} subtitle={`${pendientes.filter(p => p.estado === 'resuelto').length} resueltos`} icon={Wrench} color="amber" alert={pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto').length > 0 ? pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto').length : undefined} />}
+          {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={materials.length}                  subtitle={`${metrics.lowStockItems.length} bajo mínimo`}      icon={Package}       color={metrics.lowStockItems.length > 0 ? 'red' : 'green'} />}
+        </motion.div>
+      </div>
 
-      {/* ── MÉTRICAS OPERACIÓN ── */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}>
-        <MetricasOperacion
-          orders={orders}
-          projects={projects}
-          materials={materials}
-          assets={assets}
-          employees={employees}
-        />
-      </motion.div>
+      {/* ── OPERACIÓN ── */}
+      {canRead('WorkOrder') && (
+        <div>
+          <SectionHeader icon={ClipboardList} title="Operación" subtitle="Órdenes de trabajo y actividad reciente"
+            action={<Link to="/ordenes"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver todas <ArrowRight className="h-3 w-3" /></Button></Link>} />
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="xl:col-span-2">
+              <OTsPendientesPanel orders={orders} />
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+              <div className={cn(panel, "h-full")}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground">Actividad reciente</h3>
+                  </div>
+                  <Link to="/ordenes">
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button>
+                  </Link>
+                </div>
+                <ActivityFeed orders={orders} />
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FINANZAS Y CERTIFICACIÓN ── */}
+      {(canRead('Invoice') || canRead('Certificado')) && (
+        <div>
+          <SectionHeader icon={DollarSign} title="Finanzas y certificación" subtitle="Ingresos y certificados del período"
+            action={<Link to="/facturacion"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button></Link>} />
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            {canRead('Invoice') && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="xl:col-span-2">
+                <RevenueChart invoices={invoices} />
+              </motion.div>
+            )}
+            {canRead('Certificado') && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+                <CertificadosPanel filterCutoff={filterCutoff} />
+              </motion.div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── INFRAESTRUCTURA ── */}
+      {(canRead('Emergencias') || canRead('Project')) && (
+        <div>
+          <SectionHeader icon={Wrench} title="Infraestructura" subtitle="Emergencias y proyectos en curso"
+            action={canRead('Project') ? <Link to="/proyectos"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button></Link> : null} />
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            {canRead('Emergencias') && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="xl:col-span-2">
+                <EmergenciasWidget />
+              </motion.div>
+            )}
+            {canRead('Project') && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
+                <div className={cn(panel, "h-full")}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-foreground">Proyectos en curso</h3>
+                    <Link to="/proyectos">
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button>
+                    </Link>
+                  </div>
+                  {metrics.recentProjects.length === 0 ? (
+                    <div className="flex items-center justify-center h-24 text-xs text-muted-foreground">Sin proyectos activos</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {metrics.recentProjects.map(p => (
+                        <div key={p.id} className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-foreground truncate flex-1">{p.name}</p>
+                            <span className="text-xs font-bold text-primary flex-shrink-0 tabular-nums">{p.progress || 0}%</span>
+                          </div>
+                          <Progress value={p.progress || 0} className="h-1.5" />
+                          {p.client_name && <p className="text-[10px] text-muted-foreground">{p.client_name}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── GESTIÓN DE SITIOS ── */}
+      <div>
+        <SectionHeader icon={Shield} title="Gestión de sitios" subtitle="Indicadores por jefe de sitio" />
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+          <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} />
+        </motion.div>
+      </div>
+
+      {/* ── MÉTRICAS DE OPERACIÓN ── */}
+      <div>
+        <SectionHeader icon={BarChart3} title="Métricas de operación" subtitle="Vista global de recursos y equipos" />
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}>
+          <MetricasOperacion
+            orders={orders}
+            projects={projects}
+            materials={materials}
+            assets={assets}
+            employees={employees}
+          />
+        </motion.div>
+      </div>
     </div>
   );
 }
