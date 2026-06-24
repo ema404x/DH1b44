@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // ── Constantes estáticas ──────────────────────────────────────────────────────
 const RUTA_MODULO = {
@@ -144,7 +145,7 @@ const MessageBubble = React.memo(function MessageBubble({ msg }) {
 export function AlicePageButton({ onClick }) {
   return (
     <button onClick={onClick}
-      className="fixed bottom-20 right-4 z-40 flex items-center gap-2 px-3 py-2 rounded-full border border-primary/30 bg-card/90 backdrop-blur-sm text-xs font-medium text-primary hover:bg-primary/10 transition-all shadow-lg"
+      className="fixed bottom-24 lg:bottom-20 right-4 z-40 flex items-center gap-2 px-3 py-2 rounded-full border border-primary/30 bg-card/90 backdrop-blur-sm text-xs font-medium text-primary hover:bg-primary/10 transition-all shadow-lg"
       style={{ boxShadow: '0 2px 12px rgba(59,130,246,0.2)' }}>
       <HelpCircle className="h-3.5 w-3.5" />
       ¿Qué hago aquí?
@@ -155,6 +156,7 @@ export function AlicePageButton({ onClick }) {
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function ChatbotSoporte() {
   const location = useLocation();
+  const isMobile = useIsMobile();
   const moduloActual = RUTA_MODULO[location.pathname] || null;
   const prevModuloRef  = useRef(moduloActual);
 
@@ -437,7 +439,7 @@ export default function ChatbotSoporte() {
   // ── Render ────────────────────────────────────────────────────────────────
   const bubbleStyle = pos
     ? { position: 'fixed', left: pos.x, top: pos.y, bottom: 'auto', right: 'auto' }
-    : { position: 'fixed', bottom: 24, right: 24 };
+    : { position: 'fixed', bottom: isMobile ? 'calc(72px + env(safe-area-inset-bottom))' : 24, right: isMobile ? 16 : 24 };
 
   if (hidden) return null;
 

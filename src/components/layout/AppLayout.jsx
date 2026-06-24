@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import MobileBottomNav from './MobileBottomNav';
 import GlobalSearch from './GlobalSearch';
 import NotificationBell from './NotificationBell';
 import UserMenu from './UserMenu';
@@ -23,6 +24,7 @@ export default function AppLayout() {
   });
   const { currentUser } = useCurrentUser();
   const [activeEmergency, setActiveEmergency] = useState(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const navigate = useNavigate();
 
   // Notificaciones de emergencia para gerencia (admin)
@@ -31,7 +33,7 @@ export default function AppLayout() {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0f1e34 55%, #091422 100%)' }}>
       <OfflineBar isOnline={isOnline} pendingCount={pendingCount} isSyncing={isSyncing} onSync={syncPending} />
-      <Sidebar />
+      <Sidebar open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
       <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${!isOnline || isSyncing || pendingCount > 0 ? 'pt-8' : ''}`}>
         {/* Top bar */}
         <header className="h-14 border-b border-white/8 flex items-center gap-3 pl-14 pr-4 lg:pl-5 lg:pr-5 flex-shrink-0 z-30"
@@ -45,12 +47,13 @@ export default function AppLayout() {
           </div>
         </header>
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6" style={{ background: 'transparent' }}>
+        <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 pb-24 lg:pb-6" style={{ background: 'transparent' }}>
           <div className="page-enter">
             <Outlet />
           </div>
         </main>
       </div>
+      <MobileBottomNav onMore={() => setMobileNavOpen(true)} />
       <ChatbotSoporte />
       <EmergencyAlert
         emergencia={activeEmergency}

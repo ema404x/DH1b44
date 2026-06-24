@@ -149,11 +149,16 @@ function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesA
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ open, onOpenChange }) {
   const location = useLocation();
   const { user, userPermissions } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [internalMobileOpen, setInternalMobileOpen] = useState(false);
+  const mobileOpen = open !== undefined ? open : internalMobileOpen;
+  const setMobileOpen = (v) => {
+    if (onOpenChange) onOpenChange(v);
+    if (open === undefined) setInternalMobileOpen(v);
+  };
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('dh1-collapsed-nav'));
