@@ -7,7 +7,7 @@ import { Filter, TrendingUp, BadgeDollarSign, CircleCheck, Building2 } from 'luc
 import { format, subMonths, startOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ReporteMensualComparativo from '@/components/reportes/ReporteMensualComparativo';
-import { fmt, fmtM, pct, ChartTip, KpiCard, KpiSkeleton, TableSkeleton, SortableTh, useTableSort } from '@/components/reportes/shared';
+import { fmt, fmtM, ChartTip, KpiCard, KpiSkeleton, TableSkeleton, SortableTh, useTableSort } from '@/components/reportes/shared';
 
 const SC = {
   aprobado: { label: 'Aprobado', cls: 'bg-emerald-500/12 text-emerald-400' },
@@ -67,12 +67,11 @@ function AbonosReporte({ certs, periodo, contratista, estado }) {
   const penult   = porMes[porMes.length - 2]?.total || 0;
   const deltaMes = penult > 0 ? Math.round(((ultimo - penult) / penult) * 100) : null;
 
-  // Tablas ordenables
-  const { sort, onSort, sorted: sortedRows } = useTableSort(
-    data.slice(0, 50).map(c => ({
-      numero: String(c.numero || ''), contratista: c.contratista || '', obra: c.obra_servicio || '', mes: c.mes_periodo || '', estado: c.estado, subtotal: c.subtotal || 0,
-    })),
-  );
+  // Tabla ordenable — ordena TODO el dataset, luego pagina en render (precisión del top)
+  const allRows = data.map(c => ({
+    numero: String(c.numero || ''), contratista: c.contratista || '', obra: c.obra_servicio || '', mes: c.mes_periodo || '', estado: c.estado, subtotal: c.subtotal || 0,
+  }));
+  const { sort, onSort, sorted: sortedRows } = useTableSort(allRows, 'subtotal', 'desc');
 
   const { sorted: sortedContratistas } = useTableSort(porContratista);
 
@@ -166,7 +165,7 @@ function AbonosReporte({ certs, periodo, contratista, estado }) {
       <div className="rounded-2xl border border-border/40 bg-card overflow-hidden">
         <div className="px-5 py-3.5 border-b border-border/30 flex items-center justify-between">
           <p className="text-xs font-bold text-foreground uppercase tracking-wide">Detalle de certificados</p>
-          <span className="text-[10px] text-muted-foreground">{data.length} registros · {data.length > 50 ? 'primeros 50 — ' : ''}ordená por columna</span>
+          <span className="text-[10px] text-muted-foreground">{data.length} · {data.length > 50 ? 'top 50 de ' : ''}ordená por columna</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -181,7 +180,7 @@ function AbonosReporte({ certs, periodo, contratista, estado }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/10">
-              {sortedRows.map((cert, idx) => {
+              {sortedRows.slice(0, 50).map((cert, idx) => {
                 const sc = SC[cert.estado] || SC.borrador;
                 return (
                   <tr key={idx} className="hover:bg-muted/10 transition-colors">
@@ -221,7 +220,7 @@ export default function ReportesFacturacion() {
   const [estado,      setEstado]      = useState('todos');
 
   const { data: certs = [], isLoading } = useQuery({
-    queryKey: ['certs-reportes'],
+    queryKey: ['certificados-financiero'],
     queryFn:  () => base44.entities.Certificado.list('-fecha_certificado', 500),
     staleTime: 2 * 60 * 1000,
   });
@@ -262,7 +261,7 @@ export default function ReportesFacturacion() {
               <Select value={estado} onValueChange={setEstado}>
                 <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="todos">Emitidos + Aprobados</SelectItem>
                   <SelectItem value="aprobado">Aprobados</SelectItem>
                   <SelectItem value="emitido">Emitidos</SelectItem>
                   <SelectItem value="borrador">Borradores</SelectItem>

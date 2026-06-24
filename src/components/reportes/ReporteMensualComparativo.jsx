@@ -20,9 +20,9 @@ export default function ReporteMensualComparativo() {
   const [mes,           setMes]           = useState(format(new Date(), 'yyyy-MM'));
   const [filtroEstado,  setFiltroEstado]  = useState('todos');
 
-  const { data: certificados = [], isLoading: loadingC } = useQuery({ queryKey: ['certificados-list'], queryFn: () => base44.entities.Certificado.list('-fecha_certificado', 500),  staleTime: 2*60*1000 });
-  const { data: facturas = [],     isLoading: loadingF } = useQuery({ queryKey: ['invoices-list'],   queryFn: () => base44.entities.Invoice.list('-issue_date', 500),              staleTime: 2*60*1000 });
-  const { data: obras = [],        isLoading: loadingO } = useQuery({ queryKey: ['obras-certif-rep'],queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 500),  staleTime: 2*60*1000 });
+  const { data: certificados = [], isLoading: loadingC } = useQuery({ queryKey: ['certificados-financiero'], queryFn: () => base44.entities.Certificado.list('-fecha_certificado', 500),  staleTime: 2*60*1000 });
+  const { data: facturas = [],     isLoading: loadingF } = useQuery({ queryKey: ['invoices'],                queryFn: () => base44.entities.Invoice.list('-issue_date', 500),              staleTime: 2*60*1000 });
+  const { data: obras = [],        isLoading: loadingO } = useQuery({ queryKey: ['obras-certificacion'],      queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 500),  staleTime: 2*60*1000 });
   const loading = loadingC || loadingF || loadingO;
 
   const mesesDisponibles = useMemo(() => {
@@ -73,7 +73,7 @@ export default function ReporteMensualComparativo() {
   const diff      = totalCert - totalFac;
   const obrasOk   = rows.filter(r => Math.abs(r.diferencia) < 1).length;
 
-  const chartData = rows.slice(0, 8).map(r => ({
+  const chartData = [...rows].sort((a, b) => b.certificado - a.certificado).slice(0, 8).map(r => ({
     name: r.obra.length > 14 ? r.obra.slice(0, 14) + '…' : r.obra,
     Certificado: r.certificado,
     Facturado:   r.facturado,
