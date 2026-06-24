@@ -177,7 +177,7 @@ export default function Sidebar() {
     '/emergencias': 'Emergencias',
     '/proyectos': 'Project',
     '/ordenes': 'WorkOrder',
-    '/activos': 'Pendientes',
+    '/activos': 'Asset',
     '/informes': 'Informes',
     '/inspeccion-colegio': 'InspeccionColegio',
     '/reportes': 'Reportes',

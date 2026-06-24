@@ -17,18 +17,20 @@ Deno.serve(async (req) => {
     let ordenesVencidas = 0;
 
     // ── 1. Marcar vencidas ─────────────────────────────────────────────────
-    const ordenesAbiertas = await base44.asServiceRole.entities.OrdenRutina.filter({
-      estado: 'pendiente',
-    });
-    const ordenesEnProceso = await base44.asServiceRole.entities.OrdenRutina.filter({
-      estado: 'en_proceso',
-    });
+    // Pre-cargar en paralelo órdenes abiertas (2 queries en vez de N updates individuales)
+    const [ordenesAbiertas, ordenesEnProceso] = await Promise.all([
+      base44.asServiceRole.entities.OrdenRutina.filter({ estado: 'pendiente' }),
+      base44.asServiceRole.entities.OrdenRutina.filter({ estado: 'en_proceso' }),
+    ]);
+    const toVencer = [...ordenesAbiertas, ...ordenesEnProceso]
+      .filter(o => o.fecha_limite && o.fecha_limite < hoyStr);
 
-    for (const orden of [...ordenesAbiertas, ...ordenesEnProceso]) {
-      if (orden.fecha_limite && orden.fecha_limite < hoyStr) {
-        await base44.asServiceRole.entities.OrdenRutina.update(orden.id, { estado: 'vencida' });
-        ordenesVencidas++;
+    if (toVencer.length > 0) {
+      const updatesBulk = toVencer.map(o => ({ id: o.id, estado: 'vencida' }));
+      for (let i = 0; i < updatesBulk.length; i += 100) {
+        await base44.asServiceRole.entities.OrdenRutina.bulkUpdate(updatesBulk.slice(i, i + 100));
       }
+      ordenesVencidas = toVencer.length;
     }
 
     // ── 2. Generar nuevas órdenes ──────────────────────────────────────────

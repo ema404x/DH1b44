@@ -44,8 +44,8 @@ Deno.serve(async (req) => {
     if (action === 'getWorkOrder') {
       const { workOrderId } = body;
       if (!workOrderId) return Response.json({ error: 'workOrderId requerido' }, { status: 400 });
-      const orders = await base44.asServiceRole.entities.WorkOrder.list('-created_date', 500);
-      const workOrder = orders.find(o => o.id === workOrderId) || null;
+      const workOrders = await base44.asServiceRole.entities.WorkOrder.filter({ id: workOrderId });
+      const workOrder = workOrders[0] || null;
       return Response.json({ workOrder });
     }
 

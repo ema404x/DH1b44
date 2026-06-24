@@ -188,7 +188,7 @@ export default function Dashboard() {
 
   const allUserOrders = useMemo(() =>
     filterByUser(allOrders, ['assigned_name', 'assigned_to', 'created_by'])
-  , [allOrders, isAdmin, filterByUser]);
+  , [allOrders, filterByUser]);
 
   // Fecha de corte según el rango seleccionado
   const filterCutoff = useMemo(() => {

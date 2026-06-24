@@ -339,12 +339,24 @@ Deno.serve(async (req) => {
     const generatedCerts = [];
     const skipped = [];
 
+    // Pre-cargar todos los certificados de abono del mes para evitar N+1 queries
+    const certDate = new Date(`${certYear}-${String(certMonth).padStart(2, '0')}-01T00:00:00`);
+    const certsMesActual = await base44.asServiceRole.entities.Certificado.filter({
+      mes_periodo: mesFormato,
+      tipo: 'abono_mensual',
+      generado_automaticamente: true,
+    });
+    const certsMesSet = new Set(certsMesActual.map(c => `${c.oc_numero || ''}__${c.contratista}`));
+
+    // Pre-cargar el último número de certificado una sola vez
+    const allCertsLast = await base44.asServiceRole.entities.Certificado.filter({}, '-numero', 1);
+    let lastGlobalNum = allCertsLast.length > 0 ? (allCertsLast[0].numero || 0) : 0;
+
     for (const abono of abonos) {
       // Verificar que el mes a certificar esté dentro del período de vigencia
       if (abono.fecha_inicio_validez && abono.fecha_fin_validez) {
         const inicioDate = new Date(abono.fecha_inicio_validez + 'T00:00:00');
         const finDate = new Date(abono.fecha_fin_validez + 'T00:00:00');
-        const certDate = new Date(`${certYear}-${String(certMonth).padStart(2, '0')}-01T00:00:00`);
 
         if (certDate < inicioDate || certDate > finDate) {
           skipped.push({ contratista: abono.contratista, reason: 'Mes fuera del período de vigencia del contrato' });
@@ -352,24 +364,10 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Verificar idempotencia: no generar si ya existe para ese mes y abono
-      const existing = await base44.asServiceRole.entities.Certificado.filter({
-        oc_numero: abono.oc_numero || '__NONE__',
-        mes_periodo: mesFormato,
-        tipo: 'abono_mensual',
-        generado_automaticamente: true
-      });
-
-      const existingPorContratista = !abono.oc_numero
-        ? await base44.asServiceRole.entities.Certificado.filter({
-            contratista: abono.contratista,
-            mes_periodo: mesFormato,
-            tipo: 'abono_mensual',
-            generado_automaticamente: true
-          })
-        : [];
-
-      if (existing.length > 0 || existingPorContratista.length > 0) {
+      // Verificar idempotencia usando el set pre-cargado
+      const keyConOC = `${abono.oc_numero || ''}__${abono.contratista}`;
+      const keyContratistaOnly = `__${abono.contratista}`;
+      if (certsMesSet.has(keyConOC) || (!abono.oc_numero && certsMesSet.has(keyContratistaOnly))) {
         skipped.push({ contratista: abono.contratista, reason: 'Ya existe para este mes' });
         continue;
       }
@@ -380,10 +378,9 @@ Deno.serve(async (req) => {
       const diffMeses = (certYear - inicioY) * 12 + (certMonth - inicioM);
       const numeroEnContrato = diffMeses + 1;
 
-      // Número global de certificado
-      const allCerts = await base44.asServiceRole.entities.Certificado.filter({}, '-numero', 1);
-      const lastNum = allCerts.length > 0 ? (allCerts[0].numero || 0) : 0;
-      const certNumber = lastNum + 1;
+      // Número global de certificado — incrementar desde el valor pre-cargado
+      lastGlobalNum++;
+      const certNumber = lastGlobalNum;
 
       const fechaCert = lastBizDay.toISOString().split('T')[0];
       // Parsear montos correctamente (pueden venir como strings "1.234.567")
