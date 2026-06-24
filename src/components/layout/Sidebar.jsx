@@ -310,12 +310,11 @@ export default function Sidebar() {
                   <span className="flex-shrink-0">{group.label}</span>
                   <div className="flex-1 h-px bg-white/12" />
                   {groupPending > 0 && isGroupCollapsed ? (
-                    <span className="flex items-center gap-1 shrink-0">
-                      <span className="relative flex h-2 w-2 items-center justify-center">
+                    <span className="shrink-0 flex items-center">
+                      <span className="relative flex h-2.5 w-2.5 items-center justify-center">
                         <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
-                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_2px_rgba(251,191,36,0.6)]" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_6px_2px_rgba(251,191,36,0.6)]" />
                       </span>
-                      <span className="text-[9px] font-bold text-amber-400 leading-none tabular-nums">{groupPending}</span>
                     </span>
                   ) : (
                     <span className="text-[8px] text-sidebar-foreground/40 tabular-nums shrink-0">{group.items.length}</span>
