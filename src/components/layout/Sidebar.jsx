@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
-  Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
+  Package, FileText, Receipt, ChevronLeft, ChevronRight, ChevronDown, Menu, X,
   Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -154,6 +154,14 @@ export default function Sidebar() {
   const { user, userPermissions } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('dh1-collapsed-nav'));
+      if (Array.isArray(saved)) return new Set(saved);
+    } catch {}
+    // Por defecto colapsa todos; el efecto expande el grupo de la ruta activa
+    return new Set(navGroups.map(g => g.label));
+  });
   const { hasNewMessages, resetNotification } = useForoNotificaciones();
   const { pendientesAprobacion } = useAprobacionPendientes();
   
@@ -168,6 +176,30 @@ export default function Sidebar() {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
+
+  // Persistir grupos colapsados
+  useEffect(() => {
+    localStorage.setItem('dh1-collapsed-nav', JSON.stringify([...collapsedGroups]));
+  }, [collapsedGroups]);
+
+  // Auto-expandir el grupo que contiene la ruta activa (solo en sidebar expandida)
+  useEffect(() => {
+    if (collapsed) return;
+    setCollapsedGroups(prev => {
+      const activeGroup = navGroups.find(g => g.items.some(it => isActive(it.path)));
+      if (!activeGroup || !prev.has(activeGroup.label)) return prev;
+      const next = new Set(prev);
+      next.delete(activeGroup.label);
+      return next;
+    });
+  }, [location.pathname, collapsed]);
+
+  const toggleGroup = (label) =>
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
 
   // Mapeo de rutas → clave de módulo en RolePermission
   const routeToModule = {
@@ -256,30 +288,44 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-4 scrollbar-thin">
-        {visibleGroups.map((group) => (
-          <div key={group.label}>
-            {!collapsed && (
-              <div className="px-3 mb-1 text-[9px] font-bold uppercase tracking-[0.14em] text-sidebar-foreground/25 flex items-center gap-2">
-                <span className="flex-shrink-0">{group.label}</span>
-                <div className="flex-1 h-px bg-white/6" />
+        {visibleGroups.map((group) => {
+          const isGroupCollapsed = collapsedGroups.has(group.label);
+          const wrapperCls = collapsed
+            ? "space-y-0.5"
+            : cn("space-y-0.5 overflow-hidden transition-all duration-200", isGroupCollapsed ? "max-h-0 opacity-0" : "max-h-[600px] opacity-100");
+          return (
+            <div key={group.label}>
+              {!collapsed ? (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.label)}
+                  aria-expanded={!isGroupCollapsed}
+                  className="w-full px-3 mb-1 mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-sidebar-foreground/30 hover:text-sidebar-foreground/60 flex items-center gap-2 transition-colors"
+                >
+                  <ChevronDown className={cn("h-3 w-3 flex-shrink-0 transition-transform duration-200", isGroupCollapsed && "-rotate-90")} />
+                  <span className="flex-shrink-0">{group.label}</span>
+                  <div className="flex-1 h-px bg-white/6" />
+                  <span className="text-[8px] text-sidebar-foreground/25 tabular-nums shrink-0">{group.items.length}</span>
+                </button>
+              ) : (
+                <div className="h-px bg-white/5 my-2 mx-2" />
+              )}
+              <div className={wrapperCls}>
+                {group.items.map((item) => (
+                  <NavItem
+                    key={item.path}
+                    item={item}
+                    collapsed={collapsed}
+                    active={isActive(item.path)}
+                    onClick={() => setMobileOpen(false)}
+                    hasNewMessages={item.path === '/foro' ? hasNewMessages : false}
+                    pendientesAprobacion={pendientesAprobacion}
+                  />
+                ))}
               </div>
-            )}
-            {collapsed && <div className="h-px bg-white/5 my-2 mx-2" />}
-            <div className="space-y-0.5">
-              {group.items.map((item) => (
-                <NavItem
-                  key={item.path}
-                  item={item}
-                  collapsed={collapsed}
-                  active={isActive(item.path)}
-                  onClick={() => setMobileOpen(false)}
-                  hasNewMessages={item.path === '/foro' ? hasNewMessages : false}
-                  pendientesAprobacion={pendientesAprobacion}
-                />
-              ))}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Collapse toggle */}
