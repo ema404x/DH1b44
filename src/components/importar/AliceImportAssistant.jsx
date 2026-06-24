@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Bot, Sparkles, ChevronDown, ChevronUp, Loader2, Send, Paperclip, X, File } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, Loader2, Send, Paperclip, X, File, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 
@@ -148,6 +148,7 @@ export default function AliceImportAssistant({ step, mappingResult, importResult
   const [initDone, setInitDone] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
   const conversationInitRef = useRef(false);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -254,6 +255,12 @@ Sé concisa, práctica y amigable.`;
 
   const removeFile = (idx) => setSelectedFiles(prev => prev.filter((_, i) => i !== idx));
 
+  const copyMessage = (id, content) => {
+    navigator.clipboard?.writeText(content);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
+
   const handleSend = async (text) => {
     const msg = (text || input).trim();
     if ((!msg && !selectedFiles.length) || sending) return;
@@ -284,6 +291,7 @@ Sé concisa, práctica y amigable.`;
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="h-1 w-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
       {/* Header */}
       <button
         onClick={() => setExpanded(e => !e)}
@@ -320,33 +328,51 @@ Sé concisa, práctica y amigable.`;
             <div className="border-t border-border">
               {/* Messages */}
               <div className="max-h-80 min-h-48 overflow-y-auto px-4 py-4 space-y-4">
-                {messages.map((msg, i) => (
-                  <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    {msg.role === 'assistant' && <ChatAvatar size="sm" />}
-                    <div className={`max-w-[82%] px-3.5 py-2.5 text-sm leading-relaxed ${
-                      msg.role === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-md'
-                        : 'bg-muted/60 border border-border rounded-2xl rounded-tl-md text-foreground'
-                    }`}>
-                      {msg._typing ? (
-                        <div className="flex gap-1 items-center py-1">
-                          {[0,1,2].map(d => (
-                            <motion.div key={d} className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60"
-                              animate={{ y: [0, -4, 0], opacity: [0.4, 1, 0.4] }}
-                              transition={{ duration: 0.6, repeat: Infinity, delay: d * 0.15 }}
-                            />
-                          ))}
-                        </div>
-                      ) : msg.role === 'user' ? (
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
-                      ) : (
-                        <ReactMarkdown className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-headings:text-foreground prose-strong:text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
-                          {msg.content}
-                        </ReactMarkdown>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                {messages.map((msg, i) => {
+                  const isAssistant = msg.role === 'assistant';
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      {isAssistant && <ChatAvatar size="sm" />}
+                      <div className={`group relative max-w-[82%] px-3.5 py-2.5 text-sm leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-md'
+                          : 'bg-muted/60 border border-border rounded-2xl rounded-tl-md text-foreground'
+                      }`}>
+                        {msg._typing ? (
+                          <div className="flex gap-1 items-center py-1">
+                            {[0,1,2].map(d => (
+                              <motion.div key={d} className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60"
+                                animate={{ y: [0, -4, 0], opacity: [0.4, 1, 0.4] }}
+                                transition={{ duration: 0.6, repeat: Infinity, delay: d * 0.15 }}
+                              />
+                            ))}
+                          </div>
+                        ) : msg.role === 'user' ? (
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                        ) : (
+                          <>
+                            <ReactMarkdown className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-headings:text-foreground prose-strong:text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-a:text-primary">
+                              {msg.content}
+                            </ReactMarkdown>
+                            <button
+                              onClick={() => copyMessage(i, msg.content)}
+                              className="absolute -top-1.5 right-1 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 rounded-full bg-card border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-primary"
+                              title="Copiar respuesta"
+                            >
+                              {copiedId === i ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -354,13 +380,16 @@ Sé concisa, práctica y amigable.`;
               {currentSuggestions.length > 0 && !sending && (
                 <div className="px-4 pb-3 flex flex-wrap gap-2">
                   {currentSuggestions.map((s, i) => (
-                    <button
+                    <motion.button
                       key={i}
                       onClick={() => handleSend(s)}
-                      className="text-xs px-3 py-1.5 rounded-full border border-border bg-card hover:border-primary/40 hover:bg-primary/8 hover:text-primary transition-colors text-muted-foreground whitespace-normal text-left max-w-full"
+                      whileHover={{ y: -1 }}
+                      whileTap={{ scale: 0.97 }}
+                      className="text-xs pl-2.5 pr-3 py-1.5 rounded-full border border-border bg-card hover:border-primary/40 hover:bg-primary/10 hover:text-primary transition-colors text-muted-foreground flex items-center gap-1.5 max-w-full"
                     >
-                      {s}
-                    </button>
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary/50 flex-shrink-0" />
+                      <span className="text-left">{s}</span>
+                    </motion.button>
                   ))}
                 </div>
               )}
