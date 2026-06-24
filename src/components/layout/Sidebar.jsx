@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -47,8 +47,7 @@ const navGroups = [
       { label: 'Certificados', icon: Award, path: '/certificados' },
       { label: 'Aprobación Certificados', icon: FileCheck2, path: '/aprobacion-certificados' },
       { label: 'Certificación de Obras', icon: FileCheck2, path: '/certificacion-obras' },
-      { label: 'Facturación', icon: Receipt, path: '/facturacion' },
-      { label: 'Finanzas', icon: TrendingUp, path: '/finanzas' },
+      { label: 'Centro Financiero', icon: Wallet, path: '/facturacion' },
     ]
   },
   {
@@ -189,7 +188,6 @@ export default function Sidebar() {
     '/aprobacion-certificados': 'AprobacionCertificados',
     '/certificacion-obras': 'CertificacionObras',
     '/facturacion': 'Invoice',
-    '/finanzas': 'Finanzas',
     '/informacion-general': 'InformacionGeneral',
     '/empleados': 'Employee',
     '/mapa': 'Mapa',

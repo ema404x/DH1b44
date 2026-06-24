@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, DollarSign, AlertCircle,
-  Clock, CheckCircle2, Building2, FileCheck,
+  Clock, CheckCircle2, Building2, FileCheck, BarChart2,
 } from 'lucide-react';
 import { format, parseISO, startOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -56,20 +56,26 @@ function KpiCard({ title, value, subtitle, icon: Icon, colorCls, borderCls }) {
 }
 
 export default function DashboardFinanciero() {
+  const STALE = 2 * 60 * 1000;
   const { data: invoices = [] } = useQuery({
     queryKey: ['invoices'],
     queryFn: () => base44.entities.Invoice.list(),
-    staleTime: 2 * 60 * 1000,
+    staleTime: STALE,
   });
   const { data: certificates = [] } = useQuery({
     queryKey: ['certificados'],
     queryFn: () => base44.entities.Certificado.list(),
-    staleTime: 2 * 60 * 1000,
+    staleTime: STALE,
   });
   const { data: obras = [] } = useQuery({
     queryKey: ['obras-certificacion'],
     queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 1000),
-    staleTime: 2 * 60 * 1000,
+    staleTime: STALE,
+  });
+  const { data: projects = [] } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => base44.entities.Project.list('-updated_date', 300),
+    staleTime: STALE,
   });
 
   // ── KPIs ───────────────────────────────────────────────────────────────
@@ -88,8 +94,14 @@ export default function DashboardFinanciero() {
     const certsAprobados = certificates.filter(c => c.estado === 'aprobado');
     const montoCerts     = certsAprobados.reduce((s, c) => s + (c.subtotal || 0), 0);
 
-    return { totalFacturado, cobrado, pendiente, vencido, montoACobrar, montoListo, montoCerts, cntCerts: certsAprobados.length };
-  }, [invoices, obras, certificates]);
+    // Proyectos
+    const totalPresupuestado = projects.reduce((s, p) => s + (p.estimated_budget || 0), 0);
+    const ejecucionProm = projects.length > 0
+      ? Math.round(projects.reduce((s, p) => s + (p.progress || 0), 0) / projects.length)
+      : 0;
+
+    return { totalFacturado, cobrado, pendiente, vencido, montoACobrar, montoListo, montoCerts, cntCerts: certsAprobados.length, totalPresupuestado, ejecucionProm };
+  }, [invoices, obras, certificates, projects]);
 
   // ── Evolución mensual (facturas por mes) ──────────────────────────────
   const monthlyData = useMemo(() => {
@@ -169,14 +181,13 @@ export default function DashboardFinanciero() {
         <KpiCard title="Vencido Sin Cobrar"  value={fmt(kpis.vencido)}        subtitle={`${invoices.filter(i=>i.status==='vencida').length} facturas`}   icon={AlertCircle} colorCls="text-red-400"       borderCls="border-red-500/20 bg-red-500/5" />
       </div>
 
-      {/* ── Obras en curso ──────────────────────────────────────────────── */}
-      {kpis.montoACobrar > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <KpiCard title="A Cobrar — Obras Activas" value={fmt(kpis.montoACobrar)}  subtitle={`${obras.filter(o=>!o.ciclo_archivado).length} obras activas`} icon={Building2}  colorCls="text-primary"     borderCls="border-primary/20" />
-          <KpiCard title="Listo para Certificar"    value={fmt(kpis.montoListo)}    subtitle="Obras en estado listo"  icon={FileCheck}   colorCls="text-emerald-400" borderCls="border-emerald-500/20" />
-          <KpiCard title="Certificados Aprobados"   value={fmt(kpis.montoCerts)}    subtitle={`${kpis.cntCerts} certificados`} icon={CheckCircle2} colorCls="text-blue-400"  borderCls="border-blue-500/20" />
-        </div>
-      )}
+      {/* ── Obras + Proyectos ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard title="A Cobrar — Obras" value={fmt(kpis.montoACobrar)}  subtitle={`${obras.filter(o=>!o.ciclo_archivado).length} obras activas`} icon={Building2}  colorCls="text-primary"     borderCls="border-primary/20" />
+        <KpiCard title="Listo Certificar"  value={fmt(kpis.montoListo)}    subtitle="Obras en estado listo"  icon={FileCheck}   colorCls="text-emerald-400" borderCls="border-emerald-500/20" />
+        <KpiCard title="Presupuesto Proyectos" value={fmt(kpis.totalPresupuestado)} subtitle={`${projects.length} proyectos · ${kpis.ejecucionProm}% prom.`} icon={TrendingUp} colorCls="text-purple-400" borderCls="border-purple-500/20" />
+        <KpiCard title="Certificados Aprobados" value={fmt(kpis.montoCerts)} subtitle={`${kpis.cntCerts} certificados`} icon={CheckCircle2} colorCls="text-blue-400" borderCls="border-blue-500/20" />
+      </div>
 
       {/* ── Gráficos ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

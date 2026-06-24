@@ -115,7 +115,7 @@ const AuthenticatedApp = () => {
         <Route path="/inventario" element={<ProtectedPage moduleKey="Inventory"><Inventory /></ProtectedPage>} />
         <Route path="/presupuestos-obra" element={<ProtectedPage moduleKey="PresupuestosObra"><Presupuestos /></ProtectedPage>} />
         <Route path="/facturacion" element={<ProtectedPage moduleKey="Invoice"><Invoices /></ProtectedPage>} />
-        <Route path="/finanzas" element={<ProtectedPage moduleKey="Finanzas"><Finanzas /></ProtectedPage>} />
+        <Route path="/finanzas" element={<ProtectedPage moduleKey="Invoice"><Invoices /></ProtectedPage>} />
         <Route path="/informes" element={<ProtectedPage moduleKey="Informes"><Informes /></ProtectedPage>} />
         <Route path="/activos" element={<ProtectedPage moduleKey="Asset"><Assets /></ProtectedPage>} />
         <Route path="/calendario" element={<ProtectedPage moduleKey="Calendario"><Calendario /></ProtectedPage>} />
