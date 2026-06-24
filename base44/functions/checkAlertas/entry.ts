@@ -21,55 +21,74 @@ Deno.serve(async (req) => {
     let totalAlertas = 0;
     const resumen = [];
 
+    // Determinar qué tipos de entidad se necesitan según las configs activas
+    const tiposActivos = new Set(configs.map(c => c.tipo));
+    const necesitaAssets    = tiposActivos.has('garantia_activo');
+    const necesitaMaterials  = tiposActivos.has('stock_material');
+    const necesitaPendientes = tiposActivos.has('pendiente_vencido');
+    const necesitaWOs        = tiposActivos.has('ot_vencida');
+
+    // ── Pre-cargar todas las entidades necesarias en una sola ronda de requests ──
+    const [logsNoLeidos, logsHoy, assets, materials, pendientesVencidos, workOrders] = await Promise.all([
+      sb.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 200).catch(() => []),
+      sb.entities.AlertaLog.list('-fecha_alerta', 500).catch(() => []),
+      necesitaAssets    ? sb.entities.Asset.list('-updated_date', 500).catch(() => [])                         : Promise.resolve([]),
+      necesitaMaterials  ? sb.entities.Material.list('-updated_date', 500).catch(() => [])                      : Promise.resolve([]),
+      necesitaPendientes ? sb.entities.Pendiente.filter({ estado: 'pendiente' }).catch(() => [])                : Promise.resolve([]),
+      necesitaWOs        ? sb.entities.WorkOrder.list('-updated_date', 500).catch(() => [])                     : Promise.resolve([]),
+    ]);
+
+    // Índice de logs de hoy para lookup O(1)
+    const logsHoyFiltrados = logsHoy.filter(l => l.fecha_alerta?.startsWith(hoy));
+    const keyExistenteSet = new Set(logsHoyFiltrados.map(l => `${l.tipo}::${l.entidad_id}`));
+    const keyExistente = (tipo, entidadId) => keyExistenteSet.has(`${tipo}::${entidadId}`);
+
     // ── LIMPIEZA: marcar como leídas las alertas de entidades eliminadas ──
-    // Cargamos todas las entidades referenciadas en bulk para evitar N+1 requests.
-    const logsNoLeidos = await sb.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 200).catch(() => []);
     if (logsNoLeidos.length > 0) {
-      const [allPend, allAssets, allMats, allWOs] = await Promise.all([
-        sb.entities.Pendiente.list('-created_date', 1000).catch(() => []),
-        sb.entities.Asset.list('-created_date', 500).catch(() => []),
-        sb.entities.Material.list('-created_date', 500).catch(() => []),
-        sb.entities.WorkOrder.list('-created_date', 1000).catch(() => []),
-      ]);
-      const existingIds = {
-        Pendiente:  new Set(allPend.map(e => e.id)),
-        Asset:      new Set(allAssets.map(e => e.id)),
-        Material:   new Set(allMats.map(e => e.id)),
-        WorkOrder:  new Set(allWOs.map(e => e.id)),
-      };
+      // Reutilizar los datos ya cargados, solo buscar lo que no tenga
+      const tiposEnLogs = new Set(logsNoLeidos.map(l => l.entidad_tipo).filter(Boolean));
+      const extraSets = {};
+      const extraFetches = [];
+
+      for (const tipo of tiposEnLogs) {
+        if (tipo === 'Asset' && necesitaAssets)       { extraSets['Asset']     = new Set(assets.map(e => e.id)); continue; }
+        if (tipo === 'Material' && necesitaMaterials)  { extraSets['Material']  = new Set(materials.map(e => e.id)); continue; }
+        if (tipo === 'WorkOrder' && necesitaWOs)       { extraSets['WorkOrder'] = new Set(workOrders.map(e => e.id)); continue; }
+        if (tipo === 'Pendiente' && necesitaPendientes){ extraSets['Pendiente'] = new Set(pendientesVencidos.map(e => e.id)); continue; }
+        // Si no se cargó aún, fetch ahora
+        extraFetches.push(
+          sb.entities[tipo]?.list('-created_date', 1000).catch(() => []).then(rows => {
+            extraSets[tipo] = new Set(rows.map(r => r.id));
+          })
+        );
+      }
+      if (extraFetches.length > 0) await Promise.all(extraFetches);
 
       const toMarkRead = logsNoLeidos.filter(log => {
         if (!log.entidad_id || !log.entidad_tipo) return false;
-        const set = existingIds[log.entidad_tipo];
-        if (!set) return false;
-        return !set.has(log.entidad_id);
+        const set = extraSets[log.entidad_tipo];
+        return set && !set.has(log.entidad_id);
       });
 
-      await Promise.allSettled(
-        toMarkRead.map(log => sb.entities.AlertaLog.update(log.id, { leida: true }).catch(() => {}))
-      );
+      if (toMarkRead.length > 0) {
+        await Promise.allSettled(
+          toMarkRead.map(log => sb.entities.AlertaLog.update(log.id, { leida: true }).catch(() => {}))
+        );
+      }
     }
 
-    // Pre-cargar logs de hoy para evitar duplicados
-    const logsHoy = await sb.entities.AlertaLog.list('-fecha_alerta', 500);
-    const logsHoyFiltrados = logsHoy.filter(l => l.fecha_alerta?.startsWith(hoy));
-    const keyExistente = (tipo, entidadId) =>
-      logsHoyFiltrados.some(l => l.tipo === tipo && l.entidad_id === entidadId);
-
+    // ── Procesar configs: los datos ya están en memoria, sin queries adicionales ──
     for (const cfg of configs) {
       const alertasGeneradas = [];
 
-      // ── 1. GARANTÍA DE ACTIVOS ────────────────────────────────────────
+      // 1. GARANTÍA DE ACTIVOS
       if (cfg.tipo === 'garantia_activo') {
-        const assets = await sb.entities.Asset.list('-updated_date', 500);
         const diasAnticipacion = cfg.dias_anticipacion || 30;
         const nuevasAlertas = [];
-
         for (const asset of assets) {
           if (!asset.warranty_expiry) continue;
           if (keyExistente('garantia_activo', asset.id)) continue;
-          const vencimiento = new Date(asset.warranty_expiry);
-          const diasRestantes = Math.ceil((vencimiento - ahora) / (1000 * 60 * 60 * 24));
+          const diasRestantes = Math.ceil((new Date(asset.warranty_expiry) - ahora) / 86400000);
           if (diasRestantes <= diasAnticipacion) {
             const nivel = diasRestantes <= 7 ? 'critical' : 'warning';
             const titulo = diasRestantes < 0
@@ -88,12 +107,10 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ── 2. STOCK CRÍTICO DE MATERIALES ───────────────────────────────
+      // 2. STOCK CRÍTICO DE MATERIALES
       if (cfg.tipo === 'stock_material') {
-        const materials = await sb.entities.Material.list('-updated_date', 500);
         const pctExtra = cfg.umbral_stock_pct || 0;
         const nuevasAlertas = [];
-
         for (const mat of materials) {
           if (!mat.min_stock || mat.min_stock === 0) continue;
           if (keyExistente('stock_material', mat.id)) continue;
@@ -116,17 +133,14 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ── 3. PENDIENTES ALTAMENTE VENCIDOS ─────────────────────────────
+      // 3. PENDIENTES VENCIDOS
       if (cfg.tipo === 'pendiente_vencido') {
-        const pendientes = await sb.entities.Pendiente.filter({ estado: 'pendiente' }).catch(() => []);
         const diasLimite = cfg.dias_vencimiento_pendiente || 7;
         const nuevasAlertas = [];
-
-        for (const p of pendientes) {
+        for (const p of pendientesVencidos) {
           if (!p.fecha_limite) continue;
           if (keyExistente('pendiente_vencido', p.id)) continue;
-          const limite = new Date(p.fecha_limite);
-          const diasVencidos = Math.ceil((ahora - limite) / (1000 * 60 * 60 * 24));
+          const diasVencidos = Math.ceil((ahora - new Date(p.fecha_limite)) / 86400000);
           if (diasVencidos >= diasLimite) {
             const nivel = diasVencidos >= diasLimite * 2 ? 'critical' : 'warning';
             nuevasAlertas.push({ config_id: cfg.id, tipo: 'pendiente_vencido', nivel,
@@ -144,18 +158,15 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ── 4. OTs VENCIDAS ──────────────────────────────────────────────
+      // 4. OTs VENCIDAS
       if (cfg.tipo === 'ot_vencida') {
-        const orders = await sb.entities.WorkOrder.list('-updated_date', 500);
         const diasLimite = cfg.dias_vencimiento_ot || 1;
         const nuevasAlertas = [];
-
-        for (const ot of orders) {
+        for (const ot of workOrders) {
           if (!ot.scheduled_date) continue;
           if (['completada', 'cancelada'].includes(ot.status)) continue;
           if (keyExistente('ot_vencida', ot.id)) continue;
-          const fecha = new Date(ot.scheduled_date);
-          const diasVencidos = Math.ceil((ahora - fecha) / (1000 * 60 * 60 * 24));
+          const diasVencidos = Math.ceil((ahora - new Date(ot.scheduled_date)) / 86400000);
           if (diasVencidos >= diasLimite) {
             const nivel = diasVencidos >= 7 ? 'critical' : 'warning';
             nuevasAlertas.push({ config_id: cfg.id, tipo: 'ot_vencida', nivel,
@@ -172,11 +183,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Actualizar ultima_notificacion si se generaron alertas
       if (alertasGeneradas.length > 0) {
-        await sb.entities.AlertaConfig.update(cfg.id, {
-          ultima_notificacion: ahora.toISOString(),
-        });
+        await sb.entities.AlertaConfig.update(cfg.id, { ultima_notificacion: ahora.toISOString() });
       }
 
       resumen.push({ config: cfg.nombre, tipo: cfg.tipo, alertas: alertasGeneradas.length });
