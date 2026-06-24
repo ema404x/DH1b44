@@ -127,6 +127,18 @@ function buildResultMessage(result) {
   return `❌ La importación no pudo completarse. Revisá que el archivo tenga el formato correcto y que los campos obligatorios estén completos.`;
 }
 
+const AVATAR_GRADIENT = "bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500";
+
+function ChatAvatar({ size = 'lg' }) {
+  const dim = size === 'lg' ? 'h-9 w-9' : 'h-7 w-7';
+  const icon = size === 'lg' ? 'h-4 w-4' : 'h-3.5 w-3.5';
+  return (
+    <div className={`${dim} ${AVATAR_GRADIENT} rounded-full flex items-center justify-center flex-shrink-0 shadow-md shadow-purple-500/20`}>
+      <Sparkles className={`${icon} text-white`} />
+    </div>
+  );
+}
+
 export default function AliceImportAssistant({ step, mappingResult, importResult }) {
   const [expanded, setExpanded] = useState(true);
   const [messages, setMessages] = useState([]);
@@ -271,22 +283,30 @@ Sé concisa, práctica y amigable.`;
   const currentSuggestions = STEP_MESSAGES[step]?.suggestions || [];
 
   return (
-    <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-purple-500/5 overflow-hidden">
+    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-primary/5 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors group"
       >
-        <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center">
-            <Sparkles className="h-4 w-4 text-primary" />
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <ChatAvatar />
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-card" />
           </div>
           <div className="text-left">
-            <p className="text-sm font-semibold">Alice · Asistente de Importación</p>
-            <p className="text-[10px] text-muted-foreground">Preguntame lo que necesites sobre la importación</p>
+            <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              Alice
+              <span className="text-[10px] font-normal text-muted-foreground">· Asistente de importación</span>
+            </p>
+            <p className="text-[11px] text-emerald-400/80 flex items-center gap-1">
+              <span className="h-1 w-1 rounded-full bg-emerald-400 animate-pulse" /> En línea · Preguntame lo que necesites
+            </p>
           </div>
         </div>
-        {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        <div className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground group-hover:bg-muted transition-colors">
+          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </div>
       </button>
 
       <AnimatePresence>
@@ -297,34 +317,30 @@ Sé concisa, práctica y amigable.`;
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="border-t border-primary/10">
+            <div className="border-t border-border">
               {/* Messages */}
-              <div className="max-h-64 overflow-y-auto px-4 py-3 space-y-3">
+              <div className="max-h-80 min-h-48 overflow-y-auto px-4 py-4 space-y-4">
                 {messages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-2`}>
-                    {msg.role === 'assistant' && (
-                      <div className="h-6 w-6 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Bot className="h-3 w-3 text-primary" />
-                      </div>
-                    )}
-                    <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
+                  <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {msg.role === 'assistant' && <ChatAvatar size="sm" />}
+                    <div className={`max-w-[82%] px-3.5 py-2.5 text-sm leading-relaxed ${
                       msg.role === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-br-sm'
-                        : 'bg-card border border-border rounded-bl-sm'
+                        ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-md'
+                        : 'bg-muted/60 border border-border rounded-2xl rounded-tl-md text-foreground'
                     }`}>
                       {msg._typing ? (
-                        <div className="flex gap-1 items-center py-0.5">
-                          {[0,1,2].map(i => (
-                            <motion.div key={i} className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50"
-                              animate={{ y: [0, -3, 0] }}
-                              transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.12 }}
+                        <div className="flex gap-1 items-center py-1">
+                          {[0,1,2].map(d => (
+                            <motion.div key={d} className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60"
+                              animate={{ y: [0, -4, 0], opacity: [0.4, 1, 0.4] }}
+                              transition={{ duration: 0.6, repeat: Infinity, delay: d * 0.15 }}
                             />
                           ))}
                         </div>
                       ) : msg.role === 'user' ? (
-                        <p>{msg.content}</p>
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
                       ) : (
-                        <ReactMarkdown className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
+                        <ReactMarkdown className="prose prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-headings:text-foreground prose-strong:text-foreground prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
                           {msg.content}
                         </ReactMarkdown>
                       )}
@@ -336,12 +352,12 @@ Sé concisa, práctica y amigable.`;
 
               {/* Suggestions */}
               {currentSuggestions.length > 0 && !sending && (
-                <div className="px-4 pb-2 flex flex-wrap gap-1.5">
+                <div className="px-4 pb-3 flex flex-wrap gap-2">
                   {currentSuggestions.map((s, i) => (
                     <button
                       key={i}
                       onClick={() => handleSend(s)}
-                      className="text-[11px] px-2.5 py-1 rounded-full border border-primary/20 hover:bg-primary/10 transition-colors text-primary whitespace-nowrap"
+                      className="text-xs px-3 py-1.5 rounded-full border border-border bg-card hover:border-primary/40 hover:bg-primary/8 hover:text-primary transition-colors text-muted-foreground whitespace-normal text-left max-w-full"
                     >
                       {s}
                     </button>
@@ -351,55 +367,58 @@ Sé concisa, práctica y amigable.`;
 
               {/* File attachments preview */}
               {selectedFiles.length > 0 && (
-                <div className="px-4 py-2 border-t border-border/50 space-y-2">
+                <div className="px-4 pb-2 space-y-1.5">
                   {selectedFiles.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs bg-muted/30 rounded-lg px-2.5 py-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <File className="h-3 w-3 text-muted-foreground" />
-                        <span className="truncate text-muted-foreground">{file.name}</span>
+                    <div key={idx} className="flex items-center justify-between text-xs bg-muted/50 border border-border rounded-full pl-2.5 pr-1.5 py-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <File className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                        <span className="truncate text-foreground">{file.name}</span>
                       </div>
-                      <button onClick={() => removeFile(idx)} className="text-muted-foreground hover:text-destructive">
-                        <X className="h-3 w-3" />
+                      <button onClick={() => removeFile(idx)} className="text-muted-foreground hover:text-destructive transition-colors ml-2 flex-shrink-0">
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Input */}
-              <div className="px-4 pb-3 flex gap-2">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
-                  placeholder="Preguntale a Alice sobre la importación..."
-                  disabled={sending}
-                  className="flex-1 text-sm bg-background border border-input rounded-xl px-3 py-2 outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground disabled:opacity-50"
-                />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept=".xlsx,.xls,.csv,.json,.pdf"
-                  onChange={e => handleFileSelect(Array.from(e.target.files || []))}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={sending || uploadingFile}
-                  className="h-9 w-9 rounded-xl border border-input hover:bg-muted flex items-center justify-center disabled:opacity-40 transition-colors flex-shrink-0"
-                  title="Adjuntar archivos para que Alice analice"
-                >
-                  {uploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-                </button>
-                <button
-                  onClick={() => handleSend()}
-                  disabled={(!input.trim() && !selectedFiles.length) || sending}
-                  className="h-9 w-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0"
-                >
-                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </button>
+              {/* Input bar — estilo Google/Gemini */}
+              <div className="px-3 pb-3 pt-1">
+                <div className="flex items-center gap-1 bg-muted/60 border border-border rounded-full pl-1.5 pr-1.5 py-1 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/15 transition-all">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".xlsx,.xls,.csv,.json,.pdf"
+                    onChange={e => handleFileSelect(Array.from(e.target.files || []))}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={sending || uploadingFile}
+                    className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center disabled:opacity-40 transition-colors flex-shrink-0 text-muted-foreground hover:text-foreground"
+                    title="Adjuntar archivos para que Alice analice"
+                  >
+                    {uploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                  </button>
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                    placeholder="Preguntale a Alice sobre la importación..."
+                    disabled={sending}
+                    className="flex-1 bg-transparent border-0 outline-none text-sm px-1 py-1 placeholder:text-muted-foreground disabled:opacity-50 text-foreground"
+                  />
+                  <button
+                    onClick={() => handleSend()}
+                    disabled={(!input.trim() && !selectedFiles.length) || sending}
+                    className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30 hover:bg-primary/90 transition-all flex-shrink-0 shadow-sm"
+                    title="Enviar"
+                  >
+                    {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
