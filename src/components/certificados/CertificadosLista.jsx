@@ -11,15 +11,15 @@ import { useResolveNames } from '@/hooks/useResolveNames';
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
 const estadoStyle = {
-  borrador: 'bg-slate-100 text-slate-600 border-slate-200',
-  emitido:  'bg-blue-50 text-blue-700 border-blue-200',
-  aprobado: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  borrador: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
+  emitido:  'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  aprobado: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
 };
 
 const tipoStyle = {
-  abono_mensual: { label: 'Abono Mensual', color: 'bg-violet-100 text-violet-700 border-violet-200' },
-  obra:          { label: 'Obra',           color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  informe:       { label: 'Informe',        color: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
+  abono_mensual: { label: 'Abono Mensual', color: 'bg-violet-500/15 text-violet-300 border-violet-500/30' },
+  obra:          { label: 'Obra',           color: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
+  informe:       { label: 'Informe',        color: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' },
 };
 
 export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete, emptyLabel }) {
@@ -88,25 +88,25 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                     {c.mes_periodo && <span>{c.mes_periodo}</span>}
                   </div>
                   {c.estado === 'aprobado' && c.aprobado_por && (
-                    <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-1">
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-400 mt-1">
                       <CheckCircle2 className="h-3 w-3" />
                       <span>Aprobado por {resolve(c.aprobado_por)}</span>
                     </div>
                   )}
                   {c.estado === 'emitido' && c.tipo === 'obra' && !c.firma_jefe_sitio_url && (
-                    <div className="flex items-center gap-1.5 text-xs text-amber-500 mt-1">
+                    <div className="flex items-center gap-1.5 text-xs text-amber-400 mt-1">
                       <PenTool className="h-3 w-3" />
                       <span>Pendiente firma del jefe de sitio</span>
                     </div>
                   )}
                   {c.estado === 'emitido' && c.tipo === 'obra' && c.firma_jefe_sitio_url && (
-                    <div className="flex items-center gap-1.5 text-xs text-blue-500 mt-1">
+                    <div className="flex items-center gap-1.5 text-xs text-blue-400 mt-1">
                       <Clock className="h-3 w-3" />
                       <span>Firmado por jefe — pendiente aprobación gerencial</span>
                     </div>
                   )}
                   {c.estado === 'emitido' && c.tipo !== 'obra' && (
-                    <div className="flex items-center gap-1.5 text-xs text-blue-500 mt-1">
+                    <div className="flex items-center gap-1.5 text-xs text-blue-400 mt-1">
                       <Clock className="h-3 w-3" />
                       <span>Pendiente de aprobación</span>
                     </div>
@@ -145,7 +145,7 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
               {/* Desktop actions */}
               <div className="hidden sm:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity items-center">
                 {c.estado === 'aprobado' && c.firma_gerente_url && (
-                  <img src={c.firma_gerente_url} alt="Firma" className="h-8 object-contain border rounded bg-white px-1" title={`Aprobado por ${c.aprobado_por || ''}`} />
+                  <img src={c.firma_gerente_url} alt="Firma" className="h-8 object-contain border border-border/50 rounded bg-muted/30 px-1" title={`Aprobado por ${c.aprobado_por || ''}`} />
                 )}
                 <Button 
                   size="icon" 
