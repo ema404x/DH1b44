@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
   const ws = workbook.Sheets[sheetName];
 
   // Leer como array de arrays para manejar el header en fila 1 (índice 1)
-  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, blankrows: false });
 
   // Fila 1 (índice 1) contiene los headers reales
   // Columnas clave por índice:
@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
     else toCreate.push(proj);
   }
 
-  const BATCH_SIZE = 100;
+  const BATCH_SIZE = 500;
   let created = 0;
   let updated = 0;
   let errors = 0;
