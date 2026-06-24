@@ -26,7 +26,8 @@ export default function ImportarObrasExcelModal({ onClose, onImported }) {
       const res = await base44.functions.invoke('importarObrasExcel', { file_url });
       const data = res.data;
 
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      // Invalida y espera a que se complete el refetch
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
       setResult(data);
       setStep('done');
 
