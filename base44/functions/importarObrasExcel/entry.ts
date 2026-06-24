@@ -108,30 +108,71 @@ Deno.serve(async (req) => {
     });
   }
 
-  // ── Insertar en batches de 100 (paralelo dentro de cada batch) ───────────────
+  // ── Upsert por Nº Orden SAP: actualiza obras existentes y crea las nuevas ──
+  // Evita duplicar la planilla al re-importar y mantiene los datos siempre actualizados.
+  const deduped = new Map();
+  const noCodeRows = [];
+  for (const proj of projects) {
+    const c = proj.code ? String(proj.code).trim() : '';
+    if (c) deduped.set(c, proj); else noCodeRows.push(proj);
+  }
+  const finalList = [...deduped.values(), ...noCodeRows];
+
+  let existing = [];
+  try { existing = await base44.asServiceRole.entities.Project.list('id', 5000); } catch (_) {}
+  const byCode = new Map();
+  for (const p of existing) {
+    const c = p.code ? String(p.code).trim() : '';
+    if (c) byCode.set(c, p);
+  }
+
+  const toCreate = [];
+  const toUpdate = [];
+  for (const proj of finalList) {
+    const c = proj.code ? String(proj.code).trim() : '';
+    if (c && byCode.has(c)) toUpdate.push({ id: byCode.get(c).id, ...proj });
+    else toCreate.push(proj);
+  }
+
   const BATCH_SIZE = 100;
-  let imported = 0;
+  let created = 0;
+  let updated = 0;
   let errors = 0;
   const errorDetails = [];
 
-  for (let b = 0; b < projects.length; b += BATCH_SIZE) {
-    const batch = projects.slice(b, b + BATCH_SIZE);
+  // Creaciones
+  for (let b = 0; b < toCreate.length; b += BATCH_SIZE) {
+    const batch = toCreate.slice(b, b + BATCH_SIZE);
     try {
       await base44.asServiceRole.entities.Project.bulkCreate(batch);
-      imported += batch.length;
+      created += batch.length;
     } catch (err) {
-      // Si falla el batch completo, intentar uno a uno para rescatar los válidos
       for (let j = 0; j < batch.length; j++) {
-        try {
-          await base44.asServiceRole.entities.Project.create(batch[j]);
-          imported++;
-        } catch (e2) {
-          errors++;
-          errorDetails.push(`Fila ${b + j + 3}: ${batch[j].name?.slice(0, 40)} — ${e2.message}`);
-        }
+        try { await base44.asServiceRole.entities.Project.create(batch[j]); created++; }
+        catch (e2) { errors++; errorDetails.push(`Crear fila ${b + j + 3}: ${batch[j].name?.slice(0, 40)} — ${e2.message}`); }
       }
     }
   }
 
-  return Response.json({ imported, errors, errorDetails: errorDetails.slice(0, 20) });
+  // Actualizaciones
+  for (let b = 0; b < toUpdate.length; b += BATCH_SIZE) {
+    const batch = toUpdate.slice(b, b + BATCH_SIZE);
+    try {
+      await base44.asServiceRole.entities.Project.bulkUpdate(batch);
+      updated += batch.length;
+    } catch (err) {
+      for (let j = 0; j < batch.length; j++) {
+        try { await base44.asServiceRole.entities.Project.update(batch[j].id, batch[j]); updated++; }
+        catch (e2) { errors++; errorDetails.push(`Actualizar ${batch[j].code}: ${e2.message}`); }
+      }
+    }
+  }
+
+  return Response.json({
+    imported: created + updated,
+    created,
+    updated,
+    errors,
+    errorDetails: errorDetails.slice(0, 20),
+  });
 });

@@ -21,19 +21,28 @@ export default function ImportarObrasExcelModal({ onClose, onImported }) {
   const handleImport = async () => {
     if (!file) return;
     setStep('importing');
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const res = await base44.functions.invoke('importarObrasExcel', { file_url });
+      const data = res.data;
 
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setResult(data);
+      setStep('done');
 
-    const res = await base44.functions.invoke('importarObrasExcel', { file_url });
-    const data = res.data;
-
-    queryClient.invalidateQueries({ queryKey: ['projects'] });
-    setResult(data);
-    setStep('done');
-
-    if (data.imported > 0) {
-      toast.success(`${data.imported} obras importadas correctamente`);
-      onImported?.();
+      if (data.imported > 0) {
+        const msg = data.updated > 0
+          ? `${data.created || 0} nuevas y ${data.updated} actualizadas`
+          : `${data.imported} obras importadas`;
+        toast.success(msg);
+        onImported?.();
+      } else {
+        toast.error('No se importó ninguna obra válida');
+      }
+    } catch (err) {
+      console.error('Importar obras:', err);
+      toast.error('Error al importar: ' + (err?.message || 'intente nuevamente'));
+      setStep('upload');
     }
   };
 
@@ -116,8 +125,10 @@ export default function ImportarObrasExcelModal({ onClose, onImported }) {
                   : <AlertCircle className="h-6 w-6 text-amber-400 flex-shrink-0" />
                 }
                 <div>
-                  <p className="font-semibold text-white">{result.imported.toLocaleString()} obras importadas</p>
-                  <p className="text-sm text-slate-400">{result.errors} errores</p>
+                  <p className="font-semibold text-white">{result.imported.toLocaleString()} obras procesadas</p>
+                  <p className="text-sm text-slate-400">
+                    {result.created || 0} nuevas · {result.updated || 0} actualizadas · {result.errors} errores
+                  </p>
                 </div>
               </div>
 
