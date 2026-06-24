@@ -31,6 +31,18 @@ function mapEstado(estadoSap, detalle) {
   return 'pendiente';
 }
 
+// Clave de unicidad: Nº Orden + título normalizado.
+// Las obras que comparten Nº Orden pero tienen distinto título NO se colapsan
+// (caso común: una orden SAP cubre varias obras).
+function normTitle(t) {
+  return String(t || '').trim().toUpperCase().replace(/\s+/g, ' ');
+}
+function keyOf(code, name) {
+  const c = code ? String(code).trim() : '';
+  const n = normTitle(name);
+  return c ? `${c}::${n}` : `NULL::${n}`;
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
@@ -112,29 +124,28 @@ Deno.serve(async (req) => {
     });
   }
 
-  // ── Upsert por Nº Orden SAP: actualiza obras existentes y crea las nuevas ──
+  // ── Upsert por clave (Nº Orden + título): actualiza obras existentes y crea las nuevas ──
   // Evita duplicar la planilla al re-importar y mantiene los datos siempre actualizados.
+  // Las obras con mismo Nº Orden pero distinto título se tratan como registros distintos.
   const deduped = new Map();
-  const noCodeRows = [];
   for (const proj of projects) {
-    const c = proj.code ? String(proj.code).trim() : '';
-    if (c) deduped.set(c, proj); else noCodeRows.push(proj);
+    deduped.set(keyOf(proj.code, proj.name), proj);
   }
-  const finalList = [...deduped.values(), ...noCodeRows];
+  const finalList = [...deduped.values()];
 
   let existing = [];
-  try { existing = await base44.asServiceRole.entities.Project.list('id', 5000); } catch (_) {}
-  const byCode = new Map();
+  try { existing = await base44.asServiceRole.entities.Project.list('id', 10000); } catch (_) {}
+  const existingByKey = new Map();
   for (const p of existing) {
-    const c = p.code ? String(p.code).trim() : '';
-    if (c) byCode.set(c, p);
+    existingByKey.set(keyOf(p.code, p.name), p);
   }
 
   const toCreate = [];
   const toUpdate = [];
   for (const proj of finalList) {
-    const c = proj.code ? String(proj.code).trim() : '';
-    if (c && byCode.has(c)) toUpdate.push({ id: byCode.get(c).id, ...proj });
+    const k = keyOf(proj.code, proj.name);
+    const match = existingByKey.get(k);
+    if (match) toUpdate.push({ id: match.id, ...proj });
     else toCreate.push(proj);
   }
 
