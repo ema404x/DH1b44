@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { FileDown, Loader2 } from 'lucide-react';
+import { FileDown, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import jsPDF from 'jspdf';
+import * as XLSX from 'xlsx';
 
 const estadoLabels = {
   pendiente: 'Pendiente',
@@ -128,6 +129,55 @@ function drawRow(doc, startX, y, row, cols, isAlt, isVencido) {
   });
 
   return y + rowH;
+}
+
+function generarExcel(pendientes, agrupacion) {
+  const estadoLabelsLocal = {
+    pendiente: 'Pendiente', asignado: 'Asignado',
+    en_progreso: 'En progreso', resuelto: 'Resuelto', cancelado: 'Cancelado',
+  };
+
+  const rows = pendientes.map(p => ({
+    'N° SAP':          p.numero_sap || '',
+    'Inspector':       p.inspector || '',
+    'Jefe de Sitio':   p.jefe_sitio || '',
+    'Establecimiento': p.establecimiento || '',
+    'Tareas':          p.descripcion || '',
+    'Ubicación':       p.sitio || '',
+    'Clase Orden':     p.clase_orden || '',
+    'Estado':          estadoLabelsLocal[p.estado] || p.estado || '',
+    'Comuna':          p.comuna || '',
+    'F. Inicio':       p.fecha_emision_sap ? format(new Date(p.fecha_emision_sap), 'dd/MM/yyyy') : '',
+    'F. Límite':       p.fecha_limite ? format(new Date(p.fecha_limite), 'dd/MM/yyyy') : '',
+    'Vencido':         p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado' ? 'Sí' : 'No',
+    'Prioridad':       p.prioridad || '',
+    'N° SAP Desaprobado': p.numero_sap_desaprobado || '',
+  }));
+
+  const wb = XLSX.utils.book_new();
+
+  if (agrupacion === 'sin_agrupar') {
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [10, 20, 22, 28, 50, 28, 14, 14, 10, 14, 14, 10, 10, 18].map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws, 'Pendientes');
+  } else {
+    const grupos = {};
+    pendientes.forEach((p, i) => {
+      const key = agrupacion === 'comuna' ? (p.comuna || 'Sin comuna') : (p.jefe_sitio || 'Sin asignar');
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(rows[i]);
+    });
+
+    Object.entries(grupos).sort(([a], [b]) => a.localeCompare(b)).forEach(([key, items]) => {
+      const sheetName = key.replace(/[:\\/?*\[\]]/g, '_').substring(0, 31);
+      const ws = XLSX.utils.json_to_sheet(items);
+      ws['!cols'] = [10, 20, 22, 28, 50, 28, 14, 14, 10, 14, 14, 10, 10, 18].map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    });
+  }
+
+  const slug = agrupacion === 'comuna' ? 'por-comuna' : agrupacion === 'jefe_sitio' ? 'por-jefe' : 'completo';
+  XLSX.writeFile(wb, `pendientes-sap-${slug}-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
 }
 
 export default function ExportarPendientesPDF({ pendientes, filterInfo }) {
@@ -295,14 +345,14 @@ export default function ExportarPendientesPDF({ pendientes, filterInfo }) {
   return (
     <>
       <Button variant="outline" className="gap-1.5" onClick={() => setOpen(true)}>
-        <FileDown className="h-4 w-4" /> Exportar PDF
+        <FileDown className="h-4 w-4" /> Exportar
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileDown className="h-5 w-5" /> Exportar Reporte PDF
+              <FileDown className="h-5 w-5" /> Exportar Pendientes
             </DialogTitle>
           </DialogHeader>
 
@@ -322,23 +372,22 @@ export default function ExportarPendientesPDF({ pendientes, filterInfo }) {
                 <SelectContent>
                   <SelectItem value="comuna">Comuna</SelectItem>
                   <SelectItem value="jefe_sitio">Jefe de Sitio</SelectItem>
+                  <SelectItem value="sin_agrupar">Sin agrupar (una hoja)</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="text-xs text-muted-foreground space-y-1 bg-muted/30 rounded-md p-3">
-              <p className="font-medium text-foreground">El reporte incluye:</p>
-              <ul className="list-disc list-inside space-y-0.5 ml-1">
-                <li>Una sección por cada {agrupacion === 'comuna' ? 'comuna' : 'jefe de sitio'}</li>
-                <li>Resumen de estados por sección</li>
-                <li>Tabla con N° SAP, inspector, establecimiento, tareas, fechas y estado</li>
-                <li>Órdenes vencidas destacadas en rojo</li>
-              </ul>
             </div>
 
             <div className="flex gap-2 pt-1">
               <Button variant="outline" onClick={() => setOpen(false)} className="flex-1">
                 Cancelar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => { generarExcel(pendientes, agrupacion); setOpen(false); }}
+                disabled={pendientes.length === 0}
+                className="flex-1 gap-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+              >
+                <FileSpreadsheet className="h-4 w-4" /> Excel
               </Button>
               <Button
                 onClick={generarPDF}
@@ -347,7 +396,7 @@ export default function ExportarPendientesPDF({ pendientes, filterInfo }) {
               >
                 {generando
                   ? <><Loader2 className="h-4 w-4 animate-spin" /> Generando...</>
-                  : <><FileDown className="h-4 w-4" /> Generar PDF</>}
+                  : <><FileDown className="h-4 w-4" /> PDF</>}
               </Button>
             </div>
           </div>
