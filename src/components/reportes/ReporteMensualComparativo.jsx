@@ -1,316 +1,226 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { DollarSign, TrendingUp, CheckCircle2, AlertCircle } from 'lucide-react';
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { CheckCircle2, DollarSign, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { format, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+const fmt     = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+const fmtAxis = (n) => { if (!n) return '$0'; const a = Math.abs(n); if (a >= 1e6) return `$${(n/1e6).toFixed(1)}M`; if (a >= 1000) return `$${(n/1000).toFixed(0)}K`; return `$${n}`; };
+
+const ESTADO_CFG = {
+  listo_certificar: { label: 'Listo',       cls: 'bg-emerald-500/12 text-emerald-400' },
+  pendiente:        { label: 'Pendiente',    cls: 'bg-red-500/12 text-red-400'         },
+  observado:        { label: 'Observado',    cls: 'bg-slate-500/12 text-slate-400'     },
+  faltan_actas:     { label: 'Faltan actas', cls: 'bg-amber-500/12 text-amber-400'     },
+  falta_aprobar_mein: { label: 'Falta MEIN', cls: 'bg-orange-500/12 text-orange-400'  },
+};
+
+const Tip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-border/60 rounded-xl px-3 py-2 shadow-xl text-xs">
+      <p className="font-semibold text-foreground mb-1 max-w-[160px] truncate">{label}</p>
+      {payload.map((p, i) => (
+        <div key={i} className="flex items-center gap-1.5 mb-0.5">
+          <div className="h-1.5 w-1.5 rounded-full" style={{ background: p.fill }} />
+          <span className="text-muted-foreground">{p.name}:</span>
+          <span className="font-bold">{fmt(p.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function ReporteMensualComparativo() {
-  const [mesSeleccionado, setMesSeleccionado] = useState(format(new Date(), 'yyyy-MM'));
+  const [mes,       setMes]       = useState(format(new Date(), 'yyyy-MM'));
+  const [filtroEstado, setFiltroEstado] = useState('todos');
 
-  const { data: certificados = [] } = useQuery({
-    queryKey: ['certificados-list'],
-    queryFn: () => base44.entities.Certificado.list('-fecha_certificado', 500),
-  });
+  const { data: certificados = [] } = useQuery({ queryKey: ['certificados-list'],     queryFn: () => base44.entities.Certificado.list('-fecha_certificado', 500),  staleTime: 2*60*1000 });
+  const { data: facturas     = [] } = useQuery({ queryKey: ['invoices-list'],          queryFn: () => base44.entities.Invoice.list('-issue_date', 500),              staleTime: 2*60*1000 });
+  const { data: obras        = [] } = useQuery({ queryKey: ['obras-certif-rep'],       queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 500),  staleTime: 2*60*1000 });
 
-  const { data: facturas = [] } = useQuery({
-    queryKey: ['invoices-list'],
-    queryFn: () => base44.entities.Invoice.list('-issue_date', 500),
-  });
-
-  const { data: obras = [] } = useQuery({
-    queryKey: ['obras-certificacion-reportes'],
-    queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 500),
-  });
-
-  // Obtener certificados aprobados del mes
-  const certificadosMes = useMemo(() => {
-    return certificados.filter(c => {
-      if (!c.fecha_certificado || c.estado !== 'aprobado') return false;
-      const mes = format(new Date(c.fecha_certificado), 'yyyy-MM');
-      return mes === mesSeleccionado;
-    });
-  }, [certificados, mesSeleccionado]);
-
-  // Obtener facturas del mes
-  const facturasMes = useMemo(() => {
-    return facturas.filter(f => {
-      if (!f.issue_date) return false;
-      const mes = format(new Date(f.issue_date), 'yyyy-MM');
-      return mes === mesSeleccionado;
-    });
-  }, [facturas, mesSeleccionado]);
-
-  // Agrupar por proyecto/obra
-  const reportePorObra = useMemo(() => {
-    const map = new Map();
-
-    // Agregar certificados
-    certificadosMes.forEach(cert => {
-      const key = cert.obra_servicio || cert.ada_numero || 'Sin especificar';
-      if (!map.has(key)) {
-        map.set(key, {
-          obra: key,
-          monto_certificado: 0,
-          monto_facturado: 0,
-          certificados_qty: 0,
-          facturas_qty: 0,
-          estado_cobro: 'pendiente',
-          avance: 0,
-        });
-      }
-      const item = map.get(key);
-      item.monto_certificado += cert.subtotal || 0;
-      item.certificados_qty += 1;
-    });
-
-    // Agregar facturas
-    facturasMes.forEach(fac => {
-      const key = fac.project_name || 'Sin especificar';
-      if (!map.has(key)) {
-        map.set(key, {
-          obra: key,
-          monto_certificado: 0,
-          monto_facturado: 0,
-          certificados_qty: 0,
-          facturas_qty: 0,
-          estado_cobro: 'pendiente',
-          avance: 0,
-        });
-      }
-      const item = map.get(key);
-      item.monto_facturado += fac.total || 0;
-      item.facturas_qty += 1;
-    });
-
-    // Enriquecer con datos de obras
-    obras.forEach(obra => {
-      const key = obra.titulo;
-      if (map.has(key)) {
-        const item = map.get(key);
-        item.estado_cobro = obra.estado_cobro;
-        item.avance = obra.porcentaje_avance || 0;
-      }
-    });
-
-    return Array.from(map.values());
-  }, [certificadosMes, facturasMes, obras]);
-
-  // Resumen general del mes
-  const resumen = useMemo(() => {
-    const totalCertificado = reportePorObra.reduce((s, r) => s + r.monto_certificado, 0);
-    const totalFacturado = reportePorObra.reduce((s, r) => s + r.monto_facturado, 0);
-    const diferencia = totalCertificado - totalFacturado;
-    
-    return {
-      totalCertificado,
-      totalFacturado,
-      diferencia,
-      obrasConDiferencia: reportePorObra.filter(r => r.monto_certificado !== r.monto_facturado).length,
-    };
-  }, [reportePorObra]);
-
-  // Generar meses disponibles (últimos 12 meses)
   const mesesDisponibles = useMemo(() => {
-    const meses = [];
+    const list = [];
     for (let i = 11; i >= 0; i--) {
-      const fecha = subMonths(new Date(), i);
-      const valor = format(fecha, 'yyyy-MM');
-      const label = format(fecha, 'MMMM yyyy', { locale: es });
-      meses.push({ valor, label: label.charAt(0).toUpperCase() + label.slice(1) });
+      const f = subMonths(new Date(), i);
+      const val = format(f, 'yyyy-MM');
+      const label = format(f, 'MMMM yyyy', { locale: es });
+      list.push({ val, label: label.charAt(0).toUpperCase() + label.slice(1) });
     }
-    return meses;
+    return list;
   }, []);
 
-  const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
-  const fmtAxis = (n) => { if (!n) return '$0'; if (Math.abs(n) >= 1_000_000) return `$${(n/1_000_000).toLocaleString('es-AR', { maximumFractionDigits: 1 })}M`; if (Math.abs(n) >= 1_000) return `$${(n/1_000).toLocaleString('es-AR', { maximumFractionDigits: 0 })}K`; return `$${n}`; };
+  const certsMes = useMemo(() =>
+    certificados.filter(c => c.fecha_certificado && c.estado === 'aprobado' && format(new Date(c.fecha_certificado), 'yyyy-MM') === mes),
+  [certificados, mes]);
 
-  const estadoConfig = {
-    listo_certificar: { label: 'Listo', color: 'bg-emerald-500/15 text-emerald-400' },
-    pendiente: { label: 'Pendiente', color: 'bg-red-500/15 text-red-400' },
-    observado: { label: 'Observado', color: 'bg-slate-500/15 text-slate-400' },
-    faltan_actas: { label: 'Faltan actas', color: 'bg-yellow-500/15 text-yellow-400' },
-  };
+  const facsMes = useMemo(() =>
+    facturas.filter(f => f.issue_date && format(new Date(f.issue_date), 'yyyy-MM') === mes),
+  [facturas, mes]);
+
+  // Tabla por obra — cruza certs + facturas + obras
+  const rows = useMemo(() => {
+    const map = new Map();
+
+    certsMes.forEach(c => {
+      const k = c.obra_servicio || c.ada_numero || 'Sin especificar';
+      if (!map.has(k)) map.set(k, { obra: k, certificado: 0, facturado: 0, cQty: 0, fQty: 0, estado_cobro: 'pendiente', avance: 0 });
+      const r = map.get(k); r.certificado += c.subtotal || 0; r.cQty++;
+    });
+    facsMes.forEach(f => {
+      const k = f.project_name || 'Sin especificar';
+      if (!map.has(k)) map.set(k, { obra: k, certificado: 0, facturado: 0, cQty: 0, fQty: 0, estado_cobro: 'pendiente', avance: 0 });
+      const r = map.get(k); r.facturado += f.total || 0; r.fQty++;
+    });
+    obras.forEach(o => {
+      if (map.has(o.titulo)) {
+        const r = map.get(o.titulo);
+        r.estado_cobro = o.estado_cobro;
+        r.avance = o.porcentaje_avance || 0;
+      }
+    });
+
+    let list = Array.from(map.values());
+    if (filtroEstado !== 'todos') list = list.filter(r => r.estado_cobro === filtroEstado);
+    return list;
+  }, [certsMes, facsMes, obras, filtroEstado]);
+
+  const totalCert = rows.reduce((s, r) => s + r.certificado, 0);
+  const totalFac  = rows.reduce((s, r) => s + r.facturado, 0);
+  const diff      = totalCert - totalFac;
+  const obrasOk   = rows.filter(r => Math.abs(r.certificado - r.facturado) < 1).length;
+
+  const chartData = rows.slice(0, 8).map(r => ({
+    name: r.obra.length > 14 ? r.obra.slice(0, 14) + '…' : r.obra,
+    Certificado: r.certificado,
+    Facturado:   r.facturado,
+  }));
+
+  const DIcon = diff > 0 ? TrendingUp : diff < 0 ? TrendingDown : Minus;
+  const dCls  = diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-red-400' : 'text-muted-foreground';
 
   return (
-    <div className="space-y-6">
-      {/* Selector de mes */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-medium text-foreground">Período:</span>
-        <Select value={mesSeleccionado} onValueChange={setMesSeleccionado}>
-          <SelectTrigger className="w-48">
-            <SelectValue />
-          </SelectTrigger>
+    <div className="space-y-5">
+      {/* Filtros */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={mes} onValueChange={setMes}>
+          <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>{mesesDisponibles.map(m => <SelectItem key={m.val} value={m.val}>{m.label}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {mesesDisponibles.map(m => (
-              <SelectItem key={m.valor} value={m.valor}>{m.label}</SelectItem>
-            ))}
+            <SelectItem value="todos">Todos los estados</SelectItem>
+            {Object.entries(ESTADO_CFG).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        <span className="text-[10px] text-muted-foreground ml-1">{rows.length} obras · {certsMes.length} certificados · {facsMes.length} facturas</span>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-emerald-500/20 bg-emerald-500/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              <span className="text-xs text-muted-foreground">Total Certificado</span>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: 'Certificado',      value: fmt(totalCert), sub: `${certsMes.length} certificados`, icon: CheckCircle2, color: 'text-emerald-400', border: 'border-emerald-500/20' },
+          { label: 'Facturado',        value: fmt(totalFac),  sub: `${facsMes.length} facturas`,       icon: DollarSign,  color: 'text-blue-400',    border: 'border-blue-500/20'    },
+          { label: diff >= 0 ? 'Saldo a favor' : 'Saldo en contra', value: fmt(Math.abs(diff)), sub: diff > 0 ? 'Certificación adelantada' : diff < 0 ? 'Facturación adelantada' : 'Balanceado', icon: DIcon, color: dCls, border: 'border-border/30' },
+          { label: 'Obras alineadas',  value: obrasOk,        sub: `de ${rows.length} obras`,          icon: AlertCircle, color: 'text-purple-400',  border: 'border-purple-500/20'  },
+        ].map(k => {
+          const Icon = k.icon;
+          return (
+            <div key={k.label} className={`rounded-2xl border ${k.border} bg-card p-4`}>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Icon className={`h-3.5 w-3.5 ${k.color}`} />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{k.label}</p>
+              </div>
+              <p className={`text-xl font-bold tabular-nums ${k.color}`}>{k.value}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{k.sub}</p>
             </div>
-            <p className="text-xl font-bold text-emerald-400">{fmt(resumen.totalCertificado)}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">{certificadosMes.length} certificados</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-500/20 bg-blue-500/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-4 w-4 text-blue-400" />
-              <span className="text-xs text-muted-foreground">Total Facturado</span>
-            </div>
-            <p className="text-xl font-bold text-blue-400">{fmt(resumen.totalFacturado)}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">{facturasMes.length} facturas</p>
-          </CardContent>
-        </Card>
-
-        <Card className={`border-amber-500/20 ${resumen.diferencia >= 0 ? 'bg-emerald-500/5' : 'bg-red-500/5'}`}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4 w-4" style={{ color: resumen.diferencia >= 0 ? '#4ade80' : '#ef4444' }} />
-              <span className="text-xs text-muted-foreground">Diferencia</span>
-            </div>
-            <p className={`text-xl font-bold ${resumen.diferencia >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-              {fmt(Math.abs(resumen.diferencia))}
-            </p>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              {resumen.diferencia > 0 ? 'Certificación adelantada' : resumen.diferencia < 0 ? 'Facturación adelantada' : 'Balanceado'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-500/20 bg-purple-500/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertCircle className="h-4 w-4 text-purple-400" />
-              <span className="text-xs text-muted-foreground">Obras con Diferencia</span>
-            </div>
-            <p className="text-xl font-bold text-purple-400">{resumen.obrasConDiferencia}</p>
-            <p className="text-[10px] text-muted-foreground mt-1">de {reportePorObra.length} obras</p>
-          </CardContent>
-        </Card>
+          );
+        })}
       </div>
 
-      {/* Tabla detallada */}
-      {reportePorObra.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Detalle por Obra/Proyecto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs min-w-[640px]">
-                <thead className="bg-muted/30 border-b border-border/50">
-                  <tr>
-                    <th className="text-left py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground">Obra / Proyecto</th>
-                    <th className="text-right py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-36">Certificado</th>
-                    <th className="text-right py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-36">Facturado</th>
-                    <th className="text-right py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-36">Diferencia</th>
-                    <th className="text-center py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-20">Comp.</th>
-                    <th className="text-center py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-28">Estado</th>
-                    <th className="text-center py-2.5 px-3 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground w-20">Avance</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/30">
-                  {reportePorObra.map((row, idx) => {
-                    const diff = row.monto_certificado - row.monto_facturado;
-                    const compliance = row.monto_certificado > 0 ? Math.round((row.monto_facturado / row.monto_certificado) * 100) : 0;
-                    const config = estadoConfig[row.estado_cobro] || estadoConfig.pendiente;
-                    
-                    return (
-                      <tr key={idx} className={`hover:bg-accent/20 transition-colors ${idx % 2 !== 0 ? 'bg-muted/10' : ''}`}>
-                        <td className="py-3 px-3 font-medium max-w-xs">
-                          <span className="truncate block" title={row.obra}>{row.obra}</span>
-                        </td>
-                        <td className="text-right py-3 px-3 font-semibold text-emerald-400 tabular-nums whitespace-nowrap">{fmt(row.monto_certificado)}</td>
-                        <td className="text-right py-3 px-3 font-semibold text-blue-400 tabular-nums whitespace-nowrap">{fmt(row.monto_facturado)}</td>
-                        <td className={`text-right py-3 px-3 font-semibold tabular-nums whitespace-nowrap ${diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {diff < 0 && <span className="mr-0.5">-</span>}{fmt(Math.abs(diff))}
-                        </td>
-                        <td className="text-center py-3 px-3 tabular-nums">
-                          <span className={`text-xs font-bold ${compliance >= 100 ? 'text-emerald-400' : compliance >= 75 ? 'text-blue-400' : 'text-amber-400'}`}>
-                            {compliance}%
-                          </span>
-                        </td>
-                        <td className="text-center py-3 px-3">
-                          <Badge className={`text-[9px] whitespace-nowrap ${config.color}`}>{config.label}</Badge>
-                        </td>
-                        <td className="text-center py-3 px-3 tabular-nums">
-                          <span className="text-xs font-medium text-muted-foreground">{row.avance}%</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+      {rows.length === 0 ? (
+        <div className="rounded-2xl border border-border/30 bg-card py-14 text-center text-muted-foreground text-sm">Sin datos para el período / filtro seleccionado</div>
+      ) : (
+        <>
+          {/* Gráfico + Tabla lado a lado en desktop */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            {/* Gráfico */}
+            {chartData.length > 0 && (
+              <div className="lg:col-span-2 rounded-2xl border border-border/40 bg-card p-5">
+                <p className="text-xs font-bold text-foreground uppercase tracking-wide mb-0.5">Top obras — Comparativa</p>
+                <p className="text-[11px] text-muted-foreground mb-4">Cert. vs Facturado (primeros 8)</p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={chartData} barGap={2} barCategoryGap="30%" margin={{ top: 4, right: 4, left: 0, bottom: 40 }}>
+                    <CartesianGrid strokeDasharray="2 3" stroke="hsl(var(--border)/0.25)" vertical={false} />
+                    <XAxis dataKey="name" angle={-35} textAnchor="end" height={50} tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={48} />
+                    <Tooltip content={<Tip />} />
+                    <Bar dataKey="Certificado" fill="#4ade80" radius={[3,3,0,0]} opacity={0.85} />
+                    <Bar dataKey="Facturado"   fill="#60a5fa" radius={[3,3,0,0]} opacity={0.85} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground justify-end">
+                  <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block"/>Cert.</span>
+                  <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-blue-400 inline-block"/>Fact.</span>
+                </div>
+              </div>
+            )}
+
+            {/* Tabla */}
+            <div className="lg:col-span-3 rounded-2xl border border-border/40 bg-card overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-border/30">
+                <p className="text-xs font-bold text-foreground uppercase tracking-wide">Detalle por obra</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border/20 bg-muted/10">
+                      <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Obra</th>
+                      <th className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Cert.</th>
+                      <th className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Fact.</th>
+                      <th className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Dif.</th>
+                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hidden sm:table-cell">Av.</th>
+                      <th className="px-4 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/10">
+                    {rows.map((row, i) => {
+                      const d = row.certificado - row.facturado;
+                      const cfg = ESTADO_CFG[row.estado_cobro] || ESTADO_CFG.pendiente;
+                      return (
+                        <tr key={i} className="hover:bg-muted/10 transition-colors">
+                          <td className="px-4 py-2.5 font-semibold text-foreground/85 max-w-[140px] truncate" title={row.obra}>{row.obra}</td>
+                          <td className="px-3 py-2.5 text-right text-emerald-400 font-semibold tabular-nums whitespace-nowrap">{fmt(row.certificado)}</td>
+                          <td className="px-3 py-2.5 text-right text-blue-400 font-semibold tabular-nums whitespace-nowrap">{fmt(row.facturado)}</td>
+                          <td className={`px-3 py-2.5 text-right font-semibold tabular-nums whitespace-nowrap ${d >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {d < 0 ? '-' : ''}{fmt(Math.abs(d))}
+                          </td>
+                          <td className="px-3 py-2.5 text-center text-muted-foreground hidden sm:table-cell">{row.avance}%</td>
+                          <td className="px-4 py-2.5 text-center">
+                            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${cfg.cls}`}>{cfg.label}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="border-t border-border/30 bg-muted/10">
+                    <tr>
+                      <td className="px-4 py-2.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Total</td>
+                      <td className="px-3 py-2.5 text-right font-bold text-emerald-400 tabular-nums">{fmt(totalCert)}</td>
+                      <td className="px-3 py-2.5 text-right font-bold text-blue-400 tabular-nums">{fmt(totalFac)}</td>
+                      <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{diff < 0 ? '-' : ''}{fmt(Math.abs(diff))}</td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Gráfico comparativo */}
-      {reportePorObra.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Comparativa: Certificación vs Facturación</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={reportePorObra.slice(0, 10)} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis 
-                  dataKey="obra" 
-                  angle={-45} 
-                  textAnchor="end" 
-                  height={80}
-                  tick={{ fontSize: 11 }}
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <YAxis 
-                  stroke="hsl(var(--muted-foreground))"
-                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={72}
-                  tickFormatter={fmtAxis}
-                />
-                <Tooltip 
-                  formatter={(v) => fmt(v)}
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '6px',
-                  }}
-                  cursor={{ fill: 'hsl(var(--muted) / 0.1)' }}
-                />
-                <Legend />
-                <Bar dataKey="monto_certificado" fill="#4ade80" name="Certificado" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="monto_facturado" fill="#60a5fa" name="Facturado" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {reportePorObra.length === 0 && (
-        <Card className="text-center py-8">
-          <div className="text-muted-foreground">
-            <p>No hay datos para el período seleccionado</p>
           </div>
-        </Card>
+        </>
       )}
     </div>
   );
