@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Trash2, Upload, Plus, AlertTriangle, Loader2, X, Filter, ChevronUp, ChevronDown, Download } from 'lucide-react';
+import { Search, Trash2, Upload, Plus, AlertTriangle, Loader2, X, Filter, ChevronUp, ChevronDown, Download, ScanSearch } from 'lucide-react';
 import { format } from 'date-fns';
 import ImportarObrasExcelModal from '@/components/projects/ImportarObrasExcelModal';
+import AuditoriaSincronizacion from '@/components/projects/AuditoriaSincronizacion';
 import ProjectDetailPanel from '@/components/projects/ProjectDetailPanel';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import { toast } from 'sonner';
@@ -181,6 +182,7 @@ export default function Projects() {
   const [editing, setEditing] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
   const [showObrasImporter, setShowObrasImporter] = useState(false);
+  const [showAuditoria, setShowAuditoria] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [deleting, setDeleting] = useState(false);
   const [deletingProgress, setDeletingProgress] = useState(0);
@@ -328,6 +330,11 @@ export default function Projects() {
               {canCreate && (
                 <Button variant="outline" size="sm" className="text-xs h-7 gap-1" onClick={() => setShowObrasImporter(true)}>
                   <Upload className="h-3 w-3" /> Importar planilla
+                </Button>
+              )}
+              {canCreate && (
+                <Button variant="outline" size="sm" className="text-xs h-7 gap-1" onClick={() => setShowAuditoria(true)}>
+                  <ScanSearch className="h-3 w-3" /> Auditar sincronización
                 </Button>
               )}
               {canCreate && (
@@ -479,6 +486,10 @@ export default function Projects() {
           onClose={() => setShowObrasImporter(false)}
           onImported={() => setShowObrasImporter(false)}
         />
+      )}
+
+      {showAuditoria && (
+        <AuditoriaSincronizacion onClose={() => setShowAuditoria(false)} />
       )}
 
       {/* Confirmación borrado masivo (seleccionados) */}
