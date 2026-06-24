@@ -3,12 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { CheckCircle2, DollarSign, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { CircleCheck, BadgeDollarSign, Scale, CircleAlert } from 'lucide-react';
 import { format, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
-
-const fmt     = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
-const fmtAxis = (n) => { if (!n) return '$0'; const a = Math.abs(n); if (a >= 1e6) return `$${(n/1e6).toFixed(1)}M`; if (a >= 1000) return `$${(n/1000).toFixed(0)}K`; return `$${n}`; };
+import { fmt, fmtM, pct, ChartTip, KpiCard, KpiSkeleton, TableSkeleton, SortableTh, useTableSort } from '@/components/reportes/shared';
 
 const ESTADO_CFG = {
   listo_certificar: { label: 'Listo',       cls: 'bg-emerald-500/12 text-emerald-400' },
@@ -18,29 +16,14 @@ const ESTADO_CFG = {
   falta_aprobar_mein: { label: 'Falta MEIN', cls: 'bg-orange-500/12 text-orange-400'  },
 };
 
-const Tip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-card border border-border/60 rounded-xl px-3 py-2 shadow-xl text-xs">
-      <p className="font-semibold text-foreground mb-1 max-w-[160px] truncate">{label}</p>
-      {payload.map((p, i) => (
-        <div key={i} className="flex items-center gap-1.5 mb-0.5">
-          <div className="h-1.5 w-1.5 rounded-full" style={{ background: p.fill }} />
-          <span className="text-muted-foreground">{p.name}:</span>
-          <span className="font-bold">{fmt(p.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
 export default function ReporteMensualComparativo() {
-  const [mes,       setMes]       = useState(format(new Date(), 'yyyy-MM'));
-  const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [mes,           setMes]           = useState(format(new Date(), 'yyyy-MM'));
+  const [filtroEstado,  setFiltroEstado]  = useState('todos');
 
-  const { data: certificados = [] } = useQuery({ queryKey: ['certificados-list'],     queryFn: () => base44.entities.Certificado.list('-fecha_certificado', 500),  staleTime: 2*60*1000 });
-  const { data: facturas     = [] } = useQuery({ queryKey: ['invoices-list'],          queryFn: () => base44.entities.Invoice.list('-issue_date', 500),              staleTime: 2*60*1000 });
-  const { data: obras        = [] } = useQuery({ queryKey: ['obras-certif-rep'],       queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 500),  staleTime: 2*60*1000 });
+  const { data: certificados = [], isLoading: loadingC } = useQuery({ queryKey: ['certificados-list'], queryFn: () => base44.entities.Certificado.list('-fecha_certificado', 500),  staleTime: 2*60*1000 });
+  const { data: facturas = [],     isLoading: loadingF } = useQuery({ queryKey: ['invoices-list'],   queryFn: () => base44.entities.Invoice.list('-issue_date', 500),              staleTime: 2*60*1000 });
+  const { data: obras = [],        isLoading: loadingO } = useQuery({ queryKey: ['obras-certif-rep'],queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 500),  staleTime: 2*60*1000 });
+  const loading = loadingC || loadingF || loadingO;
 
   const mesesDisponibles = useMemo(() => {
     const list = [];
@@ -64,7 +47,6 @@ export default function ReporteMensualComparativo() {
   // Tabla por obra — cruza certs + facturas + obras
   const rows = useMemo(() => {
     const map = new Map();
-
     certsMes.forEach(c => {
       const k = c.obra_servicio || c.ada_numero || 'Sin especificar';
       if (!map.has(k)) map.set(k, { obra: k, certificado: 0, facturado: 0, cQty: 0, fQty: 0, estado_cobro: 'pendiente', avance: 0 });
@@ -78,12 +60,10 @@ export default function ReporteMensualComparativo() {
     obras.forEach(o => {
       if (map.has(o.titulo)) {
         const r = map.get(o.titulo);
-        r.estado_cobro = o.estado_cobro;
-        r.avance = o.porcentaje_avance || 0;
+        r.estado_cobro = o.estado_cobro; r.avance = o.porcentaje_avance || 0;
       }
     });
-
-    let list = Array.from(map.values());
+    let list = Array.from(map.values()).map(r => ({ ...r, diferencia: r.certificado - r.facturado, compliance: r.certificado > 0 ? Math.round((r.facturado / r.certificado) * 100) : 0 }));
     if (filtroEstado !== 'todos') list = list.filter(r => r.estado_cobro === filtroEstado);
     return list;
   }, [certsMes, facsMes, obras, filtroEstado]);
@@ -91,7 +71,7 @@ export default function ReporteMensualComparativo() {
   const totalCert = rows.reduce((s, r) => s + r.certificado, 0);
   const totalFac  = rows.reduce((s, r) => s + r.facturado, 0);
   const diff      = totalCert - totalFac;
-  const obrasOk   = rows.filter(r => Math.abs(r.certificado - r.facturado) < 1).length;
+  const obrasOk   = rows.filter(r => Math.abs(r.diferencia) < 1).length;
 
   const chartData = rows.slice(0, 8).map(r => ({
     name: r.obra.length > 14 ? r.obra.slice(0, 14) + '…' : r.obra,
@@ -99,8 +79,7 @@ export default function ReporteMensualComparativo() {
     Facturado:   r.facturado,
   }));
 
-  const DIcon = diff > 0 ? TrendingUp : diff < 0 ? TrendingDown : Minus;
-  const dCls  = diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-red-400' : 'text-muted-foreground';
+  const { sort, onSort, sorted: sortedRows } = useTableSort(rows, 'certificado', 'desc');
 
   return (
     <div className="space-y-5">
@@ -117,48 +96,49 @@ export default function ReporteMensualComparativo() {
             {Object.entries(ESTADO_CFG).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
           </SelectContent>
         </Select>
-        <span className="text-[10px] text-muted-foreground ml-1">{rows.length} obras · {certsMes.length} certificados · {facsMes.length} facturas</span>
+        {loading
+          ? <span className="text-[10px] text-muted-foreground ml-1">cargando…</span>
+          : <span className="text-[10px] text-muted-foreground ml-1">{rows.length} obras · {certsMes.length} certificados · {facsMes.length} facturas</span>}
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: 'Certificado',      value: fmt(totalCert), sub: `${certsMes.length} certificados`, icon: CheckCircle2, color: 'text-emerald-400', border: 'border-emerald-500/20' },
-          { label: 'Facturado',        value: fmt(totalFac),  sub: `${facsMes.length} facturas`,       icon: DollarSign,  color: 'text-blue-400',    border: 'border-blue-500/20'    },
-          { label: diff >= 0 ? 'Saldo a favor' : 'Saldo en contra', value: fmt(Math.abs(diff)), sub: diff > 0 ? 'Certificación adelantada' : diff < 0 ? 'Facturación adelantada' : 'Balanceado', icon: DIcon, color: dCls, border: 'border-border/30' },
-          { label: 'Obras alineadas',  value: obrasOk,        sub: `de ${rows.length} obras`,          icon: AlertCircle, color: 'text-purple-400',  border: 'border-purple-500/20'  },
-        ].map(k => {
-          const Icon = k.icon;
-          return (
-            <div key={k.label} className={`rounded-2xl border ${k.border} bg-card p-4`}>
-              <div className="flex items-center gap-1.5 mb-2">
-                <Icon className={`h-3.5 w-3.5 ${k.color}`} />
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{k.label}</p>
-              </div>
-              <p className={`text-xl font-bold tabular-nums ${k.color}`}>{k.value}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{k.sub}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {rows.length === 0 ? (
-        <div className="rounded-2xl border border-border/30 bg-card py-14 text-center text-muted-foreground text-sm">Sin datos para el período / filtro seleccionado</div>
+      {loading ? (
+        <div className="space-y-5">
+          <KpiSkeleton />
+          <TableSkeleton rows={5} cols={5} />
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-2xl border border-border/30 bg-card py-16 text-center">
+          <CircleAlert className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Sin datos para el período / filtro seleccionado.</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">Probá con otro mes o estado de cobro.</p>
+        </div>
       ) : (
         <>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <KpiCard label="Certificado"      value={fmt(totalCert)}           sub={`${certsMes.length} certificados`}                              icon={CircleCheck}   accent="emerald" />
+            <KpiCard label="Facturado"        value={fmt(totalFac)}            sub={`${facsMes.length} facturas`}                                     icon={BadgeDollarSign} accent="blue"   />
+            <KpiCard label={diff >= 0 ? 'Saldo a favor' : 'Saldo en contra'} value={fmt(Math.abs(diff))} sub={diff > 0 ? 'Certificación adelantada' : diff < 0 ? 'Facturación adelantada' : 'Balanceado'} icon={Scale} accent={diff >= 0 ? 'emerald' : 'red'} />
+            <KpiCard label="Obras alineadas"  value={obrasOk} sub={`de ${rows.length} · ${pct(obrasOk/Math.max(rows.length,1)*100)} concordancia`} icon={CircleAlert} accent="purple" />
+          </div>
+
           {/* Gráfico + Tabla lado a lado en desktop */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             {/* Gráfico */}
             {chartData.length > 0 && (
               <div className="lg:col-span-2 rounded-2xl border border-border/40 bg-card p-5">
-                <p className="text-xs font-bold text-foreground uppercase tracking-wide mb-0.5">Top obras — Comparativa</p>
-                <p className="text-[11px] text-muted-foreground mb-4">Cert. vs Facturado (primeros 8)</p>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-xs font-bold text-foreground uppercase tracking-wide">Top obras — Comparativa</p>
+                    <p className="text-[11px] text-muted-foreground">Cert. vs Facturado</p>
+                  </div>
+                </div>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={chartData} barGap={2} barCategoryGap="30%" margin={{ top: 4, right: 4, left: 0, bottom: 40 }}>
                     <CartesianGrid strokeDasharray="2 3" stroke="hsl(var(--border)/0.25)" vertical={false} />
                     <XAxis dataKey="name" angle={-35} textAnchor="end" height={50} tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                    <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={48} />
-                    <Tooltip content={<Tip />} />
+                    <YAxis tickFormatter={fmtM} tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} width={48} />
+                    <Tooltip content={<ChartTip />} />
                     <Bar dataKey="Certificado" fill="#4ade80" radius={[3,3,0,0]} opacity={0.85} />
                     <Bar dataKey="Facturado"   fill="#60a5fa" radius={[3,3,0,0]} opacity={0.85} />
                   </BarChart>
@@ -170,34 +150,39 @@ export default function ReporteMensualComparativo() {
               </div>
             )}
 
-            {/* Tabla */}
-            <div className="lg:col-span-3 rounded-2xl border border-border/40 bg-card overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-border/30">
+            {/* Tabla — ordenable */}
+            <div className={`rounded-2xl border border-border/40 bg-card overflow-hidden ${chartData.length > 0 ? 'lg:col-span-3' : 'lg:col-span-5'}`}>
+              <div className="px-5 py-3.5 border-b border-border/30 flex items-center justify-between">
                 <p className="text-xs font-bold text-foreground uppercase tracking-wide">Detalle por obra</p>
+                <span className="text-[10px] text-muted-foreground">ordená por columna</span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-border/20 bg-muted/10">
-                      <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Obra</th>
-                      <th className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Cert.</th>
-                      <th className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Fact.</th>
-                      <th className="px-3 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Dif.</th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hidden sm:table-cell">Av.</th>
-                      <th className="px-4 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Estado</th>
+                      <SortableTh label="Obra"        sortKey="obra"        currentSort={sort} onSort={onSort} />
+                      <SortableTh label="Cert."        sortKey="certificado" currentSort={sort} onSort={onSort} align="right" />
+                      <SortableTh label="Fact."        sortKey="facturado"  currentSort={sort} onSort={onSort} align="right" />
+                      <SortableTh label="Dif."         sortKey="diferencia" currentSort={sort} onSort={onSort} align="right" />
+                      <SortableTh label="Comp."        sortKey="compliance" currentSort={sort} onSort={onSort} align="center" className="hidden sm:table-cell" />
+                      <SortableTh label="Avance"       sortKey="avance"     currentSort={sort} onSort={onSort} align="center" className="hidden sm:table-cell" />
+                      <SortableTh label="Estado"      sortKey="estado_cobro" currentSort={sort} onSort={onSort} align="center" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/10">
-                    {rows.map((row, i) => {
-                      const d = row.certificado - row.facturado;
+                    {sortedRows.map((row, i) => {
                       const cfg = ESTADO_CFG[row.estado_cobro] || ESTADO_CFG.pendiente;
+                      const compCls = row.compliance >= 100 ? 'text-emerald-400' : row.compliance >= 75 ? 'text-blue-400' : 'text-amber-400';
                       return (
                         <tr key={i} className="hover:bg-muted/10 transition-colors">
-                          <td className="px-4 py-2.5 font-semibold text-foreground/85 max-w-[140px] truncate" title={row.obra}>{row.obra}</td>
+                          <td className="px-4 py-2.5 font-semibold text-foreground/85 max-w-[120px] truncate" title={row.obra}>{row.obra}</td>
                           <td className="px-3 py-2.5 text-right text-emerald-400 font-semibold tabular-nums whitespace-nowrap">{fmt(row.certificado)}</td>
                           <td className="px-3 py-2.5 text-right text-blue-400 font-semibold tabular-nums whitespace-nowrap">{fmt(row.facturado)}</td>
-                          <td className={`px-3 py-2.5 text-right font-semibold tabular-nums whitespace-nowrap ${d >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {d < 0 ? '-' : ''}{fmt(Math.abs(d))}
+                          <td className={`px-3 py-2.5 text-right font-semibold tabular-nums whitespace-nowrap ${row.diferencia >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {row.diferencia < 0 ? '-' : ''}{fmt(Math.abs(row.diferencia))}
+                          </td>
+                          <td className="px-3 py-2.5 text-center hidden sm:table-cell">
+                            <span className={`text-[10px] font-bold ${compCls}`}>{row.compliance}%</span>
                           </td>
                           <td className="px-3 py-2.5 text-center text-muted-foreground hidden sm:table-cell">{row.avance}%</td>
                           <td className="px-4 py-2.5 text-center">
@@ -213,7 +198,7 @@ export default function ReporteMensualComparativo() {
                       <td className="px-3 py-2.5 text-right font-bold text-emerald-400 tabular-nums">{fmt(totalCert)}</td>
                       <td className="px-3 py-2.5 text-right font-bold text-blue-400 tabular-nums">{fmt(totalFac)}</td>
                       <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{diff < 0 ? '-' : ''}{fmt(Math.abs(diff))}</td>
-                      <td colSpan={2} />
+                      <td colSpan={3} />
                     </tr>
                   </tfoot>
                 </table>
