@@ -29,14 +29,14 @@ Deno.serve(async (req) => {
     const necesitaPendientes = tiposActivos.has('pendiente_vencido');
     const necesitaWOs        = tiposActivos.has('ot_vencida');
 
-    // Pre-cargar todas las entidades necesarias
+    // Pre-cargar solo datos esenciales (limitar por tamaño)
     const [logsNoLeidos, logsHoy, assets, materials, pendientesVencidos, workOrders] = await Promise.all([
-      sb.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 200).catch(() => []),
-      sb.entities.AlertaLog.list('-fecha_alerta', 500).catch(() => []),
-      necesitaAssets    ? sb.entities.Asset.list('-updated_date', 500).catch(() => [])                         : Promise.resolve([]),
-      necesitaMaterials  ? sb.entities.Material.list('-updated_date', 500).catch(() => [])                      : Promise.resolve([]),
-      necesitaPendientes ? sb.entities.Pendiente.filter({ estado: 'pendiente' }).catch(() => [])                : Promise.resolve([]),
-      necesitaWOs        ? sb.entities.WorkOrder.list('-updated_date', 500).catch(() => [])                     : Promise.resolve([]),
+      sb.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 100).catch(() => []),
+      sb.entities.AlertaLog.filter({ fecha_alerta: { $gte: new Date(Date.now() - 86400000).toISOString() } }, '-fecha_alerta', 200).catch(() => []),
+      necesitaAssets    ? sb.entities.Asset.filter({}, '-updated_date', 300).catch(() => [])                         : Promise.resolve([]),
+      necesitaMaterials  ? sb.entities.Material.filter({}, '-updated_date', 300).catch(() => [])                      : Promise.resolve([]),
+      necesitaPendientes ? sb.entities.Pendiente.filter({ estado: 'pendiente' }, '-fecha_limite', 200).catch(() => [])                : Promise.resolve([]),
+      necesitaWOs        ? sb.entities.WorkOrder.filter({ status: { $nin: ['completada', 'cancelada'] } }, '-updated_date', 200).catch(() => [])                     : Promise.resolve([]),
     ]);
 
     // Índice de logs de hoy para lookup O(1)

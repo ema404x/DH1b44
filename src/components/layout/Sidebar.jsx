@@ -84,7 +84,7 @@ const navGroups = [
   },
 ];
 
-function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesAprobacion }) {
+const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesAprobacion }) {
   const isForo = item.path === '/foro';
   const isAprobacion = item.path === '/aprobacion-certificados';
   const showAprobacionBadge = isAprobacion && pendientesAprobacion > 0 && !active;
@@ -147,7 +147,7 @@ function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesA
       )}
     </div>
   );
-}
+});
 
 export default function Sidebar({ open, onOpenChange }) {
   const location = useLocation();

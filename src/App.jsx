@@ -16,7 +16,7 @@ import EjecutarOrdenPublica from '@/pages/EjecutarOrdenPublica';
 import EjecutarOTSimplePublic from '@/pages/EjecutarOTSimple';
 import PortalOperario from '@/pages/PortalOperario';
 
-// Páginas autenticadas — lazy loading (se cargan solo cuando el usuario navega a ellas)
+// Páginas autenticadas — lazy loading con prefetch en idle
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const Projects = lazy(() => import('@/pages/Projects'));
 const WorkOrders = lazy(() => import('@/pages/WorkOrders'));
@@ -24,7 +24,6 @@ const Clients = lazy(() => import('@/pages/Clients'));
 const Employees = lazy(() => import('@/pages/Employees'));
 const Inventory = lazy(() => import('@/pages/Inventory'));
 const Invoices = lazy(() => import('@/pages/Invoices'));
-const Finanzas = lazy(() => import('@/pages/Finanzas'));
 const Presupuestos = lazy(() => import('@/pages/Presupuestos'));
 const Informes = lazy(() => import('@/pages/Informes'));
 const Assets = lazy(() => import('@/pages/Assets'));
@@ -46,7 +45,6 @@ const InspeccionColegio = lazy(() => import('@/pages/InspeccionColegio'));
 const AprobacionCertificados = lazy(() => import('@/pages/AprobacionCertificados'));
 const ControlRiesgo = lazy(() => import('@/pages/ControlRiesgo'));
 const CertificacionObras = lazy(() => import('@/pages/CertificacionObras'));
-
 const CalendarioInformes = lazy(() => import('@/pages/CalendarioInformes'));
 const CrearOT = lazy(() => import('@/pages/CrearOT'));
 const Foro = lazy(() => import('@/pages/Foro'));

@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { useSmartCache } from '@/hooks/useSmartCache';
 
 export default function AppLayout() {
-  // Activa el sistema de caché persistente — hydration instantánea + auto-persist
+  // Activa el sistema de caché persistente
   useSmartCache();
 
   const { isOnline, pendingCount, isSyncing, syncPending } = useOfflineQueue((count) => {
