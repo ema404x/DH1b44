@@ -99,7 +99,7 @@ function fmtFecha(val) {
 
 // ─── Componente fila ─────────────────────────────────────────────────────────
 
-function ProyectoFila({ project, selected, onToggle, onOpen, onDelete, canDelete }) {
+const ProyectoFila = React.memo(function ProyectoFila({ project, selected, onToggle, onOpen, onDelete, canDelete }) {
   const detalle = getDetalle(project);
   const colors = DETALLE_COLORS[detalle] || DETALLE_COLORS[project.status] || DETALLE_COLORS['pendiente'];
   const avance = project.progress || 0;
@@ -194,7 +194,8 @@ export default function Projects() {
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects'],
-    queryFn: () => base44.entities.Project.list('-created_date', 5000),
+    queryFn: () => base44.entities.Project.list('-created_date', 500),
+    staleTime: 1000 * 60 * 15,
   });
 
   const saveMutation = useMutation({
