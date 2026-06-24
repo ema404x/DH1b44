@@ -290,6 +290,7 @@ export default function Sidebar() {
       <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-4 scrollbar-thin">
         {visibleGroups.map((group) => {
           const isGroupCollapsed = collapsedGroups.has(group.label);
+          const groupPending = pendientesAprobacion > 0 && group.items.some(it => it.path === '/aprobacion-certificados') ? pendientesAprobacion : 0;
           const wrapperCls = collapsed
             ? "space-y-0.5"
             : cn("space-y-0.5 overflow-hidden transition-all duration-200", isGroupCollapsed ? "max-h-0 opacity-0" : "max-h-[600px] opacity-100");
@@ -300,12 +301,25 @@ export default function Sidebar() {
                   type="button"
                   onClick={() => toggleGroup(group.label)}
                   aria-expanded={!isGroupCollapsed}
-                  className="w-full px-3 mb-1 mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-sidebar-foreground/30 hover:text-sidebar-foreground/60 flex items-center gap-2 transition-colors"
+                  className={cn(
+                    "w-full px-3 mb-1 mt-1 text-[9px] font-bold uppercase tracking-[0.14em] flex items-center gap-2 transition-colors",
+                    groupPending > 0 && isGroupCollapsed ? "text-amber-400 hover:text-amber-300" : "text-sidebar-foreground/60 hover:text-sidebar-foreground/90"
+                  )}
                 >
                   <ChevronDown className={cn("h-3 w-3 flex-shrink-0 transition-transform duration-200", isGroupCollapsed && "-rotate-90")} />
                   <span className="flex-shrink-0">{group.label}</span>
-                  <div className="flex-1 h-px bg-white/6" />
-                  <span className="text-[8px] text-sidebar-foreground/25 tabular-nums shrink-0">{group.items.length}</span>
+                  <div className="flex-1 h-px bg-white/12" />
+                  {groupPending > 0 && isGroupCollapsed ? (
+                    <span className="flex items-center gap-1 shrink-0">
+                      <span className="relative flex h-2 w-2 items-center justify-center">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_2px_rgba(251,191,36,0.6)]" />
+                      </span>
+                      <span className="text-[9px] font-bold text-amber-400 leading-none tabular-nums">{groupPending}</span>
+                    </span>
+                  ) : (
+                    <span className="text-[8px] text-sidebar-foreground/40 tabular-nums shrink-0">{group.items.length}</span>
+                  )}
                 </button>
               ) : (
                 <div className="h-px bg-white/5 my-2 mx-2" />
