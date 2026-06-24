@@ -60,15 +60,19 @@ Deno.serve(async (req) => {
 
   // ── Parsear todas las filas válidas ─────────────────────────────────────────
   const projects = [];
+  let lastComuna = '';
   for (let i = 2; i < raw.length; i++) {
     const row = raw[i];
     if (!row || row.length < 4) continue;
 
     const titulo = row[3] ? String(row[3]).trim() : null;
-    const comuna = row[0] ? String(row[0]).trim() : null;
-
     if (!titulo) continue;
-    if (!comuna || !['8A', '8B', '10A'].includes(comuna)) continue;
+
+    // Comuna: normalizar (mayúsculas, sin espacios) y rellenar huecos —
+    // las celdas combinadas dejan las filas siguientes con la comuna en blanco.
+    const comunaRaw = row[0] ? String(row[0]).trim().toUpperCase().replace(/\s+/g, '') : '';
+    const comuna = comunaRaw || lastComuna;
+    if (comunaRaw) lastComuna = comunaRaw;
 
     const nroOrden = row[7] ? String(row[7]).trim() : null;
     const monto = row[4] ? parseFloat(row[4]) || 0 : 0;
@@ -97,7 +101,7 @@ Deno.serve(async (req) => {
       address: direccion || null,
       client_name: establecimiento || null,
       notes: [
-        `Comuna: ${comuna}`,
+        `Comuna: ${comuna || '—'}`,
         jefeSitio ? `Jefe de Sitio: ${jefeSitio}` : null,
         inspector ? `Inspector: ${inspector}` : null,
         supervisor ? `Supervisor: ${supervisor}` : null,
