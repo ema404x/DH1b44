@@ -128,24 +128,28 @@ function parseRows8B(ws) {
 /**
  * Parse rows from formato_10a (no INSPECTOR column).
  * Columns: UBICACIÓN, ESTABLECIMIENTO, TAREAS A REALIZAR , N° DE ORDEN, 1° DESROBADO, FECHA INICIO, FECHA LIMITE, CLASE DE ORDEN, STATUS
+ * Also reads INSPECTOR column if present (some 10A files do include it).
  */
 function parseRows10A(ws) {
   const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
   const records = [];
+  const inspectors = new Set();
 
   for (const row of rows) {
     const nroOrden = row['N° DE ORDEN'] || row['N° DE ORDEN '] || row['NRO DE ORDEN'];
     const tareas = row['TAREAS A REALIZAR'] || row['TAREAS A REALIZAR '] || row['TAREA'] || row['DESCRIPCION'];
     const ubicacion = row['UBICACIÓN'] || row['UBICACION'] || row['UBICACIÓN '];
-    const establecimiento = row['ESTABLECIMIENTO'];
+    const establecimiento = row['ESTABLECIMIENTO'] || row['ESTABLECIMIENTO '];
     // "1° DESROBADO" is a typo for "1° DESAPROBADO" in the 10A format
     const desaprobado = row['1° DESROBADO'] || row['1° DESAPROBADO'] || row['N° DE ORDEN 1° DESAPROBADO'];
     const fechaLimite = row['FECHA LIMITE'] || row['FECHA LÍMITE'] || row['FECHA LIMITE SAP'];
+    const inspector = normalizeName(row['INSPECTOR'] || row['INSPECTOR ']);
 
     if (!nroOrden || !tareas || String(tareas).trim() === '') continue;
+    if (inspector) inspectors.add(inspector);
 
     records.push({
-      inspector: null,
+      inspector: inspector || null,
       ubicacion: ubicacion ? String(ubicacion).trim() : null,
       establecimiento: establecimiento ? String(establecimiento).trim() : null,
       tareas: String(tareas).trim(),
@@ -158,7 +162,7 @@ function parseRows10A(ws) {
     });
   }
 
-  return { rows: records, inspectors: new Set() };
+  return { rows: records, inspectors };
 }
 
 /**
@@ -214,6 +218,61 @@ Deno.serve(async (req) => {
   let totalImported = 0;
   let totalErrors = 0;
 
+  // Pre-cargar LocationData y Direccion para resolución automática (especialmente 10A)
+  const sb = base44.asServiceRole;
+  const [allLocations, allDirecciones] = await Promise.all([
+    sb.entities.LocationData.list('-created_date', 2000).catch(() => []),
+    sb.entities.Direccion.list().catch(() => []),
+  ]);
+
+  const norm = (s) => s ? String(s).trim().toUpperCase() : '';
+
+  // Construir índices para búsqueda rápida
+  // LocationData: establecimiento → { jefe_sitio, inspector }
+  const locByEstablecimiento = new Map();
+  const locByUbicacion = new Map();
+  for (const loc of allLocations) {
+    if (loc.establecimiento) locByEstablecimiento.set(norm(loc.establecimiento), loc);
+    if (loc.ubic_tecnica) locByUbicacion.set(norm(loc.ubic_tecnica), loc);
+  }
+
+  // Direccion: inspector → jefe_sitio
+  const dirByInspector = new Map();
+  for (const d of allDirecciones) {
+    if (d.inspector) dirByInspector.set(norm(d.inspector), d);
+  }
+
+  // Resolver jefe_sitio e inspector a partir de establecimiento/ubicacion
+  function resolveFromLocation(establecimiento, ubicacion, inspectorRaw) {
+    let jefe_sitio = null;
+    let inspector = inspectorRaw || null;
+
+    // 1. Buscar en LocationData por establecimiento o ubicacion técnica
+    let loc = null;
+    if (establecimiento) loc = locByEstablecimiento.get(norm(establecimiento));
+    if (!loc && ubicacion) loc = locByUbicacion.get(norm(ubicacion));
+    // Búsqueda parcial si no hubo exacta
+    if (!loc && establecimiento) {
+      const normEst = norm(establecimiento);
+      for (const [k, v] of locByEstablecimiento) {
+        if (k.includes(normEst) || normEst.includes(k)) { loc = v; break; }
+      }
+    }
+
+    if (loc) {
+      if (loc.jefe_sitio) jefe_sitio = loc.jefe_sitio;
+      if (!inspector && loc.inspector) inspector = loc.inspector;
+    }
+
+    // 2. Fallback: si hay inspector pero no jefe, buscar en Direccion
+    if (!jefe_sitio && inspector) {
+      const dir = dirByInspector.get(norm(inspector));
+      if (dir?.jefe_sitio) jefe_sitio = dir.jefe_sitio;
+    }
+
+    return { jefe_sitio, inspector };
+  }
+
   for (const sheetName of workbook.SheetNames) {
     const upperSheet = sheetName.toUpperCase();
     if (SKIP_SHEETS.some(s => upperSheet.includes(s))) continue;
@@ -240,7 +299,16 @@ Deno.serve(async (req) => {
     const errorDetails = [];
 
     for (const r of parsedRows) {
-      const jefeInfo = r.inspector ? (jefes_por_inspector?.[r.inspector] || null) : null;
+      // Jefe asignado manualmente (desde el frontend, por inspector)
+      const jefeManual = r.inspector ? (jefes_por_inspector?.[r.inspector] || null) : null;
+
+      // Resolución automática desde LocationData/Direccion (usada especialmente para 10A)
+      const autoResolved = resolveFromLocation(r.establecimiento, r.ubicacion, r.inspector);
+
+      // Prioridad: manual > automático
+      const jefe_sitio = jefeManual?.nombre || autoResolved.jefe_sitio || null;
+      const jefe_sitio_email = jefeManual?.email || null;
+      const inspector = autoResolved.inspector || r.inspector || null;
 
       const record = {
         numero_sap: r.nroOrden,
@@ -248,15 +316,15 @@ Deno.serve(async (req) => {
         descripcion: r.tareas,
         sitio: r.ubicacion || null,
         establecimiento: r.establecimiento || r.ubicacion || null,
-        inspector: r.inspector || null,
+        inspector,
         clase_orden: r.claseOrden || null,
         status_sap: r.status || null,
         comuna: comuna || null,
         tipo: claseToTipo(r.claseOrden),
-        estado: jefeInfo ? 'asignado' : statusToEstado(r.status),
+        estado: jefe_sitio ? 'asignado' : statusToEstado(r.status),
         prioridad: 'media',
-        jefe_sitio: jefeInfo?.nombre || null,
-        jefe_sitio_email: jefeInfo?.email || null,
+        jefe_sitio,
+        jefe_sitio_email,
         fecha_emision_sap: parseDate(r.fechaInicio),
         fecha_limite: parseDate(r.fechaLimite),
       };

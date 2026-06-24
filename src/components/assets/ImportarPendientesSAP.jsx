@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileSpreadsheet, CheckCircle2, Loader2, User, X, ArrowRight, Users, Building2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2, Loader2, X, ArrowRight, Users, Building2 } from 'lucide-react';
 import { SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -151,6 +151,11 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
       }
     }
     setJefesMap(jMap);
+
+    // Para formato 10A sin inspectores: informar que la asignación se hará automáticamente desde Información General
+    if (inspList.length === 0 && getFormato(comuna) === 'formato_10a') {
+      toast.info('Las órdenes 10A se asignarán automáticamente según Información General')
+    }
 
     // Upload file
     const { file_url } = await base44.integrations.Core.UploadFile({ file: f });
@@ -342,8 +347,16 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
           </CardHeader>
           <CardContent className="space-y-2 pt-0">
             {sheetInspectors.length === 0 && (
-              <div className="text-center py-6 text-muted-foreground text-sm border rounded-lg bg-muted/30">
-                Esta planilla no tiene columna INSPECTOR. Los pendientes se importarán sin inspector y podrás asignarlos manualmente.
+              <div className="py-5 px-4 border rounded-lg bg-primary/5 border-primary/20 space-y-2">
+                <p className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Asignación automática activa
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Esta planilla no tiene columna INSPECTOR. El sistema asignará automáticamente el <strong>Jefe de Sitio</strong> e <strong>Inspector</strong> de cada orden
+                  buscando el establecimiento/dirección en <strong>Información General</strong>.
+                  Las órdenes sin coincidencia quedarán sin asignar para revisión manual.
+                </p>
               </div>
             )}
             {sheetInspectors.map(({ inspector }) => {
