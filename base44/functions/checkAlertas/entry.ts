@@ -19,6 +19,7 @@ Deno.serve(async (req) => {
     const ahora = new Date();
     const hoy = ahora.toISOString().split('T')[0];
     let totalAlertas = 0;
+    let totalNotificaciones = 0;
     const resumen = [];
 
     // Determinar qué tipos de entidad se necesitan según las configs activas
@@ -28,7 +29,7 @@ Deno.serve(async (req) => {
     const necesitaPendientes = tiposActivos.has('pendiente_vencido');
     const necesitaWOs        = tiposActivos.has('ot_vencida');
 
-    // ── Pre-cargar todas las entidades necesarias en una sola ronda de requests ──
+    // Pre-cargar todas las entidades necesarias
     const [logsNoLeidos, logsHoy, assets, materials, pendientesVencidos, workOrders] = await Promise.all([
       sb.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 200).catch(() => []),
       sb.entities.AlertaLog.list('-fecha_alerta', 500).catch(() => []),
@@ -45,7 +46,6 @@ Deno.serve(async (req) => {
 
     // ── LIMPIEZA: marcar como leídas las alertas de entidades eliminadas ──
     if (logsNoLeidos.length > 0) {
-      // Reutilizar los datos ya cargados, solo buscar lo que no tenga
       const tiposEnLogs = new Set(logsNoLeidos.map(l => l.entidad_tipo).filter(Boolean));
       const extraSets = {};
       const extraFetches = [];
@@ -55,7 +55,6 @@ Deno.serve(async (req) => {
         if (tipo === 'Material' && necesitaMaterials)  { extraSets['Material']  = new Set(materials.map(e => e.id)); continue; }
         if (tipo === 'WorkOrder' && necesitaWOs)       { extraSets['WorkOrder'] = new Set(workOrders.map(e => e.id)); continue; }
         if (tipo === 'Pendiente' && necesitaPendientes){ extraSets['Pendiente'] = new Set(pendientesVencidos.map(e => e.id)); continue; }
-        // Si no se cargó aún, fetch ahora
         extraFetches.push(
           sb.entities[tipo]?.list('-created_date', 1000).catch(() => []).then(rows => {
             extraSets[tipo] = new Set(rows.map(r => r.id));
@@ -77,9 +76,25 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Procesar configs: los datos ya están en memoria, sin queries adicionales ──
+    // ── Verificar intervalo mínimo de email para evitar spam ──
+    const puedeEnviarEmail = (cfg) => {
+      if (!cfg.ultima_email) return true;
+      const horasTranscurridas = (ahora - new Date(cfg.ultima_email)) / 3600000;
+      return horasTranscurridas >= (cfg.intervalo_minimo_email_horas || 24);
+    };
+
+    // ── Función para decidir si notificar según urgencia ──
+    const debeNotificar = (cfg, nivel) => {
+      const levelOrder = { critical: 3, warning: 2, info: 1 };
+      const minimo = levelOrder[cfg.nivel_minimo_notificar || 'critical'] || 3;
+      const actual = levelOrder[nivel] || 1;
+      return actual >= minimo;
+    };
+
+    // ── Procesar configs ──
     for (const cfg of configs) {
       const alertasGeneradas = [];
+      const alertasParaNotificar = [];
 
       // 1. GARANTÍA DE ACTIVOS
       if (cfg.tipo === 'garantia_activo') {
@@ -94,10 +109,19 @@ Deno.serve(async (req) => {
             const titulo = diasRestantes < 0
               ? `Garantía VENCIDA hace ${Math.abs(diasRestantes)} días`
               : `Garantía vence en ${diasRestantes} días`;
-            nuevasAlertas.push({ config_id: cfg.id, tipo: 'garantia_activo', nivel, titulo,
+            
+            const alerta = {
+              config_id: cfg.id, tipo: 'garantia_activo', nivel, titulo,
               mensaje: `El activo "${asset.name}" tiene su garantía ${diasRestantes < 0 ? 'vencida' : 'por vencer'}.`,
               entidad_tipo: 'Asset', entidad_id: asset.id, entidad_nombre: asset.name,
-              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString() });
+              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString()
+            };
+            nuevasAlertas.push(alerta);
+            
+            // Solo agregar a notificar si cumple urgencia
+            if (debeNotificar(cfg, nivel)) {
+              alertasParaNotificar.push(alerta);
+            }
             alertasGeneradas.push({ nombre: asset.name, nivel });
           }
         }
@@ -120,10 +144,18 @@ Deno.serve(async (req) => {
             const titulo = mat.stock === 0
               ? `Sin stock: ${mat.name}`
               : `Stock bajo: ${mat.name} (${mat.stock} ${mat.unit || ''})`;
-            nuevasAlertas.push({ config_id: cfg.id, tipo: 'stock_material', nivel, titulo,
+            
+            const alerta = {
+              config_id: cfg.id, tipo: 'stock_material', nivel, titulo,
               mensaje: `El material "${mat.name}" tiene stock ${mat.stock} (mínimo: ${mat.min_stock}).`,
               entidad_tipo: 'Material', entidad_id: mat.id, entidad_nombre: mat.name,
-              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString() });
+              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString()
+            };
+            nuevasAlertas.push(alerta);
+            
+            if (debeNotificar(cfg, nivel)) {
+              alertasParaNotificar.push(alerta);
+            }
             alertasGeneradas.push({ nombre: mat.name, nivel });
           }
         }
@@ -143,12 +175,20 @@ Deno.serve(async (req) => {
           const diasVencidos = Math.ceil((ahora - new Date(p.fecha_limite)) / 86400000);
           if (diasVencidos >= diasLimite) {
             const nivel = diasVencidos >= diasLimite * 2 ? 'critical' : 'warning';
-            nuevasAlertas.push({ config_id: cfg.id, tipo: 'pendiente_vencido', nivel,
+            
+            const alerta = {
+              config_id: cfg.id, tipo: 'pendiente_vencido', nivel,
               titulo: `Pendiente vencido hace ${diasVencidos} días`,
               mensaje: `El pendiente "${(p.descripcion || p.establecimiento || '')?.substring(0, 60)}" lleva ${diasVencidos} días vencido.`,
               entidad_tipo: 'Pendiente', entidad_id: p.id,
               entidad_nombre: p.establecimiento || p.descripcion?.substring(0, 40) || p.id,
-              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString() });
+              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString()
+            };
+            nuevasAlertas.push(alerta);
+            
+            if (debeNotificar(cfg, nivel)) {
+              alertasParaNotificar.push(alerta);
+            }
             alertasGeneradas.push({ nombre: p.establecimiento || p.id, nivel });
           }
         }
@@ -169,11 +209,19 @@ Deno.serve(async (req) => {
           const diasVencidos = Math.ceil((ahora - new Date(ot.scheduled_date)) / 86400000);
           if (diasVencidos >= diasLimite) {
             const nivel = diasVencidos >= 7 ? 'critical' : 'warning';
-            nuevasAlertas.push({ config_id: cfg.id, tipo: 'ot_vencida', nivel,
+            
+            const alerta = {
+              config_id: cfg.id, tipo: 'ot_vencida', nivel,
               titulo: `OT vencida hace ${diasVencidos} día${diasVencidos !== 1 ? 's' : ''}`,
               mensaje: `La OT "${ot.title}" (${ot.code || ot.id}) lleva ${diasVencidos} días sin completar.`,
               entidad_tipo: 'WorkOrder', entidad_id: ot.id, entidad_nombre: ot.title,
-              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString() });
+              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString()
+            };
+            nuevasAlertas.push(alerta);
+            
+            if (debeNotificar(cfg, nivel)) {
+              alertasParaNotificar.push(alerta);
+            }
             alertasGeneradas.push({ nombre: ot.title, nivel });
           }
         }
@@ -183,14 +231,58 @@ Deno.serve(async (req) => {
         }
       }
 
+      // ── Enviar notificaciones SOLO si cumple urgencia + intervalo mínimo ──
+      if (alertasParaNotificar.length > 0 && cfg.notificar_email && puedeEnviarEmail(cfg)) {
+        const criticas = alertasParaNotificar.filter(a => a.nivel === 'critical');
+        if (criticas.length > 0) {
+          // Enviar email solo de alertas críticas
+          const asunto = `🚨 ${criticas.length} ALERTA${criticas.length > 1 ? 'S' : ''} URGENTE${criticas.length > 1 ? 'S' : ''}: ${cfg.nombre}`;
+          const cuerpo = `
+ALERTAS CRÍTICAS DETECTADAS
+
+${criticas.map((a, i) => `${i+1}. ${a.titulo}\n   ${a.mensaje}`).join('\n\n')}
+
+Nivel: CRÍTICO
+Tipo: ${cfg.nombre}
+Fecha: ${ahora.toLocaleString('es-AR')}
+          `.trim();
+
+          if (cfg.email_destinatarios && cfg.email_destinatarios.length > 0) {
+            try {
+              await base44.integrations.Core.SendEmail({
+                to: cfg.email_destinatarios.join(','),
+                subject: asunto,
+                body: cuerpo,
+              });
+              await sb.entities.AlertaConfig.update(cfg.id, { ultima_email: ahora.toISOString() });
+              totalNotificaciones += criticas.length;
+            } catch (err) {
+              console.error(`Error enviando email para ${cfg.nombre}:`, err.message);
+            }
+          }
+        }
+      }
+
       if (alertasGeneradas.length > 0) {
         await sb.entities.AlertaConfig.update(cfg.id, { ultima_notificacion: ahora.toISOString() });
       }
 
-      resumen.push({ config: cfg.nombre, tipo: cfg.tipo, alertas: alertasGeneradas.length });
+      resumen.push({
+        config: cfg.nombre,
+        tipo: cfg.tipo,
+        alertas: alertasGeneradas.length,
+        notificadas: alertasParaNotificar.length,
+        nivel_minimo: cfg.nivel_minimo_notificar || 'critical'
+      });
     }
 
-    return Response.json({ success: true, totalAlertas, resumen });
+    return Response.json({
+      success: true,
+      totalAlertas,
+      totalNotificaciones,
+      mensaje: `${totalAlertas} alertas detectadas, ${totalNotificaciones} notificaciones enviadas (solo urgentes)`,
+      resumen
+    });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

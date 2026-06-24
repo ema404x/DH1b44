@@ -7,7 +7,8 @@
       "enum": [
         "garantia_activo",
         "stock_material",
-        "pendiente_vencido"
+        "pendiente_vencido",
+        "ot_vencida"
       ],
       "description": "Tipo de alerta"
     },
@@ -20,6 +21,16 @@
       "default": true,
       "description": "Si la alerta est\u00e1 habilitada"
     },
+    "nivel_minimo_notificar": {
+      "type": "string",
+      "enum": [
+        "critical",
+        "warning",
+        "info"
+      ],
+      "default": "critical",
+      "description": "Nivel m\u00ednimo para enviar notificaci\u00f3n al panel/email: critical=solo urgentes, warning=moderado+urgente, info=todos"
+    },
     "dias_anticipacion": {
       "type": "number",
       "default": 30,
@@ -28,12 +39,17 @@
     "umbral_stock_pct": {
       "type": "number",
       "default": 0,
-      "description": "Umbral de stock como porcentaje adicional sobre min_stock (0 = exactamente min_stock)"
+      "description": "Umbral de stock como porcentaje adicional sobre min_stock"
     },
     "dias_vencimiento_pendiente": {
       "type": "number",
       "default": 7,
       "description": "D\u00edas vencidos para considerar pendiente cr\u00edtico"
+    },
+    "dias_vencimiento_ot": {
+      "type": "number",
+      "default": 1,
+      "description": "D\u00edas para considerar OT vencida"
     },
     "email_destinatarios": {
       "type": "array",
@@ -45,17 +61,27 @@
     "notificar_email": {
       "type": "boolean",
       "default": true,
-      "description": "Enviar notificaci\u00f3n por email"
+      "description": "Enviar notificaci\u00f3n por email (solo si cumple nivel_minimo_notificar)"
     },
     "notificar_banner": {
       "type": "boolean",
       "default": true,
-      "description": "Mostrar banner en dashboard"
+      "description": "Mostrar banner en dashboard (solo si cumple nivel_minimo_notificar)"
     },
     "ultima_notificacion": {
       "type": "string",
       "format": "date-time",
       "description": "Cu\u00e1ndo se envi\u00f3 la \u00faltima notificaci\u00f3n"
+    },
+    "ultima_email": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Cu\u00e1ndo se envi\u00f3 \u00faltimo email"
+    },
+    "intervalo_minimo_email_horas": {
+      "type": "number",
+      "default": 24,
+      "description": "Horas m\u00ednimas entre env\u00edos de email del mismo tipo"
     }
   },
   "required": [
