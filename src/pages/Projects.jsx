@@ -13,6 +13,7 @@ import ProjectDetailPanel from '@/components/projects/ProjectDetailPanel';
 import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import { toast } from 'sonner';
 import { usePermission } from '@/hooks/usePermission';
+import { debounce } from '@/lib/performance';
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 
@@ -190,13 +191,17 @@ export default function Projects() {
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState(1);
+  const [limit, setLimit] = useState(100);
   const queryClient = useQueryClient();
 
   const { data: projects = [], isLoading } = useQuery({
-    queryKey: ['projects'],
-    queryFn: () => base44.entities.Project.list('-created_date', 500),
+    queryKey: ['projects', limit],
+    queryFn: () => base44.entities.Project.list('-created_date', limit),
     staleTime: 1000 * 60 * 15,
   });
+
+  // Debounce búsqueda para evitar re-renders excesivos
+  const debouncedSearch = debounce((value) => setSearch(value), 300);
 
   const saveMutation = useMutation({
     mutationFn: (data) => editing ? base44.entities.Project.update(editing.id, data) : base44.entities.Project.create(data),
@@ -373,9 +378,12 @@ export default function Projects() {
       <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por título, establecimiento, dirección, código..."
-            className="pl-8 h-8 text-xs bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500" />
-          {search && <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"><X className="h-3 w-3" /></button>}
+          <Input 
+            onChange={e => debouncedSearch(e.target.value)} 
+            placeholder="Buscar por título, establecimiento, dirección, código..."
+            className="pl-8 h-8 text-xs bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500" 
+          />
+          {search && <button onClick={() => { setSearch(''); debouncedSearch(''); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"><X className="h-3 w-3" /></button>}
         </div>
         <Select value={comunaFilter} onValueChange={setComunaFilter}>
           <SelectTrigger className="w-28 h-8 text-xs bg-slate-800/50 border-slate-700/50 text-white">
@@ -448,7 +456,8 @@ export default function Projects() {
                 No se encontraron obras con los filtros actuales
               </div>
             ) : (
-              filtered.map(project => (
+              <>
+              {filtered.map(project => (
                 <ProyectoFila
                   key={project.id}
                   project={project}
@@ -459,6 +468,20 @@ export default function Projects() {
                   canDelete={canDelete}
                 />
               ))
+              }
+              {limit < projects.length && (
+                <div className="py-4 text-center">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setLimit(limit + 100)}
+                    className="text-xs"
+                  >
+                    Cargar {Math.min(100, projects.length - limit)} más ({limit}/{projects.length})
+                  </Button>
+                </div>
+              )}
+              </>
             )}
           </div>
         </div>
