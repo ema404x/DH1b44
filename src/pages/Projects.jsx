@@ -46,20 +46,8 @@ export default function Projects() {
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects'],
-    queryFn: async () => {
-      // Paginar hasta traer TODOS los registros sin límite artificial
-      const all = [];
-      let skip = 0;
-      const PAGE = 500;
-      while (true) {
-        const chunk = await base44.entities.Project.list('-created_date', PAGE, skip);
-        all.push(...chunk);
-        if (chunk.length < PAGE) break;
-        skip += PAGE;
-      }
-      return all;
-    },
-    staleTime: 1000 * 60 * 2,
+    queryFn: () => base44.entities.Project.list('-created_date', 5000),
+    staleTime: 1000 * 60 * 10,
   });
 
   const debouncedSearch = useMemo(() => debounce((v) => setSearch(v), 300), []);
