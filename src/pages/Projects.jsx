@@ -49,7 +49,7 @@ export default function Projects() {
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects', limit],
     queryFn: () => base44.entities.Project.list('-created_date', limit),
-    staleTime: 1000 * 60 * 15,
+    staleTime: 1000 * 60 * 2,
   });
 
   const debouncedSearch = useMemo(() => debounce((v) => setSearch(v), 300), []);

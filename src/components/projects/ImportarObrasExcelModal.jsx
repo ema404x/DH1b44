@@ -26,8 +26,6 @@ export default function ImportarObrasExcelModal({ onClose, onImported }) {
       const res = await base44.functions.invoke('importarObrasExcel', { file_url });
       const data = res.data;
 
-      // Invalida y espera a que se complete el refetch
-      await queryClient.invalidateQueries({ queryKey: ['projects'] });
       setResult(data);
       setStep('done');
 
@@ -36,6 +34,8 @@ export default function ImportarObrasExcelModal({ onClose, onImported }) {
           ? `${data.created || 0} nuevas y ${data.updated} actualizadas`
           : `${data.imported} obras importadas`;
         toast.success(msg);
+        // Forzar refetch completo descartando el cache — staleTime lo bloquearía sin esto
+        await queryClient.resetQueries({ queryKey: ['projects'] });
         onImported?.();
       } else {
         toast.error('No se importó ninguna obra válida');
