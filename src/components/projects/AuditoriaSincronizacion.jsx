@@ -37,10 +37,16 @@ export default function AuditoriaSincronizacion({ onClose }) {
     try {
       const res = await base44.functions.invoke('auditarObrasSincronizacion', { file_url: fileUrl, fix: true });
       const data = res.data;
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success(`${data.created} obras faltantes importadas`);
+      // resetQueries descarta el cache y fuerza refetch inmediato (invalidateQueries no alcanza con staleTime alto)
+      await queryClient.resetQueries({ queryKey: ['projects'] });
+      toast.success(`${data.created} creadas · ${data.updated} actualizadas${data.errors ? ` · ${data.errors} errores` : ''}`);
       setStep('done');
-      setReport(prev => ({ ...prev, faltantesCount: 0, enSistema: (prev?.enSistema || 0) + data.created }));
+      setReport(prev => ({
+        ...prev,
+        faltantesCount: 0,
+        enSistema: (prev?.enSistema || 0) + (data.created || 0),
+        faltantes: [],
+      }));
     } catch (err) {
       toast.error('Error al corregir: ' + (err?.message || 'intente nuevamente'));
       setStep('done');
