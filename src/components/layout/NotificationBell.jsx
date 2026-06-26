@@ -36,9 +36,11 @@ export default function NotificationBell() {
   const { data: notifications = [] } = useQuery({
     queryKey: ['notifications'],
     queryFn: () => base44.entities.Notification.list('-created_date', 30),
+    staleTime: 1000 * 60 * 2,
   });
 
-  const STALE = 1000 * 60 * 5; // 5 min
+  // Reutiliza el cache global — staleTime alto para no re-fetchear solo por abrir el panel
+  const STALE = 1000 * 60 * 10;
   const { data: orders    = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 80),  staleTime: STALE, refetchOnWindowFocus: false });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 50),  staleTime: STALE, refetchOnWindowFocus: false });
   const { data: assets    = [] } = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 50),     staleTime: STALE, refetchOnWindowFocus: false });
@@ -81,13 +83,8 @@ export default function NotificationBell() {
   const handleOpen = () => {
     const newOpen = !open;
     setOpen(newOpen);
-    if (newOpen) {
-      qc.invalidateQueries({ queryKey: ['notifications'] });
-      qc.invalidateQueries({ queryKey: ['workorders'] });
-      qc.invalidateQueries({ queryKey: ['materials'] });
-      qc.invalidateQueries({ queryKey: ['assets'] });
-      qc.invalidateQueries({ queryKey: ['invoices'] });
-    }
+    // Solo refrescar notificaciones (las demás queries usan cache global con staleTime alto)
+    if (newOpen) qc.invalidateQueries({ queryKey: ['notifications'] });
   };
 
   const handleClick = (n) => {

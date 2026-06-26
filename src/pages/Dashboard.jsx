@@ -1,7 +1,6 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
 import {
   FolderKanban, ClipboardList, Users, DollarSign, TrendingUp, TrendingDown,
   AlertTriangle, CheckCircle2, Wrench, ArrowRight, Zap, Package, BarChart3,
@@ -29,9 +28,6 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { es } from 'date-fns/locale';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
-
-const stagger = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.1 } } };
-const fadeUp = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 120, damping: 16 } } };
 
 const panel = "rounded-2xl border border-border bg-card shadow-sm p-4";
 
@@ -62,8 +58,8 @@ const KPI_COLORS = {
 function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, href, alert }) {
   const cfg = KPI_COLORS[color] || KPI_COLORS.blue;
   const inner = (
-    <motion.div variants={fadeUp} whileHover={{ y: -3, transition: { duration: 0.2 } }} className="h-full">
-      <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm p-5 h-full transition-shadow hover:shadow-md">
+    <div className="h-full group">
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm p-5 h-full transition-all hover:shadow-md hover:-translate-y-0.5 duration-200">
         <div className="flex items-start justify-between mb-4">
           <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", cfg.icon)}>
             <Icon className="h-5 w-5" />
@@ -87,7 +83,7 @@ function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, hr
           {subtitle && <p className="text-xs text-muted-foreground/70 mt-1">{subtitle}</p>}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
   return href ? <Link to={href} className="block h-full">{inner}</Link> : inner;
 }
@@ -148,7 +144,7 @@ function ActivityFeed({ orders }) {
 function QuickActionCard({ icon: Icon, label, desc, href, color }) {
   return (
     <Link to={href}>
-      <motion.div whileHover={{ y: -2 }} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/40 hover:bg-muted transition-colors cursor-pointer group h-full">
+      <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/40 hover:bg-muted hover:-translate-y-0.5 transition-all duration-150 cursor-pointer group h-full">
         <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0", color)}>
           <Icon className="h-4 w-4" />
         </div>
@@ -157,7 +153,7 @@ function QuickActionCard({ icon: Icon, label, desc, href, color }) {
           <p className="text-[10px] text-muted-foreground">{desc}</p>
         </div>
         <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 group-hover:text-primary ml-auto flex-shrink-0 transition-colors" />
-      </motion.div>
+      </div>
     </Link>
   );
 }
@@ -278,7 +274,7 @@ export default function Dashboard() {
       <AuroraEffect />
 
       {/* ── HEADER ── */}
-      <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1">
         <div>
           <p className="text-muted-foreground text-sm flex items-center gap-1.5 mb-1">
             <Calendar className="h-3.5 w-3.5" />
@@ -306,19 +302,17 @@ export default function Dashboard() {
             </Link>
           </div>
         )}
-      </motion.div>
+      </div>
 
       {/* ── ALERTAS ── */}
       <AlertasBanner />
 
       {/* ── FILTROS GLOBALES ── */}
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-        <DashboardFilters filters={dashFilters} onChange={setDashFilters} jefes={jefesOptions} />
-      </motion.div>
+      <DashboardFilters filters={dashFilters} onChange={setDashFilters} jefes={jefesOptions} />
 
       {/* ── CRITICAL ALERTS ── */}
       {metrics.hasAlerts && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           {metrics.overdueOrders > 0 && canRead('WorkOrder') && (
             <Link to="/ordenes" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/25 text-red-300 text-sm hover:bg-red-500/25 transition-all">
               <AlertTriangle className="h-3.5 w-3.5" /> {metrics.overdueOrders} OT{metrics.overdueOrders > 1 ? 's' : ''} vencida{metrics.overdueOrders > 1 ? 's' : ''}
@@ -334,7 +328,7 @@ export default function Dashboard() {
               <Wrench className="h-3.5 w-3.5" /> {metrics.overdueAssets.length} mantenimiento{metrics.overdueAssets.length > 1 ? 's' : ''} vencido{metrics.overdueAssets.length > 1 ? 's' : ''}
             </Link>
           )}
-        </motion.div>
+        </div>
       )}
 
       {/* ── ACCESOS RÁPIDOS ── */}
@@ -349,33 +343,31 @@ export default function Dashboard() {
         ].filter(Boolean);
         if (actions.length === 0) return null;
         return (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
-            <div className={panel}>
-              <SectionHeader icon={Sparkles} title="Accesos rápidos" subtitle="Tareas frecuentes" />
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                {actions.map((a, i) => <QuickActionCard key={i} {...a} />)}
-              </div>
+          <div className={panel}>
+            <SectionHeader icon={Sparkles} title="Accesos rápidos" subtitle="Tareas frecuentes" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              {actions.map((a, i) => <QuickActionCard key={i} {...a} />)}
             </div>
-          </motion.div>
+          </div>
         );
       })()}
 
       {/* ── INDICADORES (KPI GRID) ── */}
       <div>
         <SectionHeader title="Indicadores" subtitle="Resumen general del período" />
-        <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="OTs Pendientes"   value={metrics.pendingOrders}          subtitle={`${metrics.completedThisMonth} completadas este mes`}  icon={ClipboardList} color="amber"  alert={metrics.overdueOrders > 0 ? metrics.overdueOrders : undefined} />}
           {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="En Progreso"      value={metrics.inProgressOrders}        subtitle={`${metrics.efficiency}% de eficiencia total`}          icon={Activity}      color="purple" />}
           {canRead('Project')    && <KpiCard href="/proyectos"   title="Proyectos"        value={metrics.activeProjects}         subtitle={`${projects.length} en total`}                          icon={FolderKanban}  color="blue"   />}
           {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos del Mes" value={fmt(metrics.revenueThisMonth)} subtitle={`${fmt(metrics.pendingInvoices)} por cobrar`}         icon={DollarSign}    color="green"  trend={metrics.revenueTrend} />}
-        </motion.div>
+        </div>
         <div className="h-4" />
-        <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={metrics.activeClients}            subtitle={`${clients.length} en total`}                        icon={Users}         color="primary" />}
           {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={metrics.urgentOrders.length}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={metrics.urgentOrders.length > 0 ? 'red' : 'green'} />}
           {canRead('Asset')     && <KpiCard href="/activos"    title="Pendientes SAP"  value={pendientes.filter(p => ['pendiente','asignado','en_progreso'].includes(p.estado)).length} subtitle={`${pendientes.filter(p => p.estado === 'resuelto').length} resueltos`} icon={Wrench} color="amber" alert={pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto').length > 0 ? pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto').length : undefined} />}
           {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={materials.length}                  subtitle={`${metrics.lowStockItems.length} bajo mínimo`}      icon={Package}       color={metrics.lowStockItems.length > 0 ? 'red' : 'green'} />}
-        </motion.div>
+        </div>
       </div>
 
       {/* ── OPERACIÓN ── */}
@@ -384,23 +376,21 @@ export default function Dashboard() {
           <SectionHeader icon={ClipboardList} title="Operación" subtitle="Órdenes de trabajo y actividad reciente"
             action={<Link to="/ordenes"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver todas <ArrowRight className="h-3 w-3" /></Button></Link>} />
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="xl:col-span-2">
+            <div className="xl:col-span-2">
               <OTsPendientesPanel orders={orders} />
-            </motion.div>
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-              <div className={cn(panel, "h-full")}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-semibold text-foreground">Actividad reciente</h3>
-                  </div>
-                  <Link to="/ordenes">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button>
-                  </Link>
+            </div>
+            <div className={cn(panel, "h-full")}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground">Actividad reciente</h3>
                 </div>
-                <ActivityFeed orders={orders} />
+                <Link to="/ordenes">
+                  <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button>
+                </Link>
               </div>
-            </motion.div>
+              <ActivityFeed orders={orders} />
+            </div>
           </div>
         </div>
       )}
@@ -412,15 +402,11 @@ export default function Dashboard() {
             action={<Link to="/facturacion"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button></Link>} />
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             {canRead('Invoice') && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="xl:col-span-2">
+              <div className="xl:col-span-2">
                 <RevenueChart invoices={invoices} />
-              </motion.div>
+              </div>
             )}
-            {canRead('Certificado') && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-                <CertificadosPanel filterCutoff={filterCutoff} />
-              </motion.div>
-            )}
+            {canRead('Certificado') && <CertificadosPanel filterCutoff={filterCutoff} />}
           </div>
         </div>
       )}
@@ -432,37 +418,35 @@ export default function Dashboard() {
             action={canRead('Project') ? <Link to="/proyectos"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button></Link> : null} />
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             {canRead('Emergencias') && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="xl:col-span-2">
+              <div className="xl:col-span-2">
                 <EmergenciasWidget />
-              </motion.div>
+              </div>
             )}
             {canRead('Project') && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
-                <div className={cn(panel, "h-full")}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-foreground">Proyectos en curso</h3>
-                    <Link to="/proyectos">
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button>
-                    </Link>
-                  </div>
-                  {metrics.recentProjects.length === 0 ? (
-                    <div className="flex items-center justify-center h-24 text-xs text-muted-foreground">Sin proyectos activos</div>
-                  ) : (
-                    <div className="space-y-4">
-                      {metrics.recentProjects.map(p => (
-                        <div key={p.id} className="space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium text-foreground truncate flex-1">{p.name}</p>
-                            <span className="text-xs font-bold text-primary flex-shrink-0 tabular-nums">{p.progress || 0}%</span>
-                          </div>
-                          <Progress value={p.progress || 0} className="h-1.5" />
-                          {p.client_name && <p className="text-[10px] text-muted-foreground">{p.client_name}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              <div className={cn(panel, "h-full")}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-foreground">Proyectos en curso</h3>
+                  <Link to="/proyectos">
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button>
+                  </Link>
                 </div>
-              </motion.div>
+                {metrics.recentProjects.length === 0 ? (
+                  <div className="flex items-center justify-center h-24 text-xs text-muted-foreground">Sin proyectos activos</div>
+                ) : (
+                  <div className="space-y-4">
+                    {metrics.recentProjects.map(p => (
+                      <div key={p.id} className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-foreground truncate flex-1">{p.name}</p>
+                          <span className="text-xs font-bold text-primary flex-shrink-0 tabular-nums">{p.progress || 0}%</span>
+                        </div>
+                        <Progress value={p.progress || 0} className="h-1.5" />
+                        {p.client_name && <p className="text-[10px] text-muted-foreground">{p.client_name}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -471,23 +455,19 @@ export default function Dashboard() {
       {/* ── GESTIÓN DE SITIOS ── */}
       <div>
         <SectionHeader icon={Shield} title="Gestión de sitios" subtitle="Indicadores por jefe de sitio" />
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-          <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} />
-        </motion.div>
+        <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} />
       </div>
 
       {/* ── MÉTRICAS DE OPERACIÓN ── */}
       <div>
         <SectionHeader icon={BarChart3} title="Métricas de operación" subtitle="Vista global de recursos y equipos" />
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}>
-          <MetricasOperacion
-            orders={orders}
-            projects={projects}
-            materials={materials}
-            assets={assets}
-            employees={employees}
-          />
-        </motion.div>
+        <MetricasOperacion
+          orders={orders}
+          projects={projects}
+          materials={materials}
+          assets={assets}
+          employees={employees}
+        />
       </div>
     </div>
   );

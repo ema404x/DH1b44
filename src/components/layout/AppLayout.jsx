@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import MobileBottomNav from './MobileBottomNav';
@@ -12,29 +12,38 @@ import ChatbotSoporte from '@/components/soporte/ChatbotSoporte';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useEmergencyNotifications } from '@/hooks/useEmergencyNotifications';
 import EmergencyAlert from '@/components/emergencias/EmergencyAlert';
-import { useState } from 'react';
 import { useSmartCache } from '@/hooks/useSmartCache';
 
+// Estable entre renders — no se recrea nunca
+const onSyncCallback = (count) =>
+  toast.success(`${count} orden${count !== 1 ? 'es' : ''} de trabajo sincronizada${count !== 1 ? 's' : ''} correctamente`);
+
 export default function AppLayout() {
-  // Activa el sistema de caché persistente
   useSmartCache();
 
-  const { isOnline, pendingCount, isSyncing, syncPending } = useOfflineQueue((count) => {
-    toast.success(`${count} orden${count !== 1 ? 'es' : ''} de trabajo sincronizada${count !== 1 ? 's' : ''} correctamente`);
-  });
+  const { isOnline, pendingCount, isSyncing, syncPending } = useOfflineQueue(onSyncCallback);
   const { currentUser } = useCurrentUser();
   const [activeEmergency, setActiveEmergency] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const navigate = useNavigate();
 
-  // Notificaciones de emergencia para gerencia (admin)
   useEmergencyNotifications(currentUser, setActiveEmergency);
+
+  const handleCloseEmergency = useCallback(() => setActiveEmergency(null), []);
+  const handleViewEmergency  = useCallback(() => { navigate('/emergencias'); setActiveEmergency(null); }, [navigate]);
+  const handleMoreMobile     = useCallback(() => setMobileNavOpen(true), []);
+
+  // Clase del contenido principal — memoizada para evitar string recalc en cada render
+  const mainPaddingClass = useMemo(
+    () => !isOnline || isSyncing || pendingCount > 0 ? 'pt-8' : '',
+    [isOnline, isSyncing, pendingCount]
+  );
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0f1e34 55%, #091422 100%)' }}>
       <OfflineBar isOnline={isOnline} pendingCount={pendingCount} isSyncing={isSyncing} onSync={syncPending} />
       <Sidebar open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
-      <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${!isOnline || isSyncing || pendingCount > 0 ? 'pt-8' : ''}`}>
+      <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${mainPaddingClass}`}>
         {/* Top bar */}
         <header className="h-14 border-b border-white/8 flex items-center gap-3 pl-14 pr-4 lg:pl-5 lg:pr-5 flex-shrink-0 z-30"
           style={{ background: 'rgba(10,22,40,0.85)', backdropFilter: 'blur(12px)' }}>
@@ -53,12 +62,12 @@ export default function AppLayout() {
           </div>
         </main>
       </div>
-      <MobileBottomNav onMore={() => setMobileNavOpen(true)} />
+      <MobileBottomNav onMore={handleMoreMobile} />
       <ChatbotSoporte />
       <EmergencyAlert
         emergencia={activeEmergency}
-        onClose={() => setActiveEmergency(null)}
-        onView={() => { navigate('/emergencias'); setActiveEmergency(null); }}
+        onClose={handleCloseEmergency}
+        onView={handleViewEmergency}
       />
     </div>
   );

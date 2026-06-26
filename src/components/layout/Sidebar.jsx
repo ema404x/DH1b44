@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
@@ -84,6 +84,22 @@ const navGroups = [
   },
 ];
 
+// Mapa estático — fuera del componente, no se recrea nunca
+const routeToModule = {
+  '/': 'Dashboard', '/calendario': 'Calendario', '/emergencias': 'Emergencias',
+  '/proyectos': 'Project', '/ordenes': 'WorkOrder', '/activos': 'Asset',
+  '/informes': 'Informes', '/inspeccion-colegio': 'InspeccionColegio',
+  '/reportes': 'Reportes', '/automatizaciones': 'Automatizaciones',
+  '/clientes': 'Client', '/presupuestos-obra': 'PresupuestosObra',
+  '/control-riesgo': 'ControlRiesgo', '/certificados': 'Certificado',
+  '/aprobacion-certificados': 'AprobacionCertificados', '/certificacion-obras': 'CertificacionObras',
+  '/facturacion': 'Invoice', '/informacion-general': 'InformacionGeneral',
+  '/empleados': 'Employee', '/mapa': 'Mapa', '/mapa-jefes': 'MapaJefes',
+  '/inventario': 'Inventory', '/alertas': 'Alertas', '/permisos': 'Permisos',
+  '/auditoria': 'AuditLog', '/seguridad': 'Seguridad', '/calefaccion': 'Calefaccion',
+  '/rutinas': 'Rutinas', '/foro': null, '/tutorial': null, '/importar': 'ImportarDatos',
+};
+
 const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesAprobacion }) {
   const isForo = item.path === '/foro';
   const isAprobacion = item.path === '/aprobacion-certificados';
@@ -102,7 +118,6 @@ const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, 
             : "text-white/70 hover:bg-white/6 hover:text-white",
         )}
       >
-        {/* Active indicator bar */}
         {active && (
           <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-primary rounded-r-full shadow-[0_0_8px_2px_rgba(59,130,246,0.4)]" />
         )}
@@ -122,9 +137,7 @@ const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, 
             </span>
           )}
         </div>
-        {!collapsed && (
-          <span className="truncate flex-1">{item.label}</span>
-        )}
+        {!collapsed && <span className="truncate flex-1">{item.label}</span>}
         {!collapsed && isForo && hasNewMessages && !active && (
           <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse flex-shrink-0" />
         )}
@@ -136,7 +149,6 @@ const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, 
           </span>
         )}
       </Link>
-      {/* Tooltip when collapsed */}
       {collapsed && (
         <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 z-50 pointer-events-none
           bg-[#1a2d48] text-white text-xs font-medium px-2.5 py-1.5 rounded-md whitespace-nowrap
@@ -147,7 +159,12 @@ const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, 
       )}
     </div>
   );
-});
+}, (prev, next) =>
+  prev.active === next.active &&
+  prev.collapsed === next.collapsed &&
+  prev.hasNewMessages === next.hasNewMessages &&
+  prev.pendientesAprobacion === next.pendientesAprobacion
+);
 
 export default function Sidebar({ open, onOpenChange }) {
   const location = useLocation();
@@ -155,39 +172,37 @@ export default function Sidebar({ open, onOpenChange }) {
   const [collapsed, setCollapsed] = useState(false);
   const [internalMobileOpen, setInternalMobileOpen] = useState(false);
   const mobileOpen = open !== undefined ? open : internalMobileOpen;
-  const setMobileOpen = (v) => {
+  const setMobileOpen = useCallback((v) => {
     if (onOpenChange) onOpenChange(v);
     if (open === undefined) setInternalMobileOpen(v);
-  };
+  }, [onOpenChange, open]);
+
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('dh1-collapsed-nav'));
       if (Array.isArray(saved)) return new Set(saved);
     } catch {}
-    // Por defecto colapsa todos; el efecto expande el grupo de la ruta activa
     return new Set(navGroups.map(g => g.label));
   });
+
   const { hasNewMessages, resetNotification } = useForoNotificaciones();
   const { pendientesAprobacion } = useAprobacionPendientes();
-  
-  // Resetear notificación cuando se abre el foro
-  useEffect(() => {
-    if (location.pathname === '/foro') {
-      resetNotification();
-    }
-  }, [location.pathname, resetNotification]);
 
-  const isActive = (path) => {
+  // Memoizar isActive — evita recalcular por cada navitem en cada render
+  const isActive = useCallback((path) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
-  };
+  }, [location.pathname]);
 
-  // Persistir grupos colapsados
+  useEffect(() => {
+    if (location.pathname === '/foro') resetNotification();
+  }, [location.pathname, resetNotification]);
+
   useEffect(() => {
     localStorage.setItem('dh1-collapsed-nav', JSON.stringify([...collapsedGroups]));
   }, [collapsedGroups]);
 
-  // Auto-expandir el grupo que contiene la ruta activa (solo en sidebar expandida)
+  // Auto-expandir el grupo activo
   useEffect(() => {
     if (collapsed) return;
     setCollapsedGroups(prev => {
@@ -197,67 +212,33 @@ export default function Sidebar({ open, onOpenChange }) {
       next.delete(activeGroup.label);
       return next;
     });
-  }, [location.pathname, collapsed]);
+  }, [location.pathname, collapsed, isActive]);
 
-  const toggleGroup = (label) =>
+  const toggleGroup = useCallback((label) =>
     setCollapsedGroups(prev => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label); else next.add(label);
       return next;
-    });
+    }), []);
 
-  // Mapeo de rutas → clave de módulo en RolePermission
-  const routeToModule = {
-    '/': 'Dashboard',
-    '/calendario': 'Calendario',
-    '/emergencias': 'Emergencias',
-    '/proyectos': 'Project',
-    '/ordenes': 'WorkOrder',
-    '/activos': 'Asset',
-    '/informes': 'Informes',
-    '/inspeccion-colegio': 'InspeccionColegio',
-    '/reportes': 'Reportes',
-    '/automatizaciones': 'Automatizaciones',
-    '/clientes': 'Client',
-    '/presupuestos-obra': 'PresupuestosObra',
-    '/control-riesgo': 'ControlRiesgo',
-    '/certificados': 'Certificado',
-    '/aprobacion-certificados': 'AprobacionCertificados',
-    '/certificacion-obras': 'CertificacionObras',
-    '/facturacion': 'Invoice',
-    '/informacion-general': 'InformacionGeneral',
-    '/empleados': 'Employee',
-    '/mapa': 'Mapa',
-    '/mapa-jefes': 'MapaJefes',
-    '/inventario': 'Inventory',
-    '/alertas': 'Alertas',
-    '/permisos': 'Permisos',
-    '/auditoria': 'AuditLog',
-    '/seguridad': 'Seguridad',
-    '/calefaccion': 'Calefaccion',
-    '/rutinas': 'Rutinas',
-    '/foro': null,
-    '/tutorial': null,
-    '/importar': 'ImportarDatos',
-  };
+  // Filtrar grupos por permisos — memoizado, solo recalcula si cambian permisos o usuario
+  const visibleGroups = useMemo(() => {
+    const isAdmin = user?.role === 'admin';
+    return navGroups.map(group => ({
+      ...group,
+      items: group.items.filter(item => {
+        if (isAdmin) return true;
+        if (!userPermissions) {
+          return item.path === '/' || item.path === '/tutorial' || item.path === '/calendario';
+        }
+        const moduleKey = routeToModule[item.path];
+        if (!moduleKey) return true;
+        return userPermissions[moduleKey]?.read === true;
+      })
+    })).filter(group => group.items.length > 0);
+  }, [user?.role, userPermissions]);
 
-  // Filtrar grupos según permisos del rol
-  // Solo los admins de Base44 (user.role === 'admin') ven todo sin restricciones
-  // Si hay permisos configurados → filtrar según read
-  // Si NO hay permisos configurados y NO es admin → mostrar solo Dashboard y Tutorial (acceso mínimo)
-  const visibleGroups = navGroups.map(group => ({
-    ...group,
-    items: group.items.filter(item => {
-      if (user?.role === 'admin') return true;
-      if (!userPermissions) {
-        // Sin permisos configurados: solo acceso mínimo
-        return item.path === '/' || item.path === '/tutorial' || item.path === '/calendario';
-      }
-      const moduleKey = routeToModule[item.path];
-      if (!moduleKey) return true; // rutas sin restricción (tutorial, etc.)
-      return userPermissions[moduleKey]?.read === true;
-    })
-  })).filter(group => group.items.length > 0);
+  const handleCloseMobile = useCallback(() => setMobileOpen(false), [setMobileOpen]);
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -279,13 +260,10 @@ export default function Sidebar({ open, onOpenChange }) {
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <p
-              className="font-semibold text-sm leading-tight tracking-wide"
-              style={{
-                color: '#e8f4ff',
-                animation: 'glowPulse 2.8s ease-in-out infinite',
-              }}
-            >DH1 Software</p>
+            <p className="font-semibold text-sm leading-tight tracking-wide"
+              style={{ color: '#e8f4ff', animation: 'glowPulse 2.8s ease-in-out infinite' }}>
+              DH1 Software
+            </p>
             <p className="text-sidebar-foreground/40 text-[10px] tracking-widest uppercase">Platform</p>
           </div>
         )}
@@ -335,7 +313,7 @@ export default function Sidebar({ open, onOpenChange }) {
                     item={item}
                     collapsed={collapsed}
                     active={isActive(item.path)}
-                    onClick={() => setMobileOpen(false)}
+                    onClick={handleCloseMobile}
                     hasNewMessages={item.path === '/foro' ? hasNewMessages : false}
                     pendientesAprobacion={pendientesAprobacion}
                   />
@@ -349,7 +327,7 @@ export default function Sidebar({ open, onOpenChange }) {
       {/* Collapse toggle */}
       <div className="hidden lg:flex p-3 border-t border-sidebar-border/30">
         <button
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={() => setCollapsed(c => !c)}
           className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sidebar-foreground/30 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground/70 transition-all duration-150 text-xs group"
         >
           {collapsed
@@ -366,7 +344,6 @@ export default function Sidebar({ open, onOpenChange }) {
 
   return (
     <>
-      {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(true)}
         className="lg:hidden fixed top-3.5 left-4 z-50 h-9 w-9 rounded-lg bg-card shadow-md border border-border flex items-center justify-center"
@@ -374,13 +351,12 @@ export default function Sidebar({ open, onOpenChange }) {
         <Menu className="h-4 w-4" />
       </button>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseMobile} />
           <div className="absolute left-0 top-0 bottom-0 w-64 shadow-2xl" style={{ background: 'linear-gradient(180deg, #0a1628 0%, #0f1e34 55%, #091422 100%)' }}>
             <button
-              onClick={() => setMobileOpen(false)}
+              onClick={handleCloseMobile}
               className="absolute top-4 right-3 text-sidebar-foreground/50 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors"
             >
               <X className="h-4 w-4" />
@@ -390,7 +366,6 @@ export default function Sidebar({ open, onOpenChange }) {
         </div>
       )}
 
-      {/* Desktop sidebar */}
       <aside className={cn(
         "hidden lg:flex flex-col border-r border-white/8 transition-all duration-300 flex-shrink-0",
         collapsed ? "w-[58px]" : "w-[228px]"

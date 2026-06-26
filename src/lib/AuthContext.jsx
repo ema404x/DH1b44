@@ -25,13 +25,11 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
       setIsAuthenticated(true);
 
-      // Pre-fetch silencioso de entidades críticas para hidratar el cache
-      // Corre en background, no bloquea el login
-      setTimeout(() => {
-        const prefetchEntity = async (key, fetcher) => {
+      // Pre-fetch silencioso en idle — no compite con el primer render
+      const schedulePrefetch = (key, fetcher) => {
+        const run = async () => {
           try {
-            const existing = queryClientInstance.getQueryData([key]);
-            if (existing) return; // ya está en memoria
+            if (queryClientInstance.getQueryData([key])) return;
             const data = await fetcher();
             if (data?.length > 0) {
               queryClientInstance.setQueryData([key], data);
@@ -39,10 +37,15 @@ export const AuthProvider = ({ children }) => {
             }
           } catch (_) { /* silencioso */ }
         };
-        prefetchEntity('workorders', () => base44.entities.WorkOrder.list('-updated_date', 300));
-        prefetchEntity('employees',  () => base44.entities.Employee.list('-updated_date', 200));
-        prefetchEntity('pendientes', () => base44.entities.Pendiente.list('-updated_date', 300));
-      }, 1500); // esperar 1.5s para no competir con el primer render
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(run, { timeout: 8000 });
+        } else {
+          setTimeout(run, 2500);
+        }
+      };
+      schedulePrefetch('workorders', () => base44.entities.WorkOrder.list('-updated_date', 300));
+      schedulePrefetch('employees',  () => base44.entities.Employee.list('-updated_date', 200));
+      schedulePrefetch('pendientes', () => base44.entities.Pendiente.list('-updated_date', 300));
 
       // Vincular ficha de empleado y cargar permisos reales según su rol
       // Esto corre en CADA carga (no solo al login) para garantizar permisos actualizados
