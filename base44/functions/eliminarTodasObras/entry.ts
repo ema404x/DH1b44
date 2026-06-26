@@ -13,9 +13,17 @@ Deno.serve(async (req) => {
 
     let toDelete = ids;
     if (!toDelete || toDelete.length === 0) {
-      // Obtener todos los IDs de proyectos
-      const all = await base44.asServiceRole.entities.Project.list('id', 5000);
-      toDelete = all.map(p => p.id);
+      // Paginar para obtener TODOS los IDs sin límite de 5000
+      const allProjects = [];
+      let skip = 0;
+      const PAGE = 5000;
+      while (true) {
+        const chunk = await base44.asServiceRole.entities.Project.list('id', PAGE, skip);
+        allProjects.push(...chunk);
+        if (chunk.length < PAGE) break;
+        skip += PAGE;
+      }
+      toDelete = allProjects.map(p => p.id);
     }
 
     let deleted = 0;

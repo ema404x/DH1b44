@@ -37,7 +37,7 @@ export const PROJECT_FIELDS = [
   { key: 'notes', label: 'Notas (Jefe Sitio, Inspector, etc.)', type: 'textarea' },
 ];
 
-export const TABLE_COLS = 'repeat(1,28px) 48px 1fr 1fr 2fr 80px 90px 110px 70px 70px 100px 120px 120px 32px';
+export const TABLE_COLS = '28px 48px 1fr 1fr 2fr 80px 90px 110px 70px 70px 100px 120px 120px 32px';
 
 export const TABLE_HEADERS = [
   { k: 'comuna', label: 'COM.' },
@@ -78,5 +78,10 @@ export function fmtMonto(val) {
 
 export function fmtFecha(val) {
   if (!val) return '—';
-  try { return format(new Date(val), 'dd/MM/yy'); } catch { return '—'; }
+  try {
+    // ISO date strings (YYYY-MM-DD) son interpretadas como UTC por JS.
+    // Añadir T12:00:00 evita que cambien de día en zonas UTC-x.
+    const normalized = /^\d{4}-\d{2}-\d{2}$/.test(val) ? val + 'T12:00:00' : val;
+    return format(new Date(normalized), 'dd/MM/yy');
+  } catch { return '—'; }
 }

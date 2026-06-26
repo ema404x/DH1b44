@@ -107,13 +107,13 @@ function parsePlanilla(buffer) {
   return rows;
 }
 
-// Carga TODOS los proyectos del sistema con paginación real
+// Carga TODOS los proyectos del sistema con paginación real (máx 5000 por request)
 async function loadAllProjects(base44) {
   const all = [];
   let skip = 0;
-  const PAGE = 500;
+  const PAGE = 5000;
   while (true) {
-    const chunk = await base44.asServiceRole.entities.Project.list('-created_date', PAGE, skip);
+    const chunk = await base44.asServiceRole.entities.Project.list('id', PAGE, skip);
     all.push(...chunk);
     if (chunk.length < PAGE) break;
     skip += PAGE;

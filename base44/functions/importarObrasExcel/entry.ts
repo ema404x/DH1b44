@@ -210,24 +210,19 @@ Deno.serve(async (req) => {
     }
     const finalList = [...deduped.values()];
 
-    // ⚠️ BUG FIX: Paginar lectura de existentes si > 10k
+    // Paginar lectura de existentes con máximo 5000 por request
     let existing = [];
     try {
       let skip = 0;
-      const fetchChunk = async () => {
-        const chunk = await base44.asServiceRole.entities.Project.list('-updated_date', 1000, skip);
-        return chunk;
-      };
-      let batch = await fetchChunk();
-      existing.push(...batch);
-      while (batch.length === 1000) {
-        skip += 1000;
-        batch = await fetchChunk();
-        existing.push(...batch);
+      const PAGE = 5000;
+      while (true) {
+        const chunk = await base44.asServiceRole.entities.Project.list('id', PAGE, skip);
+        existing.push(...chunk);
+        if (chunk.length < PAGE) break;
+        skip += PAGE;
       }
     } catch (err) {
       parseErrors.push(`Lectura de projects existentes falló: ${err.message}`);
-      // Continuar asumiendo vacío
       existing = [];
     }
 

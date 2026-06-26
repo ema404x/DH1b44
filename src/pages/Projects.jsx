@@ -42,13 +42,25 @@ export default function Projects() {
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [sortKey, setSortKey]                   = useState('name');
   const [sortDir, setSortDir]                   = useState(1);
-  const [limit, setLimit]                       = useState(100);
+  const [limit, setLimit]                       = useState(500);
 
   const queryClient = useQueryClient();
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects', limit],
-    queryFn: () => base44.entities.Project.list('-created_date', limit),
+    queryFn: async () => {
+      // Paginar hasta traer todos los registros (máx 5000 por request)
+      const all = [];
+      let skip = 0;
+      const PAGE = Math.min(limit, 5000);
+      while (true) {
+        const chunk = await base44.entities.Project.list('-created_date', PAGE, skip);
+        all.push(...chunk);
+        if (chunk.length < PAGE || all.length >= limit) break;
+        skip += PAGE;
+      }
+      return all;
+    },
     staleTime: 1000 * 60 * 2,
   });
 
@@ -298,10 +310,10 @@ export default function Projects() {
                     canDelete={canDelete}
                   />
                 ))}
-                {limit < projects.length && (
+                {projects.length >= limit && (
                   <div className="py-4 text-center">
-                    <Button variant="outline" size="sm" onClick={() => setLimit(l => l + 100)} className="text-xs">
-                      Cargar {Math.min(100, projects.length - limit)} más ({limit}/{projects.length})
+                    <Button variant="outline" size="sm" onClick={() => setLimit(l => l + 500)} className="text-xs">
+                      Cargar 500 más (mostrando {projects.length.toLocaleString()})
                     </Button>
                   </div>
                 )}
