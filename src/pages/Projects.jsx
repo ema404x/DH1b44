@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useTransition } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Search, Trash2, Upload, Plus, Loader2, X, ChevronUp, ChevronDown, ScanSearch } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermission } from '@/hooks/usePermission';
-import { debounce } from '@/lib/performance';
 
 import ImportarObrasExcelModal from '@/components/projects/ImportarObrasExcelModal';
 import AuditoriaSincronizacion from '@/components/projects/AuditoriaSincronizacion';
@@ -19,8 +18,14 @@ import EntityFormDialog from '@/components/shared/EntityFormDialog';
 
 import {
   DETALLE_COLORS, PROJECT_FIELDS, TABLE_COLS, TABLE_HEADERS,
-  getDetalle, getComuna,
+  enrichProjects,
 } from '@/lib/projects-utils';
+
+// Fuera del componente para no recrear en cada render
+function SortIcon({ active, dir }) {
+  if (!active) return <ChevronUp className="h-3 w-3 opacity-0 group-hover:opacity-30" />;
+  return dir === 1 ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
+}
 
 export default function Projects() {
   const { allowed: canEdit }   = usePermission('Project', 'update');
@@ -42,15 +47,30 @@ export default function Projects() {
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [sortKey, setSortKey]                   = useState('name');
   const [sortDir, setSortDir]                   = useState(1);
+
+  // useTransition: filtrado/sort no bloquea el hilo principal
+  const [, startTransition] = useTransition();
+
   const queryClient = useQueryClient();
 
-  const { data: projects = [], isLoading } = useQuery({
+  const { data: rawProjects = [], isLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: () => base44.entities.Project.list('-created_date', 5000),
     staleTime: 1000 * 60 * 10,
+    gcTime:    1000 * 60 * 15,
   });
 
-  const debouncedSearch = useMemo(() => debounce((v) => setSearch(v), 300), []);
+  // Pre-computar TODOS los campos derivados (regex) una sola vez cuando cambia rawProjects
+  const projects = useMemo(() => enrichProjects(rawProjects), [rawProjects]);
+
+  // Debounce manual sin lodash — evita dependencia externa
+  const debouncedSetSearch = useMemo(() => {
+    let timer;
+    return (v) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => startTransition(() => setSearch(v)), 250);
+    };
+  }, []);
 
   const saveMutation = useMutation({
     mutationFn: (data) => editing
@@ -68,41 +88,42 @@ export default function Projects() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
   });
 
-  const stats = useMemo(() => {
-    const counts = {};
-    projects.forEach(p => { const d = getDetalle(p); counts[d] = (counts[d] || 0) + 1; });
-    return counts;
+  // Stats: O(n) con campos pre-computados
+  const { stats, comunaStats } = useMemo(() => {
+    const s = {}, c = { '8A': 0, '8B': 0, '10A': 0 };
+    for (const p of projects) {
+      s[p._detalle] = (s[p._detalle] || 0) + 1;
+      if (c[p._comuna] !== undefined) c[p._comuna]++;
+    }
+    return { stats: s, comunaStats: c };
   }, [projects]);
 
-  const comunaStats = useMemo(() => {
-    const c = { '8A': 0, '8B': 0, '10A': 0 };
-    projects.forEach(p => { const cm = getComuna(p); if (c[cm] !== undefined) c[cm]++; });
-    return c;
-  }, [projects]);
-
+  // Filter + sort: O(n) con campos pre-computados, sin regex
   const filtered = useMemo(() => {
+    const sq = search.toLowerCase();
     let list = projects.filter(p => {
-      if (search) {
-        const q = search.toLowerCase();
-        if (!p.name?.toLowerCase().includes(q) &&
-            !p.client_name?.toLowerCase().includes(q) &&
-            !p.address?.toLowerCase().includes(q) &&
-            !p.code?.toLowerCase().includes(q) &&
-            !p.notes?.toLowerCase().includes(q)) return false;
+      if (sq) {
+        if (!p.name?.toLowerCase().includes(sq) &&
+            !p.client_name?.toLowerCase().includes(sq) &&
+            !p.address?.toLowerCase().includes(sq) &&
+            !p.code?.toLowerCase().includes(sq) &&
+            !p.notes?.toLowerCase().includes(sq)) return false;
       }
       if (statusFilter !== 'all' && p.status !== statusFilter) return false;
-      if (comunaFilter !== 'all' && getComuna(p) !== comunaFilter) return false;
+      if (comunaFilter !== 'all' && p._comuna !== comunaFilter) return false;
       return true;
     });
 
     list.sort((a, b) => {
       let av, bv;
-      if (sortKey === 'monto')        { av = a.estimated_budget || 0; bv = b.estimated_budget || 0; }
-      else if (sortKey === 'avance')  { av = a.progress || 0;         bv = b.progress || 0; }
-      else if (sortKey === 'ai')      { av = a.start_date || '';       bv = b.start_date || ''; }
-      else if (sortKey === 'detalle') { av = getDetalle(a);            bv = getDetalle(b); }
-      else if (sortKey === 'comuna')  { av = getComuna(a);             bv = getComuna(b); }
-      else                            { av = a[sortKey] || '';         bv = b[sortKey] || ''; }
+      switch (sortKey) {
+        case 'monto':   av = a._monto;   bv = b._monto;   break;
+        case 'avance':  av = a._avance;  bv = b._avance;  break;
+        case 'ai':      av = a.start_date || ''; bv = b.start_date || ''; break;
+        case 'detalle': av = a._detalle; bv = b._detalle; break;
+        case 'comuna':  av = a._comuna;  bv = b._comuna;  break;
+        default:        av = a[sortKey] || ''; bv = b[sortKey] || '';
+      }
       if (av < bv) return -sortDir;
       if (av > bv) return sortDir;
       return 0;
@@ -111,22 +132,18 @@ export default function Projects() {
     return list;
   }, [projects, search, statusFilter, comunaFilter, sortKey, sortDir]);
 
-  const toggleSort = (key) => {
+  const toggleSort = useCallback((key) => {
     if (sortKey === key) setSortDir(d => -d);
     else { setSortKey(key); setSortDir(1); }
-  };
-
-  const SortIcon = ({ k }) => sortKey === k
-    ? (sortDir === 1 ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
-    : <ChevronUp className="h-3 w-3 opacity-0 group-hover:opacity-30" />;
+  }, [sortKey]);
 
   const toggleSelect = useCallback((id) => {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }, []);
 
-  const toggleAll = () => {
-    setSelected(selected.size === filtered.length ? new Set() : new Set(filtered.map(p => p.id)));
-  };
+  const toggleAll = useCallback(() => {
+    setSelected(s => s.size === filtered.length ? new Set() : new Set(filtered.map(p => p.id)));
+  }, [filtered]);
 
   const deleteIds = async (ids, deleteAll = false) => {
     setDeleting(true);
@@ -147,6 +164,10 @@ export default function Projects() {
       setConfirmDeleteAll(false);
     }
   };
+
+  const statsEntries = useMemo(() =>
+    Object.entries(stats).sort((a, b) => b[1] - a[1]).slice(0, 8),
+  [stats]);
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col gap-3 text-sm">
@@ -205,11 +226,11 @@ export default function Projects() {
 
       {/* RESUMEN ESTADOS */}
       <div className="flex flex-wrap gap-2">
-        {Object.entries(stats).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([d, n]) => {
+        {statsEntries.map(([d, n]) => {
           const c = DETALLE_COLORS[d] || DETALLE_COLORS['pendiente'];
           return (
             <button key={d}
-              onClick={() => setStatusFilter(d === statusFilter ? 'all' : d)}
+              onClick={() => startTransition(() => setStatusFilter(d === statusFilter ? 'all' : d))}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${c.bg} ${c.text} border-current/20 hover:opacity-80`}>
               <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
               {d}: {n}
@@ -223,7 +244,7 @@ export default function Projects() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
           <Input
-            onChange={e => debouncedSearch(e.target.value)}
+            onChange={e => debouncedSetSearch(e.target.value)}
             placeholder="Buscar por título, establecimiento, dirección, código..."
             className="pl-8 h-8 text-xs bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500"
           />
@@ -233,7 +254,7 @@ export default function Projects() {
             </button>
           )}
         </div>
-        <Select value={comunaFilter} onValueChange={setComunaFilter}>
+        <Select value={comunaFilter} onValueChange={v => startTransition(() => setComunaFilter(v))}>
           <SelectTrigger className="w-28 h-8 text-xs bg-slate-800/50 border-slate-700/50 text-white">
             <SelectValue placeholder="Comuna" />
           </SelectTrigger>
@@ -242,7 +263,7 @@ export default function Projects() {
             {['8A', '8B', '10A'].map(c => <SelectItem key={c} value={c}>Comuna {c}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={v => startTransition(() => setStatusFilter(v))}>
           <SelectTrigger className="w-36 h-8 text-xs bg-slate-800/50 border-slate-700/50 text-white">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
@@ -264,6 +285,7 @@ export default function Projects() {
         </div>
       ) : (
         <div className="rounded-xl border border-slate-800 overflow-hidden overflow-x-auto bg-slate-900/40 flex-1">
+          {/* Cabecera */}
           <div className="grid bg-slate-800/60 border-b border-slate-700"
             style={{ '--cols': TABLE_COLS, gridTemplateColumns: 'var(--cols)' }}>
             <div className="px-2 py-2 flex items-center justify-center">
@@ -273,32 +295,28 @@ export default function Projects() {
               <div key={col.k}
                 className={`group px-2 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide select-none cursor-pointer hover:text-white transition-colors flex items-center gap-0.5 ${col.hidden ? 'hidden xl:flex' : ''}`}
                 onClick={() => col.k !== '_' && toggleSort(col.k)}>
-                {col.label} {col.k !== '_' && <SortIcon k={col.k} />}
+                {col.label} {col.k !== '_' && <SortIcon active={sortKey === col.k} dir={sortDir} />}
               </div>
             ))}
           </div>
 
+          {/* Filas */}
           <div style={{ '--cols': TABLE_COLS }}>
             {filtered.length === 0 ? (
               <div className="py-16 text-center text-slate-500 text-sm">
                 No se encontraron obras con los filtros actuales
               </div>
-            ) : (
-              <>
-                {filtered.map(project => (
-                  <ProyectoFila
-                    key={project.id}
-                    project={project}
-                    selected={selected.has(project.id)}
-                    onToggle={toggleSelect}
-                    onOpen={setSelectedProject}
-                    onDelete={(id) => deleteMutation.mutate(id)}
-                    canDelete={canDelete}
-                  />
-                ))}
-
-              </>
-            )}
+            ) : filtered.map(project => (
+              <ProyectoFila
+                key={project.id}
+                project={project}
+                selected={selected.has(project.id)}
+                onToggle={toggleSelect}
+                onOpen={setSelectedProject}
+                onDelete={(id) => deleteMutation.mutate(id)}
+                canDelete={canDelete}
+              />
+            ))}
           </div>
         </div>
       )}

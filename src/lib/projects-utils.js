@@ -55,20 +55,64 @@ export const TABLE_HEADERS = [
   { k: '_', label: '' },
 ];
 
-function parseNote(notes, key) {
-  const m = notes?.match(new RegExp(`${key}:\\s*([^|]+)`));
+// Regex compiladas una sola vez — no recrear dentro de funciones por fila
+const RE_DETALLE    = /Detalle:\s*([^|]+)/;
+const RE_COMUNA     = /Comuna:\s*([^|]+)/;
+const RE_JEFE       = /Jefe de Sitio:\s*([^|]+)/;
+const RE_INSPECTOR  = /Inspector:\s*([^|]+)/;
+
+function matchNote(notes, re) {
+  const m = notes?.match(re);
   return m ? m[1].trim() : '—';
 }
 
 export function getDetalle(project) {
-  const m = project.notes?.match(/Detalle:\s*([^|]+)/);
+  const m = project.notes?.match(RE_DETALLE);
   if (m) return m[1].trim();
   return STATUS_LABELS[project.status] || project.status || '—';
 }
 
-export const getComuna    = (p) => parseNote(p.notes, 'Comuna');
-export const getJefeSitio = (p) => parseNote(p.notes, 'Jefe de Sitio');
-export const getInspector = (p) => parseNote(p.notes, 'Inspector');
+export const getComuna    = (p) => matchNote(p.notes, RE_COMUNA);
+export const getJefeSitio = (p) => matchNote(p.notes, RE_JEFE);
+export const getInspector = (p) => matchNote(p.notes, RE_INSPECTOR);
+
+/**
+ * Pre-computa todos los campos derivados de una lista de proyectos.
+ * Llámalo UNA VEZ cuando cambia `projects` (en useMemo) para que
+ * cada fila no ejecute regex en cada render.
+ */
+export function enrichProjects(projects) {
+  return projects.map(p => {
+    const notes = p.notes || '';
+    let detalle, comuna, jefe, inspector;
+
+    const mDet  = notes.match(RE_DETALLE);
+    detalle = mDet ? mDet[1].trim() : (STATUS_LABELS[p.status] || p.status || '—');
+
+    const mCom = notes.match(RE_COMUNA);
+    comuna = mCom ? mCom[1].trim() : '—';
+
+    const mJef = notes.match(RE_JEFE);
+    jefe = mJef ? mJef[1].trim() : '—';
+
+    const mIns = notes.match(RE_INSPECTOR);
+    inspector = mIns ? mIns[1].trim() : '—';
+
+    return {
+      ...p,
+      _detalle:   detalle,
+      _comuna:    comuna,
+      _jefe:      jefe,
+      _inspector: inspector,
+      _monto:     p.estimated_budget || 0,
+      _avance:    p.progress || 0,
+      _fmtMonto:  fmtMonto(p.estimated_budget),
+      _fmtAI:     fmtFecha(p.start_date),
+      _fmtAR:     fmtFecha(p.end_date),
+      _colors:    DETALLE_COLORS[detalle] || DETALLE_COLORS[p.status] || DETALLE_COLORS['pendiente'],
+    };
+  });
+}
 
 export function fmtMonto(val) {
   if (!val || val === 0) return '—';
@@ -79,8 +123,6 @@ export function fmtMonto(val) {
 export function fmtFecha(val) {
   if (!val) return '—';
   try {
-    // ISO date strings (YYYY-MM-DD) son interpretadas como UTC por JS.
-    // Añadir T12:00:00 evita que cambien de día en zonas UTC-x.
     const normalized = /^\d{4}-\d{2}-\d{2}$/.test(val) ? val + 'T12:00:00' : val;
     return format(new Date(normalized), 'dd/MM/yy');
   } catch { return '—'; }
