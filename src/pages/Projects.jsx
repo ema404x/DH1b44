@@ -42,21 +42,19 @@ export default function Projects() {
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [sortKey, setSortKey]                   = useState('name');
   const [sortDir, setSortDir]                   = useState(1);
-  const [limit, setLimit]                       = useState(500);
-
   const queryClient = useQueryClient();
 
   const { data: projects = [], isLoading } = useQuery({
-    queryKey: ['projects', limit],
+    queryKey: ['projects'],
     queryFn: async () => {
-      // Paginar hasta traer todos los registros (máx 5000 por request)
+      // Paginar hasta traer TODOS los registros sin límite artificial
       const all = [];
       let skip = 0;
-      const PAGE = Math.min(limit, 5000);
+      const PAGE = 500;
       while (true) {
         const chunk = await base44.entities.Project.list('-created_date', PAGE, skip);
         all.push(...chunk);
-        if (chunk.length < PAGE || all.length >= limit) break;
+        if (chunk.length < PAGE) break;
         skip += PAGE;
       }
       return all;
@@ -310,13 +308,7 @@ export default function Projects() {
                     canDelete={canDelete}
                   />
                 ))}
-                {projects.length >= limit && (
-                  <div className="py-4 text-center">
-                    <Button variant="outline" size="sm" onClick={() => setLimit(l => l + 500)} className="text-xs">
-                      Cargar 500 más (mostrando {projects.length.toLocaleString()})
-                    </Button>
-                  </div>
-                )}
+
               </>
             )}
           </div>
