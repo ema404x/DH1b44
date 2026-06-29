@@ -71,34 +71,43 @@ export async function loadCacheEntry(queryKey) {
 }
 
 // ── Eliminar entradas viejas (limpieza) ───────────────────────────────────────
+// Bug fix: usar una sola transacción para ambas operaciones — dos transacciones separadas
+// producen condiciones de carrera en IDB ya que la segunda puede correr antes que termine el cursor de la primera.
 export async function pruneCacheDB() {
   try {
     const db = await openCacheDB();
+    // Leer todos los registros primero (readonly), luego borrar los que corresponda (readwrite)
+    const allEntries = await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).index('savedAt').getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+
+    if (allEntries.length === 0) return;
+
+    const cutoff = Date.now() - MAX_CACHE_AGE_MS;
+    // Ordenados por savedAt asc (los más viejos primero)
+    const toDelete = new Set();
+
+    // 1) Marcar entradas más viejas que MAX_CACHE_AGE_MS
+    for (const e of allEntries) {
+      if (e.savedAt < cutoff) toDelete.add(e.queryKey);
+    }
+
+    // 2) Si tras eso aún hay exceso, marcar las más viejas restantes
+    const remaining = allEntries.filter(e => !toDelete.has(e.queryKey));
+    const excess = remaining.length - MAX_ENTRIES;
+    if (excess > 0) {
+      remaining.slice(0, excess).forEach(e => toDelete.add(e.queryKey));
+    }
+
+    if (toDelete.size === 0) return;
+
+    // Borrar en una única transacción readwrite
     const tx = db.transaction(STORE, 'readwrite');
     const store = tx.objectStore(STORE);
-    const index = store.index('savedAt');
-
-    // 1) Borrar entradas más viejas que MAX_CACHE_AGE_MS
-    const cutoff = Date.now() - MAX_CACHE_AGE_MS;
-    const range = IDBKeyRange.upperBound(cutoff);
-    const req = index.openCursor(range);
-    req.onsuccess = (e) => {
-      const cursor = e.target.result;
-      if (cursor) { cursor.delete(); cursor.continue(); }
-    };
-
-    // 2) Si hay más de MAX_ENTRIES, borrar las más viejas hasta quedar dentro del tope
-    const countReq = store.count();
-    countReq.onsuccess = () => {
-      const excess = countReq.result - MAX_ENTRIES;
-      if (excess <= 0) return;
-      const pruneReq = index.openCursor();
-      let deleted = 0;
-      pruneReq.onsuccess = (e) => {
-        const cursor = e.target.result;
-        if (cursor && deleted < excess) { cursor.delete(); deleted++; cursor.continue(); }
-      };
-    };
+    for (const key of toDelete) store.delete(key);
   } catch (_) { /* silencioso */ }
 }
 

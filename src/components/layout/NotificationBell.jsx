@@ -64,15 +64,21 @@ export default function NotificationBell() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
+  // Bug fix: guard para fechas inválidas/null antes de parseISO para evitar crashes silenciosos
+  const safeIsPast = (dateStr) => {
+    if (!dateStr) return false;
+    try { return isPast(parseISO(dateStr)); } catch { return false; }
+  };
+
   const systemAlerts = useMemo(() => {
     const alerts = [];
-    const overdueOrders = orders.filter(o => o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada','cancelada'].includes(o.status));
+    const overdueOrders = orders.filter(o => o.scheduled_date && safeIsPast(o.scheduled_date) && !['completada','cancelada'].includes(o.status));
     if (overdueOrders.length > 0) alerts.push({ id: 'ot-overdue', title: `${overdueOrders.length} OT${overdueOrders.length > 1 ? 's' : ''} vencida${overdueOrders.length > 1 ? 's' : ''}`, message: 'Órdenes con fecha pasada sin completar', type: 'warning', read: false });
-    const lowStock = materials.filter(m => m.stock <= m.min_stock && m.min_stock > 0);
+    const lowStock = materials.filter(m => typeof m.stock === 'number' && typeof m.min_stock === 'number' && m.stock <= m.min_stock && m.min_stock > 0);
     if (lowStock.length > 0) alerts.push({ id: 'stock-low', title: 'Stock bajo detectado', message: `${lowStock.length} material${lowStock.length > 1 ? 'es' : ''} por debajo del mínimo`, type: 'warning', read: false });
-    const overdueAssets = assets.filter(a => a.next_maintenance && isPast(parseISO(a.next_maintenance)));
+    const overdueAssets = assets.filter(a => a.next_maintenance && safeIsPast(a.next_maintenance));
     if (overdueAssets.length > 0) alerts.push({ id: 'maint-overdue', title: `${overdueAssets.length} mantenimiento${overdueAssets.length > 1 ? 's' : ''} vencido${overdueAssets.length > 1 ? 's' : ''}`, message: 'Activos con mantenimiento programado vencido', type: 'error', read: false });
-    const overdueInvoices = invoices.filter(i => i.status === 'vencida' || (i.due_date && isPast(parseISO(i.due_date)) && i.status === 'pendiente'));
+    const overdueInvoices = invoices.filter(i => i.status === 'vencida' || (i.due_date && safeIsPast(i.due_date) && i.status === 'pendiente'));
     if (overdueInvoices.length > 0) alerts.push({ id: 'invoice-overdue', title: 'Facturas vencidas', message: `${overdueInvoices.length} factura${overdueInvoices.length > 1 ? 's' : ''} pendiente${overdueInvoices.length > 1 ? 's' : ''} de cobro`, type: 'error', read: false });
     return alerts;
   }, [orders, materials, assets, invoices]);
@@ -229,7 +235,12 @@ export default function NotificationBell() {
                 ) : <span />}
                 {notifications.some(n => !n.read) && (
                   <button
-                    onClick={() => notifications.filter(n => !n.read).forEach(n => markReadMutation.mutate(n.id))}
+                    onClick={async () => {
+                      // Bug fix: no disparar N mutaciones en paralelo — serializar para evitar race conditions
+                      const unread = notifications.filter(n => !n.read);
+                      await Promise.all(unread.map(n => base44.entities.Notification.update(n.id, { read: true })));
+                      qc.invalidateQueries({ queryKey: ['notifications'] });
+                    }}
                     className="text-xs text-primary hover:text-primary/80 font-medium transition-colors flex items-center gap-1">
                     <CheckCheck className="h-3 w-3" /> Marcar todo leído
                   </button>

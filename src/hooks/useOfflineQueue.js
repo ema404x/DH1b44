@@ -2,7 +2,7 @@
  * useOfflineQueue — Hook para gestionar OTs creadas sin conexión.
  * Guarda en IndexedDB y sincroniza cuando vuelve la red.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 
 const DB_NAME = 'dh1-offline-queue';
@@ -67,6 +67,10 @@ export function useOfflineQueue(onSyncSuccess) {
     setPendingCount(items.length);
   }, []);
 
+  // Bug fix: usar ref para acceder siempre al callback más reciente sin re-crear syncPending
+  const onSyncSuccessRef = useRef(onSyncSuccess);
+  useEffect(() => { onSyncSuccessRef.current = onSyncSuccess; }, [onSyncSuccess]);
+
   // Sincronizar todos los items pendientes
   const syncPending = useCallback(async () => {
     const items = await getAllFromDB();
@@ -96,12 +100,12 @@ export function useOfflineQueue(onSyncSuccess) {
 
     if (synced > 0) {
       setLastSynced(new Date());
-      onSyncSuccess?.(synced);
+      onSyncSuccessRef.current?.(synced);
     }
 
     await refreshCount();
     setIsSyncing(false);
-  }, [onSyncSuccess, refreshCount]);
+  }, [refreshCount]); // Bug fix: ya no depende de onSyncSuccess — usa ref
 
   // Listeners de conectividad
   useEffect(() => {

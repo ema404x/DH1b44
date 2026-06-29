@@ -115,9 +115,15 @@ export function enrichProjects(projects) {
 }
 
 export function fmtMonto(val) {
-  if (!val || val === 0) return '—';
-  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
-  return `$${val.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+  // Bug fix: normalizar a número (Excel puede importar como string numérico)
+  const num = typeof val === 'string' ? parseFloat(val.replace(/[^0-9.-]/g, '')) : Number(val);
+  if (!num || isNaN(num) || num === 0) return '—';
+  if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(2)}M`;
+  try {
+    return `$${num.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+  } catch {
+    return `$${Math.round(num).toLocaleString()}`;
+  }
 }
 
 export function fmtFecha(val) {

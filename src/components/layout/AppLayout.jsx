@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import MobileBottomNav from './MobileBottomNav';
 import GlobalSearch from './GlobalSearch';
@@ -23,6 +23,7 @@ export default function AppLayout() {
 
   const { isOnline, pendingCount, isSyncing, syncPending } = useOfflineQueue(onSyncCallback);
   const { currentUser } = useCurrentUser();
+  const location = useLocation();
   const [activeEmergency, setActiveEmergency] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const navigate = useNavigate();
@@ -55,9 +56,9 @@ export default function AppLayout() {
             <UserMenu />
           </div>
         </header>
-        {/* Page content */}
+        {/* Page content — key por pathname para que page-enter se ejecute en cada navegación */}
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 pb-24 lg:pb-6" style={{ background: 'transparent' }}>
-          <div className="page-enter">
+          <div key={location.pathname} className="page-enter">
             <Outlet />
           </div>
         </main>

@@ -125,9 +125,16 @@ export function useEmergencyNotifications(user, onNewEmergency) {
 
     return () => {
       unsubscribe();
-      if (flashIntervalRef.current) clearInterval(flashIntervalRef.current);
-      audioCtxRef.current?.close();
-      audioCtxRef.current = null;
+      if (flashIntervalRef.current) {
+        clearInterval(flashIntervalRef.current);
+        // Restaurar título si se desmonta durante el flash
+        document.title = document.title.replace(/^🚨 EMERGENCIA: .+$/, document.title);
+      }
+      // Bug fix: close() retorna Promise — capturar para evitar unhandled rejection en cleanup
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
+      }
     };
   }, [isGerencia, requestPermission, triggerNotification]);
 }

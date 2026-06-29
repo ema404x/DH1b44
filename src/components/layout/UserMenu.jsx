@@ -11,8 +11,9 @@ export default function UserMenu() {
   const { user } = useAuth();
   const { displayName } = useCurrentUser();
 
-  const initials = displayName
-    ? displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  // Bug fix: guard para string vacío — n[0] de '' es undefined, causando '?' inesperado
+  const initials = displayName?.trim()
+    ? displayName.trim().split(/\s+/).map(n => n[0] || '').join('').toUpperCase().slice(0, 2) || '?'
     : '?';
 
   return (
