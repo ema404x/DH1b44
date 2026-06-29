@@ -50,6 +50,7 @@ const CrearOT = lazy(() => import('@/pages/CrearOT'));
 const Foro = lazy(() => import('@/pages/Foro'));
 const Calefaccion = lazy(() => import('@/pages/Calefaccion'));
 const Rutinas = lazy(() => import('@/pages/Rutinas'));
+const PortalOperarioApp = lazy(() => import('@/pages/PortalOperarioApp'));
 import ProtectedPage from '@/components/shared/ProtectedPage';
 
 // Spinner de carga mientras se descarga la página lazy
@@ -140,6 +141,7 @@ const AuthenticatedApp = () => {
         <Route path="/foro" element={<Foro />} />
         <Route path="/calefaccion" element={<ProtectedPage moduleKey="Calefaccion"><Calefaccion /></ProtectedPage>} />
         <Route path="/rutinas" element={<ProtectedPage moduleKey="Rutinas"><Rutinas /></ProtectedPage>} />
+        <Route path="/mis-ots" element={<PortalOperarioApp />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

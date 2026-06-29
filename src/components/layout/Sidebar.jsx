@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, ChevronDown, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet, HardHat
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -16,6 +16,7 @@ const navGroups = [
     items: [
       { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
       { label: 'Calendario', icon: CalendarDays, path: '/calendario' },
+      { label: 'Mis Órdenes de Trabajo', icon: HardHat, path: '/mis-ots' },
     ]
   },
   {
@@ -97,7 +98,7 @@ const routeToModule = {
   '/empleados': 'Employee', '/mapa': 'Mapa', '/mapa-jefes': 'MapaJefes',
   '/inventario': 'Inventory', '/alertas': 'Alertas', '/permisos': 'Permisos',
   '/auditoria': 'AuditLog', '/seguridad': 'Seguridad', '/calefaccion': 'Calefaccion',
-  '/rutinas': 'Rutinas', '/foro': null, '/tutorial': null, '/importar': 'ImportarDatos',
+  '/rutinas': 'Rutinas', '/mis-ots': null, '/foro': null, '/tutorial': null, '/importar': 'ImportarDatos',
 };
 
 const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesAprobacion }) {
