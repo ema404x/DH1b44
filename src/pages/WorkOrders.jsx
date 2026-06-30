@@ -120,6 +120,9 @@ export default function WorkOrders() {
     const matchSearch = !q || 
       o.title?.toLowerCase().includes(q) ||
       o.location?.toLowerCase().includes(q) ||
+      o.location_qr_name?.toLowerCase().includes(q) ||
+      o.project_name?.toLowerCase().includes(q) ||
+      o.asset_name?.toLowerCase().includes(q) ||
       o.assigned_name?.toLowerCase().includes(q) ||
       o.code?.toLowerCase().includes(q);
     const matchStatus = statusTab === 'all' || o.status === statusTab;
@@ -228,7 +231,7 @@ export default function WorkOrders() {
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
             <Input
-              placeholder="Buscar OT..."
+              placeholder="Buscar por establecimiento, ubicación, título..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-10 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500"
