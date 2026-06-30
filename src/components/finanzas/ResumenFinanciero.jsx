@@ -1,58 +1,63 @@
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { DollarSign, CheckCircle2, Clock, BarChart2 } from 'lucide-react';
+import { Building2, FileCheck, Clock, RefreshCw } from 'lucide-react';
+import { KpiCard } from '@/components/reportes/shared';
 
-export default function ResumenFinanciero({ projects, invoices, quotes }) {
-  const totalFacturado = invoices.reduce((s, i) => s + (i.total || 0), 0);
-  const totalCobrado = invoices.filter(i => i.status === 'pagada').reduce((s, i) => s + (i.total || 0), 0);
-  const totalPendiente = invoices.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0);
-  const totalVencido = invoices.filter(i => i.status === 'vencida').reduce((s, i) => s + (i.total || 0), 0);
-  const totalPresupuestado = projects.reduce((s, p) => s + (p.estimated_budget || 0), 0);
-  const ejecucionPromedio = projects.length > 0
-    ? Math.round(projects.reduce((s, p) => s + (p.progress || 0), 0) / projects.length)
-    : 0;
+export default function ResumenFinanciero({ obras, certificados, abonos, projects }) {
+  // ── KPIs alineados al flujo real de la empresa ──────────────────────────
+  // 1. Cartera de Obras: monto total de contratos de obra
+  const carteraObras = obras.reduce((s, o) => s + (o.monto_contrato || 0), 0);
 
-  const cards = [
-    {
-      label: 'Total Facturado', value: `$${totalFacturado.toLocaleString()}`,
-      icon: DollarSign, color: 'text-blue-400', bg: 'bg-blue-500/10',
-      sub: `${invoices.length} facturas`
-    },
-    {
-      label: 'Cobrado', value: `$${totalCobrado.toLocaleString()}`,
-      icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/10',
-      sub: `${Math.round(totalFacturado > 0 ? totalCobrado / totalFacturado * 100 : 0)}% del total`
-    },
-    {
-      label: 'Pendiente de Cobro', value: `$${totalPendiente.toLocaleString()}`,
-      icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/10',
-      sub: totalVencido > 0 ? `+ $${totalVencido.toLocaleString()} vencido` : 'Sin vencidos'
-    },
-    {
-      label: 'Presupuesto Total Proyectos', value: `$${totalPresupuestado.toLocaleString()}`,
-      icon: BarChart2, color: 'text-purple-400', bg: 'bg-purple-500/10',
-      sub: `${ejecucionPromedio}% ejecución promedio`
-    },
-  ];
+  // 2. Certificado Emitido: subtotal de certificados en estado emitido o aprobado
+  const certEmitidos = certificados.filter(c => c.estado === 'emitido' || c.estado === 'aprobado');
+  const montoCertificado = certEmitidos.reduce((s, c) => s + (c.subtotal || 0), 0);
+
+  // 3. Por Certificar: obras con estado_cobro = listo_certificar (pipeline inmediato)
+  const porCertificar = obras
+    .filter(o => o.estado_cobro === 'listo_certificar')
+    .reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
+
+  // 4. Abonos Mensuales: recurrente mensual de contratos de abono activos
+  const abonosActivos = abonos.filter(a => a.estado === 'activo');
+  const montoMensualAbonos = abonosActivos.reduce((s, a) => s + (a.monto_mensual || 0), 0);
+  const carteraAbonos = abonosActivos.reduce((s, a) => s + (a.monto_total_contrato || 0), 0);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {cards.map((card) => (
-        <Card key={card.label}>
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">{card.label}</p>
-                <p className="text-2xl font-bold mt-1">{card.value}</p>
-                <p className="text-xs text-muted-foreground mt-1">{card.sub}</p>
-              </div>
-              <div className={`h-10 w-10 rounded-lg ${card.bg} flex items-center justify-center`}>
-                <card.icon className={`h-5 w-5 ${card.color}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <KpiCard
+        label="Cartera de Obras"
+        value={fmtCompact(carteraObras)}
+        sub={`${obras.length} contratos · ${fmtCompact(carteraAbonos)} en abonos`}
+        icon={Building2}
+        accent="primary"
+      />
+      <KpiCard
+        label="Certificado Emitido"
+        value={fmtCompact(montoCertificado)}
+        sub={`${certEmitidos.length} certificados`}
+        icon={FileCheck}
+        accent="blue"
+      />
+      <KpiCard
+        label="Por Certificar"
+        value={fmtCompact(porCertificar)}
+        sub="Obras listas para certificar"
+        icon={Clock}
+        accent="emerald"
+      />
+      <KpiCard
+        label="Abonos Mensuales"
+        value={fmtCompact(montoMensualAbonos)}
+        sub={`${abonosActivos.length} contratos activos`}
+        icon={RefreshCw}
+        accent="amber"
+      />
     </div>
   );
+}
+
+function fmtCompact(n) {
+  const v = n || 0;
+  if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`;
+  if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toLocaleString('es-AR', { maximumFractionDigits: 0 })}K`;
+  return `$${v.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
 }
