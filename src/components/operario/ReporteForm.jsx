@@ -83,7 +83,7 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
     setSaving(true);
     try {
       // Devolver los datos al portal — la transición de estado la hace el backend
-      onSaved({
+      await onSaved({
         materials_used: usados,
         materiales_faltantes: faltantes,
         notes: notas,
@@ -91,6 +91,7 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
       });
     } catch (err) {
       toast.error('Error: ' + (err.message || 'intente nuevamente'));
+    } finally {
       setSaving(false);
     }
   };

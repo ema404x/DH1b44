@@ -181,6 +181,9 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     setStateActionLoading(true);
     try {
       const extraData = {};
+      if (accion === 'asignar' && data.assigned_name) {
+        extraData.assigned_name = data.assigned_name;
+      }
       if (accion === 'rechazar') {
         const comentario = prompt('Motivo del rechazo:');
         if (!comentario || !comentario.trim()) { setStateActionLoading(false); return; }

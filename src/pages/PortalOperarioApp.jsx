@@ -58,9 +58,11 @@ export default function PortalOperarioApp() {
       });
       toast.success(res.data.mensaje);
       queryClient.invalidateQueries({ queryKey: ['workorders-operario'] });
+      return true;
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'intente nuevamente';
       toast.error(msg);
+      return false;
     } finally {
       setProcessing(null);
       setConfirmAction(null);
@@ -79,9 +81,10 @@ export default function PortalOperarioApp() {
     await ejecutarTransicion(ot, 'iniciar', extraData);
   };
 
-  const handleReporteSaved = (ot, reporteData) => {
+  const handleReporteSaved = async (ot, reporteData) => {
     // El reporte ya guardó materiales; ahora transicionar a pendiente_validacion
-    ejecutarTransicion(ot, 'finalizar', reporteData);
+    const ok = await ejecutarTransicion(ot, 'finalizar', reporteData);
+    if (ok) setReporteOT(null);
   };
 
   if (isLoading) {
@@ -213,7 +216,6 @@ const STATUS_BADGE = {
   pendiente:   { label: 'Pendiente',   cls: 'bg-amber-400/10 text-amber-400 border-amber-400/20' },
   asignada:    { label: 'Asignada',    cls: 'bg-blue-400/10 text-blue-400 border-blue-400/20' },
   en_progreso: { label: 'En Progreso', cls: 'bg-sky-400/10 text-sky-400 border-sky-400/20' },
-  en_espera:   { label: 'En Espera',   cls: 'bg-slate-400/10 text-slate-400 border-slate-400/20' },
   pendiente_validacion: { label: 'En Validación', cls: 'bg-amber-400/10 text-amber-400 border-amber-400/20' },
 };
 
