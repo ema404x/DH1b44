@@ -1,13 +1,34 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-// Matriz de transiciones válidas — el servidor es la fuente de verdad
-const TRANSICIONES_VALIDAS = {
-  'iniciar':     { desde: 'asignada',           hacia: 'en_progreso' },
-  'finalizar':   { desde: 'en_progreso',        hacia: 'pendiente_validacion' },
-  'aprobar':     { desde: 'pendiente_validacion', hacia: 'completada' },
-  'rechazar':    { desde: 'pendiente_validacion', hacia: 'en_progreso' },
-  'pausar':      { desde: 'en_progreso',        hacia: 'en_espera' },
-  'reanudar':    { desde: 'en_espera',          hacia: 'en_progreso' },
+// Transiciones fijas: desde un estado exacto hacia otro
+const TRANSICIONES_FIJAS = {
+  'asignar':        { desde: 'pendiente',            hacia: 'asignada' },
+  'iniciar':        { desde: 'asignada',             hacia: 'en_progreso' },
+  'finalizar':      { desde: 'en_progreso',          hacia: 'pendiente_validacion' },
+  'aprobar':        { desde: 'pendiente_validacion', hacia: 'completada' },
+  'rechazar':       { desde: 'pendiente_validacion', hacia: 'en_progreso' },
+  'pausar':         { desde: 'en_progreso',          hacia: 'en_espera' },
+  'reanudar':       { desde: 'en_espera',            hacia: 'en_progreso' },
+};
+
+// Transiciones flexibles: desde cualquier estado no-terminal
+const TRANSICIONES_FLEXIBLES = {
+  'cancelar':       { hacia: 'cancelada' },
+  'convertir_obra': { hacia: 'obra' },
+};
+
+const ESTADOS_TERMINALES = ['completada', 'cancelada', 'obra'];
+
+const MENSAJES = {
+  'asignar': 'OT asignada correctamente',
+  'iniciar': 'OT iniciada correctamente',
+  'finalizar': 'OT enviada a validación',
+  'aprobar': 'OT aprobada y completada',
+  'rechazar': 'OT rechazada y devuelta al operario',
+  'pausar': 'OT pausada',
+  'reanudar': 'OT reanudada',
+  'cancelar': 'OT cancelada',
+  'convertir_obra': 'OT convertida a Futura Obra',
 };
 
 Deno.serve(async (req) => {
@@ -23,35 +44,54 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Faltan parámetros: ot_id y accion son obligatorios' }, { status: 400 });
     }
 
-    const transicion = TRANSICIONES_VALIDAS[accion];
-    if (!transicion) {
-      return Response.json({ error: `Acción "${accion}" no válida. Acciones permitidas: ${Object.keys(TRANSICIONES_VALIDAS).join(', ')}` }, { status: 400 });
+    const fija = TRANSICIONES_FIJAS[accion];
+    const flexible = TRANSICIONES_FLEXIBLES[accion];
+
+    if (!fija && !flexible) {
+      const todas = [...Object.keys(TRANSICIONES_FIJAS), ...Object.keys(TRANSICIONES_FLEXIBLES)];
+      return Response.json({ error: `Acción "${accion}" no válida. Acciones permitidas: ${todas.join(', ')}` }, { status: 400 });
     }
 
-    // Cargar la OT actual
     const ot = await base44.entities.WorkOrder.get(ot_id);
     if (!ot) {
       return Response.json({ error: 'Orden de trabajo no encontrada' }, { status: 404 });
     }
 
     // Validar estado actual
-    if (ot.status !== transicion.desde) {
-      return Response.json({
-        error: `No se puede "${accion}" porque la OT está en estado "${ot.status}". Debe estar en "${transicion.desde}".`
-      }, { status: 409 });
+    if (fija) {
+      if (ot.status !== fija.desde) {
+        return Response.json({
+          error: `No se puede "${accion}" porque la OT está en estado "${ot.status}". Debe estar en "${fija.desde}".`
+        }, { status: 409 });
+      }
+    } else if (flexible) {
+      if (ESTADOS_TERMINALES.includes(ot.status)) {
+        return Response.json({
+          error: `No se puede "${accion}" porque la OT está en estado terminal "${ot.status}".`
+        }, { status: 409 });
+      }
     }
 
-    // Validar permisos según la acción
+    const nuevoEstado = fija ? fija.hacia : flexible.hacia;
+
+    // Permisos: aprobar/rechazar solo jefe
     const esJefe = user.role === 'admin' || (extra_data.rol === 'jefe_sitio');
     if ((accion === 'aprobar' || accion === 'rechazar') && !esJefe) {
       return Response.json({ error: 'Solo el Jefe de Sitio puede aprobar o rechazar OTs' }, { status: 403 });
     }
 
-    // Construir datos de actualización
-    const updateData = { status: transicion.hacia };
+    // Validar asignado para "asignar"
+    if (accion === 'asignar' && !ot.assigned_name && !extra_data.assigned_name) {
+      return Response.json({ error: 'Debe asignar un operario antes de cambiar el estado a "Asignada"' }, { status: 400 });
+    }
+
+    const updateData = { status: nuevoEstado };
+
+    if (accion === 'asignar' && extra_data.assigned_name) {
+      updateData.assigned_name = extra_data.assigned_name;
+    }
 
     if (accion === 'iniciar') {
-      // Capturar GPS y fecha de inicio real
       if (extra_data.gps) {
         updateData.gps_latitude = extra_data.gps.latitude;
         updateData.gps_longitude = extra_data.gps.longitude;
@@ -65,7 +105,6 @@ Deno.serve(async (req) => {
     }
 
     if (accion === 'finalizar') {
-      // El reporte de materiales viene en extra_data
       if (extra_data.materials_used !== undefined) updateData.materials_used = extra_data.materials_used;
       if (extra_data.materiales_faltantes !== undefined) {
         updateData.materiales_faltantes = [...(ot.materiales_faltantes || []), ...extra_data.materiales_faltantes];
@@ -73,7 +112,6 @@ Deno.serve(async (req) => {
       if (extra_data.notes) updateData.notes = extra_data.notes;
       if (extra_data.photos) updateData.photos = [...(ot.photos || []), ...extra_data.photos];
 
-      // Validación: si hay materiales faltantes, todos deben tener motivo
       if (extra_data.materiales_faltantes && extra_data.materiales_faltantes.length > 0) {
         const sinMotivo = extra_data.materiales_faltantes.filter(m => !m.motivo || !m.motivo.trim());
         if (sinMotivo.length > 0) {
@@ -100,7 +138,7 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       ot: actualizada,
-      mensaje: `OT ${accion === 'iniciar' ? 'iniciada' : accion === 'finalizar' ? 'enviada a validación' : accion === 'aprobar' ? 'aprobada' : accion === 'rechazar' ? 'rechazada' : 'actualizada'} correctamente`
+      mensaje: MENSAJES[accion] || 'OT actualizada correctamente'
     });
 
   } catch (error) {

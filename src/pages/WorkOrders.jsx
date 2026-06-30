@@ -26,6 +26,7 @@ import HistorialEstablecimiento from '@/components/workorders/HistorialEstableci
 import ModoCampo from '@/components/workorders/ModosCampo';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { usePermission } from '@/hooks/usePermission';
+import { getTransitionAction } from '@/lib/workorder-transitions';
 
 
 
@@ -105,11 +106,25 @@ export default function WorkOrders() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['workorders'] }); setSelectedOrder(null); }
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }) => base44.entities.WorkOrder.update(id, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workorders'] }),
-    onError: () => toast.error('Error al cambiar el estado'),
-  });
+  const handleStatusChange = async (id, newStatus) => {
+    const order = visibleOrders.find(o => o.id === id);
+    if (!order) return;
+    const action = getTransitionAction(order.status, newStatus);
+    if (!action) {
+      toast.error(`Transición no válida: "${order.status}" → "${newStatus}"`);
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      return;
+    }
+    try {
+      const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: action });
+      toast.success(res.data.mensaje);
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Error al cambiar el estado';
+      toast.error(msg);
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+    }
+  };
 
   const visibleOrders = useMemo(() =>
     filterByUser(orders, ['assigned_name', 'assigned_to', 'created_by'])
@@ -261,7 +276,7 @@ export default function WorkOrders() {
               orders={visibleOrders}
               onOpen={setSelectedOrder}
               onShowQR={setQrOrder}
-              onStatusChange={(id, newStatus) => updateStatusMutation.mutate({ id, status: newStatus })}
+              onStatusChange={handleStatusChange}
             />
           )}
         </motion.div>

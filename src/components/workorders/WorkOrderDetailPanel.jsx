@@ -19,6 +19,7 @@ import WorkOrderIncompleteReason from './WorkOrderIncompleteReason';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { exportWorkOrderPDF } from '@/utils/exportWorkOrderPDF';
 import LocationEditor from './LocationEditor';
+import { getAvailableActions, ACTION_VARIANTS } from '@/lib/workorder-transitions';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ const STATUS_CFG = {
   en_progreso: { label: 'En Progreso',  color: 'text-violet-300', bg: 'bg-violet-900/30 border-violet-700/50' },
   en_espera:   { label: 'En Espera',    color: 'text-slate-300',  bg: 'bg-slate-700/30 border-slate-600/50' },
   obra:        { label: 'Obra',         color: 'text-pink-300',   bg: 'bg-pink-900/30 border-pink-700/50' },
+  pendiente_validacion: { label: 'Validación', color: 'text-amber-300', bg: 'bg-amber-900/30 border-amber-700/50' },
   completada:  { label: 'Completada',   color: 'text-emerald-300',bg: 'bg-emerald-900/30 border-emerald-700/50' },
   cancelada:   { label: 'Cancelada',    color: 'text-red-300',    bg: 'bg-red-900/30 border-red-700/50' },
 };
@@ -174,6 +176,33 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     });
   }, []);
 
+  const [stateActionLoading, setStateActionLoading] = useState(false);
+
+  const handleStateAction = async (accion) => {
+    setStateActionLoading(true);
+    try {
+      const extraData = {};
+      if (accion === 'rechazar') {
+        const comentario = prompt('Motivo del rechazo:');
+        if (!comentario || !comentario.trim()) { setStateActionLoading(false); return; }
+        extraData.rechazo_comentario = comentario.trim();
+      }
+      const res = await base44.functions.invoke('transicionEstadoOT', {
+        ot_id: order.id, accion, extra_data: extraData,
+      });
+      toast.success(res.data.mensaje);
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
+      if (accion === 'aprobar' || accion === 'rechazar') queryClient.invalidateQueries({ queryKey: ['workorders-validacion'] });
+      if (accion === 'aprobar' || accion === 'cancelar' || accion === 'convertir_obra') onClose();
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Error al cambiar el estado';
+      toast.error(msg);
+    } finally {
+      setStateActionLoading(false);
+    }
+  };
+
   const handleConvertToObra = async () => {
     if (!window.confirm('¿Convertir esta OT a Futura Obra? Se creará un pendiente de tipo obra y la OT quedará en estado "Obra".')) return;
     setConvertingToObra(true);
@@ -190,8 +219,8 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
         observaciones: data.description || '',
         fecha_limite: data.scheduled_date || undefined,
       });
-      // Actualizar el estado de la OT a 'obra'
-      await base44.entities.WorkOrder.update(order.id, { status: 'obra' });
+      // Actualizar el estado vía máquina de estados
+      await base44.functions.invoke('transicionEstadoOT', { ot_id: order.id, accion: 'convertir_obra' });
       queryClient.invalidateQueries({ queryKey: ['pendientes'] });
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
@@ -320,18 +349,9 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
           <div className="flex-shrink-0 grid grid-cols-3 gap-2 px-4 py-3 bg-slate-900/80 border-b border-white/6">
             <div>
               <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Estado</p>
-              <Select value={data.status} onValueChange={v => { if (v === 'completada' && !canComplete) { toast.warning('Completá el checklist primero'); return; } saveField('status', v); }}>
-                <SelectTrigger className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(STATUS_CFG).map(([val, cfg]) => (
-                    <SelectItem key={val} value={val} className="text-xs">
-                      <span className={cfg.color}>{cfg.label}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className={`h-8 flex items-center px-3 rounded-lg border text-[11px] font-semibold ${sCfg.bg} ${sCfg.color}`}>
+                {sCfg.label}
+              </div>
               {checklistBlocked && (
                 <p className="text-[9px] text-orange-400 mt-1 flex items-center gap-0.5">
                   <AlertTriangle className="h-2.5 w-2.5" />{doneCount}/{checklist.length} hechas
@@ -359,6 +379,23 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                 className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg px-2" />
             </div>
           </div>
+
+          {/* ── STATE MACHINE ACTIONS ────────────────────────────────────── */}
+          {getAvailableActions(data.status).length > 0 && (
+            <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-slate-900/80 border-b border-white/6">
+              {getAvailableActions(data.status).map(act => (
+                <button
+                  key={act.accion}
+                  onClick={() => handleStateAction(act.accion)}
+                  disabled={stateActionLoading}
+                  className={`flex-1 h-8 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 ${ACTION_VARIANTS[act.variant]}`}
+                >
+                  {stateActionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  {act.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* ── BODY ─────────────────────────────────────────────────────── */}
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
