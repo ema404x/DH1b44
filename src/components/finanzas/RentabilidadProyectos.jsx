@@ -5,7 +5,7 @@ import {
 import { Layers, TrendingUp, Scale } from 'lucide-react';
 import { fmt, fmtM, KpiCard, ChartTip, SortableTh, useTableSort } from '@/components/reportes/shared';
 
-export default function RentabilidadProyectos({ projects, certificados, obras }) {
+export default function RentabilidadProyectos({ projects = [], certificados = [], obras = [] }) {
   // ── Rentabilidad basada en ejecución real ──────────────────────────────
   // La empresa no usa facturas: el "facturado" se reemplaza por el valor
   // ejecutado = presupuesto × (% avance / 100).
