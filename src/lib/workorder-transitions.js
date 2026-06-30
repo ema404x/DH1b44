@@ -7,8 +7,6 @@
 const DRAG_TRANSITIONS = {
   'pendiente→asignada': 'asignar',
   'asignada→en_progreso': 'iniciar',
-  'en_progreso→en_espera': 'pausar',
-  'en_espera→en_progreso': 'reanudar',
   'en_progreso→pendiente_validacion': 'finalizar',
   'pendiente_validacion→completada': 'aprobar',
   'pendiente_validacion→en_progreso': 'rechazar',
@@ -45,11 +43,7 @@ export function getAvailableActions(status) {
       { accion: 'iniciar', label: 'Iniciar', variant: 'sky' },
     ],
     en_progreso: [
-      { accion: 'pausar', label: 'Pausar', variant: 'amber' },
       { accion: 'finalizar', label: 'Finalizar', variant: 'emerald' },
-    ],
-    en_espera: [
-      { accion: 'reanudar', label: 'Reanudar', variant: 'sky' },
     ],
     pendiente_validacion: [
       { accion: 'aprobar', label: 'Aprobar', variant: 'emerald' },

@@ -42,7 +42,7 @@ export default function PortalOperarioApp() {
     const ini = [], prog = [], val = [];
     for (const ot of misOTs) {
       if (ot.status === 'pendiente_validacion') val.push(ot);
-      else if (ot.status === 'en_progreso' || ot.status === 'en_espera') prog.push(ot);
+      else       if (ot.status === 'en_progreso') prog.push(ot);
       else ini.push(ot); // pendiente, asignada
     }
     return { porIniciar: ini, enProgreso: prog, enValidacion: val };

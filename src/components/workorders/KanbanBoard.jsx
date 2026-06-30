@@ -9,7 +9,6 @@ const COLUMNS = [
   { id: 'pendiente',   label: 'Pendiente',   color: 'border-t-yellow-500',  dot: 'bg-yellow-500',  count_bg: 'bg-yellow-500/20 text-yellow-400' },
   { id: 'asignada',    label: 'Asignada',    color: 'border-t-blue-500',    dot: 'bg-blue-500',    count_bg: 'bg-blue-500/20 text-blue-400' },
   { id: 'en_progreso', label: 'En Progreso', color: 'border-t-purple-500',  dot: 'bg-purple-500',  count_bg: 'bg-purple-500/20 text-purple-400' },
-  { id: 'en_espera',   label: 'En Espera',   color: 'border-t-amber-500',   dot: 'bg-amber-500',   count_bg: 'bg-amber-500/20 text-amber-400' },
   { id: 'pendiente_validacion', label: 'Validación', color: 'border-t-amber-400', dot: 'bg-amber-400', count_bg: 'bg-amber-400/20 text-amber-300' },
   { id: 'obra',        label: 'Obra',        color: 'border-t-pink-400',    dot: 'bg-pink-400',    count_bg: 'bg-pink-400/20 text-pink-300' },
   { id: 'completada',  label: 'Completada',  color: 'border-t-emerald-500', dot: 'bg-emerald-500', count_bg: 'bg-emerald-500/20 text-emerald-400' },

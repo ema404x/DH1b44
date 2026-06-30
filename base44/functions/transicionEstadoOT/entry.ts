@@ -7,8 +7,6 @@ const TRANSICIONES_FIJAS = {
   'finalizar':      { desde: 'en_progreso',          hacia: 'pendiente_validacion' },
   'aprobar':        { desde: 'pendiente_validacion', hacia: 'completada' },
   'rechazar':       { desde: 'pendiente_validacion', hacia: 'en_progreso' },
-  'pausar':         { desde: 'en_progreso',          hacia: 'en_espera' },
-  'reanudar':       { desde: 'en_espera',            hacia: 'en_progreso' },
 };
 
 // Transiciones flexibles: desde cualquier estado no-terminal
@@ -25,8 +23,6 @@ const MENSAJES = {
   'finalizar': 'OT enviada a validación',
   'aprobar': 'OT aprobada y completada',
   'rechazar': 'OT rechazada y devuelta al operario',
-  'pausar': 'OT pausada',
-  'reanudar': 'OT reanudada',
   'cancelar': 'OT cancelada',
   'convertir_obra': 'OT convertida a Futura Obra',
 };
