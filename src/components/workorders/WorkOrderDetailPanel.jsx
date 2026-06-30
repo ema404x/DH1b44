@@ -351,9 +351,16 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
           <div className="flex-shrink-0 grid grid-cols-3 gap-2 px-4 py-3 bg-slate-900/80 border-b border-white/6">
             <div>
               <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Estado</p>
-              <div className={`h-8 flex items-center px-3 rounded-lg border text-[11px] font-semibold ${sCfg.bg} ${sCfg.color}`}>
-                {sCfg.label}
-              </div>
+              <Select value={data.status} onValueChange={v => saveField('status', v)}>
+                <SelectTrigger className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(STATUS_CFG).map(([val, cfg]) => (
+                    <SelectItem key={val} value={val} className="text-xs">{cfg.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {checklistBlocked && (
                 <p className="text-[9px] text-orange-400 mt-1 flex items-center gap-0.5">
                   <AlertTriangle className="h-2.5 w-2.5" />{doneCount}/{checklist.length} hechas
