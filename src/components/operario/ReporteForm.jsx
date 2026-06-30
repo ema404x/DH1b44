@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { X, Loader2, Package, AlertTriangle } from 'lucide-react';
+import { X, Loader2, Package, AlertTriangle, Camera } from 'lucide-react';
 import { toast } from 'sonner';
+
+const MOTIVOS_PREDEFINIDOS = [
+  'Sin stock en pañol',
+  'Material dañado',
+  'Cantidad insuficiente',
+  'No corresponde al trabajo',
+  'Otro',
+];
 
 export default function ReporteForm({ ot, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
@@ -13,8 +21,9 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
   const [faltanteMotivo, setFaltanteMotivo] = useState('');
   const [notas, setNotas] = useState(ot.notes || '');
 
-  // Materiales usados locales (partiendo de los que ya tenía la OT)
   const [usados, setUsados] = useState(ot.materials_used || []);
+  const [photos, setPhotos] = useState(ot.photos || []);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const addUsado = () => {
     if (!material.trim()) return;
@@ -26,7 +35,14 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
   const removeUsado = (idx) => setUsados(prev => prev.filter((_, i) => i !== idx));
 
   const addFaltante = () => {
-    if (!faltanteNombre.trim()) return;
+    if (!faltanteNombre.trim()) {
+      toast.error('Indicá el nombre del material faltante');
+      return;
+    }
+    if (!faltanteMotivo.trim()) {
+      toast.error('Debes seleccionar un motivo para el material faltante');
+      return;
+    }
     setFaltantes(prev => [...prev, { material_name: faltanteNombre.trim(), cantidad_faltante: Number(faltanteCant), motivo: faltanteMotivo.trim() }]);
     setFaltanteNombre('');
     setFaltanteCant(1);
@@ -35,20 +51,46 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
 
   const removeFaltante = (idx) => setFaltantes(prev => prev.filter((_, i) => i !== idx));
 
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setPhotos(prev => [...prev, file_url]);
+    } catch (err) {
+      toast.error('Error al subir foto');
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
+  const removePhoto = (idx) => setPhotos(prev => prev.filter((_, i) => i !== idx));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validación final: si hay faltantes, todos deben tener motivo
+    if (faltantes.length > 0) {
+      const sinMotivo = faltantes.filter(m => !m.motivo || !m.motivo.trim());
+      if (sinMotivo.length > 0) {
+        toast.error('Todos los materiales faltantes deben tener un motivo');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
-      await base44.entities.WorkOrder.update(ot.id, {
-        notes: notas,
+      // Devolver los datos al portal — la transición de estado la hace el backend
+      onSaved({
         materials_used: usados,
-        materiales_faltantes: [...(ot.materiales_faltantes || []), ...faltantes],
+        materiales_faltantes: faltantes,
+        notes: notas,
+        photos,
       });
-      toast.success('Reporte guardado');
-      onSaved();
     } catch (err) {
       toast.error('Error: ' + (err.message || 'intente nuevamente'));
-    } finally {
       setSaving(false);
     }
   };
@@ -62,7 +104,10 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-800">
-          <h2 className="text-base font-bold text-white">Reporte de Materiales</h2>
+          <div>
+            <h2 className="text-base font-bold text-white">Reporte de Cierre</h2>
+            <p className="text-xs text-slate-500">Al guardar, la OT se envía al Jefe de Sitio</p>
+          </div>
           <button type="button" onClick={onClose} className="text-slate-500 hover:text-white">
             <X className="h-5 w-5" />
           </button>
@@ -72,6 +117,30 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+          {/* Fotos de evidencia */}
+          <div>
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-1.5 mb-2">
+              <Camera className="h-3.5 w-3.5 text-sky-400" /> Fotos de Evidencia
+            </label>
+            {photos.length > 0 && (
+              <div className="flex gap-2 flex-wrap mb-2">
+                {photos.map((url, i) => (
+                  <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-700">
+                    <img src={url} alt="evidencia" className="w-full h-full object-cover" />
+                    <button type="button" onClick={() => removePhoto(i)} className="absolute top-0 right-0 bg-black/70 text-white p-0.5 rounded-bl">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label className={`flex items-center justify-center gap-2 h-10 rounded-lg border border-dashed border-slate-600 text-slate-400 text-xs font-medium cursor-pointer hover:bg-slate-800 hover:text-slate-200 transition-colors ${uploadingPhoto ? 'opacity-50 pointer-events-none' : ''}`}>
+              {uploadingPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+              {uploadingPhoto ? 'Subiendo...' : 'Agregar foto'}
+              <input type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload} className="hidden" />
+            </label>
+          </div>
 
           {/* Materiales usados */}
           <div>
@@ -115,21 +184,21 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Materiales faltantes */}
+          {/* Materiales faltantes — motivo OBLIGATORIO */}
           <div>
-            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-1.5 mb-2">
+            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-1.5 mb-1">
               <AlertTriangle className="h-3.5 w-3.5 text-amber-400" /> Materiales Faltantes
             </label>
+            <p className="text-[10px] text-amber-400/70 mb-2">El motivo es obligatorio para cada faltante</p>
             {faltantes.length > 0 && (
               <div className="space-y-1.5 mb-2">
                 {faltantes.map((m, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
+                  <div key={i} className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-amber-200">{m.material_name}</p>
-                      {m.motivo && <p className="text-xs text-amber-400/70 truncate">{m.motivo}</p>}
+                      <p className="text-sm text-amber-200">{m.material_name} · {m.cantidad_faltante}u</p>
+                      <p className="text-xs text-amber-400/80">{m.motivo}</p>
                     </div>
-                    <span className="text-xs text-amber-400 tabular-nums">{m.cantidad_faltante}u</span>
-                    <button type="button" onClick={() => removeFaltante(i)} className="text-slate-500 hover:text-red-400">
+                    <button type="button" onClick={() => removeFaltante(i)} className="text-slate-500 hover:text-red-400 mt-0.5">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -152,12 +221,14 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
                   className="w-16 bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-sm text-white text-center focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
-              <input
+              <select
                 value={faltanteMotivo}
                 onChange={e => setFaltanteMotivo(e.target.value)}
-                placeholder="Motivo (opcional)"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary"
-              />
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Seleccionar motivo *</option>
+                {MOTIVOS_PREDEFINIDOS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
               <button
                 type="button"
                 onClick={addFaltante}
@@ -186,9 +257,9 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
           <button
             type="submit"
             disabled={saving}
-            className="w-full h-10 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full h-12 rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar Reporte'}
+            {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Enviar al Jefe de Sitio'}
           </button>
         </div>
       </form>

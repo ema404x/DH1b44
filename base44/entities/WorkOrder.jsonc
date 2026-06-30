@@ -50,10 +50,12 @@
         "en_progreso",
         "en_espera",
         "obra",
+        "pendiente_validacion",
         "completada",
         "cancelada"
       ],
-      "default": "pendiente"
+      "default": "pendiente",
+      "description": "Flujo: pendiente \u2192 asignada \u2192 en_progreso \u2192 pendiente_validacion \u2192 completada"
     },
     "priority": {
       "type": "string",
@@ -198,6 +200,24 @@
         "denegado",
         "no_disponible"
       ]
+    },
+    "fecha_inicio_real": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora real de inicio (cuando el operario toc\u00f3 Iniciar)"
+    },
+    "fecha_validacion": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que el jefe valid\u00f3 la OT"
+    },
+    "validado_por": {
+      "type": "string",
+      "description": "Nombre del jefe de sitio que valid\u00f3"
+    },
+    "rechazo_comentario": {
+      "type": "string",
+      "description": "Comentario del jefe al rechazar la OT"
     },
     "notes": {
       "type": "string"
