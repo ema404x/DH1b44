@@ -168,12 +168,16 @@ export default function CrearOT() {
   // base = LocationData (todos los establecimientos), enriquecida con QR id si existe
   const activeLocations = useMemo(() => {
     const norm = s => (s || '').toLowerCase().trim();
-    return locationData.map(ld => {
+
+    // 1. LocationData (fuente principal — todos los establecimientos)
+    const matchedQRNames = new Set();
+    const fromLD = locationData.map(ld => {
       const qr = locationQRs.find(q =>
         norm(q.name) === norm(ld.establecimiento) ||
         norm(q.address) === norm(ld.direccion) ||
         norm(q.name) === norm(ld.ubic_tecnica)
       );
+      if (qr) matchedQRNames.add(norm(qr.name));
       return {
         id: qr?.id || ld.id,
         name: ld.establecimiento || ld.ubic_tecnica,
@@ -186,6 +190,23 @@ export default function CrearOT() {
         _hasQR: !!qr,
       };
     });
+
+    // 2. LocationQR sin LocationData — también deben aparecer en el buscador
+    const fromQR = locationQRs
+      .filter(q => q.is_active !== false && !matchedQRNames.has(norm(q.name)))
+      .map(q => ({
+        id: q.id,
+        name: q.name,
+        address: q.address || '',
+        jefe_sitio: '',
+        inspector: '',
+        comuna: '',
+        project_name: q.project_name || '',
+        _locationDataId: null,
+        _hasQR: true,
+      }));
+
+    return [...fromLD, ...fromQR];
   }, [locationData, locationQRs]);
 
   // Para cruzar jefe de sitio por dirección (fallback)
