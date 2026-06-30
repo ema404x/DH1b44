@@ -703,6 +703,8 @@ export default function InspeccionColegioPage() {
                   establecimiento={inspeccionActiva.establecimiento}
                   fecha={inspeccionActiva.fecha_inspeccion}
                   secciones={inspeccionActiva.secciones || []}
+                  jefe_sitio={inspeccionActiva.jefe_sitio}
+                  direccion={inspeccionActiva.direccion}
                 />
               </div>
             )}
@@ -714,6 +716,8 @@ export default function InspeccionColegioPage() {
                   establecimiento={inspeccionActiva.establecimiento}
                   fecha={inspeccionActiva.fecha_inspeccion}
                   secciones={inspeccionActiva.secciones || []}
+                  jefe_sitio={inspeccionActiva.jefe_sitio}
+                  direccion={inspeccionActiva.direccion}
                 />
               </div>
             )}

@@ -20,7 +20,7 @@ const TIPO_CFG = {
   inspeccion: 'Inspección',
 };
 
-export default function GenerarOTsModal({ open, onClose, informe, establecimiento, jefesSitio = '' }) {
+export default function GenerarOTsModal({ open, onClose, informe, establecimiento, jefe_sitio, direccion }) {
   const [paso, setPaso] = useState('idle'); // idle | extrayendo | revisando | creando | listo
   const [ots, setOts] = useState([]);
   const [seleccionadas, setSeleccionadas] = useState(new Set());
@@ -103,14 +103,20 @@ ${informe.slice(0, 6000)}`,
     setPaso('creando');
     let count = 0;
     for (const ot of aCrear) {
+      const locEspecifica = ot.location && ot.location !== establecimiento
+        ? `${ot.location} — ${establecimiento}`
+        : establecimiento;
       await base44.entities.WorkOrder.create({
         title: ot.title,
         description: ot.description,
         type: ot.type || 'mantenimiento_correctivo',
         priority: ot.priority || 'media',
         status: 'pendiente',
-        location: ot.location || establecimiento,
-        notes: `OT generada automáticamente desde Inspección Edilicia - ${establecimiento}`,
+        project_name: establecimiento,
+        location: locEspecifica,
+        assigned_to: jefe_sitio || '',
+        assigned_name: jefe_sitio || '',
+        notes: `OT generada desde Inspección Edilicia — ${establecimiento}${direccion ? ` · ${direccion}` : ''}${jefe_sitio ? ` · Jefe de Sitio: ${jefe_sitio}` : ''}`,
       });
       count++;
     }

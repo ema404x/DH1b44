@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import GenerarOTsModal from './GenerarOTsModal';
 
-export default function InformeViewer({ informe, establecimiento, fecha, secciones = [] }) {
+export default function InformeViewer({ informe, establecimiento, fecha, secciones = [], jefe_sitio, direccion }) {
   const [exportando, setExportando] = useState(false);
   const [lightbox, setLightbox] = useState(null);
   const [modalOTs, setModalOTs] = useState(false);
@@ -576,6 +576,8 @@ export default function InformeViewer({ informe, establecimiento, fecha, seccion
           onClose={() => setModalOTs(false)}
           informe={informe}
           establecimiento={establecimiento}
+          jefe_sitio={jefe_sitio}
+          direccion={direccion}
         />
       </div>
 
