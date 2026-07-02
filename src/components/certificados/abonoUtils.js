@@ -1,6 +1,20 @@
 // Utilidades compartidas para Abonos Maestros
+import { GraduationCap, Stethoscope, Palette, TreePine, Wrench, Folder } from 'lucide-react';
 
 export const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+export const RUBRO_PRESETS = [
+  { value: 'EDUCACION',       label: 'Educación',       Icon: GraduationCap, color: 'text-blue-400',     bg: 'bg-blue-500/10',     border: 'border-blue-500/30' },
+  { value: 'SALUD',           label: 'Salud',           Icon: Stethoscope,   color: 'text-emerald-400',  bg: 'bg-emerald-500/10',  border: 'border-emerald-500/30' },
+  { value: 'CULTURA',         label: 'Cultura',         Icon: Palette,       color: 'text-purple-400',   bg: 'bg-purple-500/10',   border: 'border-purple-500/30' },
+  { value: 'ESPACIOS_VERDES', label: 'Espacios Verdes', Icon: TreePine,      color: 'text-green-400',    bg: 'bg-green-500/10',    border: 'border-green-500/30' },
+  { value: 'SERVICIOS',       label: 'Servicios',       Icon: Wrench,        color: 'text-amber-400',    bg: 'bg-amber-500/10',    border: 'border-amber-500/30' },
+  { value: 'OTROS',           label: 'Otros',           Icon: Folder,        color: 'text-slate-400',    bg: 'bg-slate-500/10',    border: 'border-slate-500/30' },
+];
+
+export const getRubroConfig = (value) => {
+  return RUBRO_PRESETS.find(r => r.value === value) || { value: value || 'OTROS', label: value || 'Otros', Icon: Folder, color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/30' };
+};
 
 export const parseMonto = (v) => {
   if (v === null || v === undefined || v === '') return 0;
@@ -42,6 +56,7 @@ export const mesPeriodoLabel = (dateStr) => {
 };
 
 export const EMPTY_FORM = {
+  rubro: 'OTROS',
   contratista: '', oc_numero: '', ada_numero: '', obra_servicio: '',
   emprendimiento: '', monto_total_contrato: '', fecha_oc_emision: '',
   duracion_meses: '', plazo_obra: '', condiciones_pago: '',

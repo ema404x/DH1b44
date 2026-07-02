@@ -2,6 +2,10 @@
   "name": "AbonoMaestro",
   "type": "object",
   "properties": {
+    "rubro": {
+      "type": "string",
+      "description": "Rubro/Carpeta al que pertenece el abono (EDUCACION, SALUD, etc.)"
+    },
     "contratista": {
       "type": "string",
       "description": "Nombre del contratista"
@@ -20,7 +24,7 @@
     },
     "emprendimiento": {
       "type": "string",
-      "description": "Emprendimiento (ej: EDUCACION, SALUD)"
+      "description": "Emprendimiento (ej: EDUCACION COMUNA 8A)"
     },
     "monto_total_contrato": {
       "type": "number",

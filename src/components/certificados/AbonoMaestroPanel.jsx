@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
@@ -6,18 +6,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  Plus, Loader2, DollarSign, RefreshCw, AlertTriangle
+  Plus, Loader2, DollarSign, ArrowLeft, Upload, Sparkles, FolderOpen
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { parseMonto, fmt, calcularFechas, EMPTY_FORM } from './abonoUtils';
+import { parseMonto, fmt, calcularFechas, EMPTY_FORM, getRubroConfig } from './abonoUtils';
 import AbonoMaestroCard from './AbonoMaestroCard';
 import AbonoMaestroForm from './AbonoMaestroForm';
+import AbonoRubrosGrid from './AbonoRubrosGrid';
 
 export default function AbonoMaestroPanel() {
+  const [view, setView] = useState('folders'); // 'folders' | 'rubro'
+  const [selectedRubro, setSelectedRubro] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [search, setSearch] = useState('');
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const fileRef = useRef(null);
   const qc = useQueryClient();
 
   const { data: abonos = [], isLoading } = useQuery({
@@ -27,24 +32,29 @@ export default function AbonoMaestroPanel() {
     refetchOnMount: 'always',
   });
 
+  // Abonos del rubro seleccionado
+  const rubroAbonos = useMemo(() => {
+    if (!selectedRubro) return [];
+    return abonos.filter(a => (a.rubro || 'OTROS') === selectedRubro);
+  }, [abonos, selectedRubro]);
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return abonos;
+    if (!search.trim()) return rubroAbonos;
     const q = search.toLowerCase();
-    return abonos.filter(a =>
+    return rubroAbonos.filter(a =>
       a.contratista?.toLowerCase().includes(q) ||
       a.ada_numero?.toLowerCase().includes(q) ||
       a.oc_numero?.toLowerCase().includes(q) ||
-      a.obra_servicio?.toLowerCase().includes(q) ||
-      a.emprendimiento?.toLowerCase().includes(q)
+      a.obra_servicio?.toLowerCase().includes(q)
     );
-  }, [abonos, search]);
+  }, [rubroAbonos, search]);
 
-  const stats = useMemo(() => {
-    const activos = abonos.filter(a => a.estado === 'activo').length;
-    const lotesPendientes = abonos.filter(a => !a.lote_generado && a.estado === 'activo').length;
-    const totalMensual = abonos.filter(a => a.estado === 'activo').reduce((acc, a) => acc + parseMonto(a.monto_mensual), 0);
-    return { activos, lotesPendientes, totalMensual };
-  }, [abonos]);
+  const rubroStats = useMemo(() => {
+    const activos = rubroAbonos.filter(a => a.estado === 'activo').length;
+    const lotesPendientes = rubroAbonos.filter(a => !a.lote_generado && a.estado === 'activo').length;
+    const totalMensual = rubroAbonos.filter(a => a.estado === 'activo').reduce((acc, a) => acc + parseMonto(a.monto_mensual), 0);
+    return { activos, lotesPendientes, totalMensual, total: rubroAbonos.length };
+  }, [rubroAbonos]);
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
@@ -58,6 +68,7 @@ export default function AbonoMaestroPanel() {
       }));
       const payload = {
         ...data,
+        rubro: data.rubro || selectedRubro || 'OTROS',
         monto_total_contrato: monto,
         duracion_meses: meses,
         monto_mensual: meses > 0 ? monto / meses : 0,
@@ -85,6 +96,7 @@ export default function AbonoMaestroPanel() {
   const handleEdit = (abono) => {
     setEditingId(abono.id);
     setForm({
+      rubro: abono.rubro || 'OTROS',
       contratista: abono.contratista || '',
       oc_numero: abono.oc_numero || '',
       ada_numero: abono.ada_numero || '',
@@ -106,61 +118,196 @@ export default function AbonoMaestroPanel() {
     setShowForm(true);
   };
 
-  return (
-    <div className="space-y-4">
-      {/* Header con stats + búsqueda */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex gap-3 flex-wrap">
-          <div className="text-center bg-muted/40 rounded-lg px-4 py-2">
-            <p className="text-[10px] text-muted-foreground">Activos</p>
-            <p className="text-lg font-bold text-emerald-400">{stats.activos}</p>
+  // Subir ADA/OC desde dentro de la carpeta del rubro → extrae datos y abre form pre-llenado
+  const handleUploadADA = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // reset para permitir re-subir el mismo archivo
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      toast.error('Solo se aceptan archivos PDF');
+      return;
+    }
+    setUploadingPdf(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const res = await base44.functions.invoke('extractADA', { file_url, tipo_override: 'abono_mensual' });
+      const data = res.data?.data;
+      if (!data) throw new Error('No se pudo extraer datos del PDF');
+
+      setForm({
+        ...EMPTY_FORM,
+        rubro: selectedRubro || 'OTROS',
+        contratista: data.contratista || '',
+        oc_numero: data.oc_numero || '',
+        ada_numero: data.ada_numero || '',
+        obra_servicio: data.obra_servicio || '',
+        emprendimiento: data.emprendimiento || '',
+        monto_total_contrato: data.subtotal ? String(Math.round(data.subtotal)) : '',
+        fecha_oc_emision: data.fecha_inicio || '',
+        plazo_obra: data.plazo_obra || '',
+        condiciones_pago: data.condiciones_pago || '',
+        items: data.items?.length ? data.items.map(it => ({
+          descripcion: it.descripcion || '',
+          um: it.um || 'MES',
+          cantidad: parseFloat(it.cantidad) || 1,
+          importe_unitario: parseMonto(it.importe_unitario),
+          importe_total: parseMonto(it.importe_total) || (parseMonto(it.cantidad) * parseMonto(it.importe_unitario)),
+        })) : EMPTY_FORM.items,
+      });
+      setEditingId(null);
+      setShowForm(true);
+      toast.success('Datos extraídos del PDF — revisá y guardá');
+    } catch (e) {
+      toast.error('Error al extraer: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setUploadingPdf(false);
+    }
+  };
+
+  const handleNuevoEnRubro = () => {
+    setEditingId(null);
+    setForm({ ...EMPTY_FORM, rubro: selectedRubro || 'OTROS' });
+    setShowForm(true);
+  };
+
+  const rubroCfg = selectedRubro ? getRubroConfig(selectedRubro) : null;
+  const RubroIcon = rubroCfg?.Icon;
+
+  // ── VISTA: CARPETAS POR RUBRO ──────────────────────────────────────────────
+  if (view === 'folders') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <FolderOpen className="h-4 w-4 text-primary" />
+              Rubros
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Seleccioná un rubro para gestionar sus abonos o cargar un ADA/OC</p>
           </div>
-          <div className="text-center bg-muted/40 rounded-lg px-4 py-2">
-            <p className="text-[10px] text-muted-foreground">Total mensual</p>
-            <p className="text-lg font-bold text-primary">{fmt(stats.totalMensual)}</p>
-          </div>
-          {stats.lotesPendientes > 0 && (
-            <div className="text-center bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-2">
-              <p className="text-[10px] text-amber-400">Lotes pendientes</p>
-              <p className="text-lg font-bold text-amber-400">{stats.lotesPendientes}</p>
-            </div>
-          )}
-        </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <Input
-            placeholder="Buscar..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="h-8 w-48 text-sm"
-          />
           <Button onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); }} className="gap-2 h-8 text-xs">
             <Plus className="h-3.5 w-3.5" /> Nuevo Abono
           </Button>
         </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <AbonoRubrosGrid abonos={abonos} onSelect={(rubro) => { setSelectedRubro(rubro); setView('rubro'); setSearch(''); }} />
+        )}
+
+        <Dialog open={showForm} onOpenChange={(o) => { if (!o) { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); } }}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-primary" />
+                {editingId ? 'Editar Abono Maestro' : 'Nuevo Abono Maestro'}
+              </DialogTitle>
+            </DialogHeader>
+            <AbonoMaestroForm
+              form={form}
+              setForm={setForm}
+              editingId={editingId}
+              onSave={() => saveMutation.mutate(form)}
+              onCancel={() => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); }}
+              isSaving={saveMutation.isPending}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // ── VISTA: DETALLE DEL RUBRO ───────────────────────────────────────────────
+  return (
+    <div className="space-y-4">
+      <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={handleUploadADA} />
+
+      {/* Breadcrumb + header del rubro */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => setView('folders')}>
+            <ArrowLeft className="h-4 w-4" /> Rubros
+          </Button>
+          <div className={`h-10 w-10 rounded-xl ${rubroCfg.bg} ${rubroCfg.border} border flex items-center justify-center`}>
+            {RubroIcon && <RubroIcon className={`h-5 w-5 ${rubroCfg.color}`} />}
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-foreground">{rubroCfg.label}</h2>
+            <p className="text-xs text-muted-foreground">{rubroStats.total} abono{rubroStats.total !== 1 ? 's' : ''} · {rubroStats.activos} activo{rubroStats.activos !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+
+        <div className="flex gap-2 flex-wrap items-center">
+          <div className="text-center bg-muted/40 rounded-lg px-3 py-1.5">
+            <p className="text-[10px] text-muted-foreground">Total mensual</p>
+            <p className="text-sm font-bold text-primary">{fmt(rubroStats.totalMensual)}</p>
+          </div>
+          {rubroStats.lotesPendientes > 0 && (
+            <div className="text-center bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5">
+              <p className="text-[10px] text-amber-400">Sin lote</p>
+              <p className="text-sm font-bold text-amber-400">{rubroStats.lotesPendientes}</p>
+            </div>
+          )}
+          <Input
+            placeholder="Buscar..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-8 w-40 text-sm"
+          />
+          <Button onClick={handleNuevoEnRubro} variant="outline" className="gap-2 h-8 text-xs">
+            <Plus className="h-3.5 w-3.5" /> Nuevo
+          </Button>
+          <Button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploadingPdf}
+            className="gap-2 h-8 text-xs bg-gradient-to-r from-primary to-blue-600"
+          >
+            {uploadingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+            {uploadingPdf ? 'Extrayendo...' : 'Subir ADA / OC'}
+          </Button>
+        </div>
       </div>
 
-      {/* Lista */}
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <Card className="p-12 text-center">
-          <DollarSign className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-muted-foreground text-sm">{search ? 'Sin resultados para tu búsqueda' : 'No hay contratos de abono configurados'}</p>
-          <p className="text-xs text-muted-foreground mt-1">{search ? 'Probá con otro término' : 'Creá uno para generar todos los certificados del contrato en un click'}</p>
+      {/* CTA destacado cuando el rubro está vacío */}
+      {rubroStats.total === 0 && (
+        <Card className="p-10 text-center border-2 border-dashed border-border">
+          <div className={`h-14 w-14 rounded-2xl ${rubroCfg.bg} ${rubroCfg.border} border flex items-center justify-center mx-auto mb-3`}>
+            {RubroIcon && <RubroIcon className={`h-7 w-7 ${rubroCfg.color}`} />}
+          </div>
+          <p className="text-sm font-semibold text-foreground">No hay abonos en {rubroCfg.label}</p>
+          <p className="text-xs text-muted-foreground mt-1 mb-4">Subí el ADA u OC en PDF y la IA completa los datos del contrato automáticamente</p>
+          <Button onClick={() => fileRef.current?.click()} disabled={uploadingPdf} className="gap-2 bg-gradient-to-r from-primary to-blue-600">
+            {uploadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {uploadingPdf ? 'Extrayendo datos...' : 'Subir ADA / OC'}
+          </Button>
         </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(abono => (
-            <AbonoMaestroCard
-              key={abono.id}
-              abono={abono}
-              onEdit={handleEdit}
-              onDelete={(id) => deleteMutation.mutate(id)}
-            />
-          ))}
-        </div>
+      )}
+
+      {/* Lista de abonos del rubro */}
+      {rubroStats.total > 0 && (
+        isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground text-sm">Sin resultados para tu búsqueda</p>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map(abono => (
+              <AbonoMaestroCard
+                key={abono.id}
+                abono={abono}
+                onEdit={handleEdit}
+                onDelete={(id) => deleteMutation.mutate(id)}
+              />
+            ))}
+          </div>
+        )
       )}
 
       {/* Modal formulario */}

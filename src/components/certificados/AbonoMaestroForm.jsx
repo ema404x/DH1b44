@@ -8,7 +8,7 @@ import {
   CheckCircle2, Loader2, AlertTriangle, Upload, Sparkles, Plus, X, Info
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { parseMonto, fmt, calcularFechas, mesPeriodoLabel, EMPTY_FORM } from './abonoUtils';
+import { parseMonto, fmt, calcularFechas, mesPeriodoLabel, EMPTY_FORM, RUBRO_PRESETS } from './abonoUtils';
 
 function Section({ title, children }) {
   return (
@@ -151,8 +151,20 @@ export default function AbonoMaestroForm({ form, setForm, onSave, onCancel, isSa
             <Input placeholder="Descripción del servicio contratado" value={form.obra_servicio} onChange={e => set('obra_servicio', e.target.value)} />
           </Field>
         </div>
-        <Field label="Emprendimiento">
-          <Input placeholder="Ej: EDUCACION COMUNA 8A" value={form.emprendimiento} onChange={e => set('emprendimiento', e.target.value)} />
+        <div className="col-span-2">
+          <Field label="Emprendimiento">
+            <Input placeholder="Ej: EDUCACION COMUNA 8A" value={form.emprendimiento} onChange={e => set('emprendimiento', e.target.value)} />
+          </Field>
+        </div>
+        <Field label="Rubro / Carpeta">
+          <Select value={form.rubro || 'OTROS'} onValueChange={v => set('rubro', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {RUBRO_PRESETS.map(r => (
+                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="Estado">
           <Select value={form.estado} onValueChange={v => set('estado', v)}>
