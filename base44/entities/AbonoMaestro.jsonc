@@ -4,19 +4,19 @@
   "properties": {
     "contratista": {
       "type": "string",
-      "description": "Nombre del contratista (de la columna SUBCONTRATISTA)"
+      "description": "Nombre del contratista"
     },
     "oc_numero": {
       "type": "string",
-      "description": "N\u00famero de Orden de Compra"
+      "description": "Numero de Orden de Compra"
     },
     "ada_numero": {
       "type": "string",
-      "description": "N\u00famero de ADA asociado"
+      "description": "Numero de ADA asociado"
     },
     "obra_servicio": {
       "type": "string",
-      "description": "Descripci\u00f3n de la obra o servicio"
+      "description": "Descripcion de la obra o servicio"
     },
     "emprendimiento": {
       "type": "string",
@@ -24,28 +24,28 @@
     },
     "monto_total_contrato": {
       "type": "number",
-      "description": "Monto total del contrato (de la columna PRECIO)",
+      "description": "Monto total del contrato",
       "default": 0
     },
     "fecha_oc_emision": {
       "type": "string",
       "format": "date",
-      "description": "Fecha de emisi\u00f3n de la OC (columna FECHA). El abono comienza el mes siguiente."
+      "description": "Fecha de emision de la OC. El abono comienza el mes siguiente."
     },
     "duracion_meses": {
       "type": "number",
-      "description": "Duraci\u00f3n total del contrato en meses (ingresado manualmente)",
+      "description": "Duracion total del contrato en meses",
       "default": 1
     },
     "fecha_inicio_validez": {
       "type": "string",
       "format": "date",
-      "description": "Primer d\u00eda del mes siguiente a la emisi\u00f3n de la OC (calculado autom\u00e1ticamente)"
+      "description": "Primer dia del mes siguiente a la emision de la OC (calculado automaticamente)"
     },
     "fecha_fin_validez": {
       "type": "string",
       "format": "date",
-      "description": "\u00daltimo d\u00eda del contrato (calculado autom\u00e1ticamente)"
+      "description": "Ultimo dia del contrato (calculado automaticamente)"
     },
     "monto_mensual": {
       "type": "number",
@@ -54,8 +54,13 @@
     },
     "certificados_emitidos": {
       "type": "number",
-      "description": "Cantidad de certificados ya emitidos para este contrato",
+      "description": "Cantidad de certificados generados en el lote",
       "default": 0
+    },
+    "lote_generado": {
+      "type": "boolean",
+      "description": "true si el lote completo de certificados ya fue generado",
+      "default": false
     },
     "estado": {
       "type": "string",
@@ -73,7 +78,7 @@
     },
     "plazo_entrega": {
       "type": "string",
-      "description": "Plazo de entrega (ej: 30 d\u00edas h\u00e1biles)"
+      "description": "Plazo de entrega (ej: 30 dias habiles)"
     },
     "condiciones_pago": {
       "type": "string",
@@ -91,7 +96,7 @@
     },
     "items": {
       "type": "array",
-      "description": "\u00cdtems del contrato que se copiar\u00e1n en cada certificado mensual generado",
+      "description": "Items del contrato que se copiaran en cada certificado mensual generado",
       "items": {
         "type": "object",
         "properties": {
@@ -126,14 +131,18 @@
   ],
   "rls": {
     "create": {
-      "user_condition": {
-        "role": {
-          "$in": [
-            "admin",
-            "jefe_sitio"
-          ]
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "jefe_sitio"
+          }
         }
-      }
+      ]
     },
     "read": {
       "$or": [
