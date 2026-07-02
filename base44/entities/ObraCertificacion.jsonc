@@ -129,6 +129,40 @@
       "default": false,
       "description": "true cuando el ciclo fue cerrado y archivado. Los registros archivados son de solo lectura."
     },
+    "historial": {
+      "type": "array",
+      "description": "Historial de cambios de per\u00edodo y estado",
+      "items": {
+        "type": "object",
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "periodo": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "porcentaje_avance": {
+            "type": "number"
+          },
+          "monto_a_cobrar": {
+            "type": "number"
+          },
+          "monto_contrato": {
+            "type": "number"
+          },
+          "usuario": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "notas": {
       "type": "string",
       "description": "Observaciones generales"

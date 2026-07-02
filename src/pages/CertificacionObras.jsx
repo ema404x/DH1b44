@@ -134,7 +134,6 @@ export default function CertificacionObras() {
   });
 
   // KPIs
-  const totalMonto = obras.reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
   const listoCertificar   = obras.filter(o => o.estado_cobro === 'listo_certificar').length;
   const faltanActas       = obras.filter(o => o.estado_cobro === 'faltan_actas').length;
   const pendientes        = obras.filter(o => o.estado_cobro === 'pendiente').length;

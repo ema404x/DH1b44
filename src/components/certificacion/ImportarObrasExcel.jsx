@@ -149,15 +149,23 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
   const handleImport = async () => {
     if (!preview.length) return;
     setImporting(true);
-    let ok = 0, fail = 0;
+    // Obtener OCs existentes para evitar duplicados por N° MTOM
+    const existing = await base44.entities.ObraCertificacion.list('-created_date', 1000).catch(() => []);
+    const existingOCs = new Set(existing.map(o => o.oc_numero).filter(Boolean));
+    let ok = 0, fail = 0, skipped = 0;
     for (const { obra } of preview) {
+      if (obra.oc_numero && existingOCs.has(obra.oc_numero)) {
+        skipped++;
+        continue;
+      }
       try {
         await base44.entities.ObraCertificacion.create(obra);
+        if (obra.oc_numero) existingOCs.add(obra.oc_numero);
         ok++;
       } catch { fail++; }
     }
     setImporting(false);
-    setResult({ ok, fail });
+    setResult({ ok, fail, skipped });
     if (ok > 0) onImported();
   };
 
@@ -279,10 +287,11 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
 
           {/* Resultado */}
           {result && (
-            <div className={`flex items-center gap-3 px-4 py-4 rounded-xl border ${result.fail === 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}>
-              <CheckCircle2 className={`h-5 w-5 shrink-0 ${result.fail === 0 ? 'text-emerald-400' : 'text-amber-400'}`} />
+            <div className={`flex items-center gap-3 px-4 py-4 rounded-xl border ${result.fail === 0 && result.skipped === 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}>
+              <CheckCircle2 className={`h-5 w-5 shrink-0 ${result.fail === 0 && result.skipped === 0 ? 'text-emerald-400' : 'text-amber-400'}`} />
               <div>
                 <p className="text-sm font-semibold">{result.ok} obras importadas correctamente</p>
+                {result.skipped > 0 && <p className="text-xs text-amber-400">{result.skipped} duplicada(s) omitida(s) — N° MTOM ya existente</p>}
                 {result.fail > 0 && <p className="text-xs text-muted-foreground">{result.fail} filas fallaron</p>}
               </div>
             </div>

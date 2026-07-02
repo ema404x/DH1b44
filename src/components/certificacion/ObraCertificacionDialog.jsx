@@ -29,8 +29,10 @@ function Field({ label, children }) {
 
 export default function ObraCertificacionDialog({ open, onClose, obra, onSave, saving }) {
   const [form, setForm] = useState(EMPTY);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
+    setErrors({});
     if (!obra) { setForm(EMPTY); return; }
     const roundNum = (v, decimals = 2) => {
       const n = parseFloat(v);
@@ -58,6 +60,12 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const newErrors = {};
+    if (form.estado_cobro === 'observado' && !form.motivo_observacion?.trim()) {
+      newErrors.motivo_observacion = 'Debés indicar el motivo de observación';
+    }
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
     const parsedForm = {
       ...form,
       monto_contrato:    parseFloat(form.monto_contrato) || 0,
@@ -199,9 +207,10 @@ export default function ObraCertificacionDialog({ open, onClose, obra, onSave, s
 
           {form.estado_cobro === 'observado' && (
             <Field label="Motivo de observación *">
+              {errors.motivo_observacion && <p className="text-xs text-red-400 mb-1">{errors.motivo_observacion}</p>}
               <textarea
                 value={form.motivo_observacion}
-                onChange={e => set('motivo_observacion', e.target.value)}
+                onChange={e => { set('motivo_observacion', e.target.value); setErrors(prev => ({ ...prev, motivo_observacion: undefined })); }}
                 placeholder="Explicá brevemente por qué está observada esta obra..."
                 rows={2}
                 className="w-full rounded-md border border-yellow-500/40 bg-yellow-500/5 px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-yellow-500/50 resize-none"

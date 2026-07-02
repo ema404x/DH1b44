@@ -33,13 +33,13 @@ export default function CicloSelector({ cicloActivo, ciclosDisponibles, onCambia
   // Cierra el ciclo activo: marca todos los registros activos como archivados con el nombre del ciclo
   const cerrarCicloMutation = useMutation({
     mutationFn: async () => {
-      const updates = obrasActivas.map(obra =>
-        base44.entities.ObraCertificacion.update(obra.id, {
+      await base44.entities.ObraCertificacion.bulkUpdate(
+        obrasActivas.map(obra => ({
+          id: obra.id,
           ciclo: nuevoCicloNombre,
           ciclo_archivado: true,
-        })
+        }))
       );
-      await Promise.all(updates);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['obras-certificacion'] });

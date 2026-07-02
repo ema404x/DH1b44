@@ -123,7 +123,6 @@ export function exportarFiltradoPDF(obras, filtros = {}) {
 
   const comunaLabel = (comuna && comuna !== 'todas') ? comuna : 'TODAS';
   exportarComunaPDFInternal(titulo, comunaLabel, obras);
-  const suffix = partes.length > 0 ? partes.join('_').replace(/[^a-zA-Z0-9_]/g, '') : 'todas';
 }
 
 // ── Exportar PDF ────────────────────────────────────────────────────────────
