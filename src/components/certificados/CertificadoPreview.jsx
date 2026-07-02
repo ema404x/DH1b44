@@ -29,14 +29,18 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
     : 0;
   const pdfSubtotal = hasMedicion ? totalPresente : subtotal;
 
+  // Base para deducciones: monto contratado (igual que el editor y el PDF)
+  const montoContratado = parseMonto(form.monto_contratado) > 0
+    ? parseMonto(form.monto_contratado)
+    : subtotal;
   // Usar los montos ya calculados por el editor si están disponibles (evita divergencia)
   const anticipo = form._anticipo_monto != null
     ? parseMonto(form._anticipo_monto)
-    : (form.anticipo_pct > 0 ? pdfSubtotal * ((form.anticipo_pct ?? 0) / 100) : 0);
+    : (form.anticipo_pct > 0 ? montoContratado * ((form.anticipo_pct ?? 0) / 100) : 0);
   const fondoReparo = form.fondo_reparo_aplicar
     ? (form._fondo_reparo_monto != null
         ? parseMonto(form._fondo_reparo_monto)
-        : (form.fondo_reparo_pct > 0 ? pdfSubtotal * ((form.fondo_reparo_pct ?? 0) / 100) : 0))
+        : (form.fondo_reparo_pct > 0 ? montoContratado * ((form.fondo_reparo_pct ?? 0) / 100) : 0))
     : 0;
   const totalNeto = pdfSubtotal - anticipo - fondoReparo;
 
