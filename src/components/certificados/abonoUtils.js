@@ -1,15 +1,16 @@
 // Utilidades compartidas para Abonos Maestros
-import { GraduationCap, Stethoscope, Palette, TreePine, Wrench, Folder } from 'lucide-react';
+import { Scissors, FlaskConical, Droplets, Thermometer, Cog, ArrowUpDown, Flame, Folder } from 'lucide-react';
 
 export const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 export const RUBRO_PRESETS = [
-  { value: 'EDUCACION',       label: 'Educación',       Icon: GraduationCap, color: 'text-blue-400',     bg: 'bg-blue-500/10',     border: 'border-blue-500/30' },
-  { value: 'SALUD',           label: 'Salud',           Icon: Stethoscope,   color: 'text-emerald-400',  bg: 'bg-emerald-500/10',  border: 'border-emerald-500/30' },
-  { value: 'CULTURA',         label: 'Cultura',         Icon: Palette,       color: 'text-purple-400',   bg: 'bg-purple-500/10',   border: 'border-purple-500/30' },
-  { value: 'ESPACIOS_VERDES', label: 'Espacios Verdes', Icon: TreePine,      color: 'text-green-400',    bg: 'bg-green-500/10',    border: 'border-green-500/30' },
-  { value: 'SERVICIOS',       label: 'Servicios',       Icon: Wrench,        color: 'text-amber-400',    bg: 'bg-amber-500/10',    border: 'border-amber-500/30' },
-  { value: 'OTROS',           label: 'Otros',           Icon: Folder,        color: 'text-slate-400',    bg: 'bg-slate-500/10',    border: 'border-slate-500/30' },
+  { value: 'CORTE_DE_PASTO',        label: 'Corte de Pasto',            Icon: Scissors,      color: 'text-green-400',    bg: 'bg-green-500/10',    border: 'border-green-500/30' },
+  { value: 'PRUEBAS_HERMETICIDAD',  label: 'Pruebas de Hermeticidad',   Icon: FlaskConical,  color: 'text-cyan-400',     bg: 'bg-cyan-500/10',     border: 'border-cyan-500/30' },
+  { value: 'SANEAMIENTO',           label: 'Saneamiento',               Icon: Droplets,      color: 'text-blue-400',     bg: 'bg-blue-500/10',     border: 'border-blue-500/30' },
+  { value: 'CALEFACCION_REFRIGERACION', label: 'Calefacción / Refrigeración', Icon: Thermometer, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30' },
+  { value: 'TERMOMECANICA',         label: 'Termomecánica',             Icon: Cog,           color: 'text-amber-400',    bg: 'bg-amber-500/10',    border: 'border-amber-500/30' },
+  { value: 'ASCENSORES',            label: 'Ascensores',                Icon: ArrowUpDown,   color: 'text-purple-400',   bg: 'bg-purple-500/10',   border: 'border-purple-500/30' },
+  { value: 'SISTEMAS_INCENDIOS',    label: 'Sistemas contra Incendios', Icon: Flame,         color: 'text-red-400',      bg: 'bg-red-500/10',      border: 'border-red-500/30' },
 ];
 
 export const getRubroConfig = (value) => {
@@ -56,7 +57,7 @@ export const mesPeriodoLabel = (dateStr) => {
 };
 
 export const EMPTY_FORM = {
-  rubro: 'OTROS',
+  rubro: 'CORTE_DE_PASTO',
   contratista: '', oc_numero: '', ada_numero: '', obra_servicio: '',
   emprendimiento: '', monto_total_contrato: '', fecha_oc_emision: '',
   duracion_meses: '', plazo_obra: '', condiciones_pago: '',
