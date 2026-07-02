@@ -439,6 +439,7 @@ export default function CrearOT() {
         location: locationLabel,
         project_name: selectedLocation?.project_name || '',
         assigned_name: responsable || undefined,
+        jefe_sitio: autoJefeSitio || undefined,
       });
     }
   };

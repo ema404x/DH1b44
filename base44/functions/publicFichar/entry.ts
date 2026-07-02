@@ -119,6 +119,40 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, workOrder: updated });
     }
 
+    // ACTIVATE tablet — valida código de activación y devuelve el jefe vinculado
+    if (action === 'activateTablet') {
+      const { codigo } = body;
+      if (!codigo) return Response.json({ valid: false }, { status: 400 });
+      const tablets = await sb.entities.Tablet.filter({ codigo_activacion: codigo.trim() }).catch(() => []);
+      const tablet = tablets[0];
+      if (!tablet || !tablet.activa) {
+        return Response.json({ valid: false });
+      }
+      await sb.entities.Tablet.update(tablet.id, { ultima_actividad: new Date().toISOString() }).catch(() => {});
+      return Response.json({
+        valid: true,
+        tablet: { id: tablet.id, nombre: tablet.nombre, jefe_sitio: tablet.jefe_sitio },
+      });
+    }
+
+    // GET OTs for a tablet — solo las del jefe vinculado a esa tablet
+    if (action === 'getOTsForTablet') {
+      const { tablet_id } = body;
+      if (!tablet_id) return Response.json({ error: 'tablet_id requerido' }, { status: 400 });
+      const tablets = await sb.entities.Tablet.filter({ id: tablet_id }).catch(() => []);
+      const tablet = tablets[0];
+      if (!tablet || !tablet.activa) {
+        return Response.json({ error: 'Tablet no válida o desactivada' }, { status: 404 });
+      }
+      const allOTs = await sb.entities.WorkOrder.list('-created_date', 500).catch(() => []);
+      const jefeOTs = allOTs.filter(o => o.jefe_sitio === tablet.jefe_sitio);
+      return Response.json({
+        workOrders: jefeOTs,
+        jefe_sitio: tablet.jefe_sitio,
+        tablet_nombre: tablet.nombre,
+      });
+    }
+
     return Response.json({ error: 'Acción no válida' }, { status: 400 });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

@@ -1,0 +1,62 @@
+{
+  "name": "Tablet",
+  "type": "object",
+  "properties": {
+    "nombre": {
+      "type": "string",
+      "description": "Nombre/identificador de la tablet (ej: Tablet1)"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Jefe de sitio al que est\u00e1 vinculada la tablet. Solo \u00e9l ver\u00e1 y asignar\u00e1 trabajos a esta tablet."
+    },
+    "codigo_activacion": {
+      "type": "string",
+      "description": "C\u00f3digo que ingresa el operario para vincular la tablet a su jefe de sitio"
+    },
+    "activa": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si la tablet est\u00e1 activa y puede vincularse"
+    },
+    "ultima_actividad": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima vez que la tablet consult\u00f3 \u00f3rdenes"
+    }
+  },
+  "required": [
+    "nombre",
+    "jefe_sitio",
+    "codigo_activacion"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.jefe_sitio": "{{user.full_name}}"
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

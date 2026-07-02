@@ -75,6 +75,10 @@
     "assigned_name": {
       "type": "string"
     },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Jefe de sitio responsable \u2014 vincula la OT a la tablet de su cuadrilla"
+    },
     "scheduled_date": {
       "type": "string",
       "format": "date"
@@ -121,6 +125,11 @@
         "type": "string"
       },
       "description": "URLs de fotos adjuntas"
+    },
+    "require_photos": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el operario debe adjuntar fotos antes de completar"
     },
     "signature_url": {
       "type": "string"
