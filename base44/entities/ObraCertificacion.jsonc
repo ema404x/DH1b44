@@ -137,5 +137,61 @@
   "required": [
     "titulo",
     "estado_cobro"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.jefe_sitio": "{{user.full_name}}"
+        },
+        {
+          "data.inspector": "{{user.full_name}}"
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "$and": [
+            {
+              "data.ciclo_archivado": false
+            },
+            {
+              "$or": [
+                {
+                  "created_by_id": "{{user.id}}"
+                },
+                {
+                  "data.jefe_sitio": "{{user.full_name}}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }
