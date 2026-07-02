@@ -100,12 +100,14 @@ Deno.serve(async (req) => {
       return Response.json({ file_url: result.file_url });
     }
 
-    // VERIFY operario password
+    // VERIFY operario password (stored as secret, never hardcoded)
     if (action === 'verifyOperarioPassword') {
       const { password } = body;
+      const storedPassword = Deno.env.get('OPERARIO_PASSWORD');
+      if (!storedPassword) {
+        return Response.json({ error: 'Servicio no configurado' }, { status: 503 });
+      }
       if (!password) return Response.json({ valid: false }, { status: 400 });
-      const configs = await sb.entities.RolePermission.filter({ role_name: 'operario_portal' });
-      const storedPassword = configs[0]?.description || 'operario123';
       return Response.json({ valid: password === storedPassword });
     }
 
