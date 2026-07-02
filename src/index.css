@@ -92,11 +92,34 @@
     50%       { text-shadow: 0 0 10px rgba(100,220,255,0.95), 0 0 22px rgba(0,230,200,0.7), 0 0 40px rgba(80,180,255,0.4); }
   }
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 99px; }
-  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }
+  /* Custom scrollbar — modern, thin, auto-hiding */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 4px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.25);
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background 0.15s ease;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+  }
+  ::-webkit-scrollbar-thumb:active {
+    background: hsl(var(--primary) / 0.6);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+  }
+  ::-webkit-scrollbar-corner { background: transparent; }
 
   /* Card hover lift */
   .card-lift {
