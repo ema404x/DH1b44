@@ -49,7 +49,7 @@ export default function CertificacionObras() {
   const [importOpen, setImportOpen] = useState(false);
   const [cicloVista, setCicloVista] = useState('activo');
 
-  const { data: todasObras = [], isLoading } = useQuery({
+  const { data: todasObras = [], isLoading, error: queryError } = useQuery({
     queryKey: ['obras-certificacion'],
     queryFn: async () => {
       const res = await base44.functions.invoke('gestionarObrasCertificacion', { action: 'list' });
@@ -364,6 +364,12 @@ export default function CertificacionObras() {
       {isLoading ? (
         <div className="flex justify-center py-16">
           <div className="h-8 w-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+        </div>
+      ) : queryError ? (
+        <div className="text-center py-16 text-destructive">
+          <AlertCircle className="h-12 w-12 mx-auto mb-3 opacity-40" />
+          <p className="text-sm font-medium">Error al cargar las obras</p>
+          <p className="text-xs text-muted-foreground mt-1">{queryError?.response?.data?.error || queryError?.message || 'Error desconocido'}</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">

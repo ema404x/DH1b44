@@ -33,13 +33,14 @@ export default function CicloSelector({ cicloActivo, ciclosDisponibles, onCambia
   // Cierra el ciclo activo: marca todos los registros activos como archivados con el nombre del ciclo
   const cerrarCicloMutation = useMutation({
     mutationFn: async () => {
-      await base44.entities.ObraCertificacion.bulkUpdate(
-        obrasActivas.map(obra => ({
+      // Usar backend function para bypassar RLS
+      for (const obra of obrasActivas) {
+        await base44.functions.invoke('gestionarObrasCertificacion', {
+          action: 'update',
           id: obra.id,
-          ciclo: nuevoCicloNombre,
-          ciclo_archivado: true,
-        }))
-      );
+          data: { ciclo: nuevoCicloNombre, ciclo_archivado: true },
+        });
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['obras-certificacion'] });

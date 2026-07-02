@@ -149,9 +149,12 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
   const handleImport = async () => {
     if (!preview.length) return;
     setImporting(true);
-    // Obtener OCs existentes para evitar duplicados por N° MTOM
-    const existing = await base44.entities.ObraCertificacion.list('-created_date', 1000).catch(() => []);
-    const existingOCs = new Set(existing.map(o => o.oc_numero).filter(Boolean));
+    // Obtener OCs existentes vía backend function (bypassa RLS)
+    let existingOCs = new Set();
+    try {
+      const res = await base44.functions.invoke('gestionarObrasCertificacion', { action: 'list' });
+      existingOCs = new Set((res.data.obras || []).map(o => o.oc_numero).filter(Boolean));
+    } catch { /* si falla, continuar sin check de duplicados */ }
     let ok = 0, fail = 0, skipped = 0;
     for (const { obra } of preview) {
       if (obra.oc_numero && existingOCs.has(obra.oc_numero)) {
@@ -159,7 +162,7 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
         continue;
       }
       try {
-        await base44.entities.ObraCertificacion.create(obra);
+        await base44.functions.invoke('gestionarObrasCertificacion', { action: 'create', data: obra });
         if (obra.oc_numero) existingOCs.add(obra.oc_numero);
         ok++;
       } catch { fail++; }
