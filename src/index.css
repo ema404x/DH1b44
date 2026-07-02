@@ -92,21 +92,19 @@
     50%       { text-shadow: 0 0 10px rgba(100,220,255,0.95), 0 0 22px rgba(0,230,200,0.7), 0 0 40px rgba(80,180,255,0.4); }
   }
 
-  /* Custom scrollbar — neon rainbow flow */
+  /* Custom scrollbar — blue to yellow bright flow */
   @keyframes scrollbarFlow {
     0%   { background-position: 0% 0%; }
     100% { background-position: 0% 400%; }
   }
   @keyframes scrollbarGlow {
-    0%, 100% { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 8px rgba(255,0,255,0.6); }
-    20%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 10px rgba(0,255,255,0.6); }
-    40%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 12px rgba(0,255,100,0.6); }
-    60%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 10px rgba(255,255,0,0.6); }
-    80%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 8px rgba(255,100,0,0.6); }
+    0%, 100% { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 8px rgba(0,150,255,0.7); }
+    33%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 10px rgba(0,220,255,0.8); }
+    66%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 12px rgba(255,225,0,0.8); }
   }
   * {
     scrollbar-width: auto;
-    scrollbar-color: #e91e63 transparent;
+    scrollbar-color: #00b4ff transparent;
   }
   ::-webkit-scrollbar { width: 13px; height: 13px; }
   ::-webkit-scrollbar-track {
@@ -116,12 +114,11 @@
   }
   ::-webkit-scrollbar-thumb {
     background: linear-gradient(180deg,
-      #ff00ff 0%,
-      #00ffff 20%,
-      #00ff44 40%,
-      #ffff00 60%,
-      #ff8800 80%,
-      #ff0044 100%);
+      #0066ff 0%,
+      #00b4ff 25%,
+      #00e5ff 50%,
+      #ffe100 75%,
+      #ffcc00 100%);
     background-size: 100% 300%;
     border-radius: 99px;
     border: 2px solid rgba(0,0,0,0.2);
@@ -131,12 +128,11 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg,
-      #ff66ff 0%,
-      #66ffff 20%,
-      #66ff88 40%,
-      #ffff66 60%,
-      #ffaa44 80%,
-      #ff4488 100%);
+      #3399ff 0%,
+      #33ccff 25%,
+      #66f0ff 50%,
+      #fff04d 75%,
+      #ffd633 100%);
     background-size: 100% 300%;
     background-clip: padding-box;
     border: 2px solid rgba(0,0,0,0.2);
@@ -145,9 +141,9 @@
   }
   ::-webkit-scrollbar-thumb:active {
     background: linear-gradient(180deg,
-      #ff00ff 0%,
-      #00ff44 50%,
-      #ff0044 100%);
+      #0066ff 0%,
+      #00e5ff 50%,
+      #ffcc00 100%);
     background-size: 100% 300%;
     background-clip: padding-box;
     border: 2px solid rgba(0,0,0,0.2);
