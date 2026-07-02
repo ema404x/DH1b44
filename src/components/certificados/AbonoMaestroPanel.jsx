@@ -6,14 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  Plus, Loader2, DollarSign, ArrowLeft, Upload, Sparkles, FolderOpen, Zap, CheckCircle2, FileText
+  Plus, Loader2, DollarSign, ArrowLeft, Upload, Sparkles, FolderOpen, Calendar, CheckCircle2, FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { parseMonto, fmt, calcularFechas, EMPTY_FORM, getRubroConfig } from './abonoUtils';
 import AbonoMaestroCard from './AbonoMaestroCard';
 import AbonoMaestroForm from './AbonoMaestroForm';
 import AbonoRubrosGrid from './AbonoRubrosGrid';
-import GeneracionMensualConfig from './GeneracionMensualConfig';
+import CertificacionMensualDialog from './CertificacionMensualDialog';
 
 export default function AbonoMaestroPanel() {
   const [view, setView] = useState('folders'); // 'folders' | 'rubro'
@@ -55,9 +55,9 @@ export default function AbonoMaestroPanel() {
 
   const rubroStats = useMemo(() => {
     const activos = rubroAbonos.filter(a => a.estado === 'activo').length;
-    const lotesPendientes = rubroAbonos.filter(a => !a.lote_generado && a.estado === 'activo').length;
+    const sinCertificar = rubroAbonos.filter(a => a.estado === 'activo' && (a.certificados_emitidos || 0) === 0).length;
     const totalMensual = rubroAbonos.filter(a => a.estado === 'activo').reduce((acc, a) => acc + parseMonto(a.monto_mensual), 0);
-    return { activos, lotesPendientes, totalMensual, total: rubroAbonos.length };
+    return { activos, sinCertificar, totalMensual, total: rubroAbonos.length };
   }, [rubroAbonos]);
 
   const saveMutation = useMutation({
@@ -219,8 +219,8 @@ export default function AbonoMaestroPanel() {
               disabled={isLoading || abonos.filter(a => a.estado === 'activo').length === 0}
               className="gap-2 h-8 text-xs bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg"
             >
-              {generatingMensual ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-              {generatingMensual ? 'Generando...' : 'Generar Certificados del Mes'}
+              {generatingMensual ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Calendar className="h-3.5 w-3.5" />}
+              {generatingMensual ? 'Certificando...' : 'Certificar Mes'}
             </Button>
             <Button onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); }} variant="outline" className="gap-2 h-8 text-xs">
               <Plus className="h-3.5 w-3.5" /> Nuevo Abono
@@ -261,7 +261,7 @@ export default function AbonoMaestroPanel() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                Certificados del Mes Generados
+                Certificación de {mensualResult?.mes_label || 'Mes'} Completada
               </DialogTitle>
             </DialogHeader>
             {mensualResult && (
@@ -332,8 +332,8 @@ export default function AbonoMaestroPanel() {
           </DialogContent>
         </Dialog>
 
-        {/* Dialog de configuración de generación mensual */}
-        <GeneracionMensualConfig
+        {/* Dialog de certificación mensual */}
+        <CertificacionMensualDialog
           open={showMensualConfig}
           onClose={() => setShowMensualConfig(false)}
           abonos={abonos}
@@ -369,10 +369,10 @@ export default function AbonoMaestroPanel() {
             <p className="text-[10px] text-muted-foreground">Total mensual</p>
             <p className="text-sm font-bold text-primary">{fmt(rubroStats.totalMensual)}</p>
           </div>
-          {rubroStats.lotesPendientes > 0 && (
+          {rubroStats.sinCertificar > 0 && (
             <div className="text-center bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-1.5">
-              <p className="text-[10px] text-amber-400">Sin lote</p>
-              <p className="text-sm font-bold text-amber-400">{rubroStats.lotesPendientes}</p>
+              <p className="text-[10px] text-amber-400">Sin certificar</p>
+              <p className="text-sm font-bold text-amber-400">{rubroStats.sinCertificar}</p>
             </div>
           )}
           <Input

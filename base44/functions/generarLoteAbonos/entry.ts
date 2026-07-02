@@ -234,53 +234,26 @@ async function generateCertificatePDF(certificado, logoBase64) {
   return doc.output('arraybuffer');
 }
 
-// ── Helpers compartidos ──────────────────────────────────────────────────
+// ── Helpers de mes ──────────────────────────────────────────────────────────
 
-function resolveInicioMes(abono) {
-  let inicioYear, inicioMonth;
-  if (abono.fecha_inicio_validez) {
-    [inicioYear, inicioMonth] = abono.fecha_inicio_validez.split('-').map(Number);
-  } else if (abono.fecha_oc_emision) {
-    const [y, m] = abono.fecha_oc_emision.split('-').map(Number);
-    inicioMonth = m + 1; inicioYear = y;
-    if (inicioMonth > 12) { inicioMonth = 1; inicioYear++; }
-  } else {
-    const now = new Date();
-    inicioMonth = now.getMonth() + 2; inicioYear = now.getFullYear();
-    if (inicioMonth > 12) { inicioMonth = 1; inicioYear++; }
-  }
-  return { inicioYear, inicioMonth };
+// "2026-07" → 202607 (entero comparable)
+function mesToInt(mes) {
+  return parseInt(String(mes).replace('-', ''), 10);
 }
 
-function calcMesLabel(inicioYear, inicioMonth, offset) {
-  let m = inicioMonth + offset;
-  let y = inicioYear;
-  while (m > 12) { m -= 12; y++; }
-  return {
-    mesFormato: `${y}-${String(m).padStart(2, '0')}`,
-    mesLabel: `${MESES_ES[m - 1]} ${y}`,
-  };
+// Mes actual en formato "YYYY-MM"
+function currentMes() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// Crea UN certificado para el mes dado (monthIndex 0-based dentro del contrato)
-async function generateOneCertificate(base44, abono, monthIndexOrOverride, logoBase64, currentNum) {
+// Crea UN certificado para el mes dado
+async function generateOneCertificate(base44, abono, mesInfo, logoBase64, currentNum) {
   const duracionMeses = Math.max(parseInt(abono.duracion_meses) || 1, 1);
   const montoTotalContrato = parseMonto(abono.monto_total_contrato);
   const montoMensual = parseMonto(abono.monto_mensual) || (montoTotalContrato / duracionMeses);
 
-  let mesFormato, mesLabel, numeroEnContrato;
-  if (typeof monthIndexOrOverride === 'object' && monthIndexOrOverride !== null) {
-    mesFormato = monthIndexOrOverride.mesFormato;
-    mesLabel = monthIndexOrOverride.mesLabel;
-    numeroEnContrato = monthIndexOrOverride.numeroEnContrato;
-  } else {
-    const { inicioYear, inicioMonth } = resolveInicioMes(abono);
-    const ml = calcMesLabel(inicioYear, inicioMonth, monthIndexOrOverride);
-    mesFormato = ml.mesFormato;
-    mesLabel = ml.mesLabel;
-    numeroEnContrato = monthIndexOrOverride + 1;
-  }
-
+  const { mesFormato, mesLabel, numeroEnContrato } = mesInfo;
   const numero = currentNum + 1;
 
   const certItems = abono.items?.length
@@ -352,6 +325,13 @@ async function generateOneCertificate(base44, abono, monthIndexOrOverride, logoB
   };
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// MOTOR DE CERTIFICACIÓN MENSUAL
+// ---------------------------------------------------------------------------
+// Lógica profesional mes-a-mes: se certifica UN mes específico para todos los
+// abonos activos cuya vigencia incluye ese mes. No se generan certificados
+// futuros ni duplicados.
+// ════════════════════════════════════════════════════════════════════════════
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -361,237 +341,154 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { abono_id, regenerar = false, modo } = body;
+    const { mes_target, regenerar = false, comunas = [], abono_id } = body;
 
-    // ════════════════════════════════════════════════════════════════════
-    // MODO MENSUAL: Generar el certificado del mes para TODOS los abonos activos
-    // ════════════════════════════════════════════════════════════════════
-    if (modo === 'mensual_todos') {
-      const { rubros, abono_ids, mes_target, regenerar = false, skip_completed = true, comunas } = body;
-
-      // Construir lista de abonos según configuración
-      let abonos;
-      if (abono_ids?.length) {
-        abonos = [];
-        for (const id of abono_ids) {
-          try {
-            const a = await base44.asServiceRole.entities.AbonoMaestro.get(id);
-            if (a) abonos.push(a);
-          } catch {}
-        }
-      } else {
-        abonos = await base44.asServiceRole.entities.AbonoMaestro.filter({ estado: 'activo' });
-        if (rubros?.length) {
-          abonos = abonos.filter(a => rubros.includes(a.rubro));
-        }
-      }
-
-      // Filtrar por comuna
-      if (comunas?.length) {
-        abonos = abonos.filter(a => comunas.includes(a.comuna));
-      }
-
-      // Omitir contratos completados
-      if (skip_completed) {
-        abonos = abonos.filter(a => a.estado !== 'completado');
-      }
-
-      const logoBase64 = await loadLogoBase64();
-
-      // Obtener ultimo numero de certificado global (auto-incremental)
-      const lastCerts = await base44.asServiceRole.entities.Certificado.filter({}, '-numero', 1);
-      let currentNum = lastCerts.length > 0 ? (lastCerts[0].numero || 0) : 0;
-
-      const results = [];
-      let totalGenerated = 0;
-      let totalSkipped = 0;
-
-      for (const abono of abonos) {
-        const duracionMeses = Math.max(parseInt(abono.duracion_meses) || 1, 1);
-        const { inicioYear, inicioMonth } = resolveInicioMes(abono);
-
-        let mesFormato, mesLabel, numeroEnContrato, monthIndex;
-
-        if (mes_target) {
-          // Mes específico solicitado
-          const [tY, tM] = mes_target.split('-').map(Number);
-          monthIndex = (tY - inicioYear) * 12 + (tM - inicioMonth);
-          if (monthIndex < 0 || monthIndex >= duracionMeses) {
-            results.push({ contratista: abono.contratista, comuna: abono.comuna || '—', skipped: true, reason: 'Mes fuera del contrato', mes: mes_target });
-            totalSkipped++;
-            continue;
-          }
-          mesFormato = mes_target;
-          mesLabel = `${MESES_ES[tM - 1]} ${tY}`;
-          numeroEnContrato = monthIndex + 1;
-        } else {
-          // Auto: próximo mes pendiente
-          const existingCerts = await base44.asServiceRole.entities.Certificado.filter({
-            ada_numero: abono.ada_numero || '',
-            tipo: 'abono_mensual',
-            generado_automaticamente: true,
-          });
-          monthIndex = existingCerts.length;
-          if (monthIndex >= duracionMeses) {
-            await base44.asServiceRole.entities.AbonoMaestro.update(abono.id, {
-              estado: 'completado',
-              lote_generado: true,
-              certificados_emitidos: monthIndex,
-            });
-            results.push({ contratista: abono.contratista, comuna: abono.comuna || '—', skipped: true, reason: 'Contrato completado', mes: '—' });
-            totalSkipped++;
-            continue;
-          }
-          const ml = calcMesLabel(inicioYear, inicioMonth, monthIndex);
-          mesFormato = ml.mesFormato;
-          mesLabel = ml.mesLabel;
-          numeroEnContrato = monthIndex + 1;
-        }
-
-        // Verificar si ya existe certificado para este mes
-        const existingForMonth = await base44.asServiceRole.entities.Certificado.filter({
-          ada_numero: abono.ada_numero || '',
-          tipo: 'abono_mensual',
-          mes_periodo: mesFormato,
-        });
-
-        if (existingForMonth.length > 0 && !regenerar) {
-          results.push({ contratista: abono.contratista, comuna: abono.comuna || '—', skipped: true, reason: 'Ya existe para ' + mesLabel, mes: mesLabel });
-          totalSkipped++;
-          continue;
-        }
-
-        // Si regenerar, eliminar el existente
-        if (existingForMonth.length > 0 && regenerar) {
-          for (const c of existingForMonth) {
-            if (c.generado_automaticamente) {
-              await base44.asServiceRole.entities.Certificado.delete(c.id);
-            }
-          }
-        }
-
-        try {
-          const override = { mesFormato, mesLabel, numeroEnContrato };
-          const res = await generateOneCertificate(base44, abono, override, logoBase64, currentNum);
-          currentNum = res.nextNum;
-          totalGenerated++;
-
-          // Actualizar el abono con el conteo real
-          const allCerts = await base44.asServiceRole.entities.Certificado.filter({
-            ada_numero: abono.ada_numero || '',
-            tipo: 'abono_mensual',
-            generado_automaticamente: true,
-          });
-          const newCount = allCerts.length;
-          const completado = newCount >= duracionMeses;
-          await base44.asServiceRole.entities.AbonoMaestro.update(abono.id, {
-            certificados_emitidos: newCount,
-            lote_generado: true,
-            estado: completado ? 'completado' : 'activo',
-          });
-
-          results.push({
-            contratista: abono.contratista,
-            comuna: abono.comuna || '—',
-            generated: true,
-            numero: res.numero,
-            mes: mesLabel,
-            monto: res.monto,
-            pdf_url: res.pdf_url,
-          });
-        } catch (e) {
-          results.push({ contratista: abono.contratista, comuna: abono.comuna || '—', error: e.message });
-          totalSkipped++;
-        }
-      }
-
-      return Response.json({
-        success: true,
-        message: `Generación mensual: ${totalGenerated} certificados generados, ${totalSkipped} omitidos`,
-        total_abonos: abonos.length,
-        generated: totalGenerated,
-        skipped: totalSkipped,
-        results,
-      });
+    // ── Validar parámetros ──────────────────────────────────────────────────
+    if (!mes_target) {
+      return Response.json({ error: 'mes_target es requerido (formato YYYY-MM)' }, { status: 400 });
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // MODO LOTE: Generar todos los certificados de un abono (existente)
-    // ════════════════════════════════════════════════════════════════════
-    if (!abono_id) {
-      return Response.json({ error: 'abono_id es requerido' }, { status: 400 });
+    const mesMatch = String(mes_target).match(/^(\d{4})-(\d{2})$/);
+    if (!mesMatch) {
+      return Response.json({ error: 'mes_target debe tener formato YYYY-MM' }, { status: 400 });
+    }
+    const targetY = parseInt(mesMatch[1]);
+    const targetM = parseInt(mesMatch[2]);
+    if (targetM < 1 || targetM > 12) {
+      return Response.json({ error: 'Mes inválido' }, { status: 400 });
     }
 
-    const abono = await base44.asServiceRole.entities.AbonoMaestro.get(abono_id);
-    if (!abono) {
-      return Response.json({ error: 'Abono no encontrado' }, { status: 404 });
+    // Regla profesional: no se puede certificar un mes que aún no comenzó
+    const targetInt = mesToInt(mes_target);
+    const currentInt = mesToInt(currentMes());
+    if (targetInt > currentInt) {
+      return Response.json({ error: 'No se puede certificar un mes futuro' }, { status: 400 });
     }
 
-    if (abono.lote_generado && !regenerar) {
-      return Response.json({
-        error: 'El lote ya fue generado. Usá regenerar=true para recrear los certificados.'
-      }, { status: 400 });
-    }
-
-    const duracionMeses = Math.max(parseInt(abono.duracion_meses) || 1, 1);
-    const { inicioYear, inicioMonth } = resolveInicioMes(abono);
-
-    const existingCerts = await base44.asServiceRole.entities.Certificado.filter({
-      ada_numero: abono.ada_numero || '',
-      tipo: 'abono_mensual',
-    });
-    const existingMeses = new Set(existingCerts.map(c => c.mes_periodo));
-
-    if (regenerar && existingCerts.length > 0) {
-      for (const c of existingCerts) {
-        if (c.generado_automaticamente) {
-          await base44.asServiceRole.entities.Certificado.delete(c.id);
-        }
-      }
-      existingMeses.clear();
-    }
-
+    const mesLabel = `${MESES_ES[targetM - 1]} ${targetY}`;
     const logoBase64 = await loadLogoBase64();
 
+    // ── Obtener abonos a procesar ───────────────────────────────────────────
+    let abonos;
+    if (abono_id) {
+      // Modo individual: un solo abono
+      const a = await base44.asServiceRole.entities.AbonoMaestro.get(abono_id);
+      abonos = a ? [a] : [];
+    } else {
+      // Modo masivo: todos los abonos activos
+      abonos = await base44.asServiceRole.entities.AbonoMaestro.filter({ estado: 'activo' });
+    }
+
+    // Filtro por comuna (opcional)
+    if (comunas.length > 0) {
+      abonos = abonos.filter(a => comunas.includes(a.comuna));
+    }
+
+    // Número de certificado global (auto-incremental)
     const lastCerts = await base44.asServiceRole.entities.Certificado.filter({}, '-numero', 1);
     let currentNum = lastCerts.length > 0 ? (lastCerts[0].numero || 0) : 0;
 
-    const generated = [];
-    const skipped = [];
+    const results = [];
+    let totalGenerated = 0;
+    let totalSkipped = 0;
 
-    for (let i = 0; i < duracionMeses; i++) {
-      const { mesFormato, mesLabel } = calcMesLabel(inicioYear, inicioMonth, i);
+    for (const abono of abonos) {
+      const duracionMeses = Math.max(parseInt(abono.duracion_meses) || 1, 1);
+      const inicioMes = abono.fecha_inicio_validez ? abono.fecha_inicio_validez.slice(0, 7) : null;
+      const finMes = abono.fecha_fin_validez ? abono.fecha_fin_validez.slice(0, 7) : null;
 
-      if (existingMeses.has(mesFormato)) {
-        skipped.push({ mes: mesLabel, reason: 'Ya existe' });
+      const baseResult = {
+        contratista: abono.contratista,
+        comuna: abono.comuna || '—',
+        mes: mesLabel,
+      };
+
+      // ── Validar vigencia del contrato ───────────────────────────────────
+      if (!inicioMes || !finMes) {
+        results.push({ ...baseResult, skipped: true, reason: 'Sin fechas de validez' });
+        totalSkipped++;
         continue;
       }
 
-      const res = await generateOneCertificate(base44, abono, i, logoBase64, currentNum);
-      currentNum = res.nextNum;
-      generated.push({
-        id: res.id,
-        numero: res.numero,
-        numero_en_contrato: res.numero_en_contrato,
-        mes: res.mes,
-        monto: res.monto,
-        pdf_url: res.pdf_url,
-      });
-    }
+      const inicioInt = mesToInt(inicioMes);
+      const finInt = mesToInt(finMes);
 
-    await base44.asServiceRole.entities.AbonoMaestro.update(abono_id, {
-      lote_generado: true,
-      certificados_emitidos: generated.length,
-      estado: generated.length >= duracionMeses ? 'completado' : 'activo',
-    });
+      if (targetInt < inicioInt || targetInt > finInt) {
+        results.push({ ...baseResult, skipped: true, reason: 'Fuera del contrato' });
+        totalSkipped++;
+        continue;
+      }
+
+      // ── Verificar duplicado para este mes ───────────────────────────────
+      const existingForMonth = await base44.asServiceRole.entities.Certificado.filter({
+        ada_numero: abono.ada_numero || '',
+        tipo: 'abono_mensual',
+        mes_periodo: mes_target,
+      });
+
+      if (existingForMonth.length > 0 && !regenerar) {
+        results.push({ ...baseResult, skipped: true, reason: 'Ya certificado' });
+        totalSkipped++;
+        continue;
+      }
+
+      // Si regenerar, eliminar certificados automáticos previos de este mes
+      if (existingForMonth.length > 0 && regenerar) {
+        for (const c of existingForMonth) {
+          if (c.generado_automaticamente) {
+            await base44.asServiceRole.entities.Certificado.delete(c.id);
+          }
+        }
+      }
+
+      // ── Calcular número de mes dentro del contrato ──────────────────────
+      const inicioY = parseInt(inicioMes.slice(0, 4));
+      const inicioM = parseInt(inicioMes.slice(5, 7));
+      const monthIndex = (targetY - inicioY) * 12 + (targetM - inicioM);
+      const numeroEnContrato = monthIndex + 1;
+
+      try {
+        const mesInfo = { mesFormato: mes_target, mesLabel, numeroEnContrato };
+        const res = await generateOneCertificate(base44, abono, mesInfo, logoBase64, currentNum);
+        currentNum = res.nextNum;
+        totalGenerated++;
+
+        // ── Actualizar progreso del abono ──────────────────────────────────
+        const allCerts = await base44.asServiceRole.entities.Certificado.filter({
+          ada_numero: abono.ada_numero || '',
+          tipo: 'abono_mensual',
+          generado_automaticamente: true,
+        });
+        const newCount = allCerts.length;
+        const completado = newCount >= duracionMeses;
+
+        await base44.asServiceRole.entities.AbonoMaestro.update(abono.id, {
+          certificados_emitidos: newCount,
+          lote_generado: true,
+          estado: completado ? 'completado' : 'activo',
+        });
+
+        results.push({
+          ...baseResult,
+          generated: true,
+          numero: res.numero,
+          monto: res.monto,
+          pdf_url: res.pdf_url,
+        });
+      } catch (e) {
+        results.push({ ...baseResult, error: e.message });
+        totalSkipped++;
+      }
+    }
 
     return Response.json({
       success: true,
-      message: `Lote generado: ${generated.length} certificados para ${abono.contratista}`,
-      contratista: abono.contratista,
-      totalMeses: duracionMeses,
-      generated,
-      skipped,
+      mes_target,
+      mes_label: mesLabel,
+      total_abonos: abonos.length,
+      generated: totalGenerated,
+      skipped: totalSkipped,
+      results,
     });
 
   } catch (error) {
