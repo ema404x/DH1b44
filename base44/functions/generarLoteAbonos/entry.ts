@@ -234,18 +234,205 @@ async function generateCertificatePDF(certificado, logoBase64) {
   return doc.output('arraybuffer');
 }
 
+// ── Helpers compartidos ──────────────────────────────────────────────────
+
+function resolveInicioMes(abono) {
+  let inicioYear, inicioMonth;
+  if (abono.fecha_inicio_validez) {
+    [inicioYear, inicioMonth] = abono.fecha_inicio_validez.split('-').map(Number);
+  } else if (abono.fecha_oc_emision) {
+    const [y, m] = abono.fecha_oc_emision.split('-').map(Number);
+    inicioMonth = m + 1; inicioYear = y;
+    if (inicioMonth > 12) { inicioMonth = 1; inicioYear++; }
+  } else {
+    const now = new Date();
+    inicioMonth = now.getMonth() + 2; inicioYear = now.getFullYear();
+    if (inicioMonth > 12) { inicioMonth = 1; inicioYear++; }
+  }
+  return { inicioYear, inicioMonth };
+}
+
+function calcMesLabel(inicioYear, inicioMonth, offset) {
+  let m = inicioMonth + offset;
+  let y = inicioYear;
+  while (m > 12) { m -= 12; y++; }
+  return {
+    mesFormato: `${y}-${String(m).padStart(2, '0')}`,
+    mesLabel: `${MESES_ES[m - 1]} ${y}`,
+  };
+}
+
+// Crea UN certificado para el mes dado (monthIndex 0-based dentro del contrato)
+async function generateOneCertificate(base44, abono, monthIndex, logoBase64, currentNum) {
+  const { inicioYear, inicioMonth } = resolveInicioMes(abono);
+  const { mesFormato, mesLabel } = calcMesLabel(inicioYear, inicioMonth, monthIndex);
+
+  const duracionMeses = Math.max(parseInt(abono.duracion_meses) || 1, 1);
+  const montoTotalContrato = parseMonto(abono.monto_total_contrato);
+  const montoMensual = parseMonto(abono.monto_mensual) || (montoTotalContrato / duracionMeses);
+
+  const numero = currentNum + 1;
+  const numeroEnContrato = monthIndex + 1;
+
+  const certItems = abono.items?.length
+    ? abono.items.map((it, idx) => ({
+        numero: idx + 1,
+        descripcion: it.descripcion || `Abono mensual – ${mesLabel}`,
+        um: it.um || 'MES',
+        cantidad: parseFloat(it.cantidad) || 1,
+        importe_unitario: parseMonto(it.importe_unitario),
+        importe_total: parseMonto(it.importe_total) || (parseFloat(it.cantidad) || 1) * parseMonto(it.importe_unitario),
+      }))
+    : [{
+        numero: 1,
+        descripcion: `Abono mensual de mantenimiento – ${mesLabel}`,
+        um: 'MES',
+        cantidad: 1,
+        importe_unitario: montoMensual,
+        importe_total: montoMensual,
+      }];
+
+  const subtotalReal = certItems.reduce((acc, it) => acc + (it.importe_total || 0), 0) || montoMensual;
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const newCert = {
+    numero,
+    tipo: 'abono_mensual',
+    estado: 'emitido',
+    generado_automaticamente: true,
+    contratista: abono.contratista,
+    contratista_id: abono.created_by_id || '',
+    emprendimiento: abono.emprendimiento || '',
+    obra_servicio: abono.obra_servicio || '',
+    ada_numero: abono.ada_numero || '',
+    oc_numero: abono.oc_numero || '',
+    mes_periodo: mesFormato,
+    fecha_certificado: todayStr,
+    fecha_inicio: abono.fecha_inicio_validez || '',
+    plazo_obra: abono.plazo_obra || 'Mensual',
+    plazo_entrega: abono.plazo_entrega || '',
+    condiciones_pago: abono.condiciones_pago || '',
+    monto_contratado: montoTotalContrato,
+    subtotal: subtotalReal,
+    anticipo_pct: abono.anticipo_pct || 0,
+    fondo_reparo_pct: abono.fondo_reparo_pct || 0,
+    items: certItems,
+    numero_en_contrato: numeroEnContrato,
+    duracion_meses_total: duracionMeses,
+  };
+
+  try {
+    const pdfBuffer = await generateCertificatePDF(newCert, logoBase64);
+    const uploadRes = await base44.integrations.Core.UploadFile({ file: pdfBuffer });
+    newCert.pdf_url = uploadRes.file_url;
+  } catch (e) {
+    console.log('PDF error:', e.message);
+  }
+
+  const created = await base44.asServiceRole.entities.Certificado.create(newCert);
+
+  return {
+    generated: true,
+    nextNum: numero,
+    id: created.id,
+    numero,
+    numero_en_contrato: numeroEnContrato,
+    mes: mesLabel,
+    monto: subtotalReal,
+    pdf_url: newCert.pdf_url,
+  };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-
     if (user?.role !== 'admin') {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));
-    const { abono_id, regenerar = false } = body;
+    const { abono_id, regenerar = false, modo } = body;
 
+    // ════════════════════════════════════════════════════════════════════
+    // MODO MENSUAL: Generar el certificado del mes para TODOS los abonos activos
+    // ════════════════════════════════════════════════════════════════════
+    if (modo === 'mensual_todos') {
+      const abonos = await base44.asServiceRole.entities.AbonoMaestro.filter({ estado: 'activo' });
+      const logoBase64 = await loadLogoBase64();
+
+      // Obtener ultimo numero de certificado global (auto-incremental)
+      const lastCerts = await base44.asServiceRole.entities.Certificado.filter({}, '-numero', 1);
+      let currentNum = lastCerts.length > 0 ? (lastCerts[0].numero || 0) : 0;
+
+      const results = [];
+      let totalGenerated = 0;
+      let totalSkipped = 0;
+
+      for (const abono of abonos) {
+        const duracionMeses = Math.max(parseInt(abono.duracion_meses) || 1, 1);
+
+        // Contar certificados ya generados para este abono
+        const existingCerts = await base44.asServiceRole.entities.Certificado.filter({
+          ada_numero: abono.ada_numero || '',
+          tipo: 'abono_mensual',
+          generado_automaticamente: true,
+        });
+        const monthIndex = existingCerts.length;
+
+        // Si ya se completaron todos los meses del contrato
+        if (monthIndex >= duracionMeses) {
+          await base44.asServiceRole.entities.AbonoMaestro.update(abono.id, {
+            estado: 'completado',
+            lote_generado: true,
+            certificados_emitidos: monthIndex,
+          });
+          results.push({ contratista: abono.contratista, skipped: true, reason: 'Contrato completado', mes: '—' });
+          totalSkipped++;
+          continue;
+        }
+
+        try {
+          const res = await generateOneCertificate(base44, abono, monthIndex, logoBase64, currentNum);
+          currentNum = res.nextNum;
+          totalGenerated++;
+
+          // Actualizar el abono
+          const newCount = monthIndex + 1;
+          const completado = newCount >= duracionMeses;
+          await base44.asServiceRole.entities.AbonoMaestro.update(abono.id, {
+            certificados_emitidos: newCount,
+            lote_generado: true,
+            estado: completado ? 'completado' : 'activo',
+          });
+
+          results.push({
+            contratista: abono.contratista,
+            generated: true,
+            numero: res.numero,
+            mes: res.mes,
+            monto: res.monto,
+            pdf_url: res.pdf_url,
+          });
+        } catch (e) {
+          results.push({ contratista: abono.contratista, error: e.message });
+          totalSkipped++;
+        }
+      }
+
+      return Response.json({
+        success: true,
+        message: `Generación mensual: ${totalGenerated} certificados generados, ${totalSkipped} omitidos`,
+        total_abonos: abonos.length,
+        generated: totalGenerated,
+        skipped: totalSkipped,
+        results,
+      });
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // MODO LOTE: Generar todos los certificados de un abono (existente)
+    // ════════════════════════════════════════════════════════════════════
     if (!abono_id) {
       return Response.json({ error: 'abono_id es requerido' }, { status: 400 });
     }
@@ -262,132 +449,51 @@ Deno.serve(async (req) => {
     }
 
     const duracionMeses = Math.max(parseInt(abono.duracion_meses) || 1, 1);
-    const montoTotalContrato = parseMonto(abono.monto_total_contrato);
-    const montoMensual = parseMonto(abono.monto_mensual) || (montoTotalContrato / duracionMeses);
+    const { inicioYear, inicioMonth } = resolveInicioMes(abono);
 
-    // Calcular fecha de inicio (primer dia del mes siguiente a la OC)
-    let inicioYear, inicioMonth;
-    if (abono.fecha_inicio_validez) {
-      [inicioYear, inicioMonth] = abono.fecha_inicio_validez.split('-').map(Number);
-    } else if (abono.fecha_oc_emision) {
-      const [y, m] = abono.fecha_oc_emision.split('-').map(Number);
-      inicioMonth = m + 1; inicioYear = y;
-      if (inicioMonth > 12) { inicioMonth = 1; inicioYear++; }
-    } else {
-      const now = new Date();
-      inicioMonth = now.getMonth() + 2; inicioYear = now.getFullYear();
-      if (inicioMonth > 12) { inicioMonth = 1; inicioYear++; }
-    }
-
-    // Obtener ultimo numero de certificado global
-    const lastCerts = await base44.asServiceRole.entities.Certificado.filter({}, '-numero', 1);
-    let lastGlobalNum = lastCerts.length > 0 ? (lastCerts[0].numero || 0) : 0;
-
-    // Verificar certificados existentes para idempotencia
     const existingCerts = await base44.asServiceRole.entities.Certificado.filter({
       ada_numero: abono.ada_numero || '',
       tipo: 'abono_mensual',
     });
     const existingMeses = new Set(existingCerts.map(c => c.mes_periodo));
 
-    // Si regenerar, eliminar certificados previos del lote
     if (regenerar && existingCerts.length > 0) {
       for (const c of existingCerts) {
         if (c.generado_automaticamente) {
           await base44.asServiceRole.entities.Certificado.delete(c.id);
         }
       }
+      existingMeses.clear();
     }
 
-    // Precargar logo una sola vez
     const logoBase64 = await loadLogoBase64();
+
+    const lastCerts = await base44.asServiceRole.entities.Certificado.filter({}, '-numero', 1);
+    let currentNum = lastCerts.length > 0 ? (lastCerts[0].numero || 0) : 0;
 
     const generated = [];
     const skipped = [];
-    const todayStr = new Date().toISOString().split('T')[0];
 
     for (let i = 0; i < duracionMeses; i++) {
-      let certMonth = inicioMonth + i;
-      let certYear = inicioYear;
-      while (certMonth > 12) { certMonth -= 12; certYear++; }
-      const mesFormato = `${certYear}-${String(certMonth).padStart(2, '0')}`;
-      const mesLabel = `${MESES_ES[certMonth - 1]} ${certYear}`;
+      const { mesFormato, mesLabel } = calcMesLabel(inicioYear, inicioMonth, i);
 
-      if (existingMeses.has(mesFormato) && !regenerar) {
+      if (existingMeses.has(mesFormato)) {
         skipped.push({ mes: mesLabel, reason: 'Ya existe' });
         continue;
       }
 
-      lastGlobalNum++;
-      const numeroEnContrato = i + 1;
-
-      const certItems = abono.items?.length
-        ? abono.items.map((it, idx) => ({
-            numero: idx + 1,
-            descripcion: it.descripcion || `Abono mensual – ${mesLabel}`,
-            um: it.um || 'MES',
-            cantidad: parseFloat(it.cantidad) || 1,
-            importe_unitario: parseMonto(it.importe_unitario),
-            importe_total: parseMonto(it.importe_total) || (parseFloat(it.cantidad) || 1) * parseMonto(it.importe_unitario),
-          }))
-        : [{
-            numero: 1,
-            descripcion: `Abono mensual de mantenimiento – ${mesLabel}`,
-            um: 'MES',
-            cantidad: 1,
-            importe_unitario: montoMensual,
-            importe_total: montoMensual,
-          }];
-
-      const subtotalReal = certItems.reduce((acc, it) => acc + (it.importe_total || 0), 0) || montoMensual;
-
-      const newCert = {
-        numero: lastGlobalNum,
-        tipo: 'abono_mensual',
-        estado: 'emitido',
-        generado_automaticamente: true,
-        contratista: abono.contratista,
-        contratista_id: abono.created_by_id || '',
-        emprendimiento: abono.emprendimiento || '',
-        obra_servicio: abono.obra_servicio || '',
-        ada_numero: abono.ada_numero || '',
-        oc_numero: abono.oc_numero || '',
-        mes_periodo: mesFormato,
-        fecha_certificado: todayStr,
-        fecha_inicio: abono.fecha_inicio_validez || '',
-        plazo_obra: abono.plazo_obra || 'Mensual',
-        plazo_entrega: abono.plazo_entrega || '',
-        condiciones_pago: abono.condiciones_pago || '',
-        monto_contratado: montoTotalContrato,
-        subtotal: subtotalReal,
-        anticipo_pct: abono.anticipo_pct || 0,
-        fondo_reparo_pct: abono.fondo_reparo_pct || 0,
-        items: certItems,
-        numero_en_contrato: numeroEnContrato,
-        duracion_meses_total: abono.duracion_meses,
-      };
-
-      // Generar y subir PDF
-      try {
-        const pdfBuffer = await generateCertificatePDF(newCert, logoBase64);
-        const uploadRes = await base44.integrations.Core.UploadFile({ file: pdfBuffer });
-        newCert.pdf_url = uploadRes.file_url;
-      } catch (e) {
-        console.log('PDF error:', e.message);
-      }
-
-      const created = await base44.asServiceRole.entities.Certificado.create(newCert);
+      const res = await generateOneCertificate(base44, abono, i, logoBase64, currentNum);
+      currentNum = res.nextNum;
       generated.push({
-        id: created.id,
-        numero: lastGlobalNum,
-        numero_en_contrato: numeroEnContrato,
-        mes: mesLabel,
-        monto: subtotalReal,
-        pdf_url: newCert.pdf_url,
+        id: res.id,
+        numero: res.numero,
+        numero_en_contrato: res.numero_en_contrato,
+        mes: res.mes,
+        monto: res.monto,
+        pdf_url: res.pdf_url,
       });
     }
 
-    // Actualizar el abono maestro
     await base44.asServiceRole.entities.AbonoMaestro.update(abono_id, {
       lote_generado: true,
       certificados_emitidos: generated.length,

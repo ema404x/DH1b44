@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  Plus, Loader2, DollarSign, ArrowLeft, Upload, Sparkles, FolderOpen
+  Plus, Loader2, DollarSign, ArrowLeft, Upload, Sparkles, FolderOpen, Zap, CheckCircle2, FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { parseMonto, fmt, calcularFechas, EMPTY_FORM, getRubroConfig } from './abonoUtils';
@@ -22,6 +22,8 @@ export default function AbonoMaestroPanel() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [search, setSearch] = useState('');
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [generatingMensual, setGeneratingMensual] = useState(false);
+  const [mensualResult, setMensualResult] = useState(null);
   const fileRef = useRef(null);
   const qc = useQueryClient();
 
@@ -170,6 +172,34 @@ export default function AbonoMaestroPanel() {
     setShowForm(true);
   };
 
+  // Generar el certificado del mes para TODOS los abonos activos
+  const handleGenerarMensual = async () => {
+    const activos = abonos.filter(a => a.estado === 'activo');
+    if (activos.length === 0) {
+      toast.info('No hay abonos activos para generar');
+      return;
+    }
+    if (!window.confirm(`¿Generar el certificado del mes para ${activos.length} abono(s) activo(s)?\n\nSe creará un certificado por cada abono, con numeración automática.`)) return;
+    setGeneratingMensual(true);
+    setMensualResult(null);
+    try {
+      const res = await base44.functions.invoke('generarLoteAbonos', { modo: 'mensual_todos' });
+      const data = res.data;
+      if (data.success) {
+        setMensualResult(data);
+        toast.success(`${data.generated} certificado(s) generado(s)`);
+        qc.invalidateQueries({ queryKey: ['abonos-maestro'] });
+        qc.invalidateQueries({ queryKey: ['certificados'] });
+      } else {
+        toast.error(data.error || 'Error en la generación');
+      }
+    } catch (e) {
+      toast.error('Error: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setGeneratingMensual(false);
+    }
+  };
+
   const rubroCfg = selectedRubro ? getRubroConfig(selectedRubro) : null;
   const RubroIcon = rubroCfg?.Icon;
 
@@ -185,9 +215,19 @@ export default function AbonoMaestroPanel() {
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">Seleccioná un rubro para gestionar sus abonos o cargar un ADA/OC</p>
           </div>
-          <Button onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); }} className="gap-2 h-8 text-xs">
-            <Plus className="h-3.5 w-3.5" /> Nuevo Abono
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              onClick={handleGenerarMensual}
+              disabled={generatingMensual || isLoading || abonos.filter(a => a.estado === 'activo').length === 0}
+              className="gap-2 h-8 text-xs bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg"
+            >
+              {generatingMensual ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+              {generatingMensual ? 'Generando...' : 'Generar Certificados del Mes'}
+            </Button>
+            <Button onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(true); }} variant="outline" className="gap-2 h-8 text-xs">
+              <Plus className="h-3.5 w-3.5" /> Nuevo Abono
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -214,6 +254,57 @@ export default function AbonoMaestroPanel() {
               onCancel={() => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); }}
               isSaving={saveMutation.isPending}
             />
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de resultado de generación mensual */}
+        <Dialog open={!!mensualResult} onOpenChange={(o) => { if (!o) setMensualResult(null); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                Certificados del Mes Generados
+              </DialogTitle>
+            </DialogHeader>
+            {mensualResult && (
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <div className="flex-1 bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-emerald-400">{mensualResult.generated}</p>
+                    <p className="text-xs text-muted-foreground">Generados</p>
+                  </div>
+                  <div className="flex-1 bg-muted/40 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-muted-foreground">{mensualResult.skipped}</p>
+                    <p className="text-xs text-muted-foreground">Omitidos</p>
+                  </div>
+                </div>
+                <div className="max-h-64 overflow-y-auto space-y-1.5">
+                  {mensualResult.results?.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold truncate">{r.contratista}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {r.generated ? `N° ${r.numero} · ${r.mes}` : (r.reason || r.error || 'Omitido')}
+                        </p>
+                      </div>
+                      {r.generated ? (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs font-bold text-emerald-400">{fmt(r.monto)}</span>
+                          {r.pdf_url && (
+                            <a href={r.pdf_url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                              <FileText className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground shrink-0">—</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <Button onClick={() => setMensualResult(null)} className="w-full">Cerrar</Button>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
