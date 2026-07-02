@@ -12,7 +12,7 @@ import {
   Mic, MicOff, Camera, CheckCircle2, Loader2, MapPin,
   ClipboardList, Zap, X, QrCode, Plus, Trash2, ChevronRight,
   ChevronLeft, Clock, Package, Wrench, AlertTriangle,
-  Layers, ArrowLeft, Search
+  Layers, ArrowLeft, Search, User
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import QRCodeModal from '@/components/shared/QRCodeModal';
@@ -116,6 +116,8 @@ export default function CrearOT() {
   const [requirePhotos, setRequirePhotos] = useState(false);
   const [autoJefeSitio, setAutoJefeSitio] = useState('');
   const [modoGuardado, setModoGuardado] = useState('ot'); // 'ot' | 'futura_obra'
+  const [assignedName, setAssignedName] = useState('');
+  const [assignMode, setAssignMode] = useState('lista'); // 'lista' | 'texto'
 
   // Detectar si es trabajo eléctrico
   const [dismissedReglasOro, setDismissedReglasOro] = useState(false);
@@ -215,6 +217,17 @@ export default function CrearOT() {
     queryFn: () => base44.entities.Direccion.list('direccion', 2000),
     staleTime: 300000,
   });
+
+  // Empleados activos para asignación responsable
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees-ot-assign'],
+    queryFn: () => base44.entities.Employee.list('full_name', 500),
+    staleTime: 300000,
+  });
+  const activeEmployees = useMemo(
+    () => employees.filter(e => e.status === 'activo' || !e.status).sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '')),
+    [employees]
+  );
 
   // ── Mutation ─────────────────────────────────────────────────────────────────
 
@@ -410,12 +423,13 @@ export default function CrearOT() {
         fecha_limite: scheduledDate || undefined,
       });
     } else {
+      const responsable = assignedName.trim() || autoJefeSitio || '';
       createMutation.mutate({
         title: title.trim(),
         type,
         priority,
         description,
-        status: autoJefeSitio ? 'asignada' : 'pendiente',
+        status: responsable ? 'asignada' : 'pendiente',
         scheduled_date: scheduledDate || undefined,
         materials_used: materials.filter(m => m.material_name.trim()),
         require_photos: requirePhotos,
@@ -424,7 +438,7 @@ export default function CrearOT() {
         location_qr_name: selectedLocation?.name || '',
         location: locationLabel,
         project_name: selectedLocation?.project_name || '',
-        assigned_name: autoJefeSitio || undefined,
+        assigned_name: responsable || undefined,
       });
     }
   };
@@ -449,6 +463,8 @@ export default function CrearOT() {
     setAutoJefeSitio('');
     setDismissedReglasOro(false);
     setModoGuardado('ot');
+    setAssignedName('');
+    setAssignMode('lista');
   };
 
   // ── Validaciones por paso ────────────────────────────────────────────────────
@@ -839,6 +855,70 @@ export default function CrearOT() {
               />
             </FieldGroup>
 
+            {/* Persona a cargo del trabajo */}
+            <FieldGroup label="Persona a cargo">
+              <div className="rounded-xl border border-border bg-card p-1 flex gap-1 mb-2">
+                <button
+                  onClick={() => setAssignMode('lista')}
+                  className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                    assignMode === 'lista' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <User className="h-3.5 w-3.5" /> Seleccionar
+                </button>
+                <button
+                  onClick={() => setAssignMode('texto')}
+                  className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
+                    assignMode === 'texto' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Escribir nombre
+                </button>
+              </div>
+
+              {assignMode === 'lista' ? (
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <select
+                    value={assignedName}
+                    onChange={e => setAssignedName(e.target.value)}
+                    className="w-full h-11 rounded-xl bg-card border border-border text-foreground text-sm pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
+                  >
+                    <option value="">Sin asignar...</option>
+                    {activeEmployees.map(emp => (
+                      <option key={emp.id} value={emp.full_name}>
+                        {emp.full_name}{emp.specialty && emp.specialty !== 'general' ? ` — ${emp.specialty}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    value={assignedName}
+                    onChange={e => setAssignedName(e.target.value)}
+                    placeholder="Nombre de la persona responsable..."
+                    className="bg-card border-border text-foreground h-11 pl-9"
+                  />
+                  {assignedName && (
+                    <button
+                      onClick={() => setAssignedName('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              )}
+              {autoJefeSitio && !assignedName && (
+                <p className="text-xs text-amber-400/80 mt-1.5 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                  Si no asignás una persona, se usará el jefe de sitio: {autoJefeSitio}
+                </p>
+              )}
+            </FieldGroup>
+
             {/* Materiales */}
             <FieldGroup
               label="Materiales necesarios"
@@ -899,7 +979,8 @@ export default function CrearOT() {
               <SummaryRow label="Tipo" value={TYPES.find(t => t.value === type)?.label} />
               <SummaryRow label="Prioridad" value={priority.charAt(0).toUpperCase() + priority.slice(1)} />
               {selectedLocation && <SummaryRow label="Establecimiento" value={selectedLocation.name} />}
-              {autoJefeSitio && <SummaryRow label="Jefe de sitio (auto)" value={autoJefeSitio} />}
+              {assignedName && <SummaryRow label="Persona a cargo" value={assignedName} />}
+              {autoJefeSitio && !assignedName && <SummaryRow label="Jefe de sitio (auto)" value={autoJefeSitio} />}
               {scheduledDate && <SummaryRow label="Fecha programada" value={scheduledDate} />}
               {materials.filter(m => m.material_name.trim()).length > 0 && (
                 <SummaryRow label="Materiales" value={`${materials.filter(m => m.material_name.trim()).length} ítem(s)`} />
