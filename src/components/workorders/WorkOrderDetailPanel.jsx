@@ -7,7 +7,7 @@ import {
   X, Save, Loader2, MapPin, CheckSquare, Camera, Package,
   Download, AlertTriangle, Navigation, Layers, ClipboardX,
   User, RefreshCw, QrCode, FileText, Calendar, ChevronDown,
-  CheckCircle2, Circle, Zap, Wrench,
+  CheckCircle2, Circle, Zap, Wrench, Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DeleteWorkOrderButton from './DeleteWorkOrderButton';
@@ -104,6 +104,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [qrOpen, setQrOpen] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [convertingToObra, setConvertingToObra] = useState(false);
+  const [assignMode, setAssignMode] = useState('list');
   const queryClient = useQueryClient();
 
   const { data: freshOrder, isLoading: loadingFresh, refetch } = useQuery({
@@ -368,18 +369,34 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
               )}
             </div>
             <div>
-              <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Asignado</p>
-              <Select value={data.assigned_name || '__none__'} onValueChange={v => saveField('assigned_name', v === '__none__' ? '' : v)}>
-                <SelectTrigger className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg">
-                  <SelectValue placeholder="—" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__" className="text-xs">Sin asignar</SelectItem>
-                  {activeEmployees.map(e => (
-                    <SelectItem key={e.id} value={e.full_name} className="text-xs">{e.full_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">
+                Responsable
+                <button onClick={() => setAssignMode(assignMode === 'list' ? 'text' : 'list')}
+                  className="ml-1 text-slate-500 hover:text-white inline-flex">
+                  {assignMode === 'list' ? <Pencil className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />}
+                </button>
+              </p>
+              {assignMode === 'list' ? (
+                <Select value={data.assigned_name || '__none__'} onValueChange={v => {
+                  if (v === '__none__') { saveFields({ assigned_name: '', assigned_to: '' }); return; }
+                  const emp = activeEmployees.find(e => e.full_name === v);
+                  saveFields({ assigned_name: v, assigned_to: emp?.id || '' });
+                }}>
+                  <SelectTrigger className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg">
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__" className="text-xs">Sin asignar</SelectItem>
+                    {activeEmployees.map(e => (
+                      <SelectItem key={e.id} value={e.full_name} className="text-xs">{e.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={data.assigned_name || ''} placeholder="Nombre del responsable…"
+                  onChange={e => saveFields({ assigned_name: e.target.value, assigned_to: '' })}
+                  className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg px-2" />
+              )}
             </div>
             <div>
               <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Fecha</p>
