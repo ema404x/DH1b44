@@ -13,6 +13,7 @@ import { parseMonto, fmt, calcularFechas, EMPTY_FORM, getRubroConfig } from './a
 import AbonoMaestroCard from './AbonoMaestroCard';
 import AbonoMaestroForm from './AbonoMaestroForm';
 import AbonoRubrosGrid from './AbonoRubrosGrid';
+import GeneracionMensualConfig from './GeneracionMensualConfig';
 
 export default function AbonoMaestroPanel() {
   const [view, setView] = useState('folders'); // 'folders' | 'rubro'
@@ -24,6 +25,7 @@ export default function AbonoMaestroPanel() {
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [generatingMensual, setGeneratingMensual] = useState(false);
   const [mensualResult, setMensualResult] = useState(null);
+  const [showMensualConfig, setShowMensualConfig] = useState(false);
   const fileRef = useRef(null);
   const qc = useQueryClient();
 
@@ -172,18 +174,13 @@ export default function AbonoMaestroPanel() {
     setShowForm(true);
   };
 
-  // Generar el certificado del mes para TODOS los abonos activos
-  const handleGenerarMensual = async () => {
-    const activos = abonos.filter(a => a.estado === 'activo');
-    if (activos.length === 0) {
-      toast.info('No hay abonos activos para generar');
-      return;
-    }
-    if (!window.confirm(`¿Generar el certificado del mes para ${activos.length} abono(s) activo(s)?\n\nSe creará un certificado por cada abono, con numeración automática.`)) return;
+  // Generar certificados del mes con configuración personalizable
+  const handleGenerarMensual = async (params) => {
     setGeneratingMensual(true);
     setMensualResult(null);
+    setShowMensualConfig(false);
     try {
-      const res = await base44.functions.invoke('generarLoteAbonos', { modo: 'mensual_todos' });
+      const res = await base44.functions.invoke('generarLoteAbonos', params);
       const data = res.data;
       if (data.success) {
         setMensualResult(data);
@@ -217,8 +214,8 @@ export default function AbonoMaestroPanel() {
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button
-              onClick={handleGenerarMensual}
-              disabled={generatingMensual || isLoading || abonos.filter(a => a.estado === 'activo').length === 0}
+              onClick={() => setShowMensualConfig(true)}
+              disabled={isLoading || abonos.filter(a => a.estado === 'activo').length === 0}
               className="gap-2 h-8 text-xs bg-gradient-to-r from-emerald-500 to-teal-600 hover:shadow-lg"
             >
               {generatingMensual ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
@@ -307,6 +304,15 @@ export default function AbonoMaestroPanel() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Dialog de configuración de generación mensual */}
+        <GeneracionMensualConfig
+          open={showMensualConfig}
+          onClose={() => setShowMensualConfig(false)}
+          abonos={abonos}
+          onGenerate={handleGenerarMensual}
+          generating={generatingMensual}
+        />
       </div>
     );
   }
