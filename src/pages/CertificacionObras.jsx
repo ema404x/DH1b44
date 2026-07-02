@@ -18,6 +18,7 @@ import CicloSelector from '@/components/certificacion/CicloSelector';
 import { exportarComunaPDF, exportarFiltradoPDF } from '@/components/certificacion/ExportarComunaPDF';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuth } from '@/lib/AuthContext';
+import { toast } from 'sonner';
 
 const ESTADO_CONFIG = {
   listo_certificar:    { label: 'Listo para Certificar',   color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
@@ -50,7 +51,10 @@ export default function CertificacionObras() {
 
   const { data: todasObras = [], isLoading } = useQuery({
     queryKey: ['obras-certificacion'],
-    queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 1000),
+    queryFn: async () => {
+      const res = await base44.functions.invoke('gestionarObrasCertificacion', { action: 'list' });
+      return res.data.obras || [];
+    },
   });
 
   // Obras del ciclo activo (no archivadas)
@@ -74,19 +78,23 @@ export default function CertificacionObras() {
   const esArchivado = cicloVista !== 'activo';
 
   const saveMutation = useMutation({
-    mutationFn: (data) => data.id
-      ? base44.entities.ObraCertificacion.update(data.id, data)
-      : base44.entities.ObraCertificacion.create(data),
+    mutationFn: (data) => base44.functions.invoke('gestionarObrasCertificacion', {
+      action: data.id ? 'update' : 'create',
+      id: data.id,
+      data,
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['obras-certificacion'] });
       setDialogOpen(false);
       setSelected(null);
     },
+    onError: (err) => toast.error(err?.response?.data?.error || 'No se pudo guardar la obra'),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.ObraCertificacion.delete(id),
+    mutationFn: (id) => base44.functions.invoke('gestionarObrasCertificacion', { action: 'delete', id }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['obras-certificacion'] }),
+    onError: (err) => toast.error(err?.response?.data?.error || 'No se pudo eliminar la obra'),
   });
 
   const handleNew = () => { setSelected(null); setDialogOpen(true); };
