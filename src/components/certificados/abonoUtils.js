@@ -56,8 +56,11 @@ export const mesPeriodoLabel = (dateStr) => {
   return `${MESES_ES[m - 1]} ${y}`;
 };
 
+export const COMUNAS = ['8A', '8B', '10A'];
+
 export const EMPTY_FORM = {
   rubro: 'CORTE_DE_PASTO',
+  comuna: '8A',
   contratista: '', oc_numero: '', ada_numero: '', obra_servicio: '',
   emprendimiento: '', monto_total_contrato: '', fecha_oc_emision: '',
   duracion_meses: '', plazo_obra: '', condiciones_pago: '',

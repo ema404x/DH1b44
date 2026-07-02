@@ -367,7 +367,7 @@ Deno.serve(async (req) => {
     // MODO MENSUAL: Generar el certificado del mes para TODOS los abonos activos
     // ════════════════════════════════════════════════════════════════════
     if (modo === 'mensual_todos') {
-      const { rubros, abono_ids, mes_target, regenerar = false, skip_completed = true } = body;
+      const { rubros, abono_ids, mes_target, regenerar = false, skip_completed = true, comunas } = body;
 
       // Construir lista de abonos según configuración
       let abonos;
@@ -384,6 +384,11 @@ Deno.serve(async (req) => {
         if (rubros?.length) {
           abonos = abonos.filter(a => rubros.includes(a.rubro));
         }
+      }
+
+      // Filtrar por comuna
+      if (comunas?.length) {
+        abonos = abonos.filter(a => comunas.includes(a.comuna));
       }
 
       // Omitir contratos completados
@@ -412,7 +417,7 @@ Deno.serve(async (req) => {
           const [tY, tM] = mes_target.split('-').map(Number);
           monthIndex = (tY - inicioYear) * 12 + (tM - inicioMonth);
           if (monthIndex < 0 || monthIndex >= duracionMeses) {
-            results.push({ contratista: abono.contratista, skipped: true, reason: 'Mes fuera del contrato', mes: mes_target });
+            results.push({ contratista: abono.contratista, comuna: abono.comuna || '—', skipped: true, reason: 'Mes fuera del contrato', mes: mes_target });
             totalSkipped++;
             continue;
           }
@@ -433,7 +438,7 @@ Deno.serve(async (req) => {
               lote_generado: true,
               certificados_emitidos: monthIndex,
             });
-            results.push({ contratista: abono.contratista, skipped: true, reason: 'Contrato completado', mes: '—' });
+            results.push({ contratista: abono.contratista, comuna: abono.comuna || '—', skipped: true, reason: 'Contrato completado', mes: '—' });
             totalSkipped++;
             continue;
           }
@@ -451,7 +456,7 @@ Deno.serve(async (req) => {
         });
 
         if (existingForMonth.length > 0 && !regenerar) {
-          results.push({ contratista: abono.contratista, skipped: true, reason: 'Ya existe para ' + mesLabel, mes: mesLabel });
+          results.push({ contratista: abono.contratista, comuna: abono.comuna || '—', skipped: true, reason: 'Ya existe para ' + mesLabel, mes: mesLabel });
           totalSkipped++;
           continue;
         }
@@ -487,6 +492,7 @@ Deno.serve(async (req) => {
 
           results.push({
             contratista: abono.contratista,
+            comuna: abono.comuna || '—',
             generated: true,
             numero: res.numero,
             mes: mesLabel,
@@ -494,7 +500,7 @@ Deno.serve(async (req) => {
             pdf_url: res.pdf_url,
           });
         } catch (e) {
-          results.push({ contratista: abono.contratista, error: e.message });
+          results.push({ contratista: abono.contratista, comuna: abono.comuna || '—', error: e.message });
           totalSkipped++;
         }
       }

@@ -101,6 +101,7 @@ export default function AbonoMaestroPanel() {
     setEditingId(abono.id);
     setForm({
       rubro: abono.rubro || 'OTROS',
+      comuna: abono.comuna || '8A',
       contratista: abono.contratista || '',
       oc_numero: abono.oc_numero || '',
       ada_numero: abono.ada_numero || '',
@@ -275,29 +276,55 @@ export default function AbonoMaestroPanel() {
                     <p className="text-xs text-muted-foreground">Omitidos</p>
                   </div>
                 </div>
-                <div className="max-h-64 overflow-y-auto space-y-1.5">
-                  {mensualResult.results?.map((r, i) => (
-                    <div key={i} className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold truncate">{r.contratista}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {r.generated ? `N° ${r.numero} · ${r.mes}` : (r.reason || r.error || 'Omitido')}
-                        </p>
-                      </div>
-                      {r.generated ? (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs font-bold text-emerald-400">{fmt(r.monto)}</span>
-                          {r.pdf_url && (
-                            <a href={r.pdf_url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                              <FileText className="h-3.5 w-3.5" />
-                            </a>
-                          )}
+                <div className="max-h-64 overflow-y-auto space-y-3">
+                  {(() => {
+                    const groups = {};
+                    (mensualResult.results || []).forEach(r => {
+                      const c = r.comuna || '—';
+                      if (!groups[c]) groups[c] = [];
+                      groups[c].push(r);
+                    });
+                    const comunaOrder = ['8A', '8B', '10A', '—'];
+                    return comunaOrder.filter(c => groups[c]).map(comuna => {
+                      const items = groups[comuna];
+                      const subTotal = items.filter(r => r.generated).reduce((acc, r) => acc + parseMonto(r.monto), 0);
+                      return (
+                        <div key={comuna}>
+                          <div className="flex items-center justify-between px-1 mb-1.5">
+                            <span className="text-[11px] font-bold text-indigo-300 flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                              Comuna {comuna}
+                            </span>
+                            <span className="text-[11px] font-semibold text-muted-foreground">{fmt(subTotal)}</span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {items.map((r, i) => (
+                              <div key={i} className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-semibold truncate">{r.contratista}</p>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {r.generated ? `N° ${r.numero} · ${r.mes}` : (r.reason || r.error || 'Omitido')}
+                                  </p>
+                                </div>
+                                {r.generated ? (
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-xs font-bold text-emerald-400">{fmt(r.monto)}</span>
+                                    {r.pdf_url && (
+                                      <a href={r.pdf_url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                                        <FileText className="h-3.5 w-3.5" />
+                                      </a>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground shrink-0">—</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground shrink-0">—</span>
-                      )}
-                    </div>
-                  ))}
+                      );
+                    });
+                  })()}
                 </div>
                 <Button onClick={() => setMensualResult(null)} className="w-full">Cerrar</Button>
               </div>

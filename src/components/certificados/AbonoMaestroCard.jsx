@@ -120,6 +120,11 @@ export default function AbonoMaestroCard({ abono, onEdit, onDelete }) {
               OC {abono.oc_numero}
             </span>
           )}
+          {abono.comuna && (
+            <span className="text-[10px] bg-indigo-500/15 text-indigo-300 px-2 py-0.5 rounded-full font-semibold border border-indigo-500/30">
+              Comuna {abono.comuna}
+            </span>
+          )}
           {abono.emprendimiento && (
             <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
               {abono.emprendimiento}

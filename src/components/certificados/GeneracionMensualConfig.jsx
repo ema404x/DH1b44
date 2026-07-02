@@ -2,8 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Zap, Loader2, Calendar, Layers, Settings, AlertCircle } from 'lucide-react';
-import { RUBRO_PRESETS, getRubroConfig, parseMonto, fmt, MESES_ES } from './abonoUtils';
+import { Zap, Loader2, Calendar, Layers, Settings, AlertCircle, MapPin } from 'lucide-react';
+import { RUBRO_PRESETS, getRubroConfig, parseMonto, fmt, MESES_ES, COMUNAS } from './abonoUtils';
 
 const MODO_SELECCION = { TODOS: 'todos', POR_RUBRO: 'rubro', MANUAL: 'manual' };
 const MODO_MES = { AUTO: 'auto', ESPECIFICO: 'especifico' };
@@ -58,6 +58,7 @@ export default function GeneracionMensualConfig({ open, onClose, abonos, onGener
   const [modoSeleccion, setModoSeleccion] = useState(MODO_SELECCION.TODOS);
   const [rubrosSel, setRubrosSel] = useState([]);
   const [abonosSel, setAbonosSel] = useState([]);
+  const [comunasSel, setComunasSel] = useState([]);
   const [modoMes, setModoMes] = useState(MODO_MES.AUTO);
   const [mesTarget, setMesTarget] = useState('');
   const [regenerar, setRegenerar] = useState(false);
@@ -70,6 +71,7 @@ export default function GeneracionMensualConfig({ open, onClose, abonos, onGener
       setModoSeleccion(MODO_SELECCION.TODOS);
       setRubrosSel([]);
       setAbonosSel([]);
+      setComunasSel([]);
       setModoMes(MODO_MES.AUTO);
       setMesTarget(mesesOptions[0]?.value || '');
       setRegenerar(false);
@@ -89,8 +91,11 @@ export default function GeneracionMensualConfig({ open, onClose, abonos, onGener
       if (abonosSel.length === 0) return [];
       list = list.filter(a => abonosSel.includes(a.id));
     }
+    if (comunasSel.length > 0) {
+      list = list.filter(a => comunasSel.includes(a.comuna || '8A'));
+    }
     return list;
-  }, [abonosActivos, modoSeleccion, rubrosSel, abonosSel]);
+  }, [abonosActivos, modoSeleccion, rubrosSel, abonosSel, comunasSel]);
 
   const totalMonto = useMemo(() => {
     return abonosFiltrados.reduce((acc, a) => acc + parseMonto(a.monto_mensual), 0);
@@ -104,6 +109,10 @@ export default function GeneracionMensualConfig({ open, onClose, abonos, onGener
     setAbonosSel(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);
   };
 
+  const toggleComuna = (val) => {
+    setComunasSel(prev => prev.includes(val) ? prev.filter(c => c !== val) : [...prev, val]);
+  };
+
   const handleGenerate = () => {
     const params = {
       modo: 'mensual_todos',
@@ -112,6 +121,7 @@ export default function GeneracionMensualConfig({ open, onClose, abonos, onGener
     };
     if (modoSeleccion === MODO_SELECCION.POR_RUBRO) params.rubros = rubrosSel;
     if (modoSeleccion === MODO_SELECCION.MANUAL) params.abono_ids = abonosSel;
+    if (comunasSel.length > 0) params.comunas = comunasSel;
     if (modoMes === MODO_MES.ESPECIFICO && mesTarget) params.mes_target = mesTarget;
     onGenerate(params);
   };
@@ -213,6 +223,47 @@ export default function GeneracionMensualConfig({ open, onClose, abonos, onGener
                 </div>
               )}
             </div>
+          </div>
+
+          {/* SECCIÓN 1.5: Filtro por comuna */}
+          <div>
+            <SectionTitle icon={MapPin}>Comuna</SectionTitle>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {COMUNAS.map(c => {
+                const checked = comunasSel.includes(c);
+                const count = abonosActivos.filter(a => (a.comuna || '8A') === c).length;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => toggleComuna(c)}
+                    className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition-all ${
+                      checked ? 'border-indigo-500/50 bg-indigo-500/10' : 'border-border hover:border-indigo-500/40'
+                    }`}
+                  >
+                    <Checkbox checked={checked} className="pointer-events-none" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-foreground">{c}</p>
+                      <p className="text-[10px] text-muted-foreground">{count} abono{count !== 1 ? 's' : ''}</p>
+                    </div>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setComunasSel([])}
+                className={`flex items-center justify-center gap-1.5 p-2.5 rounded-lg border text-center transition-all ${
+                  comunasSel.length === 0 ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                }`}
+              >
+                <p className="text-xs font-semibold text-foreground">Todas</p>
+              </button>
+            </div>
+            {comunasSel.length > 0 && (
+              <p className="text-[11px] text-muted-foreground mt-1.5 pl-1">
+                Filtrando por: {comunasSel.join(', ')}
+              </p>
+            )}
           </div>
 
           {/* SECCIÓN 2: Mes objetivo */}

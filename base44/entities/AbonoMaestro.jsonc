@@ -6,6 +6,15 @@
       "type": "string",
       "description": "Rubro/Carpeta al que pertenece el abono (EDUCACION, SALUD, etc.)"
     },
+    "comuna": {
+      "type": "string",
+      "enum": [
+        "8A",
+        "8B",
+        "10A"
+      ],
+      "description": "Comuna a la que pertenece el abono"
+    },
     "contratista": {
       "type": "string",
       "description": "Nombre del contratista"

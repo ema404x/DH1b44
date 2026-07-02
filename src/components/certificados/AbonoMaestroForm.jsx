@@ -166,6 +166,16 @@ export default function AbonoMaestroForm({ form, setForm, onSave, onCancel, isSa
             </SelectContent>
           </Select>
         </Field>
+        <Field label="Comuna">
+          <Select value={form.comuna || '8A'} onValueChange={v => set('comuna', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="8A">Comuna 8A</SelectItem>
+              <SelectItem value="8B">Comuna 8B</SelectItem>
+              <SelectItem value="10A">Comuna 10A</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
         <Field label="Estado">
           <Select value={form.estado} onValueChange={v => set('estado', v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
