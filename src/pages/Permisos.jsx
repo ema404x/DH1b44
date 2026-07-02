@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import React, { useState } from 'react';
 import DiagnosticoVinculacion from '@/components/permisos/DiagnosticoVinculacion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
-  Plus, Save, Trash2, Loader2, CheckCircle2, KeyRound, Eye, EyeOff,
+  Plus, Save, Trash2, Loader2, CheckCircle2, KeyRound,
   Shield, ChevronDown, ChevronUp, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import {
@@ -16,6 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { base44 } from '@/api/base44Client';
 
 const MODULES = [
   { key: 'Dashboard', label: 'Dashboard', group: 'General' },
@@ -74,67 +74,19 @@ const GROUP_COLORS = {
 };
 
 function ClaveOperarioPanel() {
-  const queryClient = useQueryClient();
-  const [clave, setClave] = useState('');
-  const [showClave, setShowClave] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const { data: configs = [] } = useQuery({
-    queryKey: ['operario_portal_config'],
-    queryFn: () => base44.entities.RolePermission.list(),
-  });
-
-  const existingConfig = configs.find(r => r.role_name === 'operario_portal');
-
-  useEffect(() => {
-    if (existingConfig) setClave(existingConfig.description || '');
-  }, [existingConfig?.id]);
-
-  const handleSave = async () => {
-    if (!clave.trim()) return;
-    setSaving(true);
-    if (existingConfig) {
-      await base44.entities.RolePermission.update(existingConfig.id, { description: clave.trim() });
-    } else {
-      await base44.entities.RolePermission.create({ role_name: 'operario_portal', description: clave.trim(), permissions: {}, is_active: true });
-    }
-    queryClient.invalidateQueries({ queryKey: ['operario_portal_config'] });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
   return (
-    <Card className="p-5 border-primary/20 bg-primary/5">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-          <KeyRound className="h-5 w-5 text-primary" />
+    <Card className="p-5 border-blue-500/20 bg-blue-500/5">
+      <div className="flex items-center gap-3">
+        <div className="h-9 w-9 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+          <KeyRound className="h-5 w-5 text-blue-400" />
         </div>
         <div>
-          <h3 className="font-semibold text-sm">Clave Global del Portal Operarios</h3>
-          <p className="text-xs text-muted-foreground">Clave requerida al escanear el QR de un establecimiento.</p>
+          <h3 className="font-semibold text-sm">Clave del Portal Operarios</h3>
+          <p className="text-xs text-muted-foreground">
+            La clave se gestiona como variable de entorno segura (OPERARIO_PASSWORD) y no puede modificarse desde aquí.
+            Contactá al administrador del sistema para cambiarla.
+          </p>
         </div>
-        {!existingConfig && (
-          <Badge className="ml-auto bg-amber-500/20 text-amber-400 border-amber-500/30">Sin configurar</Badge>
-        )}
-      </div>
-      <div className="flex gap-2 max-w-sm">
-        <div className="relative flex-1">
-          <Input
-            type={showClave ? 'text' : 'password'}
-            value={clave}
-            onChange={e => setClave(e.target.value)}
-            placeholder="Ingresá la clave..."
-            className="pr-10 h-9 text-sm"
-          />
-          <button onClick={() => setShowClave(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-            {showClave ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
-        <Button onClick={handleSave} disabled={saving || !clave.trim()} size="sm" className="gap-1.5 min-w-[90px]">
-          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saved ? <><CheckCircle2 className="h-3.5 w-3.5" /> Listo</> : <><Save className="h-3.5 w-3.5" /> Guardar</>}
-        </Button>
       </div>
     </Card>
   );

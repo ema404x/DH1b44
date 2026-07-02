@@ -144,8 +144,7 @@ Deno.serve(async (req) => {
       if (!tablet || !tablet.activa) {
         return Response.json({ error: 'Tablet no válida o desactivada' }, { status: 404 });
       }
-      const allOTs = await sb.entities.WorkOrder.list('-created_date', 500).catch(() => []);
-      const jefeOTs = allOTs.filter(o => o.jefe_sitio === tablet.jefe_sitio);
+      const jefeOTs = await sb.entities.WorkOrder.filter({ jefe_sitio: tablet.jefe_sitio }).catch(() => []);
       return Response.json({
         workOrders: jefeOTs,
         jefe_sitio: tablet.jefe_sitio,

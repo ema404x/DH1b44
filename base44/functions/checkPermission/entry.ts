@@ -18,19 +18,24 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'module y action son requeridos' }, { status: 400 });
     }
 
-    // Buscar el empleado vinculado a este usuario por email
-    const employees = await base44.asServiceRole.entities.Employee.filter({});
-    const emp = employees.find(
-      e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim()
-    );
+    // Buscar el empleado vinculado a este usuario por email (filtro directo)
+    const employees = await base44.asServiceRole.entities.Employee.filter({ email: user.email }).catch(() => []);
+    let emp = employees.find(e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim());
+    if (!emp && employees.length === 0) {
+      const allEmployees = await base44.asServiceRole.entities.Employee.list('-created_date', 2000).catch(() => []);
+      emp = allEmployees.find(e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim());
+    }
 
     if (!emp || !emp.role) {
       return Response.json({ allowed: false, reason: 'Employee not found or has no role' }, { status: 403 });
     }
 
     // Buscar el RolePermission por el rol del empleado (case-insensitive)
-    const allRolePerms = await base44.asServiceRole.entities.RolePermission.filter({});
-    const roleMatch = allRolePerms.find(
+    let roleCandidates = await base44.asServiceRole.entities.RolePermission.filter({ role_name: emp.role }).catch(() => []);
+    if (!roleCandidates || roleCandidates.length === 0) {
+      roleCandidates = await base44.asServiceRole.entities.RolePermission.list('-created_date', 500).catch(() => []);
+    }
+    const roleMatch = roleCandidates.find(
       rp => rp.role_name?.toLowerCase().trim() === emp.role.toLowerCase().trim()
     );
 
