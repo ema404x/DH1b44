@@ -92,70 +92,67 @@
     50%       { text-shadow: 0 0 10px rgba(100,220,255,0.95), 0 0 22px rgba(0,230,200,0.7), 0 0 40px rgba(80,180,255,0.4); }
   }
 
-  /* Custom scrollbar — glassy animated rainbow */
+  /* Custom scrollbar — neon rainbow flow */
   @keyframes scrollbarFlow {
     0%   { background-position: 0% 0%; }
     100% { background-position: 0% 400%; }
   }
   @keyframes scrollbarGlow {
-    0%, 100% { box-shadow: inset 0 1px 2px rgba(255,255,255,0.35), inset 0 -1px 2px rgba(0,0,0,0.35), 0 0 5px rgba(59,130,246,0.45); }
-    25%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.35), inset 0 -1px 2px rgba(0,0,0,0.35), 0 0 7px rgba(20,184,166,0.55); }
-    50%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.35), inset 0 -1px 2px rgba(0,0,0,0.35), 0 0 9px rgba(34,197,94,0.55); }
-    75%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.35), inset 0 -1px 2px rgba(0,0,0,0.35), 0 0 7px rgba(245,158,11,0.55); }
+    0%, 100% { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 8px rgba(255,0,255,0.6); }
+    20%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 10px rgba(0,255,255,0.6); }
+    40%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 12px rgba(0,255,100,0.6); }
+    60%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 10px rgba(255,255,0,0.6); }
+    80%      { box-shadow: inset 0 1px 2px rgba(255,255,255,0.4), 0 0 8px rgba(255,100,0,0.6); }
   }
   * {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--primary) / 0.6) transparent;
+    scrollbar-width: auto;
+    scrollbar-color: #e91e63 transparent;
   }
-  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar { width: 13px; height: 13px; }
   ::-webkit-scrollbar-track {
-    background: hsl(var(--muted) / 0.35);
+    background: rgba(0,0,0,0.25);
     border-radius: 99px;
-    margin: 4px;
-    box-shadow: inset 0 0 3px rgba(0,0,0,0.3);
+    margin: 3px;
   }
   ::-webkit-scrollbar-thumb {
     background: linear-gradient(180deg,
-      #60a5fa 0%,
-      #22d3ee 16%,
-      #2dd4bf 33%,
-      #4ade80 50%,
-      #facc15 66%,
-      #fb923c 83%,
-      #f87171 100%);
-    background-size: 100% 400%;
+      #ff00ff 0%,
+      #00ffff 20%,
+      #00ff44 40%,
+      #ffff00 60%,
+      #ff8800 80%,
+      #ff0044 100%);
+    background-size: 100% 300%;
     border-radius: 99px;
-    border: 2px solid transparent;
+    border: 2px solid rgba(0,0,0,0.2);
     background-clip: padding-box;
-    animation: scrollbarFlow 5s linear infinite,
-               scrollbarGlow 3.5s ease-in-out infinite;
+    animation: scrollbarFlow 3s linear infinite,
+               scrollbarGlow 2.5s ease-in-out infinite;
   }
   ::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg,
-      #93c5fd 0%,
-      #67e8f9 16%,
-      #5eead4 33%,
-      #86efac 50%,
-      #fde047 66%,
-      #fdba74 83%,
-      #fca5a5 100%);
-    background-size: 100% 400%;
+      #ff66ff 0%,
+      #66ffff 20%,
+      #66ff88 40%,
+      #ffff66 60%,
+      #ffaa44 80%,
+      #ff4488 100%);
+    background-size: 100% 300%;
     background-clip: padding-box;
-    border: 2px solid transparent;
-    animation: scrollbarFlow 2.5s linear infinite,
-               scrollbarGlow 2s ease-in-out infinite;
+    border: 2px solid rgba(0,0,0,0.2);
+    animation: scrollbarFlow 1.5s linear infinite,
+               scrollbarGlow 1.2s ease-in-out infinite;
   }
   ::-webkit-scrollbar-thumb:active {
     background: linear-gradient(180deg,
-      #60a5fa 0%,
-      #2dd4bf 33%,
-      #4ade80 66%,
-      #f87171 100%);
-    background-size: 100% 400%;
+      #ff00ff 0%,
+      #00ff44 50%,
+      #ff0044 100%);
+    background-size: 100% 300%;
     background-clip: padding-box;
-    border: 2px solid transparent;
-    animation: scrollbarFlow 1.2s linear infinite,
-               scrollbarGlow 1s ease-in-out infinite;
+    border: 2px solid rgba(0,0,0,0.2);
+    animation: scrollbarFlow 0.8s linear infinite,
+               scrollbarGlow 0.6s ease-in-out infinite;
   }
   ::-webkit-scrollbar-corner { background: transparent; }
 
