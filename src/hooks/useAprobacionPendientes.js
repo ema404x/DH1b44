@@ -4,20 +4,24 @@ import { usePermission } from '@/hooks/usePermission';
 
 /**
  * Devuelve cuántas solicitudes de certificado están esperando aprobación
- * (estado 'enviada' o 'en_revision'). Visible para cualquier usuario con
- * permiso de lectura en AprobacionCertificados (admins y gerentes).
+ * (estado 'enviada' o 'en_revision'). Usa la función backend para evitar
+ * el bloqueo de RLS en usuarios con rol de plataforma 'user' (gerentes).
  */
 export function useAprobacionPendientes() {
   const { allowed: canView } = usePermission('AprobacionCertificados', 'read');
 
-  const { data: all = [] } = useQuery({
+  const { data } = useQuery({
     queryKey: ['solicitudes-cert-badge'],
-    queryFn: () => base44.entities.SolicitudCertificado.list('-created_date', 200),
+    queryFn: async () => {
+      const res = await base44.functions.invoke('gestionarSolicitudesCert', { operation: 'list' });
+      return res.data;
+    },
     enabled: canView,
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
 
+  const all = data?.solicitudes || [];
   const total = canView
     ? all.filter(s => s.estado === 'enviada' || s.estado === 'en_revision').length
     : 0;
