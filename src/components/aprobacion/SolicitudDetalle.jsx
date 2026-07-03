@@ -76,7 +76,16 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
   };
 
   const updateMutation = useMutation({
-    mutationFn: (data) => base44.entities.SolicitudCertificado.update(solicitud.id, data),
+    mutationFn: async (params) => {
+      const res = await base44.functions.invoke('gestionarSolicitudesCert', {
+        operation: 'update',
+        id: solicitud.id,
+        data: params.data,
+        certificado_id: params.certificado_id,
+        certificado_data: params.certificado_data,
+      });
+      return res.data;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['solicitudes-cert'] });
       toast.success('Solicitud actualizada');
@@ -90,13 +99,13 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
 
   const handleMarcarRevision = () => {
     if (solicitud.estado !== 'enviada') return;
-    updateMutation.mutate({
+    updateMutation.mutate({ data: {
       estado: 'en_revision',
       historial: [
         ...(solicitud.historial || []),
         { fecha: new Date().toISOString(), estado: 'en_revision', usuario: displayName, comentario: 'Tomada para revisión' }
       ]
-    });
+    }});
   };
 
   // Puede aprobar: gerentes/admins con rol de gerencia o superAdmin general
@@ -123,27 +132,27 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
   const confirmarAprobacion = async (firmaUrl, nombreGerente) => {
     setShowFirmaModal(false);
     setAprobando(true);
-    const payload = {
-      aprobado_por: nombreGerente,
-      aprobado_por_email: user?.email,
-      fecha_aprobacion: new Date().toISOString(),
-      firma_gerente_url: firmaUrl,
-      comentarios_admin: comentario,
-      estado: 'aprobada',
-      historial: [
-        ...(solicitud.historial || []),
-        { fecha: new Date().toISOString(), estado: 'aprobada', usuario: nombreGerente, comentario: comentario || 'Aprobado' }
-      ]
-    };
-    updateMutation.mutate(payload);
-    if (solicitud.certificado_id) {
-      await base44.entities.Certificado.update(solicitud.certificado_id, {
+    updateMutation.mutate({
+      data: {
+        aprobado_por: nombreGerente,
+        aprobado_por_email: user?.email,
+        fecha_aprobacion: new Date().toISOString(),
+        firma_gerente_url: firmaUrl,
+        comentarios_admin: comentario,
+        estado: 'aprobada',
+        historial: [
+          ...(solicitud.historial || []),
+          { fecha: new Date().toISOString(), estado: 'aprobada', usuario: nombreGerente, comentario: comentario || 'Aprobado' }
+        ]
+      },
+      certificado_id: solicitud.certificado_id,
+      certificado_data: {
         estado: 'aprobado',
         firma_gerente_url: firmaUrl,
         aprobado_por: nombreGerente,
         fecha_aprobacion: new Date().toISOString(),
-      });
-    }
+      }
+    });
     setAprobando(false);
   };
 
@@ -151,19 +160,20 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
     if (!motivo.trim()) { toast.error('Ingresá el motivo de rechazo'); return; }
     const nombreGerente = displayName;
     updateMutation.mutate({
-      aprobado_por: nombreGerente,
-      aprobado_por_email: user?.email,
-      fecha_aprobacion: new Date().toISOString(),
-      estado: 'rechazada',
-      motivo_rechazo: motivo,
-      historial: [
-        ...(solicitud.historial || []),
-        { fecha: new Date().toISOString(), estado: 'rechazada', usuario: nombreGerente, comentario: motivo }
-      ]
+      data: {
+        aprobado_por: nombreGerente,
+        aprobado_por_email: user?.email,
+        fecha_aprobacion: new Date().toISOString(),
+        estado: 'rechazada',
+        motivo_rechazo: motivo,
+        historial: [
+          ...(solicitud.historial || []),
+          { fecha: new Date().toISOString(), estado: 'rechazada', usuario: nombreGerente, comentario: motivo }
+        ]
+      },
+      certificado_id: solicitud.certificado_id,
+      certificado_data: { estado: 'borrador' }
     });
-    if (solicitud.certificado_id) {
-      base44.entities.Certificado.update(solicitud.certificado_id, { estado: 'borrador' });
-    }
   };
 
   const estado = estadoConfig[solicitud.estado] || estadoConfig.borrador;

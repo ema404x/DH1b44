@@ -39,10 +39,14 @@ export default function AprobacionCertificados() {
   const [search, setSearch] = useState('');
   const [filtroPrioridad, setFiltroPrioridad] = useState('todas');
 
-  const { data: solicitudes = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['solicitudes-cert'],
-    queryFn: () => base44.entities.SolicitudCertificado.list('-created_date'),
+    queryFn: async () => {
+      const res = await base44.functions.invoke('gestionarSolicitudesCert', { operation: 'list' });
+      return res.data;
+    },
   });
+  const solicitudes = data?.solicitudes || [];
 
   // Filtrar por rol: solo superAdmin ve todas; el resto ve las suyas
   const misSolicitudes = isSuperAdmin
@@ -70,7 +74,9 @@ export default function AprobacionCertificados() {
   };
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.SolicitudCertificado.delete(id),
+    mutationFn: async (id) => {
+      await base44.functions.invoke('gestionarSolicitudesCert', { operation: 'delete', id });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes-cert'] }),
   });
 
