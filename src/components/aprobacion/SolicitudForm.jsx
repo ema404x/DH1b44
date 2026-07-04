@@ -28,6 +28,7 @@ export default function SolicitudForm({ solicitud, user, onSaved, onCancel }) {
 
   const handleFile = async (e) => {
     const file = e.target.files[0];
+    e.target.value = ''; // reset para permitir re-subir el mismo archivo
     if (!file) return;
     setUploading(true);
     try {

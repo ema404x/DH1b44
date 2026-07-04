@@ -69,10 +69,13 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
       const url = URL.createObjectURL(blob);
       setPdfBlobUrl(url);
       setShowPdf(true);
-      setGenerandoPdf(false);
     };
-    await exportFn(certificado);
-    jsPDFClass.prototype.save = origSave;
+    try {
+      await exportFn(certificado);
+    } finally {
+      jsPDFClass.prototype.save = origSave;
+      setGenerandoPdf(false);
+    }
   };
 
   const updateMutation = useMutation({

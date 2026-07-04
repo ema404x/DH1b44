@@ -46,8 +46,11 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
 
   const handleExportPDF = async () => {
     setExporting(true);
-    await exportCertificadoPDF(form);
-    setExporting(false);
+    try {
+      await exportCertificadoPDF(form);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (

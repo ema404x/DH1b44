@@ -51,7 +51,7 @@ export default function AprobacionCertificados() {
   // Filtrar por rol: solo superAdmin ve todas; el resto ve las suyas
   const misSolicitudes = isSuperAdmin
     ? solicitudes
-    : solicitudes.filter(s => s.jefe_sitio_email === user?.email || s.created_by === user?.email);
+    : solicitudes.filter(s => s.jefe_sitio_email === user?.email || s.created_by_id === user?.id);
 
   // Filtro tab + search + prioridad
   const filtered = misSolicitudes.filter(s => {

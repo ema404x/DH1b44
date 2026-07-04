@@ -179,11 +179,10 @@ export default function Dashboard() {
   const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 80),    staleTime: 120000, refetchInterval: 120000, enabled: canRead('Employee') });
 
   // Pendientes filtrados: admin ve todos, jefe de sitio solo los suyos
-  const pendientes = useMemo(() => {
-    if (isAdmin) return allPendientes;
-    const nombreJefe = user?.full_name || '';
-    return allPendientes.filter(p => p.jefe_sitio === nombreJefe);
-  }, [allPendientes, isAdmin, user]);
+  // filterByUser prioriza employeeName (ficha de empleado) sobre full_name de plataforma
+  const pendientes = useMemo(() =>
+    filterByUser(allPendientes, ['jefe_sitio'])
+  , [allPendientes, filterByUser]);
 
   const allUserOrders = useMemo(() =>
     filterByUser(allOrders, ['assigned_name', 'assigned_to', 'created_by'])
