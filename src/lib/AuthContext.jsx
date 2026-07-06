@@ -12,6 +12,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingPublicSettings] = useState(false);
   const [authError, setAuthError] = useState(null);
+  const [vinculationFailed, setVinculationFailed] = useState(false);
 
   useEffect(() => {
     checkAppState();
@@ -48,36 +49,7 @@ export const AuthProvider = ({ children }) => {
       schedulePrefetch('pendientes', () => base44.entities.Pendiente.list('-updated_date', 300));
 
       // Vincular ficha de empleado y cargar permisos reales según su rol
-      // Esto corre en CADA carga (no solo al login) para garantizar permisos actualizados
-      try {
-        const vinculacionPromise = base44.functions.invoke('vincularEmpleado', {});
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('vincularEmpleado_timeout')), 8000));
-        
-        const vinculacion = await Promise.race([vinculacionPromise, timeoutPromise]);
-        
-        if (vinculacion?.data?.linked) {
-          const perms = vinculacion.data.employee_permissions || {};
-          setUserPermissions({
-            ...perms,
-            _employeeRole: vinculacion.data.employee_role || null,
-            _employeeName: vinculacion.data.employee_name || null,
-          });
-        } else if (vinculacion?.data?.linked === false) {
-          if (currentUser?.role !== 'admin') {
-            setUserPermissions({});
-          }
-        }
-      } catch (error) {
-        // Si falla la vinculación por timeout o error, no bloquear el login
-        // pero loguear para diagnóstico
-        if (error?.message !== 'vincularEmpleado_timeout') {
-          console.warn('[AuthContext] vincularEmpleado error:', error?.message);
-        }
-        // Usuarios admin aún obtienen acceso completo, otros ven permisos vacíos
-        if (currentUser?.role !== 'admin') {
-          setUserPermissions({});
-        }
-      }
+      await linkEmployee(currentUser);
     } catch (error) {
       setIsAuthenticated(false);
       setUser(null);
@@ -91,6 +63,53 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoadingAuth(false);
     }
+  };
+
+  // Vincula al usuario con su ficha de empleado y carga permisos.
+  // Reintenta hasta 2 veces antes de marcar como fallido (evita "acceso denegado" por blips de red).
+  const linkEmployee = async (currentUser) => {
+    const maxAttempts = 2;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const vinculacionPromise = base44.functions.invoke('vincularEmpleado', {});
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 10000)
+        );
+        const vinculacion = await Promise.race([vinculacionPromise, timeoutPromise]);
+
+        if (vinculacion?.data?.linked) {
+          const perms = vinculacion.data.employee_permissions || {};
+          setUserPermissions({
+            ...perms,
+            _employeeRole: vinculacion.data.employee_role || null,
+            _employeeName: vinculacion.data.employee_name || null,
+          });
+        } else if (vinculacion?.data?.linked === false) {
+          if (currentUser?.role !== 'admin') {
+            setUserPermissions({});
+          }
+        }
+        setVinculationFailed(false);
+        return;
+      } catch (error) {
+        if (attempt < maxAttempts) {
+          await new Promise(r => setTimeout(r, 1500));
+          continue;
+        }
+        console.warn('[AuthContext] vincularEmpleado failed after retries:', error?.message);
+        if (currentUser?.role !== 'admin') {
+          setUserPermissions({});
+          setVinculationFailed(true);
+        }
+      }
+    }
+  };
+
+  const retryVinculation = async () => {
+    if (!user) return;
+    setIsLoadingAuth(true);
+    await linkEmployee(user);
+    setIsLoadingAuth(false);
   };
 
   const logout = () => {
@@ -111,9 +130,11 @@ export const AuthProvider = ({ children }) => {
       isLoadingAuth,
       isLoadingPublicSettings,
       authError,
+      vinculationFailed,
       appPublicSettings: null,
       logout,
       navigateToLogin,
+      retryVinculation,
       checkAppState
     }}>
       {children}

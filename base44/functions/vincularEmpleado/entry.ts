@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
 
     const employeeRole = emp.role || null;
 
-    // Actualizar user_id y sincronizar full_name (no bloquea el lookup de permisos)
+    // Iniciar updates (user_id sync + full_name sync) — corren en paralelo con el lookup de permisos
     const updateTasks = [];
     if (emp.user_id !== user.id) {
       updateTasks.push(sb.entities.Employee.update(emp.id, { user_id: user.id }));
@@ -56,7 +56,6 @@ Deno.serve(async (req) => {
         console.warn(`[vincularEmpleado] No se pudo sincronizar full_name: ${err.message}`);
       }));
     }
-    await Promise.allSettled(updateTasks);
 
     // Lookup de permisos por rol — tolerante a mayúsculas/minúsculas
     let employeePermissions = null;
@@ -64,7 +63,6 @@ Deno.serve(async (req) => {
       const roleNorm = employeeRole.toLowerCase().trim();
       let candidates = await sb.entities.RolePermission.filter({ role_name: employeeRole }).catch(() => []);
       if (!candidates || candidates.length === 0) {
-        // El filtro por role_name puede ser case-sensitive: listar todo y matchear insensible
         candidates = await sb.entities.RolePermission.list('-created_date', 500).catch(() => []);
       }
       const match = candidates.find(rp => rp.role_name?.toLowerCase().trim() === roleNorm);
@@ -74,6 +72,9 @@ Deno.serve(async (req) => {
         console.warn(`[vincularEmpleado] Rol "${employeeRole}" no tiene RolePermission configurado.`);
       }
     }
+
+    // Asegurar que los updates completaron antes de responder
+    await Promise.allSettled(updateTasks);
 
     return Response.json({
       linked: true,
