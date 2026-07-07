@@ -64,6 +64,14 @@ const PageLoader = () => (
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error) {
+    // Auto-recargar en errores de "chunk stale" — pasan cuando se redeploya la app
+    // y el navegador tiene referencias cacheadas a módulos que ya no existen.
+    if (error?.message?.includes('Failed to fetch dynamically imported module') ||
+        error?.message?.includes('Importing a module script failed')) {
+      window.location.reload();
+    }
+  }
   render() {
     if (this.state.hasError) {
       return (
