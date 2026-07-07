@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -25,11 +25,25 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
   const qc = useQueryClient();
   const [comentario, setComentario] = useState(solicitud.comentarios_admin || '');
   const [motivo, setMotivo] = useState('');
-  const [aprobando, setAprobando] = useState(false);
   const [showFirmaModal, setShowFirmaModal] = useState(false);
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
   const [showPdf, setShowPdf] = useState(false);
   const [generandoPdf, setGenerandoPdf] = useState(false);
+
+  // Resetear PDF y comentarios al cambiar de solicitud + revocar blob URL previo
+  useEffect(() => {
+    setShowPdf(false);
+    setPdfBlobUrl(prev => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, [solicitud.id]);
+
+  // Revocar blob URL al desmontar o cuando cambia (evita memory leak)
+  useEffect(() => {
+    if (!pdfBlobUrl?.startsWith('blob:')) return;
+    return () => URL.revokeObjectURL(pdfBlobUrl);
+  }, [pdfBlobUrl]);
 
   // Cargar el certificado vinculado vía backend (service role) — el gerente puede
   // revisar el PDF incluso antes de aprobarlo (RLS del entity bloquearía la lectura)
@@ -140,7 +154,6 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
 
   const confirmarAprobacion = async (firmaUrl, nombreGerente) => {
     setShowFirmaModal(false);
-    setAprobando(true);
     updateMutation.mutate({
       data: {
         aprobado_por: nombreGerente,
@@ -162,7 +175,6 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
         fecha_aprobacion: new Date().toISOString(),
       }
     });
-    setAprobando(false);
   };
 
   const handleRechazar = () => {
@@ -451,7 +463,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
                 size="sm"
                 className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
                 onClick={handleAprobar}
-                disabled={updateMutation.isPending || aprobando || !puedeAprobar || bloqueadoPorFirmaJefe}
+                disabled={updateMutation.isPending || !puedeAprobar || bloqueadoPorFirmaJefe}
                 title={
                   !puedeAprobar ? 'Solo Raúl García puede aprobar' :
                   bloqueadoPorFirmaJefe ? 'El jefe de sitio debe firmar primero' : ''

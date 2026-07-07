@@ -107,6 +107,7 @@ export default function AprobacionCertificados() {
     return (
       <div className="space-y-4">
         <SolicitudDetalle
+          key={selected.id}
           solicitud={selected}
           isAdmin={isSuperAdmin}
           user={user}

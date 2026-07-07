@@ -362,7 +362,7 @@ export default function Certificados() {
           </div>
           <CertificadosLista
             certificados={filtrarPorMes(filtrarPorComuna(certificados.filter(c => c.tipo === 'abono_mensual')))}
-            isLoading={isLoading}
+            isLoading={loading || isLoading}
             onNew={() => setView('upload')}
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
