@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 import { useResolveNames } from '@/hooks/useResolveNames';
+import { toast } from 'sonner';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -26,6 +27,17 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
   const { resolve } = useResolveNames();
   const [exportingPDF, setExportingPDF] = useState(null);
   const [search, setSearch] = useState('');
+
+  const handleDownloadPDF = async (cert) => {
+    setExportingPDF(cert.id);
+    try {
+      await exportCertificadoPDF(cert);
+    } catch (err) {
+      toast.error('No se pudo generar el PDF: ' + (err?.message || 'Error desconocido'));
+    } finally {
+      setExportingPDF(null);
+    }
+  };
 
   const filtrados = certificados.filter(c =>
     c.numero?.toString().includes(search) ||
@@ -117,13 +129,7 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                       <Eye className="h-3.5 w-3.5" /> Ver
                     </Button>
                     <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-emerald-600"
-                      onClick={async () => {
-                        setExportingPDF(c.id);
-                        let certData = c;
-                        try { certData = await base44.entities.Certificado.get(c.id); } catch (_) {}
-                        await exportCertificadoPDF(certData);
-                        setExportingPDF(null);
-                      }}
+                      onClick={() => handleDownloadPDF(c)}
                       disabled={exportingPDF === c.id}
                     >
                       {exportingPDF === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />} PDF
@@ -160,15 +166,7 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                   size="icon" 
                   variant="ghost" 
                   className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
-                  onClick={async () => {
-                    setExportingPDF(c.id);
-                    let certData = c;
-                    try {
-                      certData = await base44.entities.Certificado.get(c.id);
-                    } catch (_) {}
-                    await exportCertificadoPDF(certData);
-                    setExportingPDF(null);
-                  }}
+                  onClick={() => handleDownloadPDF(c)}
                   disabled={exportingPDF === c.id}
                   title="Descargar PDF"
                 >

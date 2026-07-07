@@ -31,12 +31,18 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
   const [showPdf, setShowPdf] = useState(false);
   const [generandoPdf, setGenerandoPdf] = useState(false);
 
-  // Cargar el certificado vinculado si existe
+  // Cargar el certificado vinculado vía backend (service role) — el gerente puede
+  // revisar el PDF incluso antes de aprobarlo (RLS del entity bloquearía la lectura)
   const { data: certificado } = useQuery({
     queryKey: ['certificado-sol', solicitud.certificado_id],
-    queryFn: () => base44.entities.Certificado.filter({ id: solicitud.certificado_id }),
+    queryFn: async () => {
+      const res = await base44.functions.invoke('gestionarCertificados', {
+        action: 'get',
+        certificado_id: solicitud.certificado_id,
+      });
+      return res.data.certificado || null;
+    },
     enabled: !!solicitud.certificado_id,
-    select: (data) => data?.[0] || null,
   });
 
   const handleTogglePdf = async () => {

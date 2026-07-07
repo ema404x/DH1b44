@@ -29,17 +29,25 @@ export default function Certificados() {
   const [previewing, setPreviewing] = useState(null);
   const [pendingFirmaData, setPendingFirmaData] = useState(null); // datos del cert esperando firma jefe
   const queryClient = useQueryClient();
-  const { user, displayName, filterByUser } = useCurrentUser();
+  const { user, displayName, filterByUser, isSuperAdmin, loading } = useCurrentUser();
 
   const { data: rawCertificados = [], isLoading } = useQuery({
-    queryKey: ['certificados'],
-    queryFn: () => base44.entities.Certificado.list('-created_date'),
+    queryKey: ['certificados', isSuperAdmin ? 'all' : 'mine'],
+    queryFn: async () => {
+      // Gerencia ve TODOS los certificados vía backend (service role — sin RLS)
+      if (isSuperAdmin) {
+        const res = await base44.functions.invoke('gestionarCertificados', {});
+        return res.data.certificados || [];
+      }
+      return base44.entities.Certificado.list('-created_date');
+    },
+    enabled: !loading,
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
 
   // Filtrar por creador — los jefes de sitio ven sus propios certificados (created_by_id)
-  // No filtrar por contratista_id ya que el jefe no es el contratista
+  // Gerencia (isSuperAdmin) ya recibe la lista completa del backend; filterByUser la pasa sin filtrar
   const certificados = filterByUser(rawCertificados, []);
 
   // Guardar como borrador (crea o actualiza sin emitir)
