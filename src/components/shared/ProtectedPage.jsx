@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
  */
 export default function ProtectedPage({ moduleKey, children }) {
   const { allowed, loading, vinculationFailed } = usePermission(moduleKey, 'read');
-  const { retryVinculation } = useAuth();
+  const { retryVinculation, hasEmployeeRecord } = useAuth();
 
   // Validar que moduleKey sea proporcionado
   if (!moduleKey) {
@@ -60,15 +60,18 @@ export default function ProtectedPage({ moduleKey, children }) {
   }
 
   if (!allowed) {
+    const notLinked = hasEmployeeRecord === false;
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-6">
         <div className="h-16 w-16 rounded-2xl bg-destructive/10 flex items-center justify-center">
           <ShieldOff className="h-8 w-8 text-destructive" />
         </div>
         <div>
-          <h2 className="text-xl font-bold">Acceso denegado</h2>
+          <h2 className="text-xl font-bold">{notLinked ? 'Cuenta sin vincular' : 'Acceso denegado'}</h2>
           <p className="text-muted-foreground mt-1 text-sm max-w-sm">
-            No tenés permiso para ver esta sección. Contactá a un administrador para solicitar acceso.
+            {notLinked
+              ? 'Tu usuario no está vinculado a una ficha de empleado. Contactá a un administrador para configurar tu acceso.'
+              : 'No tenés permiso para ver esta sección. Contactá a un administrador para solicitar acceso.'}
           </p>
         </div>
       </div>

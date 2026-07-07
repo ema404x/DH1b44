@@ -13,6 +13,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingPublicSettings] = useState(false);
   const [authError, setAuthError] = useState(null);
   const [vinculationFailed, setVinculationFailed] = useState(false);
+  const [hasEmployeeRecord, setHasEmployeeRecord] = useState(null);
 
   useEffect(() => {
     checkAppState();
@@ -77,14 +78,21 @@ export const AuthProvider = ({ children }) => {
         );
         const vinculacion = await Promise.race([vinculacionPromise, timeoutPromise]);
 
-        if (vinculacion?.data?.linked) {
+        // Guard: respuesta malformada (sin data o sin campo linked) → tratar como fallo
+        if (!vinculacion?.data || typeof vinculacion.data.linked !== 'boolean') {
+          throw new Error('malformed_response');
+        }
+
+        if (vinculacion.data.linked) {
           const perms = vinculacion.data.employee_permissions || {};
+          setHasEmployeeRecord(true);
           setUserPermissions({
             ...perms,
             _employeeRole: vinculacion.data.employee_role || null,
             _employeeName: vinculacion.data.employee_name || null,
           });
-        } else if (vinculacion?.data?.linked === false) {
+        } else {
+          setHasEmployeeRecord(false);
           if (currentUser?.role !== 'admin') {
             setUserPermissions({});
           }
@@ -131,6 +139,7 @@ export const AuthProvider = ({ children }) => {
       isLoadingPublicSettings,
       authError,
       vinculationFailed,
+      hasEmployeeRecord,
       appPublicSettings: null,
       logout,
       navigateToLogin,

@@ -21,9 +21,10 @@ export function usePermission(moduleKey, action = 'read') {
   // en lugar de mostrar "acceso denegado" — el usuario podría tener permisos válidos
   if (vinculationFailed) return { allowed: false, loading: false, vinculationFailed: true };
 
-  // Si no hay permisos cargados y auth aún está cargando → esperar
-  // Si auth ya terminó pero no hay permisos (vinculación falló), denegar sin bloquearse
-  if (userPermissions === null) return { allowed: false, loading: false, vinculationFailed: false };
+  // Estado inconsistente: auth terminó, no hubo error de red, pero los permisos
+  // nunca llegaron. Tratar como error transitorio (no denegación) para que la UI
+  // ofrezca reintentar en lugar de bloquear al usuario incorrectamente.
+  if (userPermissions === null) return { allowed: false, loading: false, vinculationFailed: true };
 
   // Sin permisos configurados para este usuario → denegar
   if (!moduleKey) {

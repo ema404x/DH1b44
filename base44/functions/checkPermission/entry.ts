@@ -18,12 +18,30 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'module y action son requeridos' }, { status: 400 });
     }
 
-    // Buscar el empleado vinculado a este usuario por email (filtro directo)
-    const employees = await base44.asServiceRole.entities.Employee.filter({ email: user.email }).catch(() => []);
-    let emp = employees.find(e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim());
-    if (!emp && employees.length === 0) {
-      const allEmployees = await base44.asServiceRole.entities.Employee.list('-created_date', 2000).catch(() => []);
-      emp = allEmployees.find(e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim());
+    // Buscar el empleado vinculado a este usuario por email — con reintento ante fallos transitorios
+    let emp = null;
+    let lookupFailed = false;
+    for (let attempt = 1; attempt <= 2 && !emp; attempt++) {
+      try {
+        const employees = await base44.asServiceRole.entities.Employee.filter({ email: user.email });
+        emp = employees.find(e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim());
+        if (!emp && employees.length === 0) {
+          const allEmployees = await base44.asServiceRole.entities.Employee.list('-created_date', 2000);
+          emp = allEmployees.find(e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim());
+        }
+      } catch (e) {
+        lookupFailed = true;
+        if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+
+    // Si el lookup falló por error de red/servidor, devolver 503 (no 403) para distinguir
+    // "no se pudo verificar" de "verificado y denegado"
+    if (lookupFailed && !emp) {
+      return Response.json(
+        { error: 'No se pudo verificar el empleado en este momento', transient: true },
+        { status: 503 }
+      );
     }
 
     if (!emp || !emp.role) {
