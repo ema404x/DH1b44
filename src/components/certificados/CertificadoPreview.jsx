@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download, Send, Loader2 } from 'lucide-react';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
+import { toast } from 'sonner';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d || '—'; } };
@@ -48,6 +49,8 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
     setExporting(true);
     try {
       await exportCertificadoPDF(form);
+    } catch (err) {
+      toast.error('No se pudo generar el PDF: ' + (err?.message || 'Error desconocido'));
     } finally {
       setExporting(false);
     }

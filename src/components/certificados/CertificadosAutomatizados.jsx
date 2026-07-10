@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Download, FileText, AlertCircle, CheckCircle2, Loader2, Calendar, Zap, SkipForward, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -45,7 +46,7 @@ export default function CertificadosAutomatizados() {
   if (nextCertMonth > 12) { nextCertMonth = 1; nextCertYear++; }
   const proximoMes = `${nextCertYear}-${String(nextCertMonth).padStart(2, '0')}`;
 
-  const { data: certificados = [], isLoading, refetch } = useQuery({
+  const { data: certificados = [], isLoading } = useQuery({
     queryKey: ['certificados-automatizados'],
     queryFn: () => base44.entities.Certificado.filter({ generado_automaticamente: true }, '-created_date'),
   });
@@ -55,6 +56,10 @@ export default function CertificadosAutomatizados() {
     onSuccess: (res) => {
       setResultMessage(res.data?.message || 'Proceso completado');
       queryClient.invalidateQueries({ queryKey: ['certificados-automatizados'] });
+    },
+    onError: (err) => {
+      setResultMessage(null);
+      toast.error('Error al ejecutar: ' + (err?.response?.data?.error || err?.message || 'Error desconocido'));
     }
   });
 

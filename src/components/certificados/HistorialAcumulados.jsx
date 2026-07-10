@@ -4,7 +4,7 @@ import { AlertCircle } from 'lucide-react';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
-export default function HistorialAcumulados({ adaNumero, ocNumero, contraista, montoContratado }) {
+export default function HistorialAcumulados({ adaNumero, ocNumero, contratista, montoContratado }) {
   const [certs, setCerts] = useState([]);
   const [loading, setLoading] = useState(true);
 

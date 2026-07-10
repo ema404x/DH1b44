@@ -72,12 +72,21 @@ export default function AbonoManualForm({ initialData = {}, onSave, onCancel, sa
   const removeItem = (i) => setForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }));
 
   const subtotal = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
-  const anticipo = form.anticipo_pct > 0 ? subtotal * (form.anticipo_pct / 100) : 0;
-  const fondoReparo = form.fondo_reparo_pct > 0 ? subtotal * (form.fondo_reparo_pct / 100) : 0;
+  // Base para deducciones: monto contratado si está cargado, sino suma de ítems (igual que editor y PDF)
+  const montoContratado = (form.monto_contratado || 0) > 0 ? (form.monto_contratado || 0) : subtotal;
+  const anticipo = form.anticipo_pct > 0 ? montoContratado * (form.anticipo_pct / 100) : 0;
+  const fondoReparo = form.fondo_reparo_pct > 0 ? montoContratado * (form.fondo_reparo_pct / 100) : 0;
   const totalNeto = subtotal - anticipo - fondoReparo;
 
   const handleSave = () => {
-    onSave({ ...form, subtotal, tipo: 'abono_mensual' });
+    onSave({
+      ...form,
+      subtotal,
+      tipo: 'abono_mensual',
+      fondo_reparo_aplicar: form.fondo_reparo_pct > 0,
+      _anticipo_monto: anticipo,
+      _fondo_reparo_monto: fondoReparo,
+    });
   };
 
   return (

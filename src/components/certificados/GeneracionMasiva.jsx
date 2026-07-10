@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   Loader2, Zap, CheckCircle2, AlertCircle, FileText, Upload, X, UploadCloud
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const ESTADOS = {
   pendiente: { label: 'Pendiente', color: 'text-muted-foreground', icon: FileText },
@@ -108,9 +109,11 @@ export default function GeneracionMasiva({ open, onClose, onSuccess }) {
     // Procesar todos en paralelo
     const promises = archivos.map((_, idx) =>
       procesarArchivo(idx, lastNum).catch(err => {
+        const msg = err?.message || 'Error desconocido';
         setArchivos(prev => prev.map((a, i) =>
-          i === idx ? { ...a, estado: 'error', error: err.message || 'Error desconocido' } : a
+          i === idx ? { ...a, estado: 'error', error: msg } : a
         ));
+        toast.error(`${archivos[idx]?.file?.name || 'Archivo'}: ${msg}`);
       })
     );
 

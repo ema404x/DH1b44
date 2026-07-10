@@ -154,11 +154,6 @@ export default function Certificados() {
     setView('preview');
   };
 
-  const handlePreviewPDF = (cert) => {
-    setPreviewing(cert);
-    setView('preview');
-  };
-
   const handleDraft = (formData) => {
     draftMutation.mutate(formData);
   };
@@ -366,7 +361,6 @@ export default function Certificados() {
             onNew={() => setView('upload')}
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
-            onPreviewPDF={handlePreviewPDF}
             emptyLabel="No hay certificados de Abono Mensual"
           />
           <GeneracionMasiva
@@ -383,7 +377,6 @@ export default function Certificados() {
             onNew={() => setView('upload')}
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
-            onPreviewPDF={handlePreviewPDF}
             emptyLabel="No hay certificados de Obra"
           />
         </TabsContent>
@@ -395,7 +388,6 @@ export default function Certificados() {
             onNew={() => setView('upload')}
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
-            onPreviewPDF={handlePreviewPDF}
             emptyLabel="No hay certificados de Informe"
           />
         </TabsContent>

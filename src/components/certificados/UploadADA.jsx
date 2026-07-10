@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Upload, FileText, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const TIPOS = [
   { value: 'abono_mensual', label: 'Abono Mensual', desc: 'Contrato de servicio recurrente mensual', color: 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100' },
@@ -18,45 +19,50 @@ export default function UploadADA({ onExtracted }) {
   const [tipoSeleccionado, setTipoSeleccionado] = useState(null); // null = auto-detectar
 
   const processFile = async (file) => {
-    if (!file || file.type !== 'application/pdf') return alert('Solo se aceptan archivos PDF');
+    if (!file || file.type !== 'application/pdf') { toast.error('Solo se aceptan archivos PDF'); return; }
     setLoading(true);
+    try {
+      // Paso 1: subir PDF
+      setStep('uploading');
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
 
-    // Paso 1: subir PDF
-    setStep('uploading');
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      // Paso 2: extraer datos (detección de tipo integrada en extractADA si no hay tipo_override)
+      setStep('reading');
+      const res = await base44.functions.invoke('extractADA', { file_url, tipo_override: tipoSeleccionado || null });
+      let data = res.data.data;
 
-    // Paso 2: extraer datos (detección de tipo integrada en extractADA si no hay tipo_override)
-    setStep('reading');
-    const res = await base44.functions.invoke('extractADA', { file_url, tipo_override: tipoSeleccionado || null });
-    let data = res.data.data;
-
-    // Paso 4: si hay discrepancia, llamar función de corrección por separado
-    if (data._validation?.needs_correction) {
-      setStep('correcting');
-      const corrRes = await base44.functions.invoke('correctADAItems', {
-        file_url,
-        calculated: data._validation.subtotal_calculado,
-        docTotal: data._validation.subtotal_documento,
-        direction: data._validation.correction_direction,
-      });
-      if (corrRes.data?.items?.length) {
-        const newCalc = corrRes.data.calculated;
-        const docTotal = data._validation.subtotal_documento;
-        data.items = corrRes.data.items;
-        data.subtotal = newCalc;
-        data._validation = {
-          ...data._validation,
-          subtotal_calculado: newCalc,
-          diferencia: Math.abs(newCalc - docTotal),
-          coincide: Math.abs(newCalc - docTotal) / docTotal <= 0.005,
-          needs_correction: false,
-        };
+      // Paso 4: si hay discrepancia, llamar función de corrección por separado
+      if (data._validation?.needs_correction) {
+        setStep('correcting');
+        const corrRes = await base44.functions.invoke('correctADAItems', {
+          file_url,
+          calculated: data._validation.subtotal_calculado,
+          docTotal: data._validation.subtotal_documento,
+          direction: data._validation.correction_direction,
+        });
+        if (corrRes.data?.items?.length) {
+          const newCalc = corrRes.data.calculated;
+          const docTotal = data._validation.subtotal_documento;
+          data.items = corrRes.data.items;
+          data.subtotal = newCalc;
+          data._validation = {
+            ...data._validation,
+            subtotal_calculado: newCalc,
+            diferencia: Math.abs(newCalc - docTotal),
+            coincide: Math.abs(newCalc - docTotal) / docTotal <= 0.005,
+            needs_correction: false,
+          };
+        }
       }
-    }
 
-    setStep('done');
-    setLoading(false);
-    onExtracted({ ...data, ada_pdf_url: file_url });
+      setStep('done');
+      onExtracted({ ...data, ada_pdf_url: file_url });
+    } catch (err) {
+      toast.error('Error al procesar el PDF: ' + (err?.message || 'Error desconocido'));
+      setStep('idle');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onDrop = (e) => {
