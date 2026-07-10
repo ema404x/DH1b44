@@ -197,6 +197,10 @@
       "type": "string",
       "description": "Nombre del gerente que aprob\u00f3"
     },
+    "aprobado_por_email": {
+      "type": "string",
+      "description": "Email del gerente que aprob\u00f3 (para visibilidad por RLS)"
+    },
     "fecha_aprobacion": {
       "type": "string",
       "format": "date-time",
@@ -212,13 +216,11 @@
     "create": {
       "$or": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "created_by_id": "{{user.id}}"
         },
         {
           "user_condition": {
-            "role": "jefe_sitio"
+            "role": "admin"
           }
         }
       ]
