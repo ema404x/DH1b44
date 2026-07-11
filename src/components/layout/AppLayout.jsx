@@ -10,6 +10,7 @@ import OfflineBar from '@/components/pwa/OfflineBar';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { toast } from 'sonner';
 import ChatbotSoporte from '@/components/soporte/ChatbotSoporte';
+import BugReportBubble from '@/components/shared/BugReportBubble';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useEmergencyNotifications } from '@/hooks/useEmergencyNotifications';
 import EmergencyAlert from '@/components/emergencias/EmergencyAlert';
@@ -67,6 +68,7 @@ export default function AppLayout() {
       </div>
       <MobileBottomNav onMore={handleMoreMobile} />
       <ChatbotSoporte />
+      <BugReportBubble />
       <EmergencyAlert
         emergencia={activeEmergency}
         onClose={handleCloseEmergency}
