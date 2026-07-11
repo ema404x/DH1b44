@@ -113,8 +113,7 @@
             "type": "string"
           },
           "photo_url": {
-            "type": "string",
-            "description": "Foto de ejemplo de la tarea"
+            "type": "string"
           }
         }
       }
@@ -227,6 +226,15 @@
       "type": "string",
       "description": "Comentario del jefe al rechazar la OT"
     },
+    "sector_id": {
+      "type": "string",
+      "enum": [
+        "escuela",
+        "bapro"
+      ],
+      "default": "escuela",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores."
+    },
     "notes": {
       "type": "string"
     }
@@ -241,15 +249,26 @@
     "read": {
       "$or": [
         {
-          "created_by_id": "{{user.id}}"
-        },
-        {
           "user_condition": {
             "role": "admin"
           }
         },
         {
-          "data.assigned_name": "{{user.full_name}}"
+          "$and": [
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            },
+            {
+              "$or": [
+                {
+                  "created_by_id": "{{user.id}}"
+                },
+                {
+                  "data.assigned_name": "{{user.full_name}}"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
