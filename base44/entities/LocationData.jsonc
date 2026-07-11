@@ -54,6 +54,15 @@
     "gps_longitude": {
       "type": "number",
       "description": "Longitud GPS del establecimiento"
+    },
+    "sector_id": {
+      "type": "string",
+      "enum": [
+        "escuela",
+        "bapro"
+      ],
+      "default": "escuela",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores."
     }
   },
   "required": [
@@ -75,10 +84,21 @@
           }
         },
         {
-          "data.jefe_sitio": "{{user.full_name}}"
-        },
-        {
-          "data.inspector": "{{user.full_name}}"
+          "$and": [
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            },
+            {
+              "$or": [
+                {
+                  "data.jefe_sitio": "{{user.full_name}}"
+                },
+                {
+                  "data.inspector": "{{user.full_name}}"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
