@@ -5,6 +5,7 @@ import MobileBottomNav from './MobileBottomNav';
 import GlobalSearch from './GlobalSearch';
 import NotificationBell from './NotificationBell';
 import UserMenu from './UserMenu';
+import SectorSwitcher from './SectorSwitcher';
 import OfflineBar from '@/components/pwa/OfflineBar';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { toast } from 'sonner';
@@ -52,6 +53,7 @@ export default function AppLayout() {
             <GlobalSearch />
           </div>
           <div className="flex items-center gap-1 ml-auto">
+            <SectorSwitcher />
             <NotificationBell />
             <UserMenu />
           </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useNavigate } from 'react-router-dom';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,16 +10,18 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Eye, Plus, Building2, Users, Shield } from 'lucide-react';
+import { Eye, Plus, Building2, Users, Shield, LogIn } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function Sectores() {
-  const { isAdmin } = useCurrentUser();
+  const { isAdmin, currentUser, employeeSector } = useCurrentUser();
+  const navigate = useNavigate();
   const [sectores, setSectores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [observando, setObservando] = useState(null);
   const [obsData, setObsData] = useState(null);
   const [obsLoading, setObsLoading] = useState(false);
+  const [switching, setSwitching] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -76,7 +79,23 @@ export default function Sectores() {
     }
   };
 
-  const handleObservar = async (sectorClave) => {
+  const handleObservar = async (sectorClave, sectorNombre) => {
+    setSwitching(sectorClave);
+    try {
+      // Cambiar el sector del usuario actual — esto lo "mete" dentro del sector
+      await base44.auth.updateMe({ sector_id: sectorClave });
+      toast.success(`Ingresaste al sector: ${sectorNombre}`, { duration: 3000 });
+      // Navegar al dashboard para ver los datos del sector
+      navigate('/');
+      // Recargar para que todos los contextos (auth, queries) se refresquen
+      setTimeout(() => window.location.reload(), 500);
+    } catch (e) {
+      toast.error('Error al cambiar de sector: ' + (e.message || ''));
+      setSwitching(null);
+    }
+  };
+
+  const handleVerResumen = async (sectorClave) => {
     setObservando(sectorClave);
     setObsData(null);
     setObsLoading(true);
@@ -98,6 +117,8 @@ export default function Sectores() {
       toast.error('Error al actualizar sector');
     }
   };
+
+  const currentSectorId = currentUser?.sector_id || currentUser?.data?.sector_id || employeeSector || 'escuela';
 
   const entityLabels = {
     WorkOrder: 'Órdenes de Trabajo', Employee: 'Empleados', Certificado: 'Certificados',
@@ -127,12 +148,26 @@ export default function Sectores() {
             <Building2 className="w-6 h-6 text-primary" /> Sectores
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Gestiona unidades de negocio. Cada sector aísla completamente sus datos — sin filtración entre sectores.
+            Gestiona unidades de negocio. Usá <strong>Observar</strong> para ingresar completamente a un sector.
           </p>
         </div>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="w-4 h-4" /> Nuevo Sector
         </Button>
+      </div>
+
+      {/* Indicador de sector actual */}
+      <div className="p-4 rounded-xl border border-primary/30 bg-primary/5 flex items-center gap-3">
+        <div className="text-2xl">
+          {sectores.find(s => s.clave === currentSectorId)?.icono || '🏢'}
+        </div>
+        <div className="flex-1">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">Sector activo</p>
+          <p className="font-bold text-lg">
+            {sectores.find(s => s.clave === currentSectorId)?.nombre || currentSectorId}
+          </p>
+        </div>
+        <Badge variant="default" className="text-xs">Estás aquí</Badge>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -143,53 +178,70 @@ export default function Sectores() {
             No hay sectores creados. Creá el primero.
           </div>
         ) : (
-          sectores.map(s => (
-            <Card key={s.id} className="card-lift">
-              <CardHeader className="flex flex-row items-center gap-3 pb-3">
-                <div className="text-3xl">{s.icono || '🏢'}</div>
-                <div className="flex-1 min-w-0">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <span className="truncate">{s.nombre}</span>
-                    <Badge variant={s.activo ? 'default' : 'secondary'} className="text-xs">
-                      {s.activo ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground font-mono">{s.clave}</p>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {s.descripcion && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">{s.descripcion}</p>
-                )}
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-full border border-border" style={{ background: s.color }} />
-                  <span className="text-xs text-muted-foreground font-mono">{s.color}</span>
-                  {s.config && Object.keys(s.config).length > 0 && (
-                    <Badge variant="outline" className="text-xs ml-auto">
-                      {Object.keys(s.config).length} config
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 pt-1">
-                  <Button size="sm" variant="outline" onClick={() => handleObservar(s.clave)}>
-                    <Eye className="w-4 h-4" /> Observar
-                  </Button>
-                  <div className="flex items-center gap-1.5 ml-auto text-xs text-muted-foreground">
-                    <Switch checked={s.activo} onCheckedChange={() => toggleActivo(s)} />
+          sectores.map(s => {
+            const isCurrent = s.clave === currentSectorId;
+            return (
+              <Card key={s.id} className={`card-lift ${isCurrent ? 'border-primary border-2' : ''}`}>
+                <CardHeader className="flex flex-row items-center gap-3 pb-3">
+                  <div className="text-3xl">{s.icono || '🏢'}</div>
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <span className="truncate">{s.nombre}</span>
+                      {isCurrent && <Badge variant="default" className="text-xs">Actual</Badge>}
+                      {!isCurrent && !s.activo && <Badge variant="secondary" className="text-xs">Inactivo</Badge>}
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground font-mono">{s.clave}</p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {s.descripcion && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">{s.descripcion}</p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full border border-border" style={{ background: s.color }} />
+                    <span className="text-xs text-muted-foreground font-mono">{s.color}</span>
+                    {s.config && Object.keys(s.config).length > 0 && (
+                      <Badge variant="outline" className="text-xs ml-auto">
+                        {Object.keys(s.config).length} config
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant={isCurrent ? "secondary" : "default"}
+                      disabled={isCurrent || switching === s.clave || !s.activo}
+                      onClick={() => handleObservar(s.clave, s.nombre)}
+                    >
+                      {switching === s.clave ? (
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <LogIn className="w-4 h-4" />
+                      )}
+                      {isCurrent ? 'En este sector' : 'Observar'}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleVerResumen(s.clave)}>
+                      <Eye className="w-4 h-4" /> Resumen
+                    </Button>
+                    {!isCurrent && (
+                      <div className="flex items-center gap-1.5 ml-auto text-xs text-muted-foreground">
+                        <Switch checked={s.activo} onCheckedChange={() => toggleActivo(s)} />
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
 
-      {/* Dialog Observar */}
+      {/* Dialog Observar (resumen) */}
       <Dialog open={!!observando} onOpenChange={(open) => { if (!open) { setObservando(null); setObsData(null); } }}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Eye className="w-5 h-5 text-primary" /> Observando sector: {observando}
+              <Eye className="w-5 h-5 text-primary" /> Resumen: {observando}
             </DialogTitle>
           </DialogHeader>
           {obsLoading ? (
@@ -200,7 +252,6 @@ export default function Sectores() {
             <div className="py-8 text-center text-muted-foreground">Sin datos</div>
           ) : (
             <div className="space-y-4">
-              {/* Usuarios */}
               <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                 <div className="flex items-center gap-2 mb-1">
                   <Users className="w-4 h-4 text-primary" />
@@ -215,8 +266,6 @@ export default function Sectores() {
                   </div>
                 )}
               </div>
-
-              {/* Resumen por entidad */}
               <div className="space-y-1.5">
                 {Object.entries(obsData.resumen || {}).map(([entity, info]) => (
                   <div key={entity} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">

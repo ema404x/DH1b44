@@ -57,9 +57,11 @@ Deno.serve(async (req) => {
         console.warn(`[vincularEmpleado] No se pudo sincronizar full_name: ${err.message}`);
       }));
     }
-    // Sincronizar sector_id del empleado al usuario de plataforma (para aislamiento por sector en RLS)
+    // Sincronizar sector_id del empleado al usuario de plataforma — SOLO en el primer login
+    // (cuando el usuario aún no tiene sector asignado). Después, el sector se gestiona
+    // manualmente via la función Observar/Switcher, para no pisar un cambio deliberado.
     const currentUserSector = user.data?.sector_id ?? null;
-    if (currentUserSector !== empSector) {
+    if (!currentUserSector) {
       updateTasks.push(base44.auth.updateMe({ sector_id: empSector }).catch(err => {
         console.warn(`[vincularEmpleado] No se pudo sincronizar sector_id: ${err.message}`);
       }));
