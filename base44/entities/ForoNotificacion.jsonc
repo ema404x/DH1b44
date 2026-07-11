@@ -28,6 +28,15 @@
     "leida": {
       "type": "boolean",
       "default": false
+    },
+    "sector_id": {
+      "type": "string",
+      "enum": [
+        "escuela",
+        "bapro"
+      ],
+      "default": "escuela",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores."
     }
   },
   "required": [
@@ -40,12 +49,19 @@
     "read": {
       "$or": [
         {
-          "data.usuario_id": "{{user.id}}"
-        },
-        {
           "user_condition": {
             "role": "admin"
           }
+        },
+        {
+          "$and": [
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            },
+            {
+              "data.usuario_id": "{{user.id}}"
+            }
+          ]
         }
       ]
     },
