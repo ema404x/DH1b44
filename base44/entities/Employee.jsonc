@@ -14,12 +14,8 @@
     },
     "sector_id": {
       "type": "string",
-      "enum": [
-        "escuela",
-        "bapro"
-      ],
       "default": "escuela",
-      "description": "Sector/unidad de negocio del empleado. Determina el aislamiento de datos entre sectores. Se sincroniza al usuario de plataforma al iniciar sesi\u00f3n."
+      "description": "Sector/unidad de negocio del empleado. Determina el aislamiento de datos entre sectores. Se sincroniza al usuario de plataforma al iniciar sesi\u00f3n. Valor libre definido en la entidad Sector."
     },
     "specialty": {
       "type": "string",

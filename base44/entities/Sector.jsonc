@@ -1,0 +1,63 @@
+{
+  "name": "Sector",
+  "type": "object",
+  "properties": {
+    "clave": {
+      "type": "string",
+      "description": "Clave \u00fanica del sector (ej: escuela, bapro, sanidad). Se usa como valor de sector_id en todas las entidades. Sin espacios, min\u00fasculas."
+    },
+    "nombre": {
+      "type": "string",
+      "description": "Nombre visible del sector"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Descripci\u00f3n del alcance del sector"
+    },
+    "color": {
+      "type": "string",
+      "description": "Color de acento para UI (hex)"
+    },
+    "icono": {
+      "type": "string",
+      "description": "Emoji representativo"
+    },
+    "config": {
+      "type": "object",
+      "description": "Configuraci\u00f3n personalizable del sector (comunas, rubros, plantillas, etc.). Cada sector define aqu\u00ed sus propias reglas de negocio sin afectar a otros.",
+      "additionalProperties": true
+    },
+    "activo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el sector est\u00e1 activo y puede recibir nuevos registros"
+    },
+    "orden": {
+      "type": "number",
+      "default": 0,
+      "description": "Orden de visualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "clave",
+    "nombre"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

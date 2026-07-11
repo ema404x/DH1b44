@@ -57,12 +57,8 @@
     },
     "sector_id": {
       "type": "string",
-      "enum": [
-        "escuela",
-        "bapro"
-      ],
       "default": "escuela",
-      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores."
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Valor libre definido en la entidad Sector."
     }
   },
   "required": [

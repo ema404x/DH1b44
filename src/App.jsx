@@ -50,6 +50,7 @@ const CalendarioInformes = lazy(() => import('@/pages/CalendarioInformes'));
 const CrearOT = lazy(() => import('@/pages/CrearOT'));
 const Foro = lazy(() => import('@/pages/Foro'));
 const Calefaccion = lazy(() => import('@/pages/Calefaccion'));
+const Sectores = lazy(() => import('@/pages/Sectores'));
 const Rutinas = lazy(() => import('@/pages/Rutinas'));
 const PortalOperarioApp = lazy(() => import('@/pages/PortalOperarioApp'));
 import ProtectedPage from '@/components/shared/ProtectedPage';
@@ -150,6 +151,7 @@ const AuthenticatedApp = () => {
         <Route path="/foro" element={<ProtectedPage moduleKey="Foro"><Foro /></ProtectedPage>} />
         <Route path="/calefaccion" element={<ProtectedPage moduleKey="Calefaccion"><Calefaccion /></ProtectedPage>} />
         <Route path="/rutinas" element={<ProtectedPage moduleKey="Rutinas"><Rutinas /></ProtectedPage>} />
+        <Route path="/sectores" element={<ProtectedPage moduleKey="Sectores"><Sectores /></ProtectedPage>} />
         <Route path="/mis-ots" element={<PortalOperarioApp />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, ChevronDown, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet, HardHat
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet, HardHat, Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -68,6 +68,7 @@ const navGroups = [
       { label: 'Control de Acceso', icon: Lock, path: '/permisos' },
       { label: 'Auditoría', icon: FileText, path: '/auditoria' },
       { label: 'Centro de Seguridad', icon: Shield, path: '/seguridad' },
+      { label: 'Sectores', icon: Building2, path: '/sectores' },
     ]
   },
   {
@@ -97,7 +98,7 @@ const routeToModule = {
   '/facturacion': 'Invoice', '/informacion-general': 'InformacionGeneral',
   '/empleados': 'Employee', '/mapa': 'Mapa', '/mapa-jefes': 'MapaJefes',
   '/inventario': 'Inventory', '/alertas': 'Alertas', '/permisos': 'Permisos',
-  '/auditoria': 'AuditLog', '/seguridad': 'Seguridad', '/calefaccion': 'Calefaccion',
+  '/auditoria': 'AuditLog', '/seguridad': 'Seguridad', '/sectores': 'Sectores', '/calefaccion': 'Calefaccion',
   '/rutinas': 'Rutinas', '/mis-ots': null, '/foro': null, '/tutorial': null, '/importar': 'ImportarDatos',
 };
 

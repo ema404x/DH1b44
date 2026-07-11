@@ -12,12 +12,8 @@
     },
     "sector_id": {
       "type": "string",
-      "enum": [
-        "escuela",
-        "bapro"
-      ],
       "default": "escuela",
-      "description": "Sector/unidad de negocio del usuario. A\u00edsla los datos entre sectores (escuela vs bapro). Se sincroniza desde el Employee al iniciar sesi\u00f3n."
+      "description": "Sector/unidad de negocio del usuario. A\u00edsla los datos entre sectores. Se sincroniza desde el Employee al iniciar sesi\u00f3n. Valor libre definido en la entidad Sector."
     },
     "can_delete_pendientes": {
       "type": "boolean",
