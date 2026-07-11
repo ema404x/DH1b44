@@ -16,6 +16,7 @@ import ImportadorSimple from '@/components/informacion-general/ImportadorSimple'
 import ImportadorDireccionesJefes from '@/components/informacion-general/ImportadorDireccionesJefes';
 import SincronizarModulos from '@/components/informacion-general/SincronizarModulos';
 import Anexo3Info from '@/components/informacion-general/Anexo3Info';
+import { useSectorConfig } from '@/hooks/useSectorConfig';
 
 const COMUNAS = [
   { id: '8A', label: 'Comuna 8A', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
@@ -28,6 +29,7 @@ export default function InformacionGeneral() {
   const [search, setSearch] = useState('');
   const [selectedComuna, setSelectedComuna] = useState('all');
   const queryClient = useQueryClient();
+  const { plural, singular, label } = useSectorConfig();
 
   const { data: locations = [], isLoading, refetch } = useQuery({
     queryKey: ['locations'],
@@ -89,7 +91,7 @@ export default function InformacionGeneral() {
                     <h1 className="text-2xl sm:text-4xl font-bold text-white leading-tight">Información General</h1>
                     <Badge className="bg-primary/20 text-primary border-primary/30 text-xs shrink-0">Hub Central</Badge>
                   </div>
-                  <p className="text-xs sm:text-sm text-slate-400 mt-1">Gestión integral de escuelas, direcciones y asignaciones</p>
+                  <p className="text-xs sm:text-sm text-slate-400 mt-1">Gestión integral de {plural.toLowerCase()}, direcciones y asignaciones</p>
                 </div>
               </div>
               <motion.button
@@ -106,7 +108,7 @@ export default function InformacionGeneral() {
             {/* Stats Grid Premium */}
             <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
               {[
-                { label: 'Escuelas', value: stats.total, icon: Building2, color: 'from-blue-500', highlight: stats.total > 0 },
+                { label: plural, value: stats.total, icon: Building2, color: 'from-blue-500', highlight: stats.total > 0 },
                 { label: 'Activas', value: stats.activos, icon: Zap, color: 'from-emerald-500', highlight: stats.activos === stats.total },
                 { label: 'Direcciones', value: stats.direccionesTotal, icon: MapPin, color: 'from-orange-500' },
                 { label: 'Jefes Sitio', value: stats.jefesSitio, icon: Users, color: 'from-purple-500' },
@@ -176,7 +178,7 @@ export default function InformacionGeneral() {
                   >
                     <AlertTriangle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <p className="font-semibold text-orange-200">⚠️ {sinAsignar.length} escuela(s) sin jefe de sitio</p>
+                      <p className="font-semibold text-orange-200">⚠️ {sinAsignar.length} {label(sinAsignar.length).toLowerCase()} sin jefe de sitio</p>
                       <p className="text-sm text-orange-300/80 mt-1">Completa las asignaciones para optimizar la operación</p>
                     </div>
                   </motion.div>
@@ -187,7 +189,7 @@ export default function InformacionGeneral() {
                     className="flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r from-emerald-500/20 to-emerald-600/10 border border-emerald-500/50 backdrop-blur"
                   >
                     <CheckCircle2 className="h-5 w-5 text-emerald-400 flex-shrink-0" />
-                    <p className="font-semibold text-emerald-200">✅ Todas las escuelas tienen jefe de sitio asignado</p>
+                    <p className="font-semibold text-emerald-200">✅ Todos los {plural.toLowerCase()} tienen jefe de sitio asignado</p>
                   </motion.div>
                 )}
               </motion.div>
@@ -197,7 +199,7 @@ export default function InformacionGeneral() {
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                   <Input
-                    placeholder="Buscar escuela, dirección, jefe, ubicación técnica..."
+                    placeholder={`Buscar ${singular.toLowerCase()}, dirección, jefe, ubicación técnica...`}
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     className="pl-12 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500 focus:border-primary/50 focus:ring-primary/20"
