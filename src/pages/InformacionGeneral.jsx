@@ -12,6 +12,7 @@ import {
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import DirectorioJerarquico from '@/components/informacion-general/DirectorioJerarquico';
+import AssetDirectory from '@/components/informacion-general/AssetDirectory';
 import ImportadorSimple from '@/components/informacion-general/ImportadorSimple';
 import ImportadorDireccionesJefes from '@/components/informacion-general/ImportadorDireccionesJefes';
 import SincronizarModulos from '@/components/informacion-general/SincronizarModulos';
@@ -29,7 +30,8 @@ export default function InformacionGeneral() {
   const [search, setSearch] = useState('');
   const [selectedComuna, setSelectedComuna] = useState('all');
   const queryClient = useQueryClient();
-  const { plural, singular, label } = useSectorConfig();
+  const { plural, singular, label, sectorId } = useSectorConfig();
+  const isBapro = sectorId === 'bapro';
 
   const { data: locations = [], isLoading, refetch } = useQuery({
     queryKey: ['locations'],
@@ -168,6 +170,10 @@ export default function InformacionGeneral() {
           {/* Content Directorio */}
           {activeTab === 'directorio' && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+              {isBapro ? (
+                <AssetDirectory />
+              ) : (
+              <>
               {/* Alerts */}
               <motion.div className="mb-6 space-y-3">
                 {sinAsignar.length > 0 ? (
@@ -252,10 +258,12 @@ export default function InformacionGeneral() {
                   <DirectorioJerarquico />
                 )}
               </motion.div>
-            </motion.div>
-          )}
+              </>
+              )}
+              </motion.div>
+              )}
 
-          {/* Content Anexo 3 */}
+              {/* Content Anexo 3 */}
           {activeTab === 'anexo3' && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
               <Anexo3Info />
