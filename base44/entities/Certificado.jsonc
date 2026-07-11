@@ -205,6 +205,15 @@
       "type": "string",
       "format": "date-time",
       "description": "Fecha y hora de aprobaci\u00f3n"
+    },
+    "sector_id": {
+      "type": "string",
+      "enum": [
+        "escuela",
+        "bapro"
+      ],
+      "default": "escuela",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores."
     }
   },
   "required": [
@@ -228,15 +237,26 @@
     "read": {
       "$or": [
         {
-          "created_by_id": "{{user.id}}"
-        },
-        {
           "user_condition": {
             "role": "admin"
           }
         },
         {
-          "data.aprobado_por_email": "{{user.email}}"
+          "$and": [
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            },
+            {
+              "$or": [
+                {
+                  "created_by_id": "{{user.id}}"
+                },
+                {
+                  "data.aprobado_por_email": "{{user.email}}"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
