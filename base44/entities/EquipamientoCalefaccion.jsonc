@@ -71,6 +71,15 @@
     "alerta_generada": {
       "type": "boolean",
       "default": false
+    },
+    "sector_id": {
+      "type": "string",
+      "enum": [
+        "escuela",
+        "bapro"
+      ],
+      "default": "escuela",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores."
     }
   },
   "required": [
@@ -92,7 +101,14 @@
           }
         },
         {
-          "data.jefe_sitio": "{{user.full_name}}"
+          "$and": [
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            },
+            {
+              "data.jefe_sitio": "{{user.full_name}}"
+            }
+          ]
         }
       ]
     },
