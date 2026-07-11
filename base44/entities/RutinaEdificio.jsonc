@@ -41,6 +41,15 @@
     "proxima_ejecucion": {
       "type": "string",
       "format": "date"
+    },
+    "sector_id": {
+      "type": "string",
+      "enum": [
+        "escuela",
+        "bapro"
+      ],
+      "default": "escuela",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores."
     }
   },
   "required": [

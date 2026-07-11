@@ -10,19 +10,40 @@ Deno.serve(async (req) => {
     const sb = base44.asServiceRole;
     const results = {};
 
-    // 1. Empleados: asignar sector "escuela" a registros sin sector_id
-    const empRes = await sb.entities.Employee.updateMany(
-      { sector_id: null },
-      { $set: { sector_id: 'escuela' } }
-    ).catch(e => ({ error: e.message }));
-    results.employee = empRes;
+    const entities = [
+      'Employee',
+      'WorkOrder',
+      'ObraCertificacion',
+      'AbonoMaestro',
+      'Edificio',
+      'LocationData',
+      'Certificado',
+      'SolicitudCertificado',
+      'InspeccionColegio',
+      'EquipamientoCalefaccion',
+      'OrdenRutina',
+      'RutinaEdificio',
+      'Tablet',
+      'ForoHilo',
+      'ForoNotificacion'
+    ];
 
-    // 2. Usuarios de plataforma: asignar sector "escuela" (puede no estar permitido — se ignora el error)
-    const userRes = await sb.entities.User.updateMany(
-      { sector_id: null },
-      { $set: { sector_id: 'escuela' } }
-    ).catch(e => ({ error: e.message }));
-    results.user = userRes;
+    for (const entityName of entities) {
+      try {
+        const entityApi = sb.entities[entityName];
+        if (!entityApi || typeof entityApi.updateMany !== 'function') {
+          results[entityName] = { error: `Entity ${entityName} not accessible` };
+          continue;
+        }
+        const res = await entityApi.updateMany(
+          { sector_id: null },
+          { $set: { sector_id: 'escuela' } }
+        );
+        results[entityName] = res;
+      } catch (e) {
+        results[entityName] = { error: e.message };
+      }
+    }
 
     return Response.json({ success: true, migrated: results });
   } catch (error) {
