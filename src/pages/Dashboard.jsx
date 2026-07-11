@@ -23,6 +23,7 @@ import KpisJefeSitio from '@/components/dashboard/KpisJefeSitio';
 import AuroraEffect from '@/components/dashboard/AuroraEffect';
 import DashboardFilters from '@/components/dashboard/DashboardFilters';
 import SectionHeader from '@/components/dashboard/SectionHeader';
+import BugReportBubble from '@/components/shared/BugReportBubble';
 import { format, isPast, parseISO, startOfMonth, subMonths, formatDistanceToNow, subDays } from 'date-fns';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { es } from 'date-fns/locale';
@@ -468,6 +469,7 @@ export default function Dashboard() {
           employees={employees}
         />
       </div>
+      <BugReportBubble />
     </div>
   );
 }
