@@ -131,6 +131,15 @@
         }
       }
     },
+    "sector_id": {
+      "type": "string",
+      "enum": [
+        "escuela",
+        "bapro"
+      ],
+      "default": "escuela",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores."
+    },
     "notas": {
       "type": "string",
       "description": "Observaciones adicionales"
@@ -160,15 +169,26 @@
     "read": {
       "$or": [
         {
-          "created_by_id": "{{user.id}}"
-        },
-        {
-          "data.contratista_id": "{{user.data.contratista_id}}"
-        },
-        {
           "user_condition": {
             "role": "admin"
           }
+        },
+        {
+          "$and": [
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            },
+            {
+              "$or": [
+                {
+                  "created_by_id": "{{user.id}}"
+                },
+                {
+                  "data.contratista_id": "{{user.data.contratista_id}}"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
