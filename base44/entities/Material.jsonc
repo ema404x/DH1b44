@@ -57,6 +57,11 @@
       "type": "string",
       "description": "Ubicaci\u00f3n en dep\u00f3sito"
     },
+    "sector_id": {
+      "type": "string",
+      "default": "escuela",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Valor libre definido en la entidad Sector."
+    },
     "notes": {
       "type": "string"
     }
@@ -71,16 +76,36 @@
         "role": "admin"
       }
     },
-    "read": {},
+    "read": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        }
+      ]
+    },
     "update": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     }
   }
 }
