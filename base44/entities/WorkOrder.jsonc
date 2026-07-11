@@ -243,55 +243,65 @@
   "rls": {
     "create": {},
     "read": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "$and": [
+          "$or": [
             {
-              "data.sector_id": "{{user.data.sector_id}}"
+              "user_condition": {
+                "role": "admin"
+              }
             },
             {
-              "$or": [
-                {
-                  "created_by_id": "{{user.id}}"
-                },
-                {
-                  "data.assigned_name": "{{user.full_name}}"
-                }
-              ]
+              "created_by_id": "{{user.id}}"
+            },
+            {
+              "data.assigned_name": "{{user.full_name}}"
             }
           ]
         }
       ]
     },
     "update": {
-      "$or": [
+      "$and": [
         {
-          "created_by_id": "{{user.id}}"
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "user_condition": {
-            "role": "admin"
-          }
-        },
-        {
-          "data.assigned_name": "{{user.full_name}}"
+          "$or": [
+            {
+              "created_by_id": "{{user.id}}"
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "data.assigned_name": "{{user.full_name}}"
+            }
+          ]
         }
       ]
     },
     "delete": {
-      "$or": [
+      "$and": [
         {
-          "created_by_id": "{{user.id}}"
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "$or": [
+            {
+              "created_by_id": "{{user.id}}"
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
         }
       ]
     }
