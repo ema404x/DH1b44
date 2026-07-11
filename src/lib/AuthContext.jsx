@@ -131,6 +131,18 @@ export const AuthProvider = ({ children }) => {
     base44.auth.redirectToLogin(window.location.href);
   };
 
+  // Cambio de sector persistente e inmediato:
+  // 1) persiste en el usuario (base44.auth.updateMe)
+  // 2) actualiza el estado en memoria
+  // 3) invalida todas las queries para que refetch con el nuevo sector
+  const switchSector = async (sectorId) => {
+    await base44.auth.updateMe({ sector_id: sectorId });
+    setUser(prev => ({ ...prev, sector_id: sectorId, data: { ...(prev?.data || {}), sector_id: sectorId } }));
+    setUserPermissions(prev => ({ ...prev, _employeeSector: sectorId }));
+    queryClientInstance.invalidateQueries();
+    queryClientInstance.removeQueries();
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -145,7 +157,8 @@ export const AuthProvider = ({ children }) => {
       logout,
       navigateToLogin,
       retryVinculation,
-      checkAppState
+      checkAppState,
+      switchSector
     }}>
       {children}
     </AuthContext.Provider>

@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useAuth } from '@/lib/AuthContext';
 import { ChevronDown, Building2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
 
 export default function SectorSwitcher() {
   const { isAdmin, currentUser, employeeSector } = useCurrentUser();
+  const { switchSector } = useAuth();
   const [sectores, setSectores] = useState([]);
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState(null);
@@ -38,12 +40,12 @@ export default function SectorSwitcher() {
     if (sectorClave === currentSectorId) { setOpen(false); return; }
     setSwitching(sectorClave);
     try {
-      await base44.auth.updateMe({ sector_id: sectorClave });
+      await switchSector(sectorClave);
       toast.success(`Cambiaste al sector: ${sectorNombre}`, { duration: 3000 });
       setOpen(false);
-      setTimeout(() => window.location.reload(), 400);
     } catch (e) {
       toast.error('Error al cambiar de sector: ' + (e.message || ''));
+    } finally {
       setSwitching(null);
     }
   };
