@@ -38,7 +38,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden — se requiere rol de gerencia' }, { status: 403 });
     }
 
-    const certificados = await sb.entities.Certificado.list('-created_date', 500);
+    // Filtrar por sector del usuario — aisla datos entre sectores
+    const userSector = user.data?.sector_id || user.sector_id || 'escuela';
+    const certificados = await sb.entities.Certificado.filter({ sector_id: userSector });
     return Response.json({ certificados });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

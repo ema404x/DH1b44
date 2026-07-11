@@ -25,7 +25,13 @@ Deno.serve(async (req) => {
       'RutinaEdificio',
       'Tablet',
       'ForoHilo',
-      'ForoNotificacion'
+      'ForoNotificacion',
+      'Project',
+      'Client',
+      'Invoice',
+      'Material',
+      'Asset',
+      'Pendiente'
     ];
 
     for (const entityName of entities) {

@@ -69,7 +69,9 @@ Deno.serve(async (req) => {
 
     // ── LIST ──
     if (action === 'list') {
-      const all = await sb.entities.ObraCertificacion.list('-created_date', 1000);
+      // Filtrar por sector del usuario — aisla datos entre sectores
+      const userSector = user.data?.sector_id || user.sector_id || 'escuela';
+      const all = await sb.entities.ObraCertificacion.filter({ sector_id: userSector });
       const obras = isSuperAdmin ? all : all.filter(canAccess);
       return Response.json({ obras });
     }

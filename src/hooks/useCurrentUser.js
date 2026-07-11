@@ -48,11 +48,22 @@ export function useCurrentUser() {
    *    O donde ellos mismos crearon el registro).
    */
   function filterByUser(list, fields = []) {
-    if (isSuperAdmin || !currentUser) return list;
-    // Si no tiene employeeRole asignado, no restringir — puede ver todo
-    if (!employeeRole) return list;
-    // Solo restringir si es un rol de campo explícito
-    if (!FIELD_ROLES.includes(employeeRole?.toLowerCase?.())) return list;
+    if (!currentUser) return list;
+
+    // Aislar SIEMPRE por sector_id — incluso para admins.
+    // Un admin en sector BAPRO no debe ver registros del sector escuela.
+    const userSector = currentUser?.sector_id || currentUser?.data?.sector_id || employeeSector || 'escuela';
+    let result = list.filter(item => {
+      const itemSector = item.sector_id || 'escuela';
+      return itemSector === userSector;
+    });
+
+    // SuperAdmins ven todo dentro de su sector (no se filtra por assigned_name, etc.)
+    if (isSuperAdmin) return result;
+    // Si no tiene employeeRole asignado, no restringir más allá del sector
+    if (!employeeRole) return result;
+    // Solo restringir por campos si es un rol de campo explícito
+    if (!FIELD_ROLES.includes(employeeRole?.toLowerCase?.())) return result;
 
     // IMPORTANTE: usar employeeName (ficha de empleado) como fuente principal de nombre.
     // Caer en full_name de plataforma solo si no hay ficha vinculada.
@@ -61,15 +72,11 @@ export function useCurrentUser() {
     const email = currentUser.email?.toLowerCase() || '';
     const userId = currentUser.id || '';
 
-    return list.filter(item => {
-      // Ver registros creados por él (por ID de usuario de plataforma)
+    return result.filter(item => {
       if (userId && item.created_by_id && item.created_by_id === userId) return true;
-      // Ver registros creados por él (por email legacy)
       if (email && item.created_by && item.created_by.toLowerCase() === email) return true;
-      // Ver registros donde aparece su nombre o email en los campos indicados
       return fields.some(field => {
         const val = (item[field] || '').toLowerCase();
-        // Comparar contra nombre de ficha de empleado primero, luego nombre de plataforma
         const matchEmployee = employeeNameLower && val.includes(employeeNameLower);
         const matchPlatform = platformNameLower && val.includes(platformNameLower);
         const matchEmail    = email && val === email;

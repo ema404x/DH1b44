@@ -25,7 +25,9 @@ Deno.serve(async (req) => {
 
     // ── LIST: obtener solicitudes ────────────────────────────────────────
     if (operation === 'list') {
-      const all = await base44.asServiceRole.entities.SolicitudCertificado.list('-created_date');
+      // Filtrar por sector del usuario — aisla datos entre sectores
+      const userSector = user.data?.sector_id || user.sector_id || 'escuela';
+      const all = await base44.asServiceRole.entities.SolicitudCertificado.filter({ sector_id: userSector });
 
       if (isAdmin) {
         return Response.json({ solicitudes: all, isAdmin: true });
