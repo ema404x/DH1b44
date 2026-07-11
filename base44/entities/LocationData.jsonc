@@ -73,40 +73,50 @@
       }
     },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "$and": [
+          "$or": [
             {
-              "data.sector_id": "{{user.data.sector_id}}"
+              "user_condition": {
+                "role": "admin"
+              }
             },
             {
-              "$or": [
-                {
-                  "data.jefe_sitio": "{{user.full_name}}"
-                },
-                {
-                  "data.inspector": "{{user.full_name}}"
-                }
-              ]
+              "data.jefe_sitio": "{{user.full_name}}"
+            },
+            {
+              "data.inspector": "{{user.full_name}}"
             }
           ]
         }
       ]
     },
     "update": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     }
   }
 }
