@@ -119,6 +119,15 @@
     "cerrado": {
       "type": "boolean",
       "default": false
+    },
+    "sector_id": {
+      "type": "string",
+      "enum": [
+        "escuela",
+        "bapro"
+      ],
+      "default": "escuela",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores."
     }
   },
   "required": [
@@ -127,7 +136,18 @@
   ],
   "rls": {
     "create": {},
-    "read": {},
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        }
+      ]
+    },
     "update": {
       "$or": [
         {
