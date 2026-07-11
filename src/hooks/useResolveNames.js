@@ -11,16 +11,17 @@
  *   resolve('Juan Pérez')            // → 'Juan Pérez' (sin cambios)
  *   resolveAll(['a@b.com', 'Carlos']) // → ['Ana García', 'Carlos']
  */
-import { useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 import { resolveDisplayName } from '@/lib/utils';
 
 export function useResolveNames() {
-  const queryClient = useQueryClient();
-
-  const employees = useMemo(() => {
-    return queryClient.getQueryData(['employees']) || [];
-  }, [queryClient]);
+  // useQuery subscribe al cache — se actualiza cuando llegan los empleados
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => base44.entities.Employee.list('-updated_date', 200),
+    staleTime: 120000,
+  });
 
   const resolve = (nameOrEmail, fallback) => {
     return resolveDisplayName(nameOrEmail, employees, fallback);

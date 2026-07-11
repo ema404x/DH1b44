@@ -124,7 +124,7 @@ export function useOfflineQueue(onSyncSuccess) {
       if (event.data?.type === 'SYNC_SUCCESS') {
         refreshCount();
         setLastSynced(new Date());
-        onSyncSuccess?.(1);
+        onSyncSuccessRef.current?.(1);
       }
     };
     navigator.serviceWorker?.addEventListener('message', handleSWMessage);

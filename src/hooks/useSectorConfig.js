@@ -8,7 +8,8 @@ import { base44 } from '@/api/base44Client';
  * Permite adaptar terminología y entidades según el sector (ej: BAPRO mide por Activos, Escuela por Colegios).
  */
 export function useSectorConfig() {
-  const { user, employeeSector } = useContext(AuthContext);
+  const { user, userPermissions } = useContext(AuthContext);
+  const employeeSector = userPermissions?._employeeSector || 'escuela';
   const sectorId = user?.sector_id || user?.data?.sector_id || employeeSector || 'escuela';
 
   const { data: sectores = [] } = useQuery({

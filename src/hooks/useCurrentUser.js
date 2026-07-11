@@ -74,7 +74,6 @@ export function useCurrentUser() {
 
     return result.filter(item => {
       if (userId && item.created_by_id && item.created_by_id === userId) return true;
-      if (email && item.created_by && item.created_by.toLowerCase() === email) return true;
       return fields.some(field => {
         const val = (item[field] || '').toLowerCase();
         const matchEmployee = employeeNameLower && val.includes(employeeNameLower);
