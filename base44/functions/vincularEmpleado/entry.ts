@@ -42,6 +42,7 @@ Deno.serve(async (req) => {
     }
 
     const employeeRole = emp.role || null;
+    const empSector = emp.sector_id || 'escuela';
 
     // Iniciar updates (user_id sync + full_name sync) — corren en paralelo con el lookup de permisos
     const updateTasks = [];
@@ -54,6 +55,13 @@ Deno.serve(async (req) => {
     if (emp.full_name && (platformNameIsEmail || platformNameDiffers)) {
       updateTasks.push(base44.auth.updateMe({ full_name: emp.full_name }).catch(err => {
         console.warn(`[vincularEmpleado] No se pudo sincronizar full_name: ${err.message}`);
+      }));
+    }
+    // Sincronizar sector_id del empleado al usuario de plataforma (para aislamiento por sector en RLS)
+    const currentUserSector = user.data?.sector_id ?? null;
+    if (currentUserSector !== empSector) {
+      updateTasks.push(base44.auth.updateMe({ sector_id: empSector }).catch(err => {
+        console.warn(`[vincularEmpleado] No se pudo sincronizar sector_id: ${err.message}`);
       }));
     }
 
@@ -81,6 +89,7 @@ Deno.serve(async (req) => {
       employee_id: emp.id,
       employee_name: emp.full_name,
       employee_role: employeeRole,
+      employee_sector: empSector,
       employee_permissions: employeePermissions,
       role_matched: employeePermissions !== null,
     });

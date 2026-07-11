@@ -90,6 +90,7 @@ export const AuthProvider = ({ children }) => {
             ...perms,
             _employeeRole: vinculacion.data.employee_role || null,
             _employeeName: vinculacion.data.employee_name || null,
+            _employeeSector: vinculacion.data.employee_sector || 'escuela',
           });
         } else {
           setHasEmployeeRecord(false);

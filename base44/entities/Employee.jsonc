@@ -12,6 +12,15 @@
       "type": "string",
       "description": "Rol del empleado \u2014 debe coincidir exactamente con un role_name en Control de Acceso (RolePermission)"
     },
+    "sector_id": {
+      "type": "string",
+      "enum": [
+        "escuela",
+        "bapro"
+      ],
+      "default": "escuela",
+      "description": "Sector/unidad de negocio del empleado. Determina el aislamiento de datos entre sectores. Se sincroniza al usuario de plataforma al iniciar sesi\u00f3n."
+    },
     "specialty": {
       "type": "string",
       "enum": [

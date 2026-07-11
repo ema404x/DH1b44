@@ -19,6 +19,8 @@ export function useCurrentUser() {
   const employeeRole = userPermissions?._employeeRole || null;
   // Nombre del empleado configurado en el módulo de Empleados (tiene prioridad sobre full_name de plataforma)
   const employeeName = userPermissions?._employeeName || null;
+  // Sector/unidad de negocio del empleado (aislamiento de datos entre sectores)
+  const employeeSector = userPermissions?._employeeSector || 'escuela';
   // Nombre a mostrar: nombre en ficha de empleado > nombre de plataforma
   const displayName = employeeName || currentUser?.full_name || currentUser?.email || 'Usuario';
 
@@ -90,5 +92,5 @@ export function useCurrentUser() {
     return resolveDisplayName(nameOrEmail, employees, fallback);
   }
 
-  return { currentUser, user: currentUser, isAdmin, isSuperAdmin, employeeRole, employeeName, displayName, loading, filterByUser, userPermissions, resolveUserName };
+  return { currentUser, user: currentUser, isAdmin, isSuperAdmin, employeeRole, employeeName, employeeSector, displayName, loading, filterByUser, userPermissions, resolveUserName };
 }
