@@ -184,53 +184,56 @@
       }
     },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "$and": [
+          "$or": [
             {
-              "data.sector_id": "{{user.data.sector_id}}"
+              "user_condition": {
+                "role": "admin"
+              }
             },
             {
-              "$or": [
-                {
-                  "created_by_id": "{{user.id}}"
-                },
-                {
-                  "data.jefe_sitio": "{{user.full_name}}"
-                },
-                {
-                  "data.inspector": "{{user.full_name}}"
-                }
-              ]
+              "created_by_id": "{{user.id}}"
+            },
+            {
+              "data.jefe_sitio": "{{user.full_name}}"
+            },
+            {
+              "data.inspector": "{{user.full_name}}"
             }
           ]
         }
       ]
     },
     "update": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "$and": [
+          "$or": [
             {
-              "data.ciclo_archivado": false
+              "user_condition": {
+                "role": "admin"
+              }
             },
             {
-              "$or": [
+              "$and": [
                 {
-                  "created_by_id": "{{user.id}}"
+                  "data.ciclo_archivado": false
                 },
                 {
-                  "data.jefe_sitio": "{{user.full_name}}"
+                  "$or": [
+                    {
+                      "created_by_id": "{{user.id}}"
+                    },
+                    {
+                      "data.jefe_sitio": "{{user.full_name}}"
+                    }
+                  ]
                 }
               ]
             }
@@ -239,9 +242,16 @@
       ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     }
   }
 }
