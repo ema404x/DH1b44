@@ -112,38 +112,53 @@
   "rls": {
     "create": {},
     "read": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "$and": [
+          "$or": [
             {
-              "data.sector_id": "{{user.data.sector_id}}"
+              "user_condition": {
+                "role": "admin"
+              }
             },
             {
-              "$or": [
-                {
-                  "data.responsable_id": "{{user.id}}"
-                },
-                {
-                  "data.responsable_nombre": "{{user.full_name}}"
-                }
-              ]
+              "data.responsable_id": "{{user.id}}"
+            },
+            {
+              "data.responsable_nombre": "{{user.full_name}}"
             }
           ]
         }
       ]
     },
     "update": {
-      "$or": [
+      "$and": [
         {
-          "data.responsable_id": "{{user.id}}"
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "data.responsable_nombre": "{{user.full_name}}"
+          "$or": [
+            {
+              "data.responsable_id": "{{user.id}}"
+            },
+            {
+              "data.responsable_nombre": "{{user.full_name}}"
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
           "user_condition": {
@@ -151,11 +166,6 @@
           }
         }
       ]
-    },
-    "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
     }
   }
 }
