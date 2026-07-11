@@ -20,9 +20,12 @@
         "estructura",
         "vehiculo",
         "herramienta",
+        "sistemas_informaticos",
+        "mobiliario",
+        "seguridad",
         "otro"
       ],
-      "default": "equipo_mecanico"
+      "default": "otro"
     },
     "brand": {
       "type": "string"
@@ -34,7 +37,20 @@
       "type": "string"
     },
     "location": {
-      "type": "string"
+      "type": "string",
+      "description": "Ubicaci\u00f3n f\u00edsica del activo"
+    },
+    "sede": {
+      "type": "string",
+      "description": "Sede/edificio donde se encuentra (agrupaci\u00f3n principal para BAPRO)"
+    },
+    "area": {
+      "type": "string",
+      "description": "\u00c1rea/zona/departamento dentro de la sede"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Responsable de mantenimiento del activo"
     },
     "project_id": {
       "type": "string"
@@ -124,6 +140,9 @@
             },
             {
               "created_by_id": "{{user.id}}"
+            },
+            {
+              "data.jefe_sitio": "{{user.full_name}}"
             }
           ]
         }
@@ -135,9 +154,16 @@
           "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "data.jefe_sitio": "{{user.full_name}}"
+            }
+          ]
         }
       ]
     },
