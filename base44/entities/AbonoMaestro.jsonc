@@ -163,35 +163,50 @@
       ]
     },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "$and": [
+          "$or": [
             {
-              "data.sector_id": "{{user.data.sector_id}}"
+              "user_condition": {
+                "role": "admin"
+              }
             },
             {
-              "$or": [
-                {
-                  "created_by_id": "{{user.id}}"
-                },
-                {
-                  "data.contratista_id": "{{user.data.contratista_id}}"
-                }
-              ]
+              "created_by_id": "{{user.id}}"
+            },
+            {
+              "data.contratista_id": "{{user.data.contratista_id}}"
             }
           ]
         }
       ]
     },
     "update": {
-      "$or": [
+      "$and": [
         {
-          "created_by_id": "{{user.id}}"
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "created_by_id": "{{user.id}}"
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
           "user_condition": {
@@ -199,11 +214,6 @@
           }
         }
       ]
-    },
-    "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
     }
   }
 }
