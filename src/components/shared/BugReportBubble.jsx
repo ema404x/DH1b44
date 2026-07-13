@@ -24,6 +24,7 @@ export default function BugReportBubble() {
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [error, setError] = useState(null);
+  const [hidden, setHidden] = useState(false);
 
   const reset = () => {
     setTipo('funcional');
@@ -83,21 +84,27 @@ export default function BugReportBubble() {
     <>
       {/* Burbuja flotante */}
       <AnimatePresence>
-        {!open && (
-          <motion.button
+        {!open && !hidden && (
+          <motion.div
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setOpen(true)}
-            className="fixed bottom-20 lg:bottom-6 left-4 z-40 h-12 w-12 rounded-full bg-amber-500 text-white shadow-xl flex items-center justify-center"
-            style={{ boxShadow: '0 4px 20px rgba(245,158,11,0.5)' }}
-            title="Reportar un bug o error"
+            className="fixed bottom-20 lg:bottom-6 left-4 z-40 group"
           >
-            <Bug className="h-5 w-5" />
-            <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-amber-500 animate-pulse" />
-          </motion.button>
+            <button onClick={() => setHidden(true)} title="Ocultar"
+              className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-slate-700 border border-border text-muted-foreground hover:text-white hover:bg-slate-600 flex items-center justify-center z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+              <X className="h-3 w-3" />
+            </button>
+            <button
+              onClick={() => setOpen(true)}
+              className="h-12 w-12 rounded-full bg-amber-500 text-white shadow-xl flex items-center justify-center relative"
+              style={{ boxShadow: '0 4px 20px rgba(245,158,11,0.5)' }}
+              title="Reportar un bug o error"
+            >
+              <Bug className="h-5 w-5" />
+              <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-amber-500 animate-pulse" />
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -194,10 +201,7 @@ export default function BugReportBubble() {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <p className="text-[10px] text-muted-foreground">
-                      Enviar a: <span className="font-mono text-amber-400">{BUG_EMAIL}</span>
-                    </p>
+                  <div className="flex items-center justify-end gap-2 pt-1">
                     <Button type="submit" disabled={enviando || !titulo.trim() || !descripcion.trim()} size="sm" className="gap-1.5 bg-amber-500 hover:bg-amber-600">
                       {enviando ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Enviando...</> : <><Send className="h-3.5 w-3.5" /> Enviar reporte</>}
                     </Button>
