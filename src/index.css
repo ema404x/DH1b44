@@ -85,6 +85,39 @@
   body {
     @apply bg-background text-foreground font-inter;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    overscroll-behavior: none;
+  }
+
+  /* Prevent text selection on interactive elements */
+  button, nav, [role="button"] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Ensure 44px minimum tap targets on mobile */
+  @media (max-width: 1023px) {
+    button.h-8, button.h-9,
+    a.h-8, a.h-9 {
+      min-height: 2.75rem;
+    }
+  }
+
+  /* Mobile select — invisible Radix Content wrapper that provides context
+     while Vaul Drawer renders the visible bottom sheet inside it */
+  .select-mobile-wrapper {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    transform: none !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    pointer-events: none !important;
   }
   /* Glow pulse text animation */
   @keyframes glowPulse {

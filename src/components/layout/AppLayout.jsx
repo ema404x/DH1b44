@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import MobileHeader from './MobileHeader';
 import MobileBottomNav from './MobileBottomNav';
 import GlobalSearch from './GlobalSearch';
 import NotificationBell from './NotificationBell';
@@ -47,6 +48,7 @@ export default function AppLayout() {
       <OfflineBar isOnline={isOnline} pendingCount={pendingCount} isSyncing={isSyncing} onSync={syncPending} />
       <Sidebar open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
       <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${mainPaddingClass}`}>
+        <MobileHeader />
         {/* Top bar */}
         <header className="h-14 border-b border-white/8 flex items-center gap-3 pl-14 pr-4 lg:pl-5 lg:pr-5 flex-shrink-0 z-30"
           style={{ background: 'rgba(10,22,40,0.85)', backdropFilter: 'blur(12px)' }}>

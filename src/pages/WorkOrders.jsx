@@ -25,6 +25,7 @@ import OTTemplateSelector from '@/components/workorders/OTTemplateSelector';
 import HistorialEstablecimiento from '@/components/workorders/HistorialEstablecimiento';
 import ModoCampo from '@/components/workorders/ModosCampo';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import PullToRefresh from '@/components/shared/PullToRefresh';
 import { usePermission } from '@/hooks/usePermission';
 import { getTransitionAction } from '@/lib/workorder-transitions';
 
@@ -82,6 +83,10 @@ export default function WorkOrders() {
   const { currentUser, isAdmin, filterByUser } = useCurrentUser();
   const { allowed: canCreate } = usePermission('WorkOrder', 'create');
   const { allowed: canDelete } = usePermission('WorkOrder', 'delete');
+
+  const handleRefresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['workorders'] });
+  };
 
   const { isOnline, pendingCount } = useOfflineQueue((count) => {
     toast.success(`${count} OT${count !== 1 ? 's' : ''} sincronizada${count !== 1 ? 's' : ''}`);
@@ -159,6 +164,7 @@ export default function WorkOrders() {
   };
 
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 space-y-6">
       {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
@@ -339,5 +345,6 @@ export default function WorkOrders() {
         />
       )}
     </div>
+    </PullToRefresh>
   );
 }

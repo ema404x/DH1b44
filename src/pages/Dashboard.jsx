@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FolderKanban, ClipboardList, Users, DollarSign, TrendingUp, TrendingDown,
   AlertTriangle, CheckCircle2, Wrench, ArrowRight, Zap, Package, BarChart3,
@@ -25,6 +25,7 @@ import DashboardFilters from '@/components/dashboard/DashboardFilters';
 import SectionHeader from '@/components/dashboard/SectionHeader';
 import { format, isPast, parseISO, startOfMonth, subMonths, formatDistanceToNow, subDays } from 'date-fns';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import PullToRefresh from '@/components/shared/PullToRefresh';
 import { es } from 'date-fns/locale';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
@@ -160,6 +161,8 @@ function QuickActionCard({ icon: Icon, label, desc, href, color }) {
 
 export default function Dashboard() {
   const { isAdmin, filterByUser, userPermissions, user } = useCurrentUser();
+  const queryClient = useQueryClient();
+  const handleRefresh = useCallback(() => queryClient.invalidateQueries(), [queryClient]);
   const [dashFilters, setDashFilters] = React.useState({ dateRange: 'all', jefeSitio: '', priority: '' });
 
   const canRead = useCallback((moduleKey) => {
@@ -269,6 +272,7 @@ export default function Dashboard() {
   const firstName = user?.full_name?.split(' ')[0] || '';
 
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-background space-y-6 pb-10 page-enter">
       <AuroraEffect />
 
@@ -469,5 +473,6 @@ export default function Dashboard() {
         />
       </div>
     </div>
+    </PullToRefresh>
   );
 }

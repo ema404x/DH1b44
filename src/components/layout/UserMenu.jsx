@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { LogOut, ChevronDown, UserCircle } from 'lucide-react';
+import { LogOut, ChevronDown, UserCircle, Trash2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction
+} from '@/components/ui/alert-dialog';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function UserMenu() {
   const [open, setOpen] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { displayName } = useCurrentUser();
@@ -45,6 +50,13 @@ export default function UserMenu() {
               <UserCircle className="h-4 w-4 text-muted-foreground" />
               Mi perfil
             </button>
+            <button
+              onClick={() => { setShowDeleteDialog(true); setOpen(false); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-destructive transition-colors text-left text-foreground"
+            >
+              <Trash2 className="h-4 w-4 text-muted-foreground" />
+              Eliminar cuenta
+            </button>
             <div className="mx-2 my-1 border-t border-slate-100 dark:border-slate-800" />
             <button
               onClick={() => { base44.auth.logout(); setOpen(false); }}
@@ -56,6 +68,26 @@ export default function UserMenu() {
           </div>
         </>
       )}
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar cuenta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se cerrará tu sesión y deberás contactar a un administrador para completar la eliminación de tu cuenta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { base44.auth.logout(); setShowDeleteDialog(false); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar cuenta
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
