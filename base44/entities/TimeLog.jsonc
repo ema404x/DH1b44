@@ -41,12 +41,27 @@
     "hours"
   ],
   "rls": {
-    "create": {},
-    "read": {
+    "create": {
       "$or": [
         {
-          "data.employee_id": "{{user.data.employee_id}}"
+          "user_condition": {
+            "role": "admin"
+          }
         },
+        {
+          "user_condition": {
+            "role": "jefe_sitio"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
         {
           "created_by_id": "{{user.id}}"
         },
@@ -59,9 +74,6 @@
     },
     "update": {
       "$or": [
-        {
-          "data.employee_id": "{{user.data.employee_id}}"
-        },
         {
           "created_by_id": "{{user.id}}"
         },

@@ -46,11 +46,29 @@
     "message"
   ],
   "rls": {
-    "create": {},
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "jefe_sitio"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
+      ]
+    },
     "read": {
       "$or": [
         {
-          "data.user_id": "{{user.id}}"
+          "created_by_id": "{{user.id}}"
         },
         {
           "user_condition": {
@@ -62,7 +80,7 @@
     "update": {
       "$or": [
         {
-          "data.user_id": "{{user.id}}"
+          "created_by_id": "{{user.id}}"
         },
         {
           "user_condition": {

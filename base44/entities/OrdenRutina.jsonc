@@ -110,7 +110,25 @@
     "estado"
   ],
   "rls": {
-    "create": {},
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "jefe_sitio"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
+      ]
+    },
     "read": {
       "$and": [
         {
@@ -125,9 +143,6 @@
             },
             {
               "data.responsable_id": "{{user.id}}"
-            },
-            {
-              "data.responsable_nombre": "{{user.full_name}}"
             }
           ]
         }
@@ -144,9 +159,6 @@
               "data.responsable_id": "{{user.id}}"
             },
             {
-              "data.responsable_nombre": "{{user.full_name}}"
-            },
-            {
               "user_condition": {
                 "role": "admin"
               }
@@ -156,16 +168,9 @@
       ]
     },
     "delete": {
-      "$and": [
-        {
-          "data.sector_id": "{{user.data.sector_id}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
+      "user_condition": {
+        "role": "admin"
+      }
     }
   }
 }

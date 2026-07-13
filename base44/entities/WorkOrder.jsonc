@@ -241,7 +241,25 @@
     "status"
   ],
   "rls": {
-    "create": {},
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "jefe_sitio"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
+      ]
+    },
     "read": {
       "$and": [
         {
@@ -256,9 +274,6 @@
             },
             {
               "created_by_id": "{{user.id}}"
-            },
-            {
-              "data.assigned_name": "{{user.full_name}}"
             }
           ]
         }
@@ -278,32 +293,15 @@
               "user_condition": {
                 "role": "admin"
               }
-            },
-            {
-              "data.assigned_name": "{{user.full_name}}"
             }
           ]
         }
       ]
     },
     "delete": {
-      "$and": [
-        {
-          "data.sector_id": "{{user.data.sector_id}}"
-        },
-        {
-          "$or": [
-            {
-              "created_by_id": "{{user.id}}"
-            },
-            {
-              "user_condition": {
-                "role": "admin"
-              }
-            }
-          ]
-        }
-      ]
+      "user_condition": {
+        "role": "admin"
+      }
     }
   }
 }
