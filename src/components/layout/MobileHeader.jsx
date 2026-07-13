@@ -42,8 +42,11 @@ const ROUTE_TITLES = {
 
 function getPageTitle(pathname) {
   if (ROUTE_TITLES[pathname]) return ROUTE_TITLES[pathname];
-  for (const route of Object.keys(ROUTE_TITLES)) {
-    if (route !== '/' && pathname.startsWith(route)) return ROUTE_TITLES[route];
+  const sortedRoutes = Object.keys(ROUTE_TITLES)
+    .filter((r) => r !== '/')
+    .sort((a, b) => b.length - a.length);
+  for (const route of sortedRoutes) {
+    if (pathname.startsWith(route)) return ROUTE_TITLES[route];
   }
   return 'DH1';
 }

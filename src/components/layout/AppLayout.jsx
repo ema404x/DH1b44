@@ -104,7 +104,7 @@ export default function AppLayout() {
           </div>
         </header>
         {/* Page content — slide transitions + pull-to-refresh */}
-        <main ref={mainRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 pb-24 lg:pb-6" style={{ background: 'transparent' }}>
+        <main ref={mainRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-6 pb-24 lg:pb-6" style={{ background: 'transparent' }}>
           <PullToRefresh onRefresh={handleRefresh}>
             <AnimatePresence mode="wait" custom={direction} initial={false}>
               <motion.div

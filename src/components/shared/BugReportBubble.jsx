@@ -92,7 +92,7 @@ export default function BugReportBubble() {
             className="fixed bottom-20 lg:bottom-6 left-4 z-40 group"
           >
             <button onClick={() => setHidden(true)} title="Ocultar"
-              className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-slate-700 border border-border text-muted-foreground hover:text-white hover:bg-slate-600 flex items-center justify-center z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+              className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-slate-700 border border-border text-muted-foreground hover:text-white hover:bg-slate-600 flex items-center justify-center z-10 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
               <X className="h-3 w-3" />
             </button>
             <button
