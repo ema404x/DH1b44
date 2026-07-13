@@ -130,6 +130,18 @@ Deno.serve(async (req) => {
     const { file_url, fix = false } = await req.json();
     if (!file_url) return Response.json({ error: 'file_url requerido' }, { status: 400 });
 
+    // SSRF protection: solo permitir dominios de almacenamiento confiables
+    try {
+      const parsed = new URL(file_url);
+      if (parsed.protocol !== 'https:') return Response.json({ error: 'Solo HTTPS permitido' }, { status: 403 });
+      const ALLOWED_HOSTS = ['media.base44.com', 'storage.googleapis.com'];
+      if (!ALLOWED_HOSTS.some(h => parsed.hostname === h || parsed.hostname.endsWith('.' + h))) {
+        return Response.json({ error: 'Dominio no permitido' }, { status: 403 });
+      }
+    } catch {
+      return Response.json({ error: 'URL inválida' }, { status: 400 });
+    }
+
     const res = await fetch(file_url, { signal: AbortSignal.timeout(30000) });
     if (!res.ok) return Response.json({ error: `Descarga fallida: ${res.status}` }, { status: 400 });
     const buffer = await res.arrayBuffer();

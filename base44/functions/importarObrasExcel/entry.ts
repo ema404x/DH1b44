@@ -76,27 +76,34 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'file_url requerido y válido' }, { status: 400 });
     }
 
-    // ⚠️ SECURITY: Validar que la URL sea segura (permitir solo base44/cdn)
+    // ⚠️ SECURITY: Validar que la URL sea segura (prevenir SSRF)
     try {
       const urlObj = new URL(file_url);
-      // Permitir solo HTTPS y dominios conocidos
       if (urlObj.protocol !== 'https:') {
         return Response.json({ error: 'Solo HTTPS permitido' }, { status: 403 });
+      }
+      const ALLOWED_HOSTS = ['media.base44.com', 'storage.googleapis.com'];
+      if (!ALLOWED_HOSTS.some(h => urlObj.hostname === h || urlObj.hostname.endsWith('.' + h))) {
+        return Response.json({ error: 'Dominio no permitido' }, { status: 403 });
       }
     } catch {
       return Response.json({ error: 'URL inválida' }, { status: 400 });
     }
 
-    const res = await fetch(file_url, { signal: AbortSignal.timeout(30000) }); // timeout de 30s
+    const res = await fetch(file_url, { signal: AbortSignal.timeout(30000) });
     if (!res.ok) return Response.json({ error: `Descarga fallida: ${res.status}` }, { status: 400 });
-    
+
+    // DoS protection: verificar Content-Length antes de descargar el body
+    const MAX_SIZE = 50 * 1024 * 1024;
+    const contentLength = parseInt(res.headers.get('content-length') || '0', 10);
+    if (contentLength > MAX_SIZE) {
+      return Response.json({ error: 'Archivo demasiado grande (máx 50MB)' }, { status: 413 });
+    }
+
     const buffer = await res.arrayBuffer();
     if (buffer.byteLength === 0) {
       return Response.json({ error: 'Archivo vacío' }, { status: 400 });
     }
-    
-    // ⚠️ BUG FIX: Limitar tamaño de archivo (máx 50MB para evitar exhaustión de memoria)
-    const MAX_SIZE = 50 * 1024 * 1024;
     if (buffer.byteLength > MAX_SIZE) {
       return Response.json({ error: 'Archivo demasiado grande (máx 50MB)' }, { status: 413 });
     }

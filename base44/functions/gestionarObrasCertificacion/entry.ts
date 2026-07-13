@@ -58,13 +58,13 @@ Deno.serve(async (req) => {
       if (isSuperAdmin) return true;
       if (!obra) return false;
       if (obra.created_by_id === user.id) return true;
-      if (!emp) return false;
+      // Solo usar el empleado vinculado (admin-controlled), nunca user.full_name (user-controlled)
+      if (!emp || emp.user_id !== user.id) return false;
       const empKey = nameKey(emp.full_name);
-      const userKey = nameKey(user.full_name);
       const jefeKey = nameKey(obra.jefe_sitio);
       const inspKey = nameKey(obra.inspector);
-      return (jefeKey && (jefeKey === empKey || jefeKey === userKey))
-          || (inspKey && (inspKey === empKey || inspKey === userKey));
+      return (jefeKey && jefeKey === empKey)
+          || (inspKey && inspKey === empKey);
     };
 
     // ── LIST ──

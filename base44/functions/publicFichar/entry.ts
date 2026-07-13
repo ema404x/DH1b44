@@ -89,13 +89,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // UPLOAD file
+    // UPLOAD file — validar tipo y tamaño
     if (action === 'uploadFile') {
       const { fileBase64, fileName, mimeType } = body;
       if (!fileBase64) return Response.json({ error: 'fileBase64 requerido' }, { status: 400 });
+      const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      const finalMime = mimeType || 'image/png';
+      if (!ALLOWED_MIME.includes(finalMime)) {
+        return Response.json({ error: 'Tipo de archivo no permitido' }, { status: 400 });
+      }
+      if (fileBase64.length > 14 * 1024 * 1024) {
+        return Response.json({ error: 'Archivo demasiado grande (máx 10MB)' }, { status: 413 });
+      }
       const binary = Uint8Array.from(atob(fileBase64), c => c.charCodeAt(0));
-      const blob = new Blob([binary], { type: mimeType || 'image/png' });
-      const file = new File([blob], fileName || 'upload.png', { type: mimeType || 'image/png' });
+      const blob = new Blob([binary], { type: finalMime });
+      const file = new File([blob], fileName || 'upload.png', { type: finalMime });
       const result = await sb.integrations.Core.UploadFile({ file });
       return Response.json({ file_url: result.file_url });
     }
@@ -111,11 +119,31 @@ Deno.serve(async (req) => {
       return Response.json({ valid: password === storedPassword });
     }
 
-    // UPDATE work order
+    // UPDATE work order — validar OT activa y whitelist de campos
     if (action === 'updateWorkOrder') {
       const { workOrderId, updates } = body;
       if (!workOrderId || !updates) return Response.json({ error: 'Parámetros requeridos' }, { status: 400 });
-      const updated = await sb.entities.WorkOrder.update(workOrderId, updates);
+
+      const existing = await sb.entities.WorkOrder.filter({ id: workOrderId }).catch(() => []);
+      const workOrder = existing[0];
+      if (!workOrder) return Response.json({ error: 'OT no encontrada' }, { status: 404 });
+      if (['completada', 'cancelada'].includes(workOrder.status)) {
+        return Response.json({ error: 'No se puede modificar una OT completada o cancelada' }, { status: 403 });
+      }
+
+      const ALLOWED_FIELDS = [
+        'status', 'checklist', 'photos', 'signature_url', 'signature_name',
+        'completed_date', 'gps_latitude', 'gps_longitude', 'gps_accuracy',
+        'gps_timestamp', 'gps_status', 'fecha_inicio_real', 'notes',
+        'materials_used', 'materiales_faltantes', 'motivos_incompleto',
+        'rechazo_comentario', 'validado_por', 'fecha_validacion',
+      ];
+      const safeUpdates = {};
+      for (const key of ALLOWED_FIELDS) {
+        if (key in updates) safeUpdates[key] = updates[key];
+      }
+
+      const updated = await sb.entities.WorkOrder.update(workOrderId, safeUpdates);
       return Response.json({ success: true, workOrder: updated });
     }
 
