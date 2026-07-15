@@ -11,19 +11,74 @@ Deno.serve(async (req) => {
 
     const sb = base44.asServiceRole;
 
-    // Filtrar directamente por email en la query en lugar de traer todos los empleados
+    // ── AUTO-CURACIÓN: si ya estamos vinculados por user_id pero el email cambió,
+    //    actualizar el email de la ficha y continuar. Esto evita que un cambio
+    //    de email en la plataforma desvincule al empleado.
+    const byUserId = await sb.entities.Employee.filter({ user_id: user.id }).catch(() => []);
+    if (byUserId.length > 0) {
+      const emp = byUserId[0];
+      const empEmail = (emp.email || '').toLowerCase().trim();
+      const userEmail = (user.email || '').toLowerCase().trim();
+      if (empEmail !== userEmail && userEmail) {
+        await sb.entities.Employee.update(emp.id, { email: user.email });
+      }
+      // Continuar con la lógica normal usando este empleado
+      const employeeRole = emp.role || null;
+      const empSector = emp.sector_id || 'escuela';
+
+      const updateTasks = [];
+      const isEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const platformNameIsEmail = isEmailPattern.test((user.full_name || '').trim());
+      const platformNameDiffers = (user.full_name || '').trim() !== (emp.full_name || '').trim();
+      if (emp.full_name && (platformNameIsEmail || platformNameDiffers)) {
+        updateTasks.push(base44.auth.updateMe({ full_name: emp.full_name }).catch(err => {
+          console.warn(`[vincularEmpleado] No se pudo sincronizar full_name: ${err.message}`);
+        }));
+      }
+      const currentUserSector = user.data?.sector_id ?? null;
+      if (!currentUserSector) {
+        updateTasks.push(base44.auth.updateMe({ sector_id: empSector }).catch(err => {
+          console.warn(`[vincularEmpleado] No se pudo sincronizar sector_id: ${err.message}`);
+        }));
+      }
+
+      let employeePermissions = null;
+      if (employeeRole) {
+        const roleNorm = employeeRole.toLowerCase().trim();
+        let candidates = await sb.entities.RolePermission.filter({ role_name: employeeRole }).catch(() => []);
+        if (!candidates || candidates.length === 0) {
+          candidates = await sb.entities.RolePermission.list('-created_date', 500).catch(() => []);
+        }
+        const match = candidates.find(rp => rp.role_name?.toLowerCase().trim() === roleNorm);
+        if (match) {
+          employeePermissions = match.permissions;
+        } else {
+          console.warn(`[vincularEmpleado] Rol "${employeeRole}" no tiene RolePermission configurado.`);
+        }
+      }
+
+      await Promise.allSettled(updateTasks);
+
+      return Response.json({
+        linked: true,
+        employee_id: emp.id,
+        employee_name: emp.full_name,
+        employee_role: employeeRole,
+        employee_sector: empSector,
+        employee_permissions: employeePermissions,
+        role_matched: employeePermissions !== null,
+      });
+    }
+
+    // ── Búsqueda por email (flujo normal para primer login)
     const emailNorm = user.email.toLowerCase().trim();
     const allEmployees = await sb.entities.Employee.filter({ email: user.email }).catch(() => []);
 
-    // Fallback: si el sistema devuelve case-sensitive y no matchea, buscar manualmente
-    // pero sólo sobre el conjunto filtrado (ya pequeño)
     let matches = allEmployees.filter(
       emp => emp.email?.toLowerCase().trim() === emailNorm
     );
 
-    // Si no hay match exacto por email, intentar búsqueda amplia solo si el filtro vino vacío
     if (matches.length === 0 && allEmployees.length === 0) {
-      // Última instancia: traer todos y filtrar (fallback para sistemas donde el filtro no funciona por case)
       const allFallback = await sb.entities.Employee.list('-created_date', 2000).catch(() => []);
       matches = allFallback.filter(emp => emp.email?.toLowerCase().trim() === emailNorm);
     }
