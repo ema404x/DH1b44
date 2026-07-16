@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle2, XCircle, MessageSquare, Paperclip, TrendingUp, DollarSign, Calendar, User, Building2, CheckSquare, ArrowLeft, Clock, FileText, ChevronDown, ChevronUp, ExternalLink, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, MessageSquare, Paperclip, TrendingUp, DollarSign, Calendar, User, Building2, CheckSquare, ArrowLeft, Clock, FileText, ChevronDown, ChevronUp, Download, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -59,23 +59,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
     enabled: !!solicitud.certificado_id,
   });
 
-  const handleTogglePdf = async () => {
-    if (showPdf) { setShowPdf(false); return; }
-
-    // Si ya hay un pdf_url guardado, usarlo directo
-    if (certificado?.pdf_url && !pdfBlobUrl) {
-      setPdfBlobUrl(certificado.pdf_url);
-      setShowPdf(true);
-      return;
-    }
-
-    // Si ya generamos el blob, solo mostrar
-    if (pdfBlobUrl) { setShowPdf(true); return; }
-
-    if (!certificado) return;
-    setGenerandoPdf(true);
-
-    // Importar dinámicamente
+  const generarPdfBlob = async (cert) => {
     const [{ exportCertificadoPDF: exportFn }, jsPDFModule] = await Promise.all([
       import('@/utils/exportCertificadoPDF'),
       import('jspdf'),
@@ -84,16 +68,56 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
 
     // Monkey-patch save para capturar el blob en lugar de descargar
     const origSave = jsPDFClass.prototype.save;
-    jsPDFClass.prototype.save = function() {
-      const blob = this.output('blob');
-      const url = URL.createObjectURL(blob);
+    return new Promise((resolve, reject) => {
+      jsPDFClass.prototype.save = function() {
+        const blob = this.output('blob');
+        const url = URL.createObjectURL(blob);
+        resolve(url);
+      };
+      exportFn(cert).then(() => {
+        jsPDFClass.prototype.save = origSave;
+      }).catch(err => {
+        jsPDFClass.prototype.save = origSave;
+        reject(err);
+      });
+    });
+  };
+
+  const handleTogglePdf = async () => {
+    if (showPdf) { setShowPdf(false); return; }
+
+    if (pdfBlobUrl) { setShowPdf(true); return; }
+    if (!certificado) return;
+    setGenerandoPdf(true);
+
+    try {
+      const url = await generarPdfBlob(certificado);
       setPdfBlobUrl(url);
       setShowPdf(true);
-    };
-    try {
-      await exportFn(certificado);
+    } catch (err) {
+      toast.error('Error al generar el PDF');
     } finally {
-      jsPDFClass.prototype.save = origSave;
+      setGenerandoPdf(false);
+    }
+  };
+
+  const handleDescargarPdf = async () => {
+    if (!certificado) return;
+    setGenerandoPdf(true);
+    try {
+      // Regenerar el PDF siempre — así incluye la firma del gerente si ya fue aprobado
+      const url = await generarPdfBlob(certificado);
+      setPdfBlobUrl(url);
+      // Trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Certificado_${certificado.numero || ''}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      toast.error('Error al descargar el PDF');
+    } finally {
       setGenerandoPdf(false);
     }
   };
@@ -111,6 +135,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['solicitudes-cert'] });
+      qc.invalidateQueries({ queryKey: ['certificado-sol', solicitud.certificado_id] });
       toast.success('Solicitud actualizada');
       onSaved();
     }
@@ -234,12 +259,18 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {pdfBlobUrl && (
-                  <a href={pdfBlobUrl} download={`Certificado_${certificado?.numero || ''}.pdf`}
-                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                )}
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="gap-2 flex-shrink-0"
+                  onClick={handleDescargarPdf}
+                  disabled={!certificado || generandoPdf}
+                >
+                  {generandoPdf
+                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generando...</>
+                    : <><Download className="h-3.5 w-3.5" /> Descargar</>
+                  }
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -247,11 +278,9 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
                   onClick={handleTogglePdf}
                   disabled={!certificado || generandoPdf}
                 >
-                  {generandoPdf
-                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generando...</>
-                    : showPdf
-                      ? <><ChevronUp className="h-3.5 w-3.5" /> Ocultar PDF</>
-                      : <><ChevronDown className="h-3.5 w-3.5" /> Ver PDF</>
+                  {showPdf
+                    ? <><ChevronUp className="h-3.5 w-3.5" /> Ocultar</>
+                    : <><ChevronDown className="h-3.5 w-3.5" /> Ver PDF</>
                   }
                 </Button>
               </div>
@@ -342,9 +371,24 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
       {solicitud.estado === 'aprobada' && (
         <Card className="border-emerald-200 bg-emerald-50/30">
           <CardContent className="p-4 space-y-2">
-            <p className="text-xs font-semibold uppercase text-emerald-700 mb-2 flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Aprobado por {solicitud.aprobado_por}
-            </p>
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-xs font-semibold uppercase text-emerald-700 mb-2 flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Aprobado por {solicitud.aprobado_por}
+              </p>
+              {solicitud.certificado_id && (
+                <Button
+                  size="sm"
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={handleDescargarPdf}
+                  disabled={!certificado || generandoPdf}
+                >
+                  {generandoPdf
+                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generando...</>
+                    : <><Download className="h-3.5 w-3.5" /> Descargar certificado</>
+                  }
+                </Button>
+              )}
+            </div>
             <div className="flex items-center gap-4">
               {solicitud.firma_gerente_url && (
                 <img src={solicitud.firma_gerente_url} alt="Firma del gerente" className="h-16 object-contain border rounded bg-white p-1" />
