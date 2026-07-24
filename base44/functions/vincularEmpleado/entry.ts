@@ -43,6 +43,9 @@ Deno.serve(async (req) => {
       const employeeRole = emp.role || null;
       const empSector = emp.sector_id || 'escuela';
 
+      // Sincronizar rol de plataforma (gerente / user) según el rol del empleado
+      syncPlatformRole(user.id, employeeRole, user.role);
+
       const updateTasks = [];
       const isEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const platformNameIsEmail = isEmailPattern.test((user.full_name || '').trim());
@@ -115,6 +118,9 @@ Deno.serve(async (req) => {
 
     const employeeRole = emp.role || null;
     const empSector = emp.sector_id || 'escuela';
+
+    // Sincronizar rol de plataforma (gerente / user) según el rol del empleado
+    syncPlatformRole(user.id, employeeRole, user.role);
 
     // Iniciar updates (user_id sync + full_name sync) — corren en paralelo con el lookup de permisos
     const updateTasks = [];

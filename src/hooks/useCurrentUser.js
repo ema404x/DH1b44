@@ -35,6 +35,7 @@ export function useCurrentUser() {
   // 2. Tiene un rol de empleado con visibilidad total
   const isSuperAdmin = 
     (currentUser?.role === 'admin' && !FIELD_ROLES.includes(employeeRole?.toLowerCase?.())) ||
+    currentUser?.role === 'gerente' ||
     ADMIN_EMPLOYEE_ROLES.includes(employeeRole?.toLowerCase?.());
 
   // Alias para compatibilidad — si es superAdmin se llama "admin"
