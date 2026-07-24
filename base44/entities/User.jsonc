@@ -6,7 +6,8 @@
       "type": "string",
       "enum": [
         "admin",
-        "user"
+        "user",
+        "gerente"
       ],
       "default": "user"
     },
