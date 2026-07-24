@@ -11,6 +11,23 @@ Deno.serve(async (req) => {
 
     const sb = base44.asServiceRole;
 
+    // ── Sincronizar el rol de plataforma según el rol del empleado.
+    //    "Gerencia" → "gerente" (rol con visibilidad total de OTs y módulos).
+    //    Cualquier otro rol → "user" (a menos que sea admin, que se respeta).
+    const GERENTE_ROLES = ['gerencia', 'gerente'];
+    async function syncPlatformRole(userId, employeeRole, currentPlatformRole) {
+      const empRoleNorm = (employeeRole || '').toLowerCase().trim();
+      const shouldBe = GERENTE_ROLES.includes(empRoleNorm) ? 'gerente' : 'user';
+      // No degradar un admin de plataforma
+      if (currentPlatformRole === 'admin') return;
+      if (currentPlatformRole === shouldBe) return;
+      try {
+        await sb.entities.User.update(userId, { role: shouldBe });
+      } catch (err) {
+        console.warn(`[vincularEmpleado] No se pudo sincronizar role: ${err.message}`);
+      }
+    }
+
     // ── AUTO-CURACIÓN: si ya estamos vinculados por user_id pero el email cambió,
     //    actualizar el email de la ficha y continuar. Esto evita que un cambio
     //    de email en la plataforma desvincule al empleado.
