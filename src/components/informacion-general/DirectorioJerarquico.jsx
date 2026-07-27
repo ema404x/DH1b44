@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useUbicaciones } from '@/hooks/useUbicaciones';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,9 +35,7 @@ export default function DirectorioJerarquico() {
       }
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['direcciones'] });
-      queryClient.invalidateQueries({ queryKey: ['locations'] });
-      queryClient.invalidateQueries({ queryKey: ['locations-crear-ot'] });
+      queryClient.invalidateQueries({ queryKey: ['ubicaciones-unificadas'] });
       if (variables.data.inspector !== undefined) {
         toast.success('Inspector actualizado en dirección y escuelas vinculadas');
         setEditingInspector(null);
@@ -50,15 +49,8 @@ export default function DirectorioJerarquico() {
     },
   });
 
-  const { data: direcciones = [] } = useQuery({
-    queryKey: ['direcciones'],
-    queryFn: () => base44.entities.Direccion.list('-updated_date', 500),
-  });
-
-  const { data: escuelas = [] } = useQuery({
-    queryKey: ['escuelas'],
-    queryFn: () => base44.entities.LocationData.list('-updated_date', 500),
-  });
+  // Hook unificado — trae Direccion + LocationData via service role (sin RLS)
+  const { locations: escuelas = [], direcciones = [] } = useUbicaciones();
 
   // Mapear escuelas por dirección
   const directorioCompleto = useMemo(() => {

@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MapPin, Search, X, CheckCircle2, User } from 'lucide-react';
+import { useUbicaciones } from '@/hooks/useUbicaciones';
 
 /**
  * LocationEditor — muestra un buscador inline para asignar dirección + jefe de sitio.
@@ -17,24 +16,8 @@ export default function LocationEditor({ currentLocation, currentAssigned, onSav
   const inputRef = useRef(null);
   const containerRef = useRef(null);
 
-  // LocationData — fuente de verdad de establecimientos (igual que CrearOT e Información General)
-  const { data: locationData = [] } = useQuery({
-    queryKey: ['location-data-editor'],
-    queryFn: () => base44.entities.LocationData.list('establecimiento', 5000),
-    staleTime: 300_000,
-  });
-  // Direccion — join via direccion_id para resolver la dirección real de cada establecimiento
-  const { data: direcciones = [] } = useQuery({
-    queryKey: ['direcciones-editor'],
-    queryFn: () => base44.entities.Direccion.list('direccion', 5000),
-    staleTime: 300_000,
-  });
-  // LocationQR — solo para obtener el QR id
-  const { data: locationQRs = [] } = useQuery({
-    queryKey: ['location-qrs-editor'],
-    queryFn: () => base44.entities.LocationQR.list('name', 5000),
-    staleTime: 300_000,
-  });
+  // Hook unificado — trae LocationData + Direccion + LocationQR via service role (sin RLS)
+  const { locations: unifiedLocations, isLoading } = useUbicaciones();
 
   // Cerrar al click externo
   useEffect(() => {
@@ -47,30 +30,20 @@ export default function LocationEditor({ currentLocation, currentAssigned, onSav
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Lista unificada: base = LocationData, enriquecida con QR id si existe
-  // Join con Direccion via direccion_id para resolver la dirección real
-  const norm = (s) => (s || '').toLowerCase().trim();
-  const unifiedLocations = useMemo(() =>
-    locationData.map(ld => {
-      const dir = direcciones.find(d => d.id === ld.direccion_id);
-      const address = dir?.direccion || '';
-      const qr = locationQRs.find(q =>
-        norm(q.name) === norm(ld.establecimiento) ||
-        norm(q.address) === norm(address)
-      );
-      return {
-        id: qr?.id || ld.id,
-        name: ld.establecimiento || ld.ubic_tecnica || '',
-        address,
-        jefe_sitio: ld.jefe_sitio || dir?.jefe_sitio || '',
-        _hasQR: !!qr,
-      };
-    })
-  , [locationData, locationQRs, direcciones]);
+  // La lista unificada ya viene pre-joinada desde el backend
+  const mappedLocations = useMemo(() =>
+    unifiedLocations.map(ld => ({
+      id: ld.location_qr_id || ld.id,
+      name: ld.establecimiento || ld.ubic_tecnica || '',
+      address: ld.direccion || '',
+      jefe_sitio: ld.jefe_sitio || '',
+      _hasQR: ld._hasQR,
+    }))
+  , [unifiedLocations]);
 
   // Filtro de sugerencias
   const suggestions = query.trim().length >= 2
-    ? unifiedLocations.filter(loc => {
+    ? mappedLocations.filter(loc => {
         const q = query.toLowerCase();
         return (
           loc.name?.toLowerCase().includes(q) ||

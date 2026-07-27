@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useUbicaciones } from '@/hooks/useUbicaciones';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,15 +33,7 @@ export default function InformacionGeneral() {
   const { plural, singular, label, sectorId } = useSectorConfig();
   const isBapro = sectorId === 'bapro';
 
-  const { data: locations = [], isLoading, refetch } = useQuery({
-    queryKey: ['locations'],
-    queryFn: () => base44.entities.LocationData.list('-created_date', 500),
-  });
-
-  const { data: direcciones = [] } = useQuery({
-    queryKey: ['direcciones'],
-    queryFn: () => base44.entities.Direccion.list('-updated_date', 500),
-  });
+  const { locations, direcciones, isLoading, refetch } = useUbicaciones();
 
   const stats = useMemo(() => ({
     total: locations.length,

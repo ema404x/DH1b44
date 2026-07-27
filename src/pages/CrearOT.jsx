@@ -5,6 +5,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useUbicaciones } from '@/hooks/useUbicaciones';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -152,54 +153,31 @@ export default function CrearOT() {
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
-  // LocationData es la fuente de verdad de establecimientos (misma que Información General)
-  const { data: locationData = [], isLoading: loadingLocations } = useQuery({
-    queryKey: ['location-data-ot'],
-    queryFn: () => base44.entities.LocationData.list('establecimiento', 5000),
-    staleTime: 300000,
-  });
+  // Hook unificado — trae LocationData + Direccion + LocationQR via service role (sin RLS)
+  // Garantiza que todos los usuarios vean el listado completo de direcciones.
+  const { locations: rawLocations = [], locationQRs = [], isLoading: loadingLocations } = useUbicaciones();
+  // Alias para compatibilidad con handleSelectLocation (fallback por dirección)
+  const direcciones = rawLocations;
 
-  // LocationQR — solo para obtener el QR id al seleccionar
-  const { data: locationQRs = [] } = useQuery({
-    queryKey: ['locations-qr-ot'],
-    queryFn: () => base44.entities.LocationQR.list('name', 5000),
-    staleTime: 300000,
-  });
-
-  // Direccion — para resolver la dirección real de cada LocationData via direccion_id
-  const { data: direcciones = [] } = useQuery({
-    queryKey: ['direcciones-ot'],
-    queryFn: () => base44.entities.Direccion.list('direccion', 2000),
-    staleTime: 300000,
-  });
-
-  // Construir lista unificada de ubicaciones para el buscador:
-  // base = LocationData (todos los establecimientos), enriquecida con QR id si existe
+  // Construir lista unificada de ubicaciones para el buscador.
+  // El join LocationData ↔ Direccion ya viene hecho desde el backend.
   const activeLocations = useMemo(() => {
     const norm = s => (s || '').toLowerCase().trim();
-
-    // 1. LocationData (fuente principal — todos los establecimientos)
-    //    Join con Direccion via direccion_id para resolver la dirección real
     const matchedQRNames = new Set();
-    const fromLD = locationData.map(ld => {
-      const dir = direcciones.find(d => d.id === ld.direccion_id);
-      const address = dir?.direccion || '';
-      const qr = locationQRs.find(q =>
-        norm(q.name) === norm(ld.establecimiento) ||
-        norm(q.address) === norm(address) ||
-        norm(q.name) === norm(ld.ubic_tecnica)
-      );
-      if (qr) matchedQRNames.add(norm(qr.name));
+
+    // 1. LocationData con dirección y QR ya resueltos
+    const fromLD = rawLocations.map(ld => {
+      if (ld.location_qr_id) matchedQRNames.add(norm(ld.establecimiento));
       return {
-        id: qr?.id || ld.id,
+        id: ld.location_qr_id || ld.id,
         name: ld.establecimiento || ld.ubic_tecnica,
-        address,
-        jefe_sitio: ld.jefe_sitio || dir?.jefe_sitio || '',
-        inspector: ld.inspector || dir?.inspector || '',
-        comuna: ld.comuna || dir?.comuna || '',
-        project_name: qr?.project_name || '',
+        address: ld.direccion || '',
+        jefe_sitio: ld.jefe_sitio || '',
+        inspector: ld.inspector || '',
+        comuna: ld.comuna || '',
+        project_name: ld.project_name || '',
         _locationDataId: ld.id,
-        _hasQR: !!qr,
+        _hasQR: ld._hasQR,
       };
     });
 
@@ -219,7 +197,7 @@ export default function CrearOT() {
       }));
 
     return [...fromLD, ...fromQR];
-  }, [locationData, locationQRs, direcciones]);
+  }, [rawLocations, locationQRs]);
 
   // Empleados activos para asignación responsable
   const { data: employees = [] } = useQuery({
