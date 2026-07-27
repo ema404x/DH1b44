@@ -108,19 +108,16 @@ export const AuthProvider = ({ children }) => {
           continue;
         }
         console.warn('[AuthContext] vincularEmpleado failed after retries:', error?.message);
-        // NUNCA bloquear al usuario por un error de red/servidor.
-        // Conservar permisos previos si existen; si no, dar acceso mínimo.
+        // Si hay permisos previos (sesión anterior), conservarlos para no
+        // bloquear al usuario por un blip de red.
+        // Si NO hay estado previo (primer login), marcar vinculationFailed
+        // para que la UI muestre "Error de conexión" con botón Reintentar,
+        // en lugar de "Acceso denegado" o "Cuenta sin vincular".
         if (currentUser?.role === 'admin') {
-          // Los admins siempre tienen acceso
+         // Los admins siempre tienen acceso
         } else if (!userPermissions) {
-          // Solo si no hay estado previo, dar permisos mínimos
-          setUserPermissions({
-            _employeeRole: 'user',
-            _employeeName: currentUser?.full_name || null,
-            _employeeSector: currentUser?.data?.sector_id || 'escuela',
-          });
+         setVinculationFailed(true);
         }
-        // No marcar vinculationFailed=true — el usuario mantiene acceso
       }
     }
   };

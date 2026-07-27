@@ -77,7 +77,10 @@ Deno.serve(async (req) => {
         }
       }
 
-      await Promise.allSettled(updateTasks);
+      // Fire-and-forget: los updates de nombre/sector no deben bloquear
+      // la respuesta. Los permisos son lo que el frontend necesita para
+      // desbloquear el acceso; la sincronización puede completar en paralelo.
+      Promise.allSettled(updateTasks).catch(() => {});
 
       return Response.json({
         linked: true,
@@ -178,8 +181,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Asegurar que los updates completaron antes de responder
-    await Promise.allSettled(updateTasks);
+    // Fire-and-forget: los updates de user_id/nombre/sector no deben bloquear
+    // la respuesta. Los permisos son lo que el frontend necesita para
+    // desbloquear el acceso; la sincronización puede completar en paralelo.
+    Promise.allSettled(updateTasks).catch(() => {});
 
     return Response.json({
       linked: true,

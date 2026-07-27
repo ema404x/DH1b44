@@ -60,6 +60,9 @@ export default function ProtectedPage({ moduleKey, children }) {
   }
 
   if (!allowed) {
+    // hasEmployeeRecord === null → la vinculación no pudo completarse (timeout/red)
+    // pero no sabemos si el empleado existe. No mostrar "Cuenta sin vincular".
+    // false → efectivamente no hay ficha de empleado vinculada.
     const notLinked = hasEmployeeRecord === false;
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-6">
@@ -74,6 +77,11 @@ export default function ProtectedPage({ moduleKey, children }) {
               : 'No tenés permiso para ver esta sección. Contactá a un administrador para solicitar acceso.'}
           </p>
         </div>
+        {notLinked && (
+          <Button onClick={retryVinculation} variant="outline" className="gap-2">
+            <RefreshCw className="h-4 w-4" /> Reintentar vinculación
+          </Button>
+        )}
       </div>
     );
   }
