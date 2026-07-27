@@ -58,26 +58,7 @@
         "role": "admin"
       }
     },
-    "read": {
-      "$or": [
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "gerente"
-          }
-        },
-        {
-          "data.jefe_sitio": "{{user.full_name}}"
-        },
-        {
-          "data.inspector": "{{user.full_name}}"
-        }
-      ]
-    },
+    "read": {},
     "update": {
       "user_condition": {
         "role": "admin"
