@@ -85,6 +85,11 @@
               }
             },
             {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
               "data.jefe_sitio": "{{user.full_name}}"
             },
             {
