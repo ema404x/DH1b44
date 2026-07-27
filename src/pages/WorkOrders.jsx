@@ -319,11 +319,11 @@ export default function WorkOrders() {
       {/* Kanban */}
       {!modoCampo && viewMode === 'kanban' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          {visibleOrders.length === 0 && !isLoading ? (
+          {filtered.length === 0 && !isLoading ? (
             <EmptyState icon={ClipboardList} title="No hay órdenes" description="Creá una nueva orden de trabajo" actionLabel="Nueva OT" onAction={() => navigate('/crear-ot')} />
           ) : (
             <KanbanBoard
-              orders={visibleOrders}
+              orders={filtered}
               onOpen={setSelectedOrder}
               onShowQR={setQrOrder}
               onStatusChange={handleStatusChange}
