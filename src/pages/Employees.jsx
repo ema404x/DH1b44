@@ -163,7 +163,7 @@ export default function Employees() {
       }
       // No hay usuario de plataforma con ese email → limpiar user_id stale
       if (emp.user_id) {
-        await base44.entities.Employee.update(emp.id, { user_id: '' });
+        await base44.entities.Employee.update(emp.id, { user_id: null });
       }
       return { matched: false };
     },
@@ -175,6 +175,9 @@ export default function Employees() {
       } else {
         toast({ title: 'Sin usuario coincidente', description: 'No hay usuario de plataforma con ese email. Invitalo primero.', variant: 'destructive' });
       }
+    },
+    onError: (err) => {
+      toast({ title: 'Error al re-vincular', description: err?.message || 'No se pudo completar la operación.', variant: 'destructive' });
     }
   });
 
