@@ -20,7 +20,10 @@ export default function InformesTabla({ informes, onEdit, onDelete, isLoading, h
 
   const filtered = informes.filter(i =>
     !search ||
-    i.titulo?.toLowerCase().includes(search.toLowerCase())
+    i.titulo?.toLowerCase().includes(search.toLowerCase()) ||
+    i.codigo?.toLowerCase().includes(search.toLowerCase()) ||
+    i.responsable?.toLowerCase().includes(search.toLowerCase()) ||
+    i.descripcion?.toLowerCase().includes(search.toLowerCase())
   );
 
   const today = new Date();
@@ -71,7 +74,7 @@ export default function InformesTabla({ informes, onEdit, onDelete, isLoading, h
             </TableHeader>
             <TableBody>
               {filtered.map(informe => (
-                <TableRow key={informe.id} className={`group ${highlight === 'vencido' ? 'bg-red-50/40' : ''}`}>
+                <TableRow key={informe.id} className={`group ${highlight === 'vencido' ? 'bg-red-950/30' : ''}`}>
                   <TableCell>
                     <div className="flex items-start gap-2">
                       <div>

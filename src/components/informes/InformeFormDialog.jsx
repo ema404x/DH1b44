@@ -48,7 +48,21 @@ export default function InformeFormDialog({ open, onOpenChange, initialData, onS
 
   const set = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
 
-  const handleSubmit = (e) => { e.preventDefault(); onSave(form); };
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const today = new Date().toISOString().split('T')[0];
+    const prevEstado = initialData?.estado;
+    const patch = {};
+    // Auto-set fecha_envio al pasar a enviado
+    if (form.estado === 'enviado' && prevEstado !== 'enviado' && !form.fecha_envio) {
+      patch.fecha_envio = today;
+    }
+    // Auto-set fecha_aprobacion al pasar a aprobado
+    if (form.estado === 'aprobado' && prevEstado !== 'aprobado' && !form.fecha_aprobacion) {
+      patch.fecha_aprobacion = today;
+    }
+    onSave({ ...form, ...patch });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -68,7 +82,10 @@ export default function InformeFormDialog({ open, onOpenChange, initialData, onS
             </div>
             <div className="space-y-1.5">
               <Label>Tipo</Label>
-              <Input value="Mantenimiento" disabled className="bg-muted" />
+              <Select value={form.tipo || 'mantenimiento'} onValueChange={v => set('tipo', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{tipoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Estado</Label>

@@ -6,19 +6,19 @@ export default function InformesStats({ informes, vencidos }) {
   const stats = [
     {
       label: 'Total Informes', value: informes.length,
-      icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50',
+      icon: FileText, color: 'text-blue-400', bg: 'bg-blue-500/10',
     },
     {
       label: 'Pendientes', value: informes.filter(i => ['pendiente', 'en_preparacion'].includes(i.estado)).length,
-      icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50',
+      icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/10',
     },
     {
       label: 'Entregados', value: informes.filter(i => ['enviado', 'aprobado'].includes(i.estado)).length,
-      icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50',
+      icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/10',
     },
     {
       label: 'Vencidos / Urgentes', value: vencidos.length,
-      icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50',
+      icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/10',
     },
   ];
 
