@@ -166,6 +166,13 @@ export default function CrearOT() {
     staleTime: 300000,
   });
 
+  // Direccion — para resolver la dirección real de cada LocationData via direccion_id
+  const { data: direcciones = [] } = useQuery({
+    queryKey: ['direcciones-ot'],
+    queryFn: () => base44.entities.Direccion.list('direccion', 2000),
+    staleTime: 300000,
+  });
+
   // Construir lista unificada de ubicaciones para el buscador:
   // base = LocationData (todos los establecimientos), enriquecida con QR id si existe
   const activeLocations = useMemo(() => {
@@ -213,13 +220,6 @@ export default function CrearOT() {
 
     return [...fromLD, ...fromQR];
   }, [locationData, locationQRs, direcciones]);
-
-  // Para cruzar jefe de sitio por dirección (fallback)
-  const { data: direcciones = [] } = useQuery({
-    queryKey: ['direcciones-ot'],
-    queryFn: () => base44.entities.Direccion.list('direccion', 2000),
-    staleTime: 300000,
-  });
 
   // Empleados activos para asignación responsable
   const { data: employees = [] } = useQuery({
