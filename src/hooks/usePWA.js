@@ -32,6 +32,16 @@ export function usePWA() {
           });
         })
         .catch((err) => console.warn('[PWA] SW registration failed:', err));
+
+      // Recargar cuando el nuevo SW tome control (garantiza código fresco)
+      if (navigator.serviceWorker.controller) {
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
+        });
+      }
     }
 
     // Capturar el prompt de instalación

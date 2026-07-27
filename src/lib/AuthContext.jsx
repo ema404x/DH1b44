@@ -67,74 +67,48 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Vincula al usuario con su ficha de empleado y carga permisos.
-  // Reintenta hasta 2 veces antes de marcar como fallido (evita "acceso denegado" por blips de red).
-  // Si la función falla, intenta cargar permisos directamente desde las entidades (fallback).
+  // ESTRATEGIA: cargar permisos directamente desde el SDK (primario) + invocar
+  // vincularEmpleado en background para sincronizar metadatos (fire-and-forget).
+  // Esto elimina la dependencia de la función backend para desbloquear el acceso.
   const linkEmployee = async (currentUser) => {
-    const maxAttempts = 2;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        const vinculacionPromise = base44.functions.invoke('vincularEmpleado', {});
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 20000)
-        );
-        const vinculacion = await Promise.race([vinculacionPromise, timeoutPromise]);
+    if (currentUser?.role === 'admin') return; // Los admins siempre tienen acceso
 
-        // Guard: respuesta malformada (sin data o sin campo linked) → tratar como fallo
-        if (!vinculacion?.data || typeof vinculacion.data.linked !== 'boolean') {
-          throw new Error('malformed_response');
-        }
-
-        if (vinculacion.data.linked) {
-          const perms = vinculacion.data.employee_permissions || {};
-          setHasEmployeeRecord(!vinculacion.data.fallback);
-          setUserPermissions({
-            ...perms,
-            _employeeRole: vinculacion.data.employee_role || null,
-            _employeeName: vinculacion.data.employee_name || null,
-            _employeeSector: vinculacion.data.employee_sector || 'escuela',
-          });
-        } else {
-          setHasEmployeeRecord(false);
-        }
-        setVinculationFailed(false);
-        return;
-      } catch (error) {
-        if (attempt < maxAttempts) {
-          await new Promise(r => setTimeout(r, 1500));
-          continue;
-        }
-        console.warn('[AuthContext] vincularEmpleado failed after retries:', error?.message);
-
-        // ── FALLBACK: cargar permisos directamente desde las entidades ──
-        // Si la función falla pero el usuario está autenticado, intentamos
-        // resolver su ficha de empleado y permisos directamente con el SDK.
-        // Esto evita bloquear al usuario por un fallo transitorio del backend.
-        if (currentUser?.role === 'admin') {
-          return; // Los admins siempre tienen acceso
-        }
-        try {
-          const fallbackPerms = await loadPermissionsDirectly(currentUser);
-          if (fallbackPerms) {
-            setVinculationFailed(false);
-            return;
-          }
-        } catch (e) {
-          console.warn('[AuthContext] Fallback permission load failed:', e?.message);
-        }
-        setVinculationFailed(true);
-      }
+    // 1) Cargar permisos directamente desde el SDK — flujo primario
+    try {
+      await loadPermissionsDirectly(currentUser);
+      setVinculationFailed(false);
+    } catch (e) {
+      console.warn('[AuthContext] Direct permission load failed:', e?.message);
+      setVinculationFailed(true);
     }
+
+    // 2) Invocar vincularEmpleado en background para sincronizar metadatos
+    //    (rol de plataforma, sector_id, nombre). No bloquea el acceso.
+    base44.functions.invoke('vincularEmpleado', {}).catch(() => {});
   };
 
   // Carga permisos directamente desde Employee + RolePermission (sin backend function)
   const loadPermissionsDirectly = async (currentUser) => {
-    if (!currentUser?.email) return null;
-    // Buscar ficha de empleado por email
-    const employees = await base44.entities.Employee.filter({ email: currentUser.email });
-    const emp = employees.find(
-      e => e.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()
-    );
-    if (!emp) return null;
+    if (!currentUser?.email) return false;
+
+    // Buscar ficha de empleado — primero por user_id, luego por email
+    let emp = null;
+    try {
+      const byUserId = await base44.entities.Employee.filter({ user_id: currentUser.id });
+      emp = byUserId[0];
+    } catch (_) { /* RLS puede bloquear — intentar por email */ }
+
+    if (!emp) {
+      const byEmail = await base44.entities.Employee.filter({ email: currentUser.email });
+      emp = byEmail.find(
+        e => e.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()
+      );
+    }
+
+    if (!emp) {
+      setHasEmployeeRecord(false);
+      return false;
+    }
 
     // Buscar permisos del rol
     let perms = {};

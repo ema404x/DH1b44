@@ -1,5 +1,5 @@
-// DH1 ERP — Service Worker v1.0
-const CACHE_NAME = 'dh1-erp-v1';
+// DH1 ERP — Service Worker v2.0
+const CACHE_NAME = 'dh1-erp-v2';
 const OFFLINE_URL = '/offline.html';
 
 // Recursos que se cachean en la instalación
@@ -14,7 +14,6 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(PRECACHE_ASSETS).catch(() => {
-        // Si falla algún asset, continuar igual
         return Promise.resolve();
       });
     })
@@ -22,7 +21,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// ── Activación ───────────────────────────────────────────────────────────────
+// ── Activación — limpiar TODAS las caches viejas ─────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -30,6 +29,10 @@ self.addEventListener('activate', (event) => {
     )
   );
   self.clients.claim();
+  // Forzar a todos los clientes a recargar para obtener el nuevo código
+  self.clients.matchAll().then((clients) => {
+    clients.forEach((client) => client.navigate(client.url));
+  });
 });
 
 // ── Estrategia de fetching ───────────────────────────────────────────────────
@@ -58,21 +61,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Para assets JS/CSS/fonts: Stale-While-Revalidate
+  // Para assets JS/CSS/fonts: Network-first (NO stale-while-revalidate)
+  // Esto garantiza que siempre se cargue la versión más reciente del código.
   if (
     url.pathname.match(/\.(js|css|woff2?|png|jpg|svg|ico)$/) ||
     url.pathname.startsWith('/assets/')
   ) {
     event.respondWith(
-      caches.open(CACHE_NAME).then((cache) =>
-        cache.match(request).then((cached) => {
-          const networkFetch = fetch(request).then((res) => {
-            cache.put(request, res.clone());
-            return res;
-          });
-          return cached || networkFetch;
+      fetch(request)
+        .then((res) => {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(request, clone));
+          return res;
         })
-      )
+        .catch(() => caches.match(request).then((cached) => cached || new Response('', { status: 504 })))
     );
     return;
   }
@@ -99,14 +101,12 @@ async function syncWorkOrders() {
 
       if (response.ok) {
         await deletePending(db, item.id);
-        // Notificar a los clientes activos
         const clients = await self.clients.matchAll();
         clients.forEach((client) =>
           client.postMessage({ type: 'SYNC_SUCCESS', orderId: item.localId })
         );
       }
     } catch (err) {
-      // Dejar en cola para el próximo intento
       console.log('[SW] Sync failed for', item.localId, '— will retry');
     }
   }
