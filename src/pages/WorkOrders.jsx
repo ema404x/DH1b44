@@ -261,13 +261,13 @@ export default function WorkOrders() {
             />
           </div>
           <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
-            {['all', 'pendiente', 'en_progreso', 'completada'].map(tab => (
+            {['all', 'pendiente', 'asignada', 'en_progreso', 'pendiente_validacion', 'completada', 'cancelada'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setStatusTab(tab)}
-                className={`text-xs px-3 py-1.5 rounded font-medium transition-all ${statusTab === tab ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
+                className={`text-xs px-3 py-1.5 rounded font-medium transition-all whitespace-nowrap ${statusTab === tab ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
               >
-                {tab === 'all' ? 'Todas' : tab.replace('_', ' ')}
+                {tab === 'all' ? 'Todas' : tab === 'pendiente_validacion' ? 'Validación' : tab.replace('_', ' ')}
               </button>
             ))}
           </div>

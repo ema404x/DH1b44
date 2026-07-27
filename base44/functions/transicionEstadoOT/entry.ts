@@ -70,10 +70,11 @@ Deno.serve(async (req) => {
 
     const nuevoEstado = fija ? fija.hacia : flexible.hacia;
 
-    // Permisos: aprobar/rechazar solo jefe
-    const esJefe = user.role === 'admin' || (extra_data.rol === 'jefe_sitio');
+    // Permisos: aprobar/rechazar solo jefe de sitio, admin o gerente
+    const userRole = user.role || '';
+    const esJefe = ['admin', 'gerente', 'jefe_sitio'].includes(userRole);
     if ((accion === 'aprobar' || accion === 'rechazar') && !esJefe) {
-      return Response.json({ error: 'Solo el Jefe de Sitio puede aprobar o rechazar OTs' }, { status: 403 });
+      return Response.json({ error: 'Solo el Jefe de Sitio, Admin o Gerente puede aprobar o rechazar OTs' }, { status: 403 });
     }
 
     // Validar asignado para "asignar"

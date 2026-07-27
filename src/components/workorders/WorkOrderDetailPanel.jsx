@@ -139,12 +139,18 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const latestRef = useRef(data);
   const mountedRef = useRef(true);
   useEffect(() => { latestRef.current = data; }, [data]);
-  // Cleanup: cancelar timer pendiente y marcar como desmontado al cerrar el panel
+  // Cleanup: al desmontar, si hay un save pendiente (debounce), ejecutarlo inmediatamente
+  // en lugar de cancelarlo — previene pérdida de datos al cerrar el panel rápido.
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      clearTimeout(saveTimerRef.current);
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+        // Fire-and-forget: envía el último estado al servidor antes de desmontar
+        saveMutationRef.current.mutate(latestRef.current);
+      }
     };
   }, []);
 
