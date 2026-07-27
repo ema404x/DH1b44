@@ -18,12 +18,57 @@ Deno.serve(async (req) => {
     const en7dias = new Date(ahora); en7dias.setDate(ahora.getDate() + 7);
 
     // Traer datos
-    const [pendientes, ots, emergencias, users] = await Promise.all([
+    const [pendientes, ots, emergencias, users, timeLogs, attendanceLogs] = await Promise.all([
       sb.entities.Pendiente.list('-created_date', 500),
       sb.entities.WorkOrder.list('-created_date', 500),
       sb.entities.Emergencia.list('-created_date', 50),
       sb.entities.User.list(),
+      sb.entities.TimeLog.list('-created_date', 500),
+      sb.entities.AttendanceLog.list('-created_date', 500),
     ]);
+
+    // ── Tiempo de uso por usuario (últimos 7 días) ──────────────────────────
+    // 1) Horas cargadas en OTs (TimeLog)
+    const horasOT = {};
+    timeLogs.forEach(t => {
+      if (!t.date || new Date(t.date) < hace7dias) return;
+      const nombre = t.employee_name || 'Sin nombre';
+      if (!horasOT[nombre]) horasOT[nombre] = 0;
+      horasOT[nombre] += t.hours || 0;
+    });
+
+    // 2) Horas de asistencia (AttendanceLog: pares entrada→salida)
+    const fichajesPorUsuario = {};
+    attendanceLogs.forEach(a => {
+      if (!a.timestamp || new Date(a.timestamp) < hace7dias) return;
+      const nombre = a.employee_name || 'Sin nombre';
+      if (!fichajesPorUsuario[nombre]) fichajesPorUsuario[nombre] = [];
+      fichajesPorUsuario[nombre].push(a);
+    });
+
+    const horasAsistencia = {};
+    Object.entries(fichajesPorUsuario).forEach(([nombre, logs]) => {
+      logs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      let totalMs = 0;
+      let entradaPendiente = null;
+      for (const log of logs) {
+        if (log.type === 'entrada') {
+          entradaPendiente = new Date(log.timestamp);
+        } else if (log.type === 'salida' && entradaPendiente) {
+          totalMs += new Date(log.timestamp) - entradaPendiente;
+          entradaPendiente = null;
+        }
+      }
+      horasAsistencia[nombre] = totalMs / (1000 * 60 * 60); // ms → horas
+    });
+
+    // Combinar todos los nombres que aparecen en alguno de los dos
+    const todosNombres = new Set([...Object.keys(horasOT), ...Object.keys(horasAsistencia)]);
+    const usoPorUsuario = Array.from(todosNombres).map(nombre => ({
+      nombre,
+      horasOT: +(horasOT[nombre] || 0).toFixed(1),
+      horasAsistencia: +(horasAsistencia[nombre] || 0).toFixed(1),
+    })).sort((a, b) => (b.horasOT + b.horasAsistencia) - (a.horasOT + a.horasAsistencia));
 
     // Agrupar pendientes por jefe de sitio
     const jefesMap = {};
@@ -80,6 +125,30 @@ Deno.serve(async (req) => {
             <p style="margin: 4px 0; color: #94a3b8;">• OTs nuevas esta semana: <strong style="color: #a78bfa;">${resumenGlobal.otsNuevasSemana}</strong></p>
           </div>
 
+          ${usoPorUsuario.length > 0 ? `
+          <div style="background: #1e3a5f; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <h3 style="color: #e2e8f0; margin-top: 0; margin-bottom: 12px;">⏱️ Tiempo de Uso por Usuario (7 días)</h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <thead>
+                <tr style="border-bottom: 1px solid #3b5170;">
+                  <th style="text-align: left; padding: 6px 8px; color: #94a3b8;">Usuario</th>
+                  <th style="text-align: right; padding: 6px 8px; color: #94a3b8;">Horas OT</th>
+                  <th style="text-align: right; padding: 6px 8px; color: #94a3b8;">Horas Fichaje</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${usoPorUsuario.map(u => `
+                  <tr style="border-bottom: 1px solid #1e3a5f;">
+                    <td style="padding: 6px 8px; color: #e2e8f0;">${u.nombre}</td>
+                    <td style="padding: 6px 8px; text-align: right; color: #a78bfa; font-weight: 600;">${u.horasOT}h</td>
+                    <td style="padding: 6px 8px; text-align: right; color: #10b981; font-weight: 600;">${u.horasAsistencia}h</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+
           <p style="color: #64748b; font-size: 12px; text-align: center; margin-top: 24px;">
             Generado automáticamente por DH1 ERP · ${ahora.toLocaleString('es-AR')}
           </p>
@@ -101,7 +170,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return Response.json({ success: true, resumenGlobal, emailsEnviados, jefesSinEmail: Object.keys(jefesMap).length });
+    return Response.json({ success: true, resumenGlobal, usoPorUsuario, emailsEnviados, jefesSinEmail: Object.keys(jefesMap).length });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
