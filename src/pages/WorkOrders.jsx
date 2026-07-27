@@ -252,6 +252,7 @@ export default function WorkOrders() {
         {/* Stats */}
         <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
+            { label: 'Total', value: stats.total, color: 'from-slate-400' },
             { label: 'Pendientes', value: stats.pendientes, color: 'from-yellow-500' },
             { label: 'En Progreso', value: stats.en_progreso, color: 'from-purple-500' },
             { label: 'Completadas', value: stats.completadas, color: 'from-emerald-500' },
