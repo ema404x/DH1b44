@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Search, Plus, ClipboardList, MapPin,
   Zap, Wrench, TrendingUp,
-  Layers, History, Smartphone, LayoutGrid, Kanban, User
+  Layers, History, Smartphone, LayoutGrid, Kanban, User, SlidersHorizontal
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import KanbanBoard from '@/components/workorders/KanbanBoard';
@@ -28,6 +28,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import PullToRefresh from '@/components/shared/PullToRefresh';
 import { usePermission } from '@/hooks/usePermission';
 import { getTransitionAction } from '@/lib/workorder-transitions';
+import AdvancedFilters from '@/components/workorders/AdvancedFilters';
 
 
 
@@ -78,9 +79,15 @@ export default function WorkOrders() {
   const [templateOpen, setTemplateOpen] = useState(false);
   const [historialOpen, setHistorialOpen] = useState(false);
   const [modoCampo, setModoCampo] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [advFilters, setAdvFilters] = useState({
+    priority: '', type: '', assigned_to: '', jefe_sitio: '',
+    date_from: '', date_to: '', overdue_only: false,
+  });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { currentUser, isAdmin, filterByUser } = useCurrentUser();
+  const { currentUser, isAdmin, isSuperAdmin, filterByUser } = useCurrentUser();
+  const isGerente = isAdmin || currentUser?.role === 'gerente';
   const { allowed: canCreate } = usePermission('WorkOrder', 'create');
   const { allowed: canDelete } = usePermission('WorkOrder', 'delete');
 
@@ -148,8 +155,20 @@ export default function WorkOrders() {
       o.assigned_name?.toLowerCase().includes(q) ||
       o.code?.toLowerCase().includes(q);
     const matchStatus = statusTab === 'all' || o.status === statusTab;
-    return matchSearch && matchStatus;
-  }), [visibleOrders, search, statusTab]);
+
+    // Filtros avanzados (gerentes/admin)
+    const matchPriority = !advFilters.priority || o.priority === advFilters.priority;
+    const matchType = !advFilters.type || o.type === advFilters.type;
+    const matchOperario = !advFilters.assigned_to || o.assigned_name === advFilters.assigned_to;
+    const matchJefe = !advFilters.jefe_sitio || o.jefe_sitio === advFilters.jefe_sitio;
+    const matchDateFrom = !advFilters.date_from || (o.scheduled_date && o.scheduled_date >= advFilters.date_from);
+    const matchDateTo = !advFilters.date_to || (o.scheduled_date && o.scheduled_date <= advFilters.date_to);
+    const matchOverdue = !advFilters.overdue_only || (() => {
+      try { return o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada','cancelada'].includes(o.status); } catch { return false; }
+    })();
+
+    return matchSearch && matchStatus && matchPriority && matchType && matchOperario && matchJefe && matchDateFrom && matchDateTo && matchOverdue;
+  }), [visibleOrders, search, statusTab, advFilters]);
 
   const stats = useMemo(() => ({
     total: visibleOrders.length,
@@ -206,6 +225,11 @@ export default function WorkOrders() {
           <Button variant="outline" size="sm" onClick={() => setHistorialOpen(true)} className="gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2">
             <History className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Historial</span>
           </Button>
+          {isGerente && (
+            <Button variant="outline" size="sm" onClick={() => setShowAdvanced(v => !v)} className={`gap-1 text-xs px-2 ${showAdvanced ? 'bg-primary/20 border-primary/50 text-primary' : 'border-slate-700 text-slate-300 hover:text-white'}`}>
+              <SlidersHorizontal className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Filtros</span>
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setTemplateOpen(true)} className="gap-1 border-slate-700 text-slate-300 hover:text-white text-xs px-2">
             <Layers className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Plantillas</span>
           </Button>
@@ -240,6 +264,18 @@ export default function WorkOrders() {
           ))}
         </motion.div>
       </motion.div>
+
+      {/* Filtros Avanzados (gerentes) */}
+      {isGerente && showAdvanced && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          <AdvancedFilters
+            filters={advFilters}
+            onChange={setAdvFilters}
+            onReset={() => setAdvFilters({ priority: '', type: '', assigned_to: '', jefe_sitio: '', date_from: '', date_to: '', overdue_only: false })}
+            orders={visibleOrders}
+          />
+        </motion.div>
+      )}
 
       {/* Modo Campo */}
       {modoCampo && (
