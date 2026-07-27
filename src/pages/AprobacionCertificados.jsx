@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Search, FileCheck2, Clock, CheckCircle2, XCircle, SendHorizonal, Filter } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import PageHeader from '@/components/shared/PageHeader';
 import SolicitudForm from '@/components/aprobacion/SolicitudForm';
 import SolicitudCard from '@/components/aprobacion/SolicitudCard';
@@ -63,7 +64,7 @@ export default function AprobacionCertificados() {
       s.numero?.toLowerCase().includes(search.toLowerCase());
     const matchPrioridad = filtroPrioridad === 'todas' || s.prioridad === filtroPrioridad;
     return matchTab && matchSearch && matchPrioridad;
-  });
+  }).sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0));
 
   const counts = {
     enviada: misSolicitudes.filter(s => s.estado === 'enviada').length,
@@ -77,7 +78,13 @@ export default function AprobacionCertificados() {
     mutationFn: async (id) => {
       await base44.functions.invoke('gestionarSolicitudesCert', { operation: 'delete', id });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes-cert'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['solicitudes-cert'] });
+      toast.success('Solicitud eliminada');
+    },
+    onError: (err) => {
+      toast.error('Error al eliminar: ' + (err?.message || 'Error desconocido'));
+    },
   });
 
   const handleNew = () => { setEditing(null); setView('form'); };

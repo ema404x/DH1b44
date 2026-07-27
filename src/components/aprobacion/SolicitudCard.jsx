@@ -8,18 +8,20 @@ import { es } from 'date-fns/locale';
 import { useResolveNames } from '@/hooks/useResolveNames';
 
 const estadoConfig = {
-  borrador:    { label: 'Borrador',     color: 'bg-slate-100 text-slate-600 border-slate-300' },
-  enviada:     { label: 'Enviada',      color: 'bg-blue-100 text-blue-700 border-blue-300' },
-  en_revision: { label: 'En revisión',  color: 'bg-amber-100 text-amber-700 border-amber-300' },
-  aprobada:    { label: 'Aprobada',     color: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
-  rechazada:   { label: 'Rechazada',    color: 'bg-red-100 text-red-700 border-red-300' },
+  borrador:    { label: 'Borrador',     color: 'bg-slate-500/15 text-slate-300 border-slate-500/30' },
+  enviada:     { label: 'Enviada',      color: 'bg-blue-500/15 text-blue-300 border-blue-500/30' },
+  en_revision: { label: 'En revisión',  color: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  aprobada:    { label: 'Aprobada',     color: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  rechazada:   { label: 'Rechazada',    color: 'bg-red-500/15 text-red-300 border-red-500/30' },
 };
 
 const prioridadConfig = {
-  normal:  { label: 'Normal',  color: 'bg-slate-100 text-slate-500' },
-  alta:    { label: 'Alta',    color: 'bg-orange-100 text-orange-600' },
-  urgente: { label: 'Urgente', color: 'bg-red-100 text-red-700 font-bold' },
+  normal:  { label: 'Normal',  color: 'bg-slate-500/15 text-slate-400' },
+  alta:    { label: 'Alta',    color: 'bg-orange-500/15 text-orange-400' },
+  urgente: { label: 'Urgente', color: 'bg-red-500/15 text-red-400 font-bold' },
 };
+
+const fmtARS = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
 export default function SolicitudCard({ solicitud, onView, onEdit, onDelete, isAdmin }) {
   const { resolve } = useResolveNames();
@@ -53,7 +55,7 @@ export default function SolicitudCard({ solicitud, onView, onEdit, onDelete, isA
           {solicitud.monto_solicitado > 0 && (
             <span className="flex items-center gap-1.5 font-medium text-foreground">
               <DollarSign className="h-3 w-3 flex-shrink-0" />
-              {solicitud.monto_solicitado.toLocaleString('es-AR')}
+              {fmtARS(solicitud.monto_solicitado)}
             </span>
           )}
           {solicitud.porcentaje_avance > 0 && (
@@ -77,7 +79,7 @@ export default function SolicitudCard({ solicitud, onView, onEdit, onDelete, isA
         </div>
 
         {solicitud.estado === 'aprobada' && solicitud.aprobado_por && (
-          <div className="flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-md px-2.5 py-1.5">
+          <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md px-2.5 py-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" />
             Aprobado por {resolve(solicitud.aprobado_por)}
             {solicitud.fecha_aprobacion && <span className="text-muted-foreground ml-1">· {format(new Date(solicitud.fecha_aprobacion), 'dd MMM yy', { locale: es })}</span>}
@@ -85,7 +87,7 @@ export default function SolicitudCard({ solicitud, onView, onEdit, onDelete, isA
         )}
 
         {solicitud.estado === 'rechazada' && solicitud.motivo_rechazo && (
-          <div className="flex items-start gap-1.5 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-2.5 py-1.5">
+          <div className="flex items-start gap-1.5 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-md px-2.5 py-1.5">
             <XCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
             <span>{solicitud.motivo_rechazo}</span>
           </div>
