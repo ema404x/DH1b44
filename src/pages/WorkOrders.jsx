@@ -177,11 +177,11 @@ export default function WorkOrders() {
   }), [visibleOrders, search, statusTab, advFilters]);
 
   const stats = useMemo(() => ({
-    total: visibleOrders.length,
-    pendientes: visibleOrders.filter(o => o.status === 'pendiente').length,
-    en_progreso: visibleOrders.filter(o => o.status === 'en_progreso').length,
-    completadas: visibleOrders.filter(o => o.status === 'completada').length,
-  }), [visibleOrders]);
+    total: filtered.length,
+    pendientes: filtered.filter(o => o.status === 'pendiente').length,
+    en_progreso: filtered.filter(o => o.status === 'en_progreso').length,
+    completadas: filtered.filter(o => o.status === 'completada').length,
+  }), [filtered]);
 
   const container = {
     hidden: { opacity: 0 },
