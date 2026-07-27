@@ -103,7 +103,24 @@ Deno.serve(async (req) => {
       matches = allFallback.filter(emp => emp.email?.toLowerCase().trim() === emailNorm);
     }
 
-    if (matches.length === 0) return Response.json({ linked: false, reason: 'no_match' });
+    if (matches.length === 0) {
+      // ── NUNCA DESVINCULAR ──
+      // Si no se encontró ficha por user_id ni por email, NO bloquear al usuario.
+      // Se retorna linked:true con acceso mínimo (rol 'user', sin employee_id).
+      // El usuario verá solo sus propios registros (vía created_by_id en RLS).
+      // El admin puede gestionar la vinculación manualmente desde el módulo Empleados.
+      const fallbackSector = user.data?.sector_id || 'escuela';
+      return Response.json({
+        linked: true,
+        employee_id: null,
+        employee_name: user.full_name || user.email,
+        employee_role: 'user',
+        employee_sector: fallbackSector,
+        employee_permissions: {},
+        role_matched: false,
+        fallback: true,
+      });
+    }
 
     // Elegir el empleado a vincular
     let emp;

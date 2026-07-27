@@ -85,7 +85,7 @@ export const AuthProvider = ({ children }) => {
 
         if (vinculacion.data.linked) {
           const perms = vinculacion.data.employee_permissions || {};
-          setHasEmployeeRecord(true);
+          setHasEmployeeRecord(!vinculacion.data.fallback);
           setUserPermissions({
             ...perms,
             _employeeRole: vinculacion.data.employee_role || null,
@@ -93,9 +93,11 @@ export const AuthProvider = ({ children }) => {
             _employeeSector: vinculacion.data.employee_sector || 'escuela',
           });
         } else {
+          // linked:false ya no debería llegar del backend (siempre retorna linked:true),
+          // pero por seguridad conservamos permisos previos en lugar de limpiarlos.
           setHasEmployeeRecord(false);
           if (currentUser?.role !== 'admin') {
-            setUserPermissions({});
+            // No limpiar permisos — conservar el estado previo para no bloquear al usuario
           }
         }
         setVinculationFailed(false);
@@ -106,10 +108,19 @@ export const AuthProvider = ({ children }) => {
           continue;
         }
         console.warn('[AuthContext] vincularEmpleado failed after retries:', error?.message);
-        if (currentUser?.role !== 'admin') {
-          setUserPermissions({});
-          setVinculationFailed(true);
+        // NUNCA bloquear al usuario por un error de red/servidor.
+        // Conservar permisos previos si existen; si no, dar acceso mínimo.
+        if (currentUser?.role === 'admin') {
+          // Los admins siempre tienen acceso
+        } else if (!userPermissions) {
+          // Solo si no hay estado previo, dar permisos mínimos
+          setUserPermissions({
+            _employeeRole: 'user',
+            _employeeName: currentUser?.full_name || null,
+            _employeeSector: currentUser?.data?.sector_id || 'escuela',
+          });
         }
+        // No marcar vinculationFailed=true — el usuario mantiene acceso
       }
     }
   };
