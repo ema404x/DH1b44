@@ -179,8 +179,12 @@ export default function WorkOrders() {
   const stats = useMemo(() => ({
     total: filtered.length,
     pendientes: filtered.filter(o => o.status === 'pendiente').length,
+    asignadas: filtered.filter(o => o.status === 'asignada').length,
     en_progreso: filtered.filter(o => o.status === 'en_progreso').length,
+    validacion: filtered.filter(o => o.status === 'pendiente_validacion').length,
+    obra: filtered.filter(o => o.status === 'obra').length,
     completadas: filtered.filter(o => o.status === 'completada').length,
+    canceladas: filtered.filter(o => o.status === 'cancelada').length,
   }), [filtered]);
 
   const container = {
@@ -250,12 +254,16 @@ export default function WorkOrders() {
         </div>
 
         {/* Stats */}
-        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
           {[
             { label: 'Total', value: stats.total, color: 'from-slate-400' },
             { label: 'Pendientes', value: stats.pendientes, color: 'from-yellow-500' },
+            { label: 'Asignadas', value: stats.asignadas, color: 'from-blue-500' },
             { label: 'En Progreso', value: stats.en_progreso, color: 'from-purple-500' },
+            { label: 'Validación', value: stats.validacion, color: 'from-amber-400' },
+            { label: 'Obra', value: stats.obra, color: 'from-pink-400' },
             { label: 'Completadas', value: stats.completadas, color: 'from-emerald-500' },
+            { label: 'Canceladas', value: stats.canceladas, color: 'from-red-500' },
           ].map((stat, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border border-slate-700/50 rounded-lg p-4">
