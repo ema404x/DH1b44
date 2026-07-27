@@ -29,12 +29,15 @@ import PullToRefresh from '@/components/shared/PullToRefresh';
 import { usePermission } from '@/hooks/usePermission';
 import { getTransitionAction } from '@/lib/workorder-transitions';
 import AdvancedFilters from '@/components/workorders/AdvancedFilters';
+import { useResolveCreator } from '@/hooks/useResolveCreator';
 
 
 
 
 function WorkOrderCard({ order, onOpen, onShowQR }) {
+  const { resolveCreator } = useResolveCreator();
   const isOverdue = (() => { try { return order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
+  const creadorPor = resolveCreator(order.created_by_id);
 
   return (
     <motion.div
@@ -58,6 +61,9 @@ function WorkOrderCard({ order, onOpen, onShowQR }) {
             {order.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{order.location}</span>}
             {order.assigned_name && <span className="flex items-center gap-1"><User className="h-3 w-3" />{order.assigned_name}</span>}
           </div>
+          <p className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
+            <User className="h-2.5 w-2.5" /> Creada por {creadorPor}
+          </p>
         </div>
       </div>
 

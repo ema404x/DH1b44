@@ -20,6 +20,7 @@ import QRCodeModal from '@/components/shared/QRCodeModal';
 import { exportWorkOrderPDF } from '@/utils/exportWorkOrderPDF';
 import LocationEditor from './LocationEditor';
 import { getAvailableActions, ACTION_VARIANTS } from '@/lib/workorder-transitions';
+import { useResolveCreator } from '@/hooks/useResolveCreator';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,8 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [convertingToObra, setConvertingToObra] = useState(false);
   const [assignMode, setAssignMode] = useState('list');
   const queryClient = useQueryClient();
+  const { resolveCreator } = useResolveCreator();
+  const creadorPor = resolveCreator(order.created_by_id);
 
   const { data: freshOrder, isLoading: loadingFresh, refetch } = useQuery({
     queryKey: ['workorder-detail', order.id],
@@ -339,6 +342,10 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                     {data.scheduled_date}
                   </span>
                 )}
+                <span className="flex items-center gap-1 text-[11px] text-white/55">
+                  <User className="h-3 w-3 text-white/30 flex-shrink-0" />
+                  Creada por {creadorPor}
+                </span>
               </div>
             </div>
 

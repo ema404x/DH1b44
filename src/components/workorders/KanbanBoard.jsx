@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, User, Zap, Wrench, QrCode } from 'lucide-react';
 import { isPast, parseISO } from 'date-fns';
 import WorkOrderQRButton from './WorkOrderQRButton';
+import { useResolveCreator } from '@/hooks/useResolveCreator';
 
 const COLUMNS = [
   { id: 'pendiente',   label: 'Pendiente',   color: 'border-t-yellow-500',  dot: 'bg-yellow-500',  count_bg: 'bg-yellow-500/20 text-yellow-400' },
@@ -23,7 +24,9 @@ const priorityColors = {
 };
 
 function KanbanCard({ order, index, onOpen, onShowQR }) {
+  const { resolveCreator } = useResolveCreator();
   const isOverdue = (() => { try { return order.scheduled_date && order.scheduled_date.length >= 10 && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
+  const creadorPor = resolveCreator(order.created_by_id);
 
   return (
     <Draggable draggableId={order.id} index={index}>
@@ -68,6 +71,10 @@ function KanbanCard({ order, index, onOpen, onShowQR }) {
                 <span className="truncate">{order.assigned_name}</span>
               </p>
             )}
+            <p className="text-[10px] text-muted-foreground/70 flex items-center gap-1 truncate">
+              <Wrench className="h-2.5 w-2.5 flex-shrink-0" />
+              <span className="truncate">Creada por {creadorPor}</span>
+            </p>
           </div>
 
           {isOverdue && (
