@@ -73,31 +73,7 @@
       }
     },
     "read": {
-      "$and": [
-        {
-          "data.sector_id": "{{user.data.sector_id}}"
-        },
-        {
-          "$or": [
-            {
-              "user_condition": {
-                "role": "admin"
-              }
-            },
-            {
-              "user_condition": {
-                "role": "gerente"
-              }
-            },
-            {
-              "data.jefe_sitio": "{{user.full_name}}"
-            },
-            {
-              "data.inspector": "{{user.full_name}}"
-            }
-          ]
-        }
-      ]
+      "data.sector_id": "{{user.data.sector_id}}"
     },
     "update": {
       "$and": [
