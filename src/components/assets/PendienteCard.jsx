@@ -36,7 +36,7 @@ export default function PendienteCard({ pendiente: p, estadoColors, prioridadCol
   };
 
   return (
-    <Card className={`group transition-shadow ${isVencido ? 'border-red-300 bg-red-50/30' : ''} ${showInline ? 'shadow-md ring-1 ring-primary/30' : 'hover:shadow-md'}`}>
+    <Card className={`group transition-shadow ${isVencido ? 'border-red-500/30 bg-red-950/30' : ''} ${showInline ? 'shadow-md ring-1 ring-primary/30' : 'hover:shadow-md'}`}>
       {/* Main card body — click to open full modal */}
       <CardContent className="pt-4 pb-4 space-y-3 cursor-pointer" onClick={() => !showInline && onEdit(p)}>
         {/* Header */}
@@ -75,13 +75,13 @@ export default function PendienteCard({ pendiente: p, estadoColors, prioridadCol
               <span className="truncate">Jefe: <span className="font-medium text-foreground">{p.jefe_sitio}</span></span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 text-yellow-600">
+            <div className="flex items-center gap-1.5 text-amber-400/80">
               <AlertCircle className="h-3 w-3 flex-shrink-0" />
               <span>Sin jefe asignado</span>
             </div>
           )}
           {p.fecha_limite && (
-            <div className={`flex items-center gap-1.5 ${isVencido ? 'text-red-600 font-medium' : diasRestantes !== null && diasRestantes <= 7 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+            <div className={`flex items-center gap-1.5 ${isVencido ? 'text-red-400 font-medium' : diasRestantes !== null && diasRestantes <= 7 ? 'text-amber-400' : 'text-muted-foreground'}`}>
               <Calendar className="h-3 w-3 flex-shrink-0" />
               <span>
                 {isVencido

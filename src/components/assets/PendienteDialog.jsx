@@ -122,7 +122,7 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  const jefes = employees.filter(e => ['supervisor', 'capataz', 'ingeniero', 'gerente'].includes(e.role));
+  const jefes = employees.filter(e => e.role === 'jefe_sitio');
 
   const handleSave = async () => {
     // Register historial if editing existing
