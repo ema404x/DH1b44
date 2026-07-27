@@ -111,6 +111,42 @@ export default function WorkOrders() {
     queryFn: () => base44.entities.WorkOrder.list('-created_date', 500)
   });
 
+  // Direcciones — fuente canónica de jefes de sitio.
+  // Se usa para resolver el jefe_sitio de OTs que no lo tienen poblado,
+  // cruzando la dirección de la OT contra la dirección de la Direccion.
+  const { data: direcciones = [] } = useQuery({
+    queryKey: ['direcciones-jefes'],
+    queryFn: () => base44.entities.Direccion.list('-created_date', 500),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Mapa normalizado: dirección → jefe_sitio
+  const addrToJefe = useMemo(() => {
+    const map = {};
+    const norm = (s) => (s || '').toUpperCase().trim().replace(/\s+/g, ' ').replace(/,\s*CABA\s*$/, '').replace(/,\s*$/, '').trim();
+    direcciones.forEach(d => {
+      if (d.direccion && d.jefe_sitio) {
+        map[norm(d.direccion)] = d.jefe_sitio.trim();
+      }
+    });
+    return { map, norm };
+  }, [direcciones]);
+
+  // Resuelve el jefe_sitio de una OT: directo si lo tiene, sino por cruce de dirección.
+  const resolveJefe = useMemo(() => (o) => {
+    if (o.jefe_sitio) return o.jefe_sitio;
+    const { map, norm } = addrToJefe;
+    const locNorm = norm(o.location);
+    if (!locNorm) return null;
+    // Match exacto tras normalización
+    if (map[locNorm]) return map[locNorm];
+    // Match por contenido (la dirección de Direccion está contenida en la location de la OT o viceversa)
+    for (const addr of Object.keys(map)) {
+      if (locNorm.includes(addr) || addr.includes(locNorm)) return map[addr];
+    }
+    return null;
+  }, [addrToJefe]);
+
   const createMutation = useMutation({
     mutationFn: async (data) => base44.entities.WorkOrder.create(data),
     onSuccess: () => {
@@ -167,7 +203,8 @@ export default function WorkOrders() {
     const matchType = !advFilters.type || o.type === advFilters.type;
     const norm = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
     const matchOperario = !advFilters.assigned_to || norm(o.assigned_name) === norm(advFilters.assigned_to);
-    const matchJefe = !advFilters.jefe_sitio || norm(o.jefe_sitio) === norm(advFilters.jefe_sitio);
+    const resolvedJefe = resolveJefe(o);
+    const matchJefe = !advFilters.jefe_sitio || (resolvedJefe && norm(resolvedJefe) === norm(advFilters.jefe_sitio));
     const matchDateFrom = !advFilters.date_from || (o.scheduled_date && o.scheduled_date >= advFilters.date_from);
     const matchDateTo = !advFilters.date_to || (o.scheduled_date && o.scheduled_date <= advFilters.date_to);
     const matchOverdue = !advFilters.overdue_only || (() => {
@@ -175,7 +212,7 @@ export default function WorkOrders() {
     })();
 
     return matchSearch && matchStatus && matchPriority && matchType && matchOperario && matchJefe && matchDateFrom && matchDateTo && matchOverdue;
-  }), [visibleOrders, search, statusTab, advFilters]);
+  }), [visibleOrders, search, statusTab, advFilters, resolveJefe]);
 
   const stats = useMemo(() => ({
     total: filtered.length,
@@ -289,6 +326,7 @@ export default function WorkOrders() {
             onChange={setAdvFilters}
             onReset={() => setAdvFilters({ priority: '', type: '', assigned_to: '', jefe_sitio: '', date_from: '', date_to: '', overdue_only: false })}
             orders={visibleOrders}
+            direcciones={direcciones}
           />
         </motion.div>
       )}

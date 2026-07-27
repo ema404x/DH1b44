@@ -23,7 +23,7 @@ const TIPOS = [
   { value: 'emergencia', label: 'Emergencia' },
 ];
 
-export default function AdvancedFilters({ filters, onChange, onReset, orders }) {
+export default function AdvancedFilters({ filters, onChange, onReset, orders, direcciones: propDirecciones }) {
   const { priority, type, assigned_to, jefe_sitio, date_from, date_to, overdue_only } = filters;
 
   // Extraer valores únicos de las OTs ya cargadas para los selectores
@@ -42,11 +42,14 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders }) 
   // Consultar TODOS los jefes de sitio desde la entidad Direccion,
   // y fusionar con los que aparecen en las OTs — garantiza que el
   // listado esté completo aunque un jefe no tenga OTs visibles.
-  const { data: direcciones } = useQuery({
+  // Si el padre ya pasó direcciones (mismo queryKey), se reutilizan.
+  const { data: queriedDirecciones } = useQuery({
     queryKey: ['direcciones-jefes'],
     queryFn: () => base44.entities.Direccion.list('-created_date', 500),
     staleTime: 5 * 60 * 1000,
+    enabled: !propDirecciones,
   });
+  const direcciones = propDirecciones || queriedDirecciones;
 
   const jefes = useMemo(() => {
     const set = new Map();
