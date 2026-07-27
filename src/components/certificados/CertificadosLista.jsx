@@ -11,9 +11,9 @@ import { toast } from 'sonner';
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
 const estadoStyle = {
-  borrador: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
-  emitido:  'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  aprobado: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  borrador: { label: 'Borrador', cls: 'bg-slate-500/15 text-slate-300 border-slate-500/30' },
+  emitido:  { label: 'Emitido',  cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30' },
+  aprobado: { label: 'Aprobado', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
 };
 
 const tipoStyle = {
@@ -80,8 +80,8 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <h3 className="font-semibold text-sm">Certificado N° {c.numero}</h3>
-                    <Badge className={`text-xs border ${estadoStyle[c.estado] || estadoStyle.borrador}`}>
-                      {c.estado}
+                    <Badge className={`text-xs border ${(estadoStyle[c.estado] || estadoStyle.borrador).cls}`}>
+                      {(estadoStyle[c.estado] || estadoStyle.borrador).label}
                     </Badge>
                     {c.tipo && tipoStyle[c.tipo] && (
                       <Badge className={`text-xs border ${tipoStyle[c.tipo].color}`}>

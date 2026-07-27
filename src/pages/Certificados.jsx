@@ -179,10 +179,14 @@ export default function Certificados() {
   };
 
   const detectarComuna = (cert) => {
-    const texto = `${cert.emprendimiento || ''} ${cert.obra_servicio || ''}`.toUpperCase();
-    if (texto.includes('8A') || texto.includes('8 A')) return '8A';
-    if (texto.includes('8B') || texto.includes('8 B')) return '8B';
-    if (texto.includes('10A') || texto.includes('10 A')) return '10A';
+    // Pad + normalize para detectar la comuna como token independiente
+    // Evita falsos positivos como "18A" → 8A
+    const texto = ` ${cert.emprendimiento || ''} ${cert.obra_servicio || ''} `.toUpperCase().replace(/\s+/g, ' ');
+    // Normalizar "8 A" → "8A", "10 A" → "10A" (solo si A/B es un token separado)
+    const norm = texto.replace(/(\d+)\s+(A|B)(?=\s|$)/g, '$1$2');
+    if (norm.includes(' 8A ')) return '8A';
+    if (norm.includes(' 8B ')) return '8B';
+    if (norm.includes(' 10A ')) return '10A';
     return null;
   };
 
