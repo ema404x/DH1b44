@@ -23,6 +23,12 @@ export default function LocationEditor({ currentLocation, currentAssigned, onSav
     queryFn: () => base44.entities.LocationData.list('establecimiento', 5000),
     staleTime: 300_000,
   });
+  // Direccion — join via direccion_id para resolver la dirección real de cada establecimiento
+  const { data: direcciones = [] } = useQuery({
+    queryKey: ['direcciones-editor'],
+    queryFn: () => base44.entities.Direccion.list('direccion', 5000),
+    staleTime: 300_000,
+  });
   // LocationQR — solo para obtener el QR id
   const { data: locationQRs = [] } = useQuery({
     queryKey: ['location-qrs-editor'],
@@ -42,22 +48,25 @@ export default function LocationEditor({ currentLocation, currentAssigned, onSav
   }, []);
 
   // Lista unificada: base = LocationData, enriquecida con QR id si existe
+  // Join con Direccion via direccion_id para resolver la dirección real
   const norm = (s) => (s || '').toLowerCase().trim();
   const unifiedLocations = useMemo(() =>
     locationData.map(ld => {
+      const dir = direcciones.find(d => d.id === ld.direccion_id);
+      const address = dir?.direccion || '';
       const qr = locationQRs.find(q =>
         norm(q.name) === norm(ld.establecimiento) ||
-        norm(q.address) === norm(ld.direccion)
+        norm(q.address) === norm(address)
       );
       return {
         id: qr?.id || ld.id,
         name: ld.establecimiento || ld.ubic_tecnica || '',
-        address: ld.direccion || '',
-        jefe_sitio: ld.jefe_sitio || '',
+        address,
+        jefe_sitio: ld.jefe_sitio || dir?.jefe_sitio || '',
         _hasQR: !!qr,
       };
     })
-  , [locationData, locationQRs]);
+  , [locationData, locationQRs, direcciones]);
 
   // Filtro de sugerencias
   const suggestions = query.trim().length >= 2

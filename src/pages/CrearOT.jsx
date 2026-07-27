@@ -172,21 +172,24 @@ export default function CrearOT() {
     const norm = s => (s || '').toLowerCase().trim();
 
     // 1. LocationData (fuente principal — todos los establecimientos)
+    //    Join con Direccion via direccion_id para resolver la dirección real
     const matchedQRNames = new Set();
     const fromLD = locationData.map(ld => {
+      const dir = direcciones.find(d => d.id === ld.direccion_id);
+      const address = dir?.direccion || '';
       const qr = locationQRs.find(q =>
         norm(q.name) === norm(ld.establecimiento) ||
-        norm(q.address) === norm(ld.direccion) ||
+        norm(q.address) === norm(address) ||
         norm(q.name) === norm(ld.ubic_tecnica)
       );
       if (qr) matchedQRNames.add(norm(qr.name));
       return {
         id: qr?.id || ld.id,
         name: ld.establecimiento || ld.ubic_tecnica,
-        address: ld.direccion || '',
-        jefe_sitio: ld.jefe_sitio || '',
-        inspector: ld.inspector || '',
-        comuna: ld.comuna || '',
+        address,
+        jefe_sitio: ld.jefe_sitio || dir?.jefe_sitio || '',
+        inspector: ld.inspector || dir?.inspector || '',
+        comuna: ld.comuna || dir?.comuna || '',
         project_name: qr?.project_name || '',
         _locationDataId: ld.id,
         _hasQR: !!qr,
@@ -209,7 +212,7 @@ export default function CrearOT() {
       }));
 
     return [...fromLD, ...fromQR];
-  }, [locationData, locationQRs]);
+  }, [locationData, locationQRs, direcciones]);
 
   // Para cruzar jefe de sitio por dirección (fallback)
   const { data: direcciones = [] } = useQuery({
