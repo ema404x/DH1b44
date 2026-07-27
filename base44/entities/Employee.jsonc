@@ -100,33 +100,36 @@
       }
     },
     "read": {
-      "$and": [
+      "$or": [
         {
-          "data.sector_id": "{{user.data.sector_id}}"
+          "data.user_id": "{{user.id}}"
         },
         {
-          "$or": [
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "$and": [
             {
-              "data.user_id": "{{user.id}}"
+              "data.sector_id": "{{user.data.sector_id}}"
             },
             {
-              "user_condition": {
-                "role": "admin"
-              }
+              "data.email": "{{user.email}}"
             }
           ]
         }
       ]
     },
     "update": {
-      "$and": [
+      "$or": [
         {
-          "data.sector_id": "{{user.data.sector_id}}"
+          "data.user_id": "{{user.id}}"
         },
         {
-          "$or": [
+          "$and": [
             {
-              "data.user_id": "{{user.id}}"
+              "data.sector_id": "{{user.data.sector_id}}"
             },
             {
               "user_condition": {
