@@ -22,21 +22,28 @@ const RUTA_MODULO = {
   '/automatizaciones': 'Automatizaciones', '/seguridad': 'Seguridad y Auditoría',
   '/auditoria': 'Seguridad y Auditoría', '/calendario': 'Calendario',
   '/informes': 'Informes', '/facturacion': 'Facturación', '/control-riesgo': 'Control de Riesgos',
+  '/crear-ot': 'Crear Orden de Trabajo', '/foro': 'Foro del Equipo',
+  '/calefaccion': 'Calefacción', '/rutinas': 'Rutinas de Mantenimiento',
+  '/sectores': 'Sectores', '/informacion-general': 'Información General',
+  '/certificacion-obras': 'Certificación de Obras', '/aprobacion-certificados': 'Aprobación de Certificados',
+  '/calendario-informes': 'Calendario de Informes', '/mapa-jefes': 'Mapa de Jefes de Sitio',
 };
 
 const MODULOS_POR_ROL = {
-  admin:         ['Dashboard','Proyectos','Órdenes de Trabajo','Pendientes SAP','Inventario/Pañol','Clientes/Proveedores','Empleados','Presupuestos','Certificados','Inspecciones de Colegios','Mapa','Emergencias','Reportes y Finanzas','Alertas','Automatizaciones','Seguridad y Auditoría'],
+  admin:         ['Dashboard','Proyectos','Órdenes de Trabajo','Crear Orden de Trabajo','Pendientes SAP','Inventario/Pañol','Clientes/Proveedores','Empleados','Presupuestos','Certificados','Aprobación de Certificados','Certificación de Obras','Inspecciones de Colegios','Calefacción','Rutinas de Mantenimiento','Información General','Mapa','Mapa de Jefes de Sitio','Emergencias','Reportes y Finanzas','Foro del Equipo','Alertas','Automatizaciones','Seguridad y Auditoría','Control de Riesgos'],
+  gerente:       ['Dashboard','Proyectos','Órdenes de Trabajo','Crear Orden de Trabajo','Pendientes SAP','Inventario/Pañol','Clientes/Proveedores','Empleados','Presupuestos','Certificados','Aprobación de Certificados','Certificación de Obras','Inspecciones de Colegios','Calefacción','Rutinas de Mantenimiento','Información General','Mapa','Mapa de Jefes de Sitio','Emergencias','Reportes y Finanzas','Foro del Equipo','Alertas','Control de Riesgos'],
   user:          ['Dashboard','Órdenes de Trabajo','Pendientes SAP','Inventario/Pañol','Inspecciones de Colegios','Mapa','Emergencias'],
-  jefe_sitio:    ['Dashboard','Proyectos','Órdenes de Trabajo','Pendientes SAP','Inventario/Pañol','Empleados','Inspecciones de Colegios','Mapa','Emergencias','Reportes y Finanzas'],
+  jefe_sitio:    ['Dashboard','Proyectos','Órdenes de Trabajo','Crear Orden de Trabajo','Pendientes SAP','Inventario/Pañol','Empleados','Inspecciones de Colegios','Calefacción','Rutinas de Mantenimiento','Información General','Mapa','Mapa de Jefes de Sitio','Emergencias','Reportes y Finanzas','Foro del Equipo'],
   inspector:     ['Dashboard','Pendientes SAP','Órdenes de Trabajo','Inspecciones de Colegios','Mapa','Emergencias'],
-  administrativo:['Certificados','Presupuestos','Reportes y Finanzas'],
+  administrativo:['Certificados','Aprobación de Certificados','Certificación de Obras','Presupuestos','Reportes y Finanzas'],
   supervisor:    ['Dashboard','Proyectos','Órdenes de Trabajo','Pendientes SAP','Reportes y Finanzas','Emergencias'],
   tecnico:       ['Órdenes de Trabajo','Inventario/Pañol','Emergencias'],
   viewer:        ['Dashboard'],
 };
 
 const DESCRIPCION_ROL = {
-  admin:          'Administrador con acceso completo.',
+  admin:          'Administrador con acceso completo al sistema y todos los sectores.',
+  gerente:        'Gerente con acceso completo a datos de todos los módulos del sistema.',
   jefe_sitio:     'Jefe de Sitio: gestiona OTs, inspecciones, pendientes SAP, cuadrilla y pañol de su zona.',
   inspector:      'Inspector técnico: inspecciones de colegios, pendientes SAP y OTs.',
   supervisor:     'Supervisor: revisa reportes, aprueba OTs, controla establecimientos.',
@@ -57,6 +64,15 @@ const SUGERENCIAS_POR_MODULO = {
   'Emergencias':              { categoria: '🚨 Emergencias',         preguntas: ['¿Cómo registro una emergencia?','¿Cómo asigno una cuadrilla?'] },
   'Reportes y Finanzas':      { categoria: '📊 Reportes',            preguntas: ['¿Cómo veo el flujo de caja?','¿Cómo analizo la rentabilidad?'] },
   'Certificados':             { categoria: '📜 Certificados',        preguntas: ['¿Cómo genero un certificado?','¿Cómo subo una ADA?'] },
+  'Crear Orden de Trabajo':   { categoria: '🔧 Crear OT',            preguntas: ['¿Cómo uso el asistente de creación de OT?','¿Cómo asigno jefe de sitio automáticamente?'] },
+  'Aprobación de Certificados': { categoria: '✅ Aprobación',         preguntas: ['¿Cómo apruebo un certificado con firma?','¿Qué pasa si rechazo una solicitud?'] },
+  'Certificación de Obras':   { categoria: '🏗️ Certificación',       preguntas: ['¿Cómo cambio el estado de cobro de una obra?','¿Cómo archivo un ciclo mensual?'] },
+  'Calefacción':              { categoria: '🌡️ Calefacción',          preguntas: ['¿Cómo registro equipos de calefacción?','¿Cuándo se genera una alerta de calefacción crítica?'] },
+  'Rutinas de Mantenimiento': { categoria: '🔄 Rutinas',              preguntas: ['¿Cómo asigno rutinas a un edificio?','¿Cómo genero órdenes de rutina?'] },
+  'Información General':      { categoria: '📋 Info General',         preguntas: ['¿Cómo asigno jefes de sitio a escuelas?','¿Cómo importo establecimientos?'] },
+  'Foro del Equipo':          { categoria: '💬 Foro',                 preguntas: ['¿Cómo creo un hilo en el foro?','¿Cómo hago una encuesta?'] },
+  'Control de Riesgos':       { categoria: '⚠️ Riesgos',              preguntas: ['¿Cómo interpreto la matriz de riesgos?','¿Qué es el método de control MP/MC/MT?'] },
+  'Mapa de Jefes de Sitio':   { categoria: '📍 Cobertura',            preguntas: ['¿Cómo veo la cobertura de jefes de sitio?','¿Cómo importo datos del mapa?'] },
 };
 
 const INTERNAL_PREFIXES = ['[CONTEXTO', '[MODO REFLEXIVA', '[AYUDA PÁGINA', '[CERT'];
@@ -68,7 +84,7 @@ function getSugerenciasParaRol(rol) {
 
 function buildContextoRol(user, moduloActual, empleadoInfo) {
   const nombre = user?.full_name || user?.email || 'el usuario';
-  const rol = empleadoInfo?.employee_role?.toLowerCase().trim() || (user?.role === 'admin' ? 'admin' : 'user');
+  const rol = empleadoInfo?.employee_role?.toLowerCase().trim() || (user?.role === 'admin' ? 'admin' : user?.role === 'gerente' ? 'gerente' : 'user');
   const desc = DESCRIPCION_ROL[rol] || DESCRIPCION_ROL.user;
   return `[CONTEXTO INTERNO]\nUsuario: ${nombre} | Rol: ${rol} | ${desc}${moduloActual ? ` | Módulo actual: ${moduloActual}.` : ''}\nAdaptá respuestas al rol. No menciones restricciones de acceso.`;
 }
@@ -233,7 +249,7 @@ export default function ChatbotSoporte() {
 
   const isThinking  = messages.length > 0 && messages[messages.length - 1]?.role === 'user';
   const rolEfectivo = useMemo(
-    () => empleadoInfo?.employee_role?.toLowerCase().trim() || (currentUser?.role === 'admin' ? 'admin' : 'user'),
+    () => empleadoInfo?.employee_role?.toLowerCase().trim() || (currentUser?.role === 'admin' ? 'admin' : currentUser?.role === 'gerente' ? 'gerente' : 'user'),
     [empleadoInfo, currentUser]
   );
   const sugerencias = useMemo(() => getSugerenciasParaRol(rolEfectivo), [rolEfectivo]);
@@ -267,7 +283,7 @@ export default function ChatbotSoporte() {
     initInProgress.current = true;
     setInitError(false);
     try {
-      const rol = empInfo?.employee_role?.toLowerCase().trim() || (user?.role === 'admin' ? 'admin' : 'user');
+      const rol = empInfo?.employee_role?.toLowerCase().trim() || (user?.role === 'admin' ? 'admin' : user?.role === 'gerente' ? 'gerente' : 'user');
       const conv = await base44.agents.createConversation({
         agent_name: 'soporte_app',
         metadata: { name: 'Soporte', user_role: rol },
