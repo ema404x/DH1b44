@@ -68,6 +68,7 @@ export const AuthProvider = ({ children }) => {
 
   // Vincula al usuario con su ficha de empleado y carga permisos.
   // Reintenta hasta 2 veces antes de marcar como fallido (evita "acceso denegado" por blips de red).
+  // Si la función falla, intenta cargar permisos directamente desde las entidades (fallback).
   const linkEmployee = async (currentUser) => {
     const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -93,12 +94,7 @@ export const AuthProvider = ({ children }) => {
             _employeeSector: vinculacion.data.employee_sector || 'escuela',
           });
         } else {
-          // linked:false ya no debería llegar del backend (siempre retorna linked:true),
-          // pero por seguridad conservamos permisos previos en lugar de limpiarlos.
           setHasEmployeeRecord(false);
-          if (currentUser?.role !== 'admin') {
-            // No limpiar permisos — conservar el estado previo para no bloquear al usuario
-          }
         }
         setVinculationFailed(false);
         return;
@@ -108,18 +104,55 @@ export const AuthProvider = ({ children }) => {
           continue;
         }
         console.warn('[AuthContext] vincularEmpleado failed after retries:', error?.message);
-        // Si hay permisos previos (sesión anterior), conservarlos para no
-        // bloquear al usuario por un blip de red.
-        // Si NO hay estado previo (primer login), marcar vinculationFailed
-        // para que la UI muestre "Error de conexión" con botón Reintentar,
-        // en lugar de "Acceso denegado" o "Cuenta sin vincular".
+
+        // ── FALLBACK: cargar permisos directamente desde las entidades ──
+        // Si la función falla pero el usuario está autenticado, intentamos
+        // resolver su ficha de empleado y permisos directamente con el SDK.
+        // Esto evita bloquear al usuario por un fallo transitorio del backend.
         if (currentUser?.role === 'admin') {
-         // Los admins siempre tienen acceso
-        } else if (!userPermissions) {
-         setVinculationFailed(true);
+          return; // Los admins siempre tienen acceso
         }
+        try {
+          const fallbackPerms = await loadPermissionsDirectly(currentUser);
+          if (fallbackPerms) {
+            setVinculationFailed(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('[AuthContext] Fallback permission load failed:', e?.message);
+        }
+        setVinculationFailed(true);
       }
     }
+  };
+
+  // Carga permisos directamente desde Employee + RolePermission (sin backend function)
+  const loadPermissionsDirectly = async (currentUser) => {
+    if (!currentUser?.email) return null;
+    // Buscar ficha de empleado por email
+    const employees = await base44.entities.Employee.filter({ email: currentUser.email });
+    const emp = employees.find(
+      e => e.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()
+    );
+    if (!emp) return null;
+
+    // Buscar permisos del rol
+    let perms = {};
+    if (emp.role) {
+      const roleNorm = emp.role.toLowerCase().trim();
+      const allPerms = await base44.entities.RolePermission.list('-created_date', 500);
+      const match = allPerms.find(rp => rp.role_name?.toLowerCase().trim() === roleNorm);
+      if (match) perms = match.permissions || {};
+    }
+
+    setHasEmployeeRecord(true);
+    setUserPermissions({
+      ...perms,
+      _employeeRole: emp.role || null,
+      _employeeName: emp.full_name || null,
+      _employeeSector: emp.sector_id || 'escuela',
+    });
+    return true;
   };
 
   const retryVinculation = async () => {
