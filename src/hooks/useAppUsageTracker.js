@@ -23,7 +23,11 @@ export function useAppUsageTracker(user) {
     const onActivity = () => { lastActivityRef.current = Date.now(); };
     const onFocus = () => { isFocusedRef.current = true; };
     const onBlur = () => { isFocusedRef.current = false; };
-    const onVisibility = () => { isFocusedRef.current = !document.hidden; };
+    const onVisibility = () => {
+      isFocusedRef.current = !document.hidden;
+      // Al ocultar la pestaña, guardar inmediatamente — beforeunload no espera async
+      if (document.hidden) flush();
+    };
 
     const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
     events.forEach(e => window.addEventListener(e, onActivity, { passive: true }));
@@ -42,10 +46,11 @@ export function useAppUsageTracker(user) {
       if (savingRef.current) return;
       const seconds = Math.round(activeSecondsRef.current);
       if (seconds < 5) return;
-      activeSecondsRef.current = 0;
       savingRef.current = true;
       try {
-        const today = new Date().toISOString().split('T')[0];
+        // Fecha LOCAL (no UTC) — toISOString() desplazaría el día después de las 21:00 en AR
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const existing = await base44.entities.AppUsageLog.filter({
           user_email: user.email,
           date: today
@@ -62,7 +67,11 @@ export function useAppUsageTracker(user) {
             active_seconds: seconds
           });
         }
-      } catch (_) {} finally {
+        // Descontar solo tras guardar exitosamente — si falla, los segundos se reintentan
+        activeSecondsRef.current -= seconds;
+      } catch (_) {
+        // No resetear — los segundos se acumulan para el próximo intento
+      } finally {
         savingRef.current = false;
       }
     };

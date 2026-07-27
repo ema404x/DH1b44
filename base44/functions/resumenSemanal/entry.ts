@@ -15,7 +15,6 @@ Deno.serve(async (req) => {
     const sb = base44.asServiceRole;
     const ahora = new Date();
     const hace7dias = new Date(ahora); hace7dias.setDate(ahora.getDate() - 7);
-    const en7dias = new Date(ahora); en7dias.setDate(ahora.getDate() + 7);
 
     // Traer datos
     const [pendientes, ots, emergencias, users, usageLogs] = await Promise.all([
