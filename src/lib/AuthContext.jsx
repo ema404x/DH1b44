@@ -67,42 +67,67 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Vincula al usuario con su ficha de empleado y carga permisos.
-  // ESTRATEGIA: cargar permisos directamente desde el SDK (primario) + invocar
-  // vincularEmpleado en background para sincronizar metadatos (fire-and-forget).
-  // Esto elimina la dependencia de la función backend para desbloquear el acceso.
+  // ESTRATEGIA DE DEGRADACIÓN GRACEFUL (3 capas):
+  //   1) SDK directo (Employee + RolePermission) — más rápido
+  //   2) Backend function vincularEmpleado (service role, bypassa RLS)
+  //   3) Acceso mínimo al Dashboard — NUNCA bloquear a un usuario autenticado
   const linkEmployee = async (currentUser) => {
-    if (currentUser?.role === 'admin') return; // Los admins siempre tienen acceso
+    if (currentUser?.role === 'admin') return;
 
-    // 1) Cargar permisos directamente desde el SDK — flujo primario
+    let loaded = false;
+
+    // Capa 1: SDK directo
     try {
-      await loadPermissionsDirectly(currentUser);
-      setVinculationFailed(false);
+      loaded = await loadPermissionsDirectly(currentUser);
     } catch (e) {
-      console.warn('[AuthContext] Direct permission load failed:', e?.message);
-      setVinculationFailed(true);
+      console.warn('[AuthContext] SDK permission load failed:', e?.message);
     }
 
-    // 2) Invocar vincularEmpleado en background para sincronizar metadatos
-    //    (rol de plataforma, sector_id, nombre). No bloquea el acceso.
+    // Capa 2: Backend function (bypassa RLS con service role)
+    if (!loaded) {
+      try {
+        loaded = await loadPermissionsViaFunction();
+      } catch (e) {
+        console.warn('[AuthContext] Backend function permission load failed:', e?.message);
+      }
+    }
+
+    // Capa 3: Acceso mínimo — el usuario está autenticado, no bloquear
+    if (!loaded) {
+      setUserPermissions({
+        Dashboard: { read: true },
+        _employeeSector: currentUser?.data?.sector_id || currentUser?.sector_id || 'escuela',
+        _minimalAccess: true,
+      });
+      setVinculationFailed(false);
+      // Reintento en background para recuperar permisos completos
+      base44.functions.invoke('vincularEmpleado', {}).catch(() => {});
+      return;
+    }
+
+    setVinculationFailed(false);
+    // Sincronizar metadatos en background (nombre, sector, rol de plataforma)
     base44.functions.invoke('vincularEmpleado', {}).catch(() => {});
   };
 
-  // Carga permisos directamente desde Employee + RolePermission (sin backend function)
+  // Capa 1: Carga permisos desde Employee + RolePermission con el SDK
   const loadPermissionsDirectly = async (currentUser) => {
     if (!currentUser?.email) return false;
 
-    // Buscar ficha de empleado — primero por user_id, luego por email
     let emp = null;
+
     try {
       const byUserId = await base44.entities.Employee.filter({ user_id: currentUser.id });
       emp = byUserId[0];
-    } catch (_) { /* RLS puede bloquear — intentar por email */ }
+    } catch (_) {}
 
     if (!emp) {
-      const byEmail = await base44.entities.Employee.filter({ email: currentUser.email });
-      emp = byEmail.find(
-        e => e.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()
-      );
+      try {
+        const byEmail = await base44.entities.Employee.filter({ email: currentUser.email });
+        emp = byEmail.find(
+          e => e.email?.toLowerCase().trim() === currentUser.email.toLowerCase().trim()
+        );
+      } catch (_) {}
     }
 
     if (!emp) {
@@ -110,13 +135,14 @@ export const AuthProvider = ({ children }) => {
       return false;
     }
 
-    // Buscar permisos del rol
     let perms = {};
     if (emp.role) {
-      const roleNorm = emp.role.toLowerCase().trim();
-      const allPerms = await base44.entities.RolePermission.list('-created_date', 500);
-      const match = allPerms.find(rp => rp.role_name?.toLowerCase().trim() === roleNorm);
-      if (match) perms = match.permissions || {};
+      try {
+        const roleNorm = emp.role.toLowerCase().trim();
+        const allPerms = await base44.entities.RolePermission.list('-created_date', 500);
+        const match = allPerms.find(rp => rp.role_name?.toLowerCase().trim() === roleNorm);
+        if (match) perms = match.permissions || {};
+      } catch (_) {}
     }
 
     setHasEmployeeRecord(true);
@@ -125,6 +151,22 @@ export const AuthProvider = ({ children }) => {
       _employeeRole: emp.role || null,
       _employeeName: emp.full_name || null,
       _employeeSector: emp.sector_id || 'escuela',
+    });
+    return true;
+  };
+
+  // Capa 2: Carga permisos vía backend function (service role, bypassa RLS)
+  const loadPermissionsViaFunction = async () => {
+    const result = await base44.functions.invoke('vincularEmpleado', {});
+    const data = result?.data || result;
+    if (!data || data.linked !== true) return false;
+
+    setHasEmployeeRecord(!data.fallback);
+    setUserPermissions({
+      ...(data.employee_permissions || {}),
+      _employeeRole: data.employee_role || null,
+      _employeeName: data.employee_name || null,
+      _employeeSector: data.employee_sector || 'escuela',
     });
     return true;
   };

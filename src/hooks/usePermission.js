@@ -22,9 +22,12 @@ export function usePermission(moduleKey, action = 'read') {
   if (vinculationFailed) return { allowed: false, loading: false, vinculationFailed: true };
 
   // Estado inconsistente: auth terminó, no hubo error de red, pero los permisos
-  // nunca llegaron. Tratar como error transitorio (no denegación) para que la UI
-  // ofrezca reintentar en lugar de bloquear al usuario incorrectamente.
-  if (userPermissions === null) return { allowed: false, loading: false, vinculationFailed: true };
+  // nunca llegaron. Conceder acceso mínimo al Dashboard para no bloquear al usuario.
+  // El reintento en background completará los permisos reales.
+  if (userPermissions === null) {
+    if (moduleKey === 'Dashboard') return { allowed: true, loading: false, vinculationFailed: false };
+    return { allowed: false, loading: false, vinculationFailed: false };
+  }
 
   // Sin permisos configurados para este usuario → denegar
   if (!moduleKey) {
