@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode, SettingsIcon, Plus, Users, Zap, LinkIcon, UnlinkIcon, MapPin, Building2, AlertTriangle, CheckCircle2, RefreshCw, XCircle } from 'lucide-react';
+import { Search, UserCog, Mail, SettingsIcon, Plus, Users, Zap, Building2, AlertTriangle } from 'lucide-react';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -21,6 +21,7 @@ import EmployeeCard from '@/components/employees/EmployeeCard';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { usePermission } from '@/hooks/usePermission';
+import { useToast } from '@/components/ui/use-toast';
 
 const roleLabels = {
   operario: 'Operario', tecnico: 'Técnico', capataz: 'Capataz', supervisor: 'Supervisor',
@@ -76,6 +77,7 @@ export default function Employees() {
   const [qrEmployee, setQrEmployee] = useState(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: employees = [], isLoading } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list('-created_date') });
   const { data: locations = [] } = useQuery({ queryKey: ['locations'], queryFn: () => base44.entities.LocationData.list('-created_date', 500) });
@@ -132,9 +134,6 @@ export default function Employees() {
     if (platformUser.email?.toLowerCase().trim() !== emp.email?.toLowerCase().trim()) {
       return { level: 'error', label: 'Email no coincide', detail: 'El email del usuario no coincide con la ficha' };
     }
-    if (platformUser.disabled) {
-      return { level: 'error', label: 'Usuario deshabilitado', detail: 'La cuenta de plataforma está deshabilitada' };
-    }
     if (emp.role && rolePermissions.length > 0) {
       const roleNorm = emp.role.toLowerCase().trim();
       const hasRolePerm = rolePermissions.some(rp => rp.role_name?.toLowerCase().trim() === roleNorm);
@@ -150,20 +149,32 @@ export default function Employees() {
     [employees, users, rolePermissions]
   );
 
-  // Re-vincular: fuerza la sincronización del empleado con su usuario de plataforma
+  // Re-vincular: busca el usuario de plataforma cuyo email coincide con el empleado
+  // y lo vincula directamente. Si no hay match, limpia el user_id stale.
   const relinkMutation = useMutation({
     mutationFn: async (emp) => {
-      // Si tiene user_id, forzar update del email para que coincida
-      if (emp.user_id && emp.email) {
-        // Llamar a la función de vinculación que re-sincroniza todo
-        const res = await base44.functions.invoke('vincularEmpleado', {});
-        return res;
+      if (!emp.email) return { matched: false };
+      const matchingUser = users.find(
+        u => u.email?.toLowerCase().trim() === emp.email?.toLowerCase().trim()
+      );
+      if (matchingUser) {
+        await base44.entities.Employee.update(emp.id, { user_id: matchingUser.id });
+        return { matched: true };
       }
-      return null;
+      // No hay usuario de plataforma con ese email → limpiar user_id stale
+      if (emp.user_id) {
+        await base44.entities.Employee.update(emp.id, { user_id: '' });
+      }
+      return { matched: false };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      if (result?.matched) {
+        toast({ title: 'Empleado vinculado', description: 'El usuario se vinculó correctamente.' });
+      } else {
+        toast({ title: 'Sin usuario coincidente', description: 'No hay usuario de plataforma con ese email. Invitalo primero.', variant: 'destructive' });
+      }
     }
   });
 

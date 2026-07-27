@@ -49,9 +49,6 @@ export function getLinkStatus(emp, users = [], rolePermissions = []) {
   if (platformUser.email?.toLowerCase().trim() !== emp.email?.toLowerCase().trim()) {
     return { level: 'error', label: 'Email no coincide', detail: `Email de plataforma (${platformUser.email}) no coincide con la ficha (${emp.email})` };
   }
-  if (platformUser.disabled) {
-    return { level: 'error', label: 'Deshabilitado', detail: 'La cuenta de plataforma está deshabilitada' };
-  }
   // Verificar que el rol tenga permisos configurados
   if (emp.role && rolePermissions.length > 0) {
     const roleNorm = emp.role.toLowerCase().trim();

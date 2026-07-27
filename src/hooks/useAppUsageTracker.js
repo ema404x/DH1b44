@@ -78,6 +78,7 @@ export function useAppUsageTracker(user) {
 
     const save = setInterval(flush, SAVE_INTERVAL);
     window.addEventListener('beforeunload', flush);
+    window.addEventListener('pagehide', flush);
 
     return () => {
       events.forEach(e => window.removeEventListener(e, onActivity));
@@ -87,6 +88,7 @@ export function useAppUsageTracker(user) {
       clearInterval(tick);
       clearInterval(save);
       window.removeEventListener('beforeunload', flush);
+      window.removeEventListener('pagehide', flush);
     };
   }, [user?.email]);
 }

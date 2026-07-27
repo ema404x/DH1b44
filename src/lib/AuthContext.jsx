@@ -75,11 +75,13 @@ export const AuthProvider = ({ children }) => {
     if (currentUser?.role === 'admin') return;
 
     let loaded = false;
+    let networkError = false;
 
     // Capa 1: SDK directo
     try {
       loaded = await loadPermissionsDirectly(currentUser);
     } catch (e) {
+      networkError = true;
       console.warn('[AuthContext] SDK permission load failed:', e?.message);
     }
 
@@ -88,6 +90,7 @@ export const AuthProvider = ({ children }) => {
       try {
         loaded = await loadPermissionsViaFunction();
       } catch (e) {
+        networkError = true;
         console.warn('[AuthContext] Backend function permission load failed:', e?.message);
       }
     }
@@ -99,7 +102,10 @@ export const AuthProvider = ({ children }) => {
         _employeeSector: currentUser?.data?.sector_id || currentUser?.sector_id || 'escuela',
         _minimalAccess: true,
       });
-      setVinculationFailed(false);
+      // vinculationFailed=true solo si hubo error de red → la UI ofrece reintentar.
+      // Si no hubo error de red, el usuario simplemente no tiene ficha → "Acceso denegado".
+      setVinculationFailed(networkError);
+      setHasEmployeeRecord(false);
       // Reintento en background para recuperar permisos completos
       base44.functions.invoke('vincularEmpleado', {}).catch(() => {});
       return;
@@ -160,8 +166,11 @@ export const AuthProvider = ({ children }) => {
     const result = await base44.functions.invoke('vincularEmpleado', {});
     const data = result?.data || result;
     if (!data || data.linked !== true) return false;
+    // Fallback = el backend no encontró ficha de empleado → no hay error de red,
+    // pero tampoco hay permisos reales. Retornar false para que Capa 3 asigne acceso mínimo.
+    if (data.fallback === true) return false;
 
-    setHasEmployeeRecord(!data.fallback);
+    setHasEmployeeRecord(true);
     setUserPermissions({
       ...(data.employee_permissions || {}),
       _employeeRole: data.employee_role || null,
