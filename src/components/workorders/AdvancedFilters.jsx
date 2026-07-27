@@ -35,13 +35,27 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders }) 
     return Array.from(set.values()).sort();
   }, [orders]);
 
+  // Consultar TODOS los jefes de sitio desde la entidad Direccion,
+  // y fusionar con los que aparecen en las OTs — garantiza que el
+  // listado esté completo aunque un jefe no tenga OTs visibles.
+  const { data: direcciones } = useQuery({
+    queryKey: ['direcciones-jefes'],
+    queryFn: () => base44.entities.Direccion.list('-created_date', 500),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const jefes = useMemo(() => {
     const set = new Map();
-    orders.forEach(o => {
-      if (o.jefe_sitio) set.set(o.jefe_sitio, o.jefe_sitio);
+    // Desde Direccion (fuente canónica de jefes de sitio)
+    direcciones?.forEach(d => {
+      if (d.jefe_sitio) set.set(d.jefe_sitio.trim(), d.jefe_sitio.trim());
     });
-    return Array.from(set.values()).sort();
-  }, [orders]);
+    // Desde las OTs (por si hay jefes que no están en Direccion)
+    orders.forEach(o => {
+      if (o.jefe_sitio) set.set(o.jefe_sitio.trim(), o.jefe_sitio.trim());
+    });
+    return Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [orders, direcciones]);
 
   const activeCount = [priority, type, assigned_to, jefe_sitio, date_from, date_to].filter(Boolean).length + (overdue_only ? 1 : 0);
 
