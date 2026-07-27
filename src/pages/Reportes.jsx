@@ -162,10 +162,12 @@ export default function Reportes() {
     value: filteredOrders.filter(o => o.type === key).length,
   })).filter(d => d.value > 0);
 
-  // Eficiencia por técnico
+  // Eficiencia por técnico (excluye jefes de sitio — no ejecutan OTs, las validan)
+  const jefeNamesLower = new Set(jefesUnicos.map(n => n.toLowerCase().trim()));
   const eficienciaPorTecnico = Object.entries(
     filteredOrders.reduce((acc, o) => {
       if (!o.assigned_name) return acc;
+      if (jefeNamesLower.has(o.assigned_name.toLowerCase().trim())) return acc;
       if (!acc[o.assigned_name]) acc[o.assigned_name] = { total: 0, completadas: 0 };
       acc[o.assigned_name].total++;
       if (o.status === 'completada') acc[o.assigned_name].completadas++;
