@@ -29,10 +29,14 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders }) 
   // Extraer valores únicos de las OTs ya cargadas para los selectores
   const operarios = useMemo(() => {
     const set = new Map();
+    const norm = (s) => s.trim().replace(/\s+/g, ' ');
     orders.forEach(o => {
-      if (o.assigned_name) set.set(o.assigned_name, o.assigned_name);
+      if (o.assigned_name) {
+        const n = norm(o.assigned_name);
+        if (!set.has(n.toLowerCase())) set.set(n.toLowerCase(), n);
+      }
     });
-    return Array.from(set.values()).sort();
+    return Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'es'));
   }, [orders]);
 
   // Consultar TODOS los jefes de sitio desde la entidad Direccion,
@@ -46,13 +50,20 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders }) 
 
   const jefes = useMemo(() => {
     const set = new Map();
+    const norm = (s) => s.trim().replace(/\s+/g, ' ');
     // Desde Direccion (fuente canónica de jefes de sitio)
     direcciones?.forEach(d => {
-      if (d.jefe_sitio) set.set(d.jefe_sitio.trim(), d.jefe_sitio.trim());
+      if (d.jefe_sitio) {
+        const n = norm(d.jefe_sitio);
+        if (!set.has(n.toLowerCase())) set.set(n.toLowerCase(), n);
+      }
     });
     // Desde las OTs (por si hay jefes que no están en Direccion)
     orders.forEach(o => {
-      if (o.jefe_sitio) set.set(o.jefe_sitio.trim(), o.jefe_sitio.trim());
+      if (o.jefe_sitio) {
+        const n = norm(o.jefe_sitio);
+        if (!set.has(n.toLowerCase())) set.set(n.toLowerCase(), n);
+      }
     });
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'es'));
   }, [orders, direcciones]);

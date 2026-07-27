@@ -165,8 +165,9 @@ export default function WorkOrders() {
     // Filtros avanzados (gerentes/admin)
     const matchPriority = !advFilters.priority || o.priority === advFilters.priority;
     const matchType = !advFilters.type || o.type === advFilters.type;
-    const matchOperario = !advFilters.assigned_to || o.assigned_name === advFilters.assigned_to;
-    const matchJefe = !advFilters.jefe_sitio || o.jefe_sitio === advFilters.jefe_sitio;
+    const norm = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const matchOperario = !advFilters.assigned_to || norm(o.assigned_name) === norm(advFilters.assigned_to);
+    const matchJefe = !advFilters.jefe_sitio || norm(o.jefe_sitio) === norm(advFilters.jefe_sitio);
     const matchDateFrom = !advFilters.date_from || (o.scheduled_date && o.scheduled_date >= advFilters.date_from);
     const matchDateTo = !advFilters.date_to || (o.scheduled_date && o.scheduled_date <= advFilters.date_to);
     const matchOverdue = !advFilters.overdue_only || (() => {
