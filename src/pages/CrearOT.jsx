@@ -205,8 +205,9 @@ export default function CrearOT() {
     queryFn: () => base44.entities.Employee.list('full_name', 500),
     staleTime: 300000,
   });
+  // Excluir jefes de sitio — no ejecutan OTs, las validan.
   const activeEmployees = useMemo(
-    () => employees.filter(e => e.status === 'activo' || !e.status).sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '')),
+    () => employees.filter(e => (e.status === 'activo' || !e.status) && e.role !== 'jefe_sitio').sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '')),
     [employees]
   );
 

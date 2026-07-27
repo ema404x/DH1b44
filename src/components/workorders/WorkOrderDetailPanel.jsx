@@ -126,7 +126,8 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     queryFn: () => base44.entities.Employee.list('full_name', 200),
     staleTime: 600_000,
   });
-  const activeEmployees = employees.filter(e => e.status === 'activo' || !e.status);
+  // Excluir jefes de sitio — no ejecutan OTs, las validan.
+  const activeEmployees = employees.filter(e => (e.status === 'activo' || !e.status) && e.role !== 'jefe_sitio');
 
   const saveMutation = useMutation({
     mutationFn: (d) => base44.entities.WorkOrder.update(order.id, d),

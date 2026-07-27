@@ -105,7 +105,8 @@ export default function Reportes() {
     .map(e => e.full_name)
     .filter(Boolean)
     .sort();
-  const tecnicosUnicos = [...new Set(employees.map(e => e.full_name).filter(Boolean))].sort();
+  // Excluir jefes de sitio — tienen su propio filtro dedicado
+  const tecnicosUnicos = [...new Set(employees.filter(e => !e.role || !e.role.toLowerCase().includes('jefe')).map(e => e.full_name).filter(Boolean))].sort();
 
   // Build location → jefe/comuna lookup for enriching orders
   const locationLookup = useMemo(() => {

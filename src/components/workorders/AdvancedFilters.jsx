@@ -26,19 +26,6 @@ const TIPOS = [
 export default function AdvancedFilters({ filters, onChange, onReset, orders, direcciones: propDirecciones }) {
   const { priority, type, assigned_to, jefe_sitio, date_from, date_to, overdue_only } = filters;
 
-  // Extraer valores únicos de las OTs ya cargadas para los selectores
-  const operarios = useMemo(() => {
-    const set = new Map();
-    const norm = (s) => s.trim().replace(/\s+/g, ' ');
-    orders.forEach(o => {
-      if (o.assigned_name) {
-        const n = norm(o.assigned_name);
-        if (!set.has(n.toLowerCase())) set.set(n.toLowerCase(), n);
-      }
-    });
-    return Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [orders]);
-
   // Consultar TODOS los jefes de sitio desde la entidad Direccion,
   // y fusionar con los que aparecen en las OTs — garantiza que el
   // listado esté completo aunque un jefe no tenga OTs visibles.
@@ -50,6 +37,31 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
     enabled: !propDirecciones,
   });
   const direcciones = propDirecciones || queriedDirecciones;
+
+  // Set de nombres de jefes (lowercase) para excluirlos del listado de operarios
+  const jefeNamesSet = useMemo(() => {
+    const set = new Set();
+    const norm = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    direcciones?.forEach(d => { if (d.jefe_sitio) set.add(norm(d.jefe_sitio)); });
+    orders.forEach(o => { if (o.jefe_sitio) set.add(norm(o.jefe_sitio)); });
+    return set;
+  }, [orders, direcciones]);
+
+  // Operarios asignados — extrae valores únicos de las OTs,
+  // excluyendo jefes de sitio (tienen su propio filtro separado)
+  const operarios = useMemo(() => {
+    const set = new Map();
+    const norm = (s) => s.trim().replace(/\s+/g, ' ');
+    orders.forEach(o => {
+      if (o.assigned_name) {
+        const n = norm(o.assigned_name);
+        if (!jefeNamesSet.has(n.toLowerCase()) && !set.has(n.toLowerCase())) {
+          set.set(n.toLowerCase(), n);
+        }
+      }
+    });
+    return Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [orders, jefeNamesSet]);
 
   const jefes = useMemo(() => {
     const set = new Map();
