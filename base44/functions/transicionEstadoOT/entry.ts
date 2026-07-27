@@ -70,9 +70,23 @@ Deno.serve(async (req) => {
 
     const nuevoEstado = fija ? fija.hacia : flexible.hacia;
 
-    // Permisos: aprobar/rechazar solo jefe de sitio, admin o gerente
+    // Permisos: aprobar/rechazar solo jefe de sitio, admin o gerente.
+    // El rol 'jefe_sitio' vive en la entidad Employee (el rol de plataforma es 'user'),
+    // así que hay que buscar la ficha del empleado por user_id.
     const userRole = user.role || '';
-    const esJefe = ['admin', 'gerente', 'jefe_sitio'].includes(userRole);
+    const esAdminPlataforma = ['admin', 'gerente'].includes(userRole);
+    let esJefe = esAdminPlataforma;
+    if (!esJefe) {
+      try {
+        const empleados = await base44.asServiceRole.entities.Employee
+          .filter({ user_id: user.id }).catch(() => []);
+        const emp = empleados && empleados.length > 0 ? empleados[0] : null;
+        const empRole = (emp?.role || '').toLowerCase().trim();
+        esJefe = empRole === 'jefe_sitio' || empRole === 'jefe de sitio';
+      } catch {
+        esJefe = false;
+      }
+    }
     if ((accion === 'aprobar' || accion === 'rechazar') && !esJefe) {
       return Response.json({ error: 'Solo el Jefe de Sitio, Admin o Gerente puede aprobar o rechazar OTs' }, { status: 403 });
     }
