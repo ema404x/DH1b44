@@ -263,9 +263,9 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
     return (
       <div className="space-y-5">
         {/* File + comuna info */}
-        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+        <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3">
           <div className="flex items-center gap-3">
-            <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+            <FileSpreadsheet className="h-5 w-5 text-emerald-400" />
             <div>
               <p className="font-medium text-sm">{file?.name}</p>
               <p className="text-xs text-muted-foreground">
@@ -470,10 +470,10 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
   if (step === 'done' && importResults) {
     return (
       <div className="space-y-4">
-        <div className={`flex items-center gap-3 p-4 rounded-lg ${importResults.totalErrors === 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'}`}>
-          <CheckCircle2 className="h-6 w-6 text-emerald-600 flex-shrink-0" />
+        <div className={`flex items-center gap-3 p-4 rounded-lg ${importResults.totalErrors === 0 ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-amber-500/10 border border-amber-500/20'}`}>
+          <CheckCircle2 className="h-6 w-6 text-emerald-400 flex-shrink-0" />
           <div>
-            <p className="font-semibold">{importResults.totalImported.toLocaleString()} órdenes importadas · {importResults.totalErrors} errores</p>
+            <p className="font-semibold">{importResults.totalImported.toLocaleString()} órdenes importadas · {importResults.totalErrors} errores{importResults.totalSkipped > 0 ? ` · ${importResults.totalSkipped} duplicados omitidos` : ''}</p>
             <p className="text-sm text-muted-foreground">Comuna {comuna} · Los pendientes ya están disponibles en el sistema</p>
           </div>
         </div>
@@ -483,8 +483,9 @@ export default function ImportarPendientesSAP({ onImportDone, defaultComuna = '8
             <div key={r.sheet} className="flex items-center justify-between text-sm border rounded-lg px-4 py-2.5">
               <span className="font-medium">{r.sheet}</span>
               <div className="flex items-center gap-3">
-                <Badge className="bg-emerald-100 text-emerald-700">{r.imported} importadas</Badge>
-                {r.errors > 0 && <Badge className="bg-red-100 text-red-700">{r.errors} errores</Badge>}
+                <Badge className="bg-emerald-500/15 text-emerald-400">{r.imported} importadas</Badge>
+                {r.skipped > 0 && <Badge className="bg-amber-500/15 text-amber-400">{r.skipped} duplicados</Badge>}
+                {r.errors > 0 && <Badge className="bg-red-500/15 text-red-400">{r.errors} errores</Badge>}
               </div>
             </div>
           ))}

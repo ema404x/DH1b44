@@ -125,12 +125,27 @@ export default function PendienteDialog({ open, onOpenChange, pendiente, onSave,
   const jefes = employees.filter(e => e.role === 'jefe_sitio');
 
   const handleSave = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const prevEstado = pendiente?.estado;
+    const patch = {};
+
+    // Auto-set fecha_asignacion al pasar a asignado
+    if (form.estado === 'asignado' && prevEstado !== 'asignado' && !form.fecha_asignacion) {
+      patch.fecha_asignacion = today;
+    }
+    // Auto-set fecha_resolucion al pasar a resuelto
+    if (form.estado === 'resuelto' && prevEstado !== 'resuelto' && !form.fecha_resolucion) {
+      patch.fecha_resolucion = today;
+    }
+
+    const formWithDates = { ...form, ...patch };
+
     // Register historial if editing existing
     if (pendiente?.id) {
-      await registrarCambio(pendiente.id, form.numero_sap, pendiente, form);
+      await registrarCambio(pendiente.id, form.numero_sap, pendiente, formWithDates);
       qc.invalidateQueries({ queryKey: ['pendiente-historial', pendiente.id] });
     }
-    onSave(form);
+    onSave(formWithDates);
   };
 
   return (

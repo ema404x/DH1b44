@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
 
 const SKIP_SHEETS = ['PARA FORMATO CONDICIONAL', 'ESC'];
+const BATCH_SIZE = 50;
 
 function parseDate(val) {
   if (!val) return null;
@@ -9,7 +10,6 @@ function parseDate(val) {
   // Si es número serial de Excel (ej: 45123)
   if (typeof val === 'number' || /^\d{5}$/.test(String(val).trim())) {
     const serial = typeof val === 'number' ? val : parseInt(val);
-    // Excel epoch real: 30 dic 1899 = serial 0 (incluye bug del 29/feb/1900 ficticio)
     const date = new Date(Date.UTC(1899, 11, 30 + serial));
     const y = date.getUTCFullYear();
     const m = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -49,45 +49,19 @@ function statusToEstado(status) {
   return 'pendiente';
 }
 
-/**
- * Detect the format of the Excel file based on the commune.
- * - '8A': multiple sheets per inspector, has INSPECTOR column, FECHA LIMITE SAP
- * - '8B': single sheet "PENDIENTES 8B", no INSPECTOR column — inspector name IS the column header,
- *         columns: [inspector_name, ubicacion, descripcion, nro_orden, col_4, col_5, fecha_inicio, fecha_limite, clase, status]
- * - '10A': single sheet "PENDIENTES C10A", no INSPECTOR column, FECHA LIMITE (no SAP suffix)
- */
 function detectFormat(comuna) {
   if (String(comuna).includes('8B')) return 'formato_8b';
   if (String(comuna).includes('10') || String(comuna).includes('10A')) return 'formato_10a';
-  return 'formato_8a'; // default (8A, multiple sheets with INSPECTOR column)
+  return 'formato_8a';
 }
 
-/**
- * Parse rows from formato_8b sheet.
- * The sheet has NO proper headers — xlsx reads row 0 as headers.
- * Column layout (positional, by index):
- *   0: inspector name (the column header is the inspector's name)
- *   1: ubicacion
- *   2: descripcion (TAREAS A REALIZAR)
- *   3: N° DE ORDEN
- *   4: (col extra / vacía)
- *   5: (col extra / vacía)
- *   6: FECHA INICIO
- *   7: FECHA LIMITE
- *   8: CLASE DE ORDEN
- *   9: STATUS
- */
 function parseRows8B(ws) {
-  // Read as array of arrays — fila 0 del Excel es la primera fila real de datos
-  // (el xlsx la interpreta como header ficticio, por eso usamos header:1 y empezamos desde índice 0)
   const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
   if (!raw || raw.length < 1) return { rows: [], inspectors: new Set() };
 
   const records = [];
   const inspectors = new Set();
 
-  // Estructura columnas 8B:
-  // 0=inspector, 1=ubicacion, 2=ubicacion2(dup), 3=tareas, 4=nro_orden, 5=col_vacia, 6=fecha_inicio, 7=fecha_limite, 8=clase_orden, 9=status
   for (let i = 0; i < raw.length; i++) {
     const row = raw[i];
     if (!row || row.length < 4) continue;
@@ -95,7 +69,6 @@ function parseRows8B(ws) {
     const nroOrden = row[4];
     const tareas = row[3] ? String(row[3]).trim() : null;
 
-    // Saltar filas sin orden válida o sin tarea
     if (!nroOrden || !tareas || tareas === '') continue;
     const nroStr = String(nroOrden).trim();
     if (nroStr === '' || isNaN(Number(nroStr))) continue;
@@ -125,11 +98,6 @@ function parseRows8B(ws) {
   return { rows: records, inspectors };
 }
 
-/**
- * Parse rows from formato_10a (no INSPECTOR column).
- * Columns: UBICACIÓN, ESTABLECIMIENTO, TAREAS A REALIZAR , N° DE ORDEN, 1° DESROBADO, FECHA INICIO, FECHA LIMITE, CLASE DE ORDEN, STATUS
- * Also reads INSPECTOR column if present (some 10A files do include it).
- */
 function parseRows10A(ws) {
   const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
   const records = [];
@@ -140,7 +108,6 @@ function parseRows10A(ws) {
     const tareas = row['TAREAS A REALIZAR'] || row['TAREAS A REALIZAR '] || row['TAREA'] || row['DESCRIPCION'];
     const ubicacion = row['UBICACIÓN'] || row['UBICACION'] || row['UBICACIÓN '];
     const establecimiento = row['ESTABLECIMIENTO'] || row['ESTABLECIMIENTO '];
-    // "1° DESROBADO" is a typo for "1° DESAPROBADO" in the 10A format
     const desaprobado = row['1° DESROBADO'] || row['1° DESAPROBADO'] || row['N° DE ORDEN 1° DESAPROBADO'];
     const fechaLimite = row['FECHA LIMITE'] || row['FECHA LÍMITE'] || row['FECHA LIMITE SAP'];
     const inspector = normalizeName(row['INSPECTOR'] || row['INSPECTOR ']);
@@ -165,9 +132,6 @@ function parseRows10A(ws) {
   return { rows: records, inspectors };
 }
 
-/**
- * Parse rows from formato_8a (standard, with INSPECTOR column).
- */
 function parseRows8A(ws) {
   const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
   const records = [];
@@ -217,18 +181,25 @@ Deno.serve(async (req) => {
   const results = [];
   let totalImported = 0;
   let totalErrors = 0;
+  let totalSkipped = 0;
 
-  // Pre-cargar LocationData y Direccion para resolución automática (especialmente 10A)
+  // Pre-cargar LocationData y Direccion para resolución automática
   const sb = base44.asServiceRole;
-  const [allLocations, allDirecciones] = await Promise.all([
+  const [allLocations, allDirecciones, existingPendientes] = await Promise.all([
     sb.entities.LocationData.list('-created_date', 2000).catch(() => []),
     sb.entities.Direccion.list().catch(() => []),
+    // Pre-cargar pendientes existentes de esta comuna para evitar duplicados por numero_sap
+    base44.entities.Pendiente.filter({ comuna }, '-created_date', 2000).catch(() => []),
   ]);
+
+  // Set de números SAP ya existentes — previene duplicados
+  const existingSapNumbers = new Set(
+    existingPendientes.map(p => p.numero_sap).filter(Boolean)
+  );
 
   const norm = (s) => s ? String(s).trim().toUpperCase() : '';
 
-  // Construir índices para búsqueda rápida
-  // LocationData: establecimiento → { jefe_sitio, inspector }
+  // Índices para búsqueda rápida de jefe_sitio e inspector
   const locByEstablecimiento = new Map();
   const locByUbicacion = new Map();
   for (const loc of allLocations) {
@@ -236,22 +207,18 @@ Deno.serve(async (req) => {
     if (loc.ubic_tecnica) locByUbicacion.set(norm(loc.ubic_tecnica), loc);
   }
 
-  // Direccion: inspector → jefe_sitio
   const dirByInspector = new Map();
   for (const d of allDirecciones) {
     if (d.inspector) dirByInspector.set(norm(d.inspector), d);
   }
 
-  // Resolver jefe_sitio e inspector a partir de establecimiento/ubicacion
   function resolveFromLocation(establecimiento, ubicacion, inspectorRaw) {
     let jefe_sitio = null;
     let inspector = inspectorRaw || null;
 
-    // 1. Buscar en LocationData por establecimiento o ubicacion técnica
     let loc = null;
     if (establecimiento) loc = locByEstablecimiento.get(norm(establecimiento));
     if (!loc && ubicacion) loc = locByUbicacion.get(norm(ubicacion));
-    // Búsqueda parcial si no hubo exacta
     if (!loc && establecimiento) {
       const normEst = norm(establecimiento);
       for (const [k, v] of locByEstablecimiento) {
@@ -264,7 +231,6 @@ Deno.serve(async (req) => {
       if (!inspector && loc.inspector) inspector = loc.inspector;
     }
 
-    // 2. Fallback: si hay inspector pero no jefe, buscar en Direccion
     if (!jefe_sitio && inspector) {
       const dir = dirByInspector.get(norm(inspector));
       if (dir?.jefe_sitio) jefe_sitio = dir.jefe_sitio;
@@ -281,37 +247,36 @@ Deno.serve(async (req) => {
     let parsedRows = [];
 
     if (formato === 'formato_8b') {
-      const parsed = parseRows8B(ws);
-      parsedRows = parsed.rows;
+      parsedRows = parseRows8B(ws).rows;
     } else if (formato === 'formato_10a') {
-      const parsed = parseRows10A(ws);
-      parsedRows = parsed.rows;
+      parsedRows = parseRows10A(ws).rows;
     } else {
-      // formato_8a
-      const parsed = parseRows8A(ws);
-      parsedRows = parsed.rows;
+      parsedRows = parseRows8A(ws).rows;
     }
 
     if (!parsedRows.length) continue;
 
-    let imported = 0;
-    let errors = 0;
-    const errorDetails = [];
+    let skipped = 0;
+    const recordsToCreate = [];
 
     for (const r of parsedRows) {
-      // Jefe asignado manualmente (desde el frontend, por inspector)
       const jefeManual = r.inspector ? (jefes_por_inspector?.[r.inspector] || null) : null;
-
-      // Resolución automática desde LocationData/Direccion (usada especialmente para 10A)
       const autoResolved = resolveFromLocation(r.establecimiento, r.ubicacion, r.inspector);
 
-      // Prioridad: manual > automático
       const jefe_sitio = jefeManual?.nombre || autoResolved.jefe_sitio || null;
       const jefe_sitio_email = jefeManual?.email || null;
       const inspector = autoResolved.inspector || r.inspector || null;
 
+      const nroSap = r.nroOrden;
+
+      // DEDUP: saltar si ya existe un pendiente con el mismo numero_sap en esta comuna
+      if (nroSap && existingSapNumbers.has(nroSap)) {
+        skipped++;
+        continue;
+      }
+
       const record = {
-        numero_sap: r.nroOrden,
+        numero_sap: nroSap,
         numero_sap_desaprobado: r.desaprobado || null,
         descripcion: r.tareas,
         sitio: r.ubicacion || null,
@@ -329,19 +294,42 @@ Deno.serve(async (req) => {
         fecha_limite: parseDate(r.fechaLimite),
       };
 
+      recordsToCreate.push(record);
+      // Prevenir duplicados intra-lote
+      if (nroSap) existingSapNumbers.add(nroSap);
+    }
+
+    // BULK CREATE en lotes de 50 — mucho más rápido que creates individuales
+    let imported = 0;
+    let errors = 0;
+    const errorDetails = [];
+
+    for (let i = 0; i < recordsToCreate.length; i += BATCH_SIZE) {
+      const batch = recordsToCreate.slice(i, i + BATCH_SIZE);
       try {
-        await base44.entities.Pendiente.create(record);
-        imported++;
-      } catch (err) {
-        errors++;
-        errorDetails.push(`Orden ${record.numero_sap}: ${err.message}`);
+        await base44.entities.Pendiente.bulkCreate(batch);
+        imported += batch.length;
+      } catch (batchErr) {
+        // Fallback: intentar creates individuales para preservar el reporte de errores
+        for (const rec of batch) {
+          try {
+            await base44.entities.Pendiente.create(rec);
+            imported++;
+          } catch (e) {
+            errors++;
+            if (errorDetails.length < 5) {
+              errorDetails.push(`Orden ${rec.numero_sap}: ${e.message}`);
+            }
+          }
+        }
       }
     }
 
     totalImported += imported;
     totalErrors += errors;
-    results.push({ sheet: sheetName, imported, errors, errorDetails: errorDetails.slice(0, 5) });
+    totalSkipped += skipped;
+    results.push({ sheet: sheetName, imported, errors, skipped, errorDetails });
   }
 
-  return Response.json({ results, totalImported, totalErrors });
+  return Response.json({ results, totalImported, totalErrors, totalSkipped });
 });

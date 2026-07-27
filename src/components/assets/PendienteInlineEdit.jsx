@@ -49,15 +49,21 @@ export default function PendienteInlineEdit({ pendiente, onSave, onClose, isSavi
   const handleSave = () => {
     const emp = employees.find(e => e.full_name === form.jefe_sitio);
     const today = new Date().toISOString().split('T')[0];
+
+    // Calcular estado resultante (auto-promote si se asigna jefe a un pendiente)
+    const willPromoteToAsignado = form.jefe_sitio && pendiente.estado === 'pendiente' && form.estado === 'pendiente';
+    const resultingEstado = willPromoteToAsignado ? 'asignado' : form.estado;
+
     onSave({
       ...form,
       ...(emp?.email ? { jefe_sitio_email: emp.email } : {}),
-      // auto-promote to asignado if jefe was set
-      ...(form.jefe_sitio && pendiente.estado === 'pendiente' && form.estado === 'pendiente'
-        ? { estado: 'asignado' }
+      ...(willPromoteToAsignado ? { estado: 'asignado' } : {}),
+      // Auto-set fecha_asignacion al pasar a asignado
+      ...(resultingEstado === 'asignado' && pendiente.estado !== 'asignado'
+        ? { fecha_asignacion: today }
         : {}),
-      // auto-set fecha_resolucion al pasar a resuelto
-      ...(form.estado === 'resuelto' && pendiente.estado !== 'resuelto'
+      // Auto-set fecha_resolucion al pasar a resuelto
+      ...(resultingEstado === 'resuelto' && pendiente.estado !== 'resuelto'
         ? { fecha_resolucion: today }
         : {}),
     });
