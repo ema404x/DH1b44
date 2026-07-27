@@ -298,6 +298,16 @@ export default function Employees() {
             ))}
           </SelectContent>
         </Select>
+        {employeesWithIssues.length > 0 && (
+          <Button
+            variant={onlyIssues ? 'default' : 'outline'}
+            onClick={() => setOnlyIssues(!onlyIssues)}
+            className={`gap-2 border-slate-700/50 ${onlyIssues ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-slate-800/50 text-white hover:bg-slate-700/50'}`}
+          >
+            <AlertTriangle className="h-4 w-4" />
+            {onlyIssues ? 'Ver todos' : `${employeesWithIssues.length} con problemas`}
+          </Button>
+        )}
       </motion.div>
 
       {/* Grid */}
