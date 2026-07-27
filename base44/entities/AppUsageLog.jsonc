@@ -1,0 +1,51 @@
+{
+  "name": "AppUsageLog",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario"
+    },
+    "user_name": {
+      "type": "string",
+      "description": "Nombre del usuario"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del registro (un registro por usuario por d\u00eda)"
+    },
+    "active_seconds": {
+      "type": "number",
+      "default": 0,
+      "description": "Segundos activos usando la app (tab enfocada, sin idle)"
+    }
+  },
+  "required": [
+    "user_email",
+    "date"
+  ],
+  "rls": {
+    "create": {},
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "created_by_id": "{{user.id}}"
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

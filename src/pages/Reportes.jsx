@@ -766,34 +766,29 @@ export default function Reportes() {
                       <div className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4">
                         <div className="flex items-center gap-2 mb-3">
                           <Clock className="h-4 w-4 text-cyan-400" />
-                          <h4 className="text-sm font-semibold text-white">Tiempo de Uso por Usuario (7 días)</h4>
+                          <h4 className="text-sm font-semibold text-white">Tiempo de Uso de la App por Usuario (7 días)</h4>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b border-slate-600/50">
                                 <th className="text-left py-2 px-3 text-xs font-semibold text-slate-400 uppercase">Usuario</th>
-                                <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400 uppercase">Horas en OTs</th>
-                                <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400 uppercase">Horas de Fichaje</th>
-                                <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400 uppercase">Total</th>
+                                <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400 uppercase">Horas de Uso</th>
                               </tr>
                             </thead>
                             <tbody>
                               {resumenSemanal.usoPorUsuario.map((u, i) => {
-                                const total = u.horasOT + u.horasAsistencia;
-                                const maxTotal = Math.max(...resumenSemanal.usoPorUsuario.map(x => x.horasOT + x.horasAsistencia), 1);
-                                const pct = (total / maxTotal) * 100;
+                                const maxHoras = Math.max(...resumenSemanal.usoPorUsuario.map(x => x.horas), 1);
+                                const pct = (u.horas / maxHoras) * 100;
                                 return (
                                   <tr key={i} className="border-b border-slate-700/30 hover:bg-slate-600/20">
                                     <td className="py-2 px-3 text-slate-200 font-medium">{u.nombre}</td>
-                                    <td className="py-2 px-3 text-right text-violet-400 font-semibold tabular-nums">{u.horasOT}h</td>
-                                    <td className="py-2 px-3 text-right text-emerald-400 font-semibold tabular-nums">{u.horasAsistencia}h</td>
                                     <td className="py-2 px-3 text-right">
                                       <div className="flex items-center justify-end gap-2">
-                                        <div className="w-20 bg-slate-600/50 rounded-full h-2 overflow-hidden">
+                                        <div className="w-24 bg-slate-600/50 rounded-full h-2 overflow-hidden">
                                           <div className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" style={{ width: `${pct}%` }} />
                                         </div>
-                                        <span className="text-white font-bold tabular-nums w-12 text-right">{total.toFixed(1)}h</span>
+                                        <span className="text-cyan-400 font-bold tabular-nums w-12 text-right">{u.horas}h</span>
                                       </div>
                                     </td>
                                   </tr>

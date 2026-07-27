@@ -19,6 +19,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useEmergencyNotifications } from '@/hooks/useEmergencyNotifications';
 import EmergencyAlert from '@/components/emergencias/EmergencyAlert';
 import { useSmartCache } from '@/hooks/useSmartCache';
+import { useAppUsageTracker } from '@/hooks/useAppUsageTracker';
 
 // Estable entre renders — no se recrea nunca
 const onSyncCallback = (count) =>
@@ -37,6 +38,7 @@ export default function AppLayout() {
   const queryClient = useQueryClient();
   const { isOnline, pendingCount, isSyncing, syncPending } = useOfflineQueue(onSyncCallback);
   const { currentUser } = useCurrentUser();
+  useAppUsageTracker(currentUser);
   const location = useLocation();
   const navigationType = useNavigationType();
   const [activeEmergency, setActiveEmergency] = useState(null);
