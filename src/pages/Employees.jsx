@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode, SettingsIcon, Plus, Users, Zap, LinkIcon, UnlinkIcon, MapPin, Building2 } from 'lucide-react';
+import { Search, UserCog, Pencil, Trash2, Phone, Mail, QrCode, SettingsIcon, Plus, Users, Zap, LinkIcon, UnlinkIcon, MapPin, Building2, AlertTriangle, CheckCircle2, RefreshCw, XCircle } from 'lucide-react';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -17,6 +17,7 @@ import EntityFormDialog from '@/components/shared/EntityFormDialog';
 import AsignacionAutomatica from '@/components/employees/AsignacionAutomatica';
 import InviteUserDialog from '@/components/employees/InviteUserDialog';
 import SyncEmployeesButton from '@/components/employees/SyncEmployeesButton';
+import EmployeeCard from '@/components/employees/EmployeeCard';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { usePermission } from '@/hooks/usePermission';
@@ -69,6 +70,7 @@ export default function Employees() {
   const { allowed: canDelete } = usePermission('Employee', 'delete');
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [onlyIssues, setOnlyIssues] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [qrEmployee, setQrEmployee] = useState(null);
@@ -78,6 +80,7 @@ export default function Employees() {
   const { data: employees = [], isLoading } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list('-created_date') });
   const { data: locations = [] } = useQuery({ queryKey: ['locations'], queryFn: () => base44.entities.LocationData.list('-created_date', 500) });
   const { data: rolePermissions = [] } = useQuery({ queryKey: ['rolePermissions'], queryFn: () => base44.entities.RolePermission.list() });
+  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => base44.entities.User.list('-created_date', 500) });
 
   const jefesSitio = useMemo(() =>
     employees.filter(e => e.role === 'jefe_sitio').map(e => ({ value: e.full_name, label: e.full_name })),
@@ -113,6 +116,57 @@ export default function Employees() {
     inspectores: employees.filter(e => e.role === 'inspector').length,
   }), [employees]);
 
+  // ── Diagnóstico de vinculación por empleado ──
+  // Determina si el empleado puede ingresar al sistema o tiene algún problema.
+  const getLinkStatus = (emp) => {
+    if (!emp.email?.trim()) {
+      return { level: 'error', label: 'Sin email', detail: 'No tiene email configurado, no puede ingresar' };
+    }
+    const platformUser = emp.user_id ? users.find(u => u.id === emp.user_id) : null;
+    if (!emp.user_id) {
+      return { level: 'error', label: 'Sin vincular', detail: 'Tiene email pero no está vinculado a un usuario' };
+    }
+    if (!platformUser) {
+      return { level: 'error', label: 'Usuario roto', detail: 'El user_id no corresponde a un usuario activo' };
+    }
+    if (platformUser.email?.toLowerCase().trim() !== emp.email?.toLowerCase().trim()) {
+      return { level: 'error', label: 'Email no coincide', detail: 'El email del usuario no coincide con la ficha' };
+    }
+    if (platformUser.disabled) {
+      return { level: 'error', label: 'Usuario deshabilitado', detail: 'La cuenta de plataforma está deshabilitada' };
+    }
+    if (emp.role && rolePermissions.length > 0) {
+      const roleNorm = emp.role.toLowerCase().trim();
+      const hasRolePerm = rolePermissions.some(rp => rp.role_name?.toLowerCase().trim() === roleNorm);
+      if (!hasRolePerm) {
+        return { level: 'error', label: 'Sin permisos', detail: `El rol "${emp.role}" no tiene permisos configurados` };
+      }
+    }
+    return { level: 'ok', label: 'Vinculado', detail: 'Puede ingresar al sistema' };
+  };
+
+  const employeesWithIssues = useMemo(() =>
+    employees.filter(e => getLinkStatus(e).level === 'error'),
+    [employees, users, rolePermissions]
+  );
+
+  // Re-vincular: fuerza la sincronización del empleado con su usuario de plataforma
+  const relinkMutation = useMutation({
+    mutationFn: async (emp) => {
+      // Si tiene user_id, forzar update del email para que coincida
+      if (emp.user_id && emp.email) {
+        // Llamar a la función de vinculación que re-sincroniza todo
+        const res = await base44.functions.invoke('vincularEmpleado', {});
+        return res;
+      }
+      return null;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    }
+  });
+
   const saveMutation = useMutation({
     mutationFn: (data) => editing ? base44.entities.Employee.update(editing.id, data) : base44.entities.Employee.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['employees'] }); setDialogOpen(false); setEditing(null); }
@@ -126,7 +180,8 @@ export default function Employees() {
   const filtered = employees.filter(e => {
     const matchSearch = !search || e.full_name?.toLowerCase().includes(search.toLowerCase());
     const matchRole = roleFilter === 'all' || e.role === roleFilter;
-    return matchSearch && matchRole;
+    const matchIssue = !onlyIssues || getLinkStatus(e).level === 'error';
+    return matchSearch && matchRole && matchIssue;
   });
 
   const getInitials = (name) => name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
@@ -181,7 +236,7 @@ export default function Employees() {
             { label: 'Total', value: stats.total, icon: Users, color: 'from-blue-500' },
             { label: 'Activos', value: stats.activos, icon: Zap, color: 'from-emerald-500' },
             { label: 'Jefes de Sitio', value: stats.jefesSitio, icon: Building2, color: 'from-violet-500' },
-            { label: 'Inspectores', value: stats.inspectores, icon: UserCog, color: 'from-cyan-500' },
+            { label: 'Con Problemas', value: employeesWithIssues.length, icon: AlertTriangle, color: 'from-red-500' },
           ].map((stat, i) => (
             <motion.div key={i} variants={item}>
               <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border border-slate-700/50 rounded-lg p-4">
@@ -251,91 +306,22 @@ export default function Employees() {
       ) : (
         <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(emp => (
-            <motion.div key={emp.id} variants={item}>
-              <Card className="group border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur hover:shadow-xl hover:shadow-cyan-500/20 transition-all border border-slate-700/50">
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-4">
-                    <Avatar className="h-12 w-12 flex-shrink-0">
-                      <AvatarFallback className="bg-gradient-to-br from-cyan-500 to-blue-600 text-white font-semibold">{getInitials(emp.full_name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-semibold text-white">{emp.full_name}</p>
-                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            <span className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full font-medium ${getRoleBadgeClass(emp.role)}`}>
-                              {getRoleLabel(emp.role)}
-                            </span>
-                            {emp.assigned_comuna && (
-                              <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium ${comunaColors[emp.assigned_comuna] || 'bg-slate-500/20 text-slate-300'}`}>
-                                <MapPin className="h-2.5 w-2.5" />
-                                {emp.assigned_comuna}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-cyan-400 hover:text-cyan-300" onClick={() => setQrEmployee(emp)}>
-                            <QrCode className="h-3.5 w-3.5" />
-                          </Button>
-                          {canEdit && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400" onClick={() => { setEditing(emp); setDialogOpen(true); }}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                          {canDelete && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500"><Trash2 className="h-3.5 w-3.5" /></Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>¿Eliminar empleado?</AlertDialogTitle>
-                                  <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteMutation.mutate(emp.id)}>Eliminar</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-1">
-                        <StatusBadge value={emp.status || 'activo'} />
-                        {emp.user_id ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-                            <LinkIcon className="h-2.5 w-2.5" /> Vinculado
-                          </span>
-                        ) : emp.email ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20">
-                            <UnlinkIcon className="h-2.5 w-2.5" /> Sin vincular
-                          </span>
-                        ) : null}
-                      </div>
-
-                      {emp.assigned_location && (
-                        <p className="text-xs text-cyan-400 mt-2 flex items-center gap-1">
-                          <MapPin className="h-3 w-3 flex-shrink-0" />{emp.assigned_location}
-                        </p>
-                      )}
-                      {emp.assigned_jefe_sitio && emp.role !== 'jefe_sitio' && (
-                        <p className="text-xs text-violet-400 mt-1 flex items-center gap-1">
-                          <Building2 className="h-3 w-3 flex-shrink-0" />Jefe: {emp.assigned_jefe_sitio}
-                        </p>
-                      )}
-
-                      <div className="mt-3 space-y-1">
-                        {emp.phone && <p className="text-xs text-slate-400 flex items-center gap-1.5"><Phone className="h-3 w-3" />{emp.phone}</p>}
-                        {emp.email && <p className="text-xs text-slate-400 flex items-center gap-1.5"><Mail className="h-3 w-3" />{emp.email}</p>}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+            <EmployeeCard
+              key={emp.id}
+              emp={emp}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              roleLabel={getRoleLabel(emp.role)}
+              roleBadgeClass={getRoleBadgeClass(emp.role)}
+              item={item}
+              onEdit={(emp) => { setEditing(emp); setDialogOpen(true); }}
+              onDelete={(id) => deleteMutation.mutate(id)}
+              onQR={setQrEmployee}
+              onRelink={(emp) => relinkMutation.mutate(emp)}
+              isRelinking={relinkMutation.isPending}
+              users={users}
+              rolePermissions={rolePermissions}
+            />
           ))}
         </motion.div>
       )}
