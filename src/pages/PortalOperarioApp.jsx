@@ -58,6 +58,7 @@ export default function PortalOperarioApp() {
       });
       toast.success(res.data.mensaje);
       queryClient.invalidateQueries({ queryKey: ['workorders-operario'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
       return true;
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'intente nuevamente';

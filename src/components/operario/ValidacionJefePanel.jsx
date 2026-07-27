@@ -36,6 +36,7 @@ export default function ValidacionJefePanel() {
       toast.success(res.data.mensaje);
       queryClient.invalidateQueries({ queryKey: ['workorders-validacion'] });
       queryClient.invalidateQueries({ queryKey: ['workorders-operario'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'intente nuevamente';
       toast.error(msg);
