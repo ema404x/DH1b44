@@ -18,7 +18,6 @@ Deno.serve(async (req) => {
     async function syncPlatformRole(userId, employeeRole, currentPlatformRole) {
       const empRoleNorm = (employeeRole || '').toLowerCase().trim();
       const shouldBe = GERENTE_ROLES.includes(empRoleNorm) ? 'gerente' : 'user';
-      // No degradar un admin de plataforma
       if (currentPlatformRole === 'admin') return;
       if (currentPlatformRole === shouldBe) return;
       try {
@@ -29,39 +28,22 @@ Deno.serve(async (req) => {
     }
 
     // ── AUTO-CURACIÓN: si ya estamos vinculados por user_id pero el email cambió,
-    //    actualizar el email de la ficha y continuar. Esto evita que un cambio
-    //    de email en la plataforma desvincule al empleado.
+    //    actualizar el email de la ficha y continuar.
     const byUserId = await sb.entities.Employee.filter({ user_id: user.id }).catch(() => []);
     if (byUserId.length > 0) {
       const emp = byUserId[0];
       const empEmail = (emp.email || '').toLowerCase().trim();
       const userEmail = (user.email || '').toLowerCase().trim();
       if (empEmail !== userEmail && userEmail) {
-        await sb.entities.Employee.update(emp.id, { email: user.email });
+        await sb.entities.Employee.update(emp.id, { email: user.email }).catch(() => {});
       }
-      // Continuar con la lógica normal usando este empleado
       const employeeRole = emp.role || null;
       const empSector = emp.sector_id || 'escuela';
 
-      // Sincronizar rol de plataforma (gerente / user) según el rol del empleado
-      syncPlatformRole(user.id, employeeRole, user.role);
+      // Sincronizar rol de plataforma — fire and forget
+      syncPlatformRole(user.id, employeeRole, user.role).catch(() => {});
 
-      const updateTasks = [];
-      const isEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const platformNameIsEmail = isEmailPattern.test((user.full_name || '').trim());
-      const platformNameDiffers = (user.full_name || '').trim() !== (emp.full_name || '').trim();
-      if (emp.full_name && (platformNameIsEmail || platformNameDiffers)) {
-        updateTasks.push(base44.auth.updateMe({ full_name: emp.full_name }).catch(err => {
-          console.warn(`[vincularEmpleado] No se pudo sincronizar full_name: ${err.message}`);
-        }));
-      }
-      const currentUserSector = user.data?.sector_id ?? null;
-      if (!currentUserSector) {
-        updateTasks.push(base44.auth.updateMe({ sector_id: empSector }).catch(err => {
-          console.warn(`[vincularEmpleado] No se pudo sincronizar sector_id: ${err.message}`);
-        }));
-      }
-
+      // Lookup de permisos PRIMERO — es lo que el frontend necesita para desbloquear el acceso
       let employeePermissions = null;
       if (employeeRole) {
         const roleNorm = employeeRole.toLowerCase().trim();
@@ -77,13 +59,23 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Fire-and-forget: los updates de nombre/sector no deben bloquear
-      // la respuesta. Los permisos son lo que el frontend necesita para
-      // desbloquear el acceso; la sincronización puede completar en paralelo.
+      // Fire-and-forget: los updates de nombre/sector no bloquean la respuesta
+      const updateTasks = [];
+      const isEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const platformNameIsEmail = isEmailPattern.test((user.full_name || '').trim());
+      const platformNameDiffers = (user.full_name || '').trim() !== (emp.full_name || '').trim();
+      if (emp.full_name && (platformNameIsEmail || platformNameDiffers)) {
+        updateTasks.push(base44.auth.updateMe({ full_name: emp.full_name }).catch(() => {}));
+      }
+      const currentUserSector = user.data?.sector_id ?? null;
+      if (!currentUserSector) {
+        updateTasks.push(base44.auth.updateMe({ sector_id: empSector }).catch(() => {}));
+      }
       Promise.allSettled(updateTasks).catch(() => {});
 
       return Response.json({
         linked: true,
+        fallback: false,
         employee_id: emp.id,
         employee_name: emp.full_name,
         employee_role: employeeRole,
@@ -110,8 +102,6 @@ Deno.serve(async (req) => {
       // ── NUNCA DESVINCULAR ──
       // Si no se encontró ficha por user_id ni por email, NO bloquear al usuario.
       // Se retorna linked:true con acceso mínimo (rol 'user', sin employee_id).
-      // El usuario verá solo sus propios registros (vía created_by_id en RLS).
-      // El admin puede gestionar la vinculación manualmente desde el módulo Empleados.
       const fallbackSector = user.data?.sector_id || 'escuela';
       return Response.json({
         linked: true,
@@ -139,31 +129,8 @@ Deno.serve(async (req) => {
     const employeeRole = emp.role || null;
     const empSector = emp.sector_id || 'escuela';
 
-    // Sincronizar rol de plataforma (gerente / user) según el rol del empleado
-    syncPlatformRole(user.id, employeeRole, user.role);
-
-    // Iniciar updates (user_id sync + full_name sync) — corren en paralelo con el lookup de permisos
-    const updateTasks = [];
-    if (emp.user_id !== user.id) {
-      updateTasks.push(sb.entities.Employee.update(emp.id, { user_id: user.id }));
-    }
-    const isEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const platformNameIsEmail = isEmailPattern.test((user.full_name || '').trim());
-    const platformNameDiffers = (user.full_name || '').trim() !== (emp.full_name || '').trim();
-    if (emp.full_name && (platformNameIsEmail || platformNameDiffers)) {
-      updateTasks.push(base44.auth.updateMe({ full_name: emp.full_name }).catch(err => {
-        console.warn(`[vincularEmpleado] No se pudo sincronizar full_name: ${err.message}`);
-      }));
-    }
-    // Sincronizar sector_id del empleado al usuario de plataforma — SOLO en el primer login
-    // (cuando el usuario aún no tiene sector asignado). Después, el sector se gestiona
-    // manualmente via la función Observar/Switcher, para no pisar un cambio deliberado.
-    const currentUserSector = user.data?.sector_id ?? null;
-    if (!currentUserSector) {
-      updateTasks.push(base44.auth.updateMe({ sector_id: empSector }).catch(err => {
-        console.warn(`[vincularEmpleado] No se pudo sincronizar sector_id: ${err.message}`);
-      }));
-    }
+    // Sincronizar rol de plataforma — fire and forget
+    syncPlatformRole(user.id, employeeRole, user.role).catch(() => {});
 
     // Lookup de permisos por rol — tolerante a mayúsculas/minúsculas
     let employeePermissions = null;
@@ -181,13 +148,26 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fire-and-forget: los updates de user_id/nombre/sector no deben bloquear
-    // la respuesta. Los permisos son lo que el frontend necesita para
-    // desbloquear el acceso; la sincronización puede completar en paralelo.
+    // Fire-and-forget: los updates de user_id/nombre/sector no bloquean la respuesta
+    const updateTasks = [];
+    if (emp.user_id !== user.id) {
+      updateTasks.push(sb.entities.Employee.update(emp.id, { user_id: user.id }).catch(() => {}));
+    }
+    const isEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const platformNameIsEmail = isEmailPattern.test((user.full_name || '').trim());
+    const platformNameDiffers = (user.full_name || '').trim() !== (emp.full_name || '').trim();
+    if (emp.full_name && (platformNameIsEmail || platformNameDiffers)) {
+      updateTasks.push(base44.auth.updateMe({ full_name: emp.full_name }).catch(() => {}));
+    }
+    const currentUserSector = user.data?.sector_id ?? null;
+    if (!currentUserSector) {
+      updateTasks.push(base44.auth.updateMe({ sector_id: empSector }).catch(() => {}));
+    }
     Promise.allSettled(updateTasks).catch(() => {});
 
     return Response.json({
       linked: true,
+      fallback: false,
       employee_id: emp.id,
       employee_name: emp.full_name,
       employee_role: employeeRole,

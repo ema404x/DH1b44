@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }) => {
       try {
         const vinculacionPromise = base44.functions.invoke('vincularEmpleado', {});
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 10000)
+          setTimeout(() => reject(new Error('timeout')), 20000)
         );
         const vinculacion = await Promise.race([vinculacionPromise, timeoutPromise]);
 
