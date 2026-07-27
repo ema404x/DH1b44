@@ -34,6 +34,16 @@ import { useResolveCreator } from '@/hooks/useResolveCreator';
 
 
 
+const STATUS_LABELS = {
+  pendiente: 'Pendiente',
+  asignada: 'Asignada',
+  en_progreso: 'En Progreso',
+  obra: 'Obra',
+  pendiente_validacion: 'Validación',
+  completada: 'Completada',
+  cancelada: 'Cancelada',
+};
+
 function WorkOrderCard({ order, onOpen, onShowQR }) {
   const { resolveCreator } = useResolveCreator();
   const isOverdue = (() => { try { return order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
@@ -68,7 +78,7 @@ function WorkOrderCard({ order, onOpen, onShowQR }) {
       </div>
 
       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/50">
-        <Badge className="text-xs bg-slate-700 text-slate-200">{order.status}</Badge>
+        <Badge className="text-xs bg-slate-700 text-slate-200">{STATUS_LABELS[order.status] || order.status}</Badge>
         <Badge variant="secondary" className="text-xs">{order.priority}</Badge>
         {isOverdue && <Badge className="bg-red-500/20 text-red-300 text-xs">VENCIDA</Badge>}
       </div>
@@ -338,8 +348,8 @@ export default function WorkOrders() {
         </motion.div>
       )}
 
-      {/* Search (solo en vista grilla) */}
-      {!modoCampo && viewMode === 'grid' && (
+      {/* Search (ambas vistas) + Filtros de estado (solo grilla) */}
+      {!modoCampo && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
@@ -350,17 +360,19 @@ export default function WorkOrders() {
               className="pl-10 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-500"
             />
           </div>
-          <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
-            {['all', 'pendiente', 'asignada', 'en_progreso', 'pendiente_validacion', 'completada', 'cancelada'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setStatusTab(tab)}
-                className={`text-xs px-3 py-1.5 rounded font-medium transition-all whitespace-nowrap ${statusTab === tab ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
-              >
-                {tab === 'all' ? 'Todas' : tab === 'pendiente_validacion' ? 'Validación' : tab.replace('_', ' ')}
-              </button>
-            ))}
-          </div>
+          {viewMode === 'grid' && (
+            <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1 border border-slate-700/50 overflow-x-auto">
+              {['all', 'pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion', 'completada', 'cancelada'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setStatusTab(tab)}
+                  className={`text-xs px-3 py-1.5 rounded font-medium transition-all whitespace-nowrap ${statusTab === tab ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  {tab === 'all' ? 'Todas' : STATUS_LABELS[tab] || tab.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
+          )}
         </motion.div>
       )}
 
