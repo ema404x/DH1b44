@@ -34,55 +34,61 @@ Deno.serve(async (req) => {
       updates.sector_id = sector;
     }
 
-    // ── Stamping de jefe_sitio_email para WorkOrder ──
-    // Si la OT tiene jefe_sitio (nombre) pero no jefe_sitio_email, resolver el email
-    // desde los registros de Employee usando fuzzy matching.
-    if (entityName === 'WorkOrder' && data.jefe_sitio && !data.jefe_sitio_email) {
+    // ── Stamping de jefe_sitio y jefe_sitio_email para WorkOrder y Pendiente ──
+    if ((entityName === 'WorkOrder' || entityName === 'Pendiente') && !data.jefe_sitio_email) {
       try {
         const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
         const allEmployees = await sb.entities.Employee.list('-updated_date', 500);
-        const jefeNorm = normalize(data.jefe_sitio);
 
-        // 1) Exact match
-        let email = null;
-        for (const emp of allEmployees) {
-          if (emp.email && normalize(emp.full_name) === jefeNorm) {
-            email = emp.email.toLowerCase().trim();
-            break;
-          }
-        }
-
-        // 2) Contains match
-        if (!email) {
+        // Si jefe_sitio (nombre) está seteado, resolver email por fuzzy matching
+        if (data.jefe_sitio) {
+          const jefeNorm = normalize(data.jefe_sitio);
+          let email = null;
+          // 1) Exact match
           for (const emp of allEmployees) {
-            if (!emp.email || !emp.full_name) continue;
-            const empNorm = normalize(emp.full_name);
-            if (jefeNorm.includes(empNorm) || empNorm.includes(jefeNorm)) {
+            if (emp.email && normalize(emp.full_name) === jefeNorm) {
               email = emp.email.toLowerCase().trim();
               break;
             }
           }
-        }
-
-        // 3) Fuzzy: match by distinctive name parts (last names)
-        if (!email) {
-          const jefeParts = jefeNorm.split(/\s+/).filter(p => p.length > 2);
-          let bestScore = 0;
-          let bestEmail = null;
-          for (const emp of allEmployees) {
-            if (!emp.email || !emp.full_name) continue;
-            const empParts = normalize(emp.full_name).split(/\s+/).filter(p => p.length > 2);
-            const common = empParts.filter(p => jefeParts.includes(p));
-            if (common.length >= 1 && common.length > bestScore) {
-              bestScore = common.length;
-              bestEmail = emp.email.toLowerCase().trim();
+          // 2) Contains match (solo para nombres largos)
+          if (!email && jefeNorm.length >= 10) {
+            for (const emp of allEmployees) {
+              if (!emp.email || !emp.full_name) continue;
+              const empNorm = normalize(emp.full_name);
+              if (empNorm.length >= 10 && (jefeNorm.includes(empNorm) || empNorm.includes(jefeNorm))) {
+                email = emp.email.toLowerCase().trim();
+                break;
+              }
             }
           }
-          email = bestEmail;
-        }
-
-        if (email) {
-          updates.jefe_sitio_email = email;
+          // 3) Fuzzy: match by distinctive name parts
+          if (!email) {
+            const jefeParts = jefeNorm.split(/\s+/).filter(p => p.length > 2);
+            let bestScore = 0;
+            let bestEmail = null;
+            for (const emp of allEmployees) {
+              if (!emp.email || !emp.full_name) continue;
+              const empParts = normalize(emp.full_name).split(/\s+/).filter(p => p.length > 2);
+              const common = empParts.filter(p => jefeParts.includes(p));
+              if (common.length >= 1 && common.length > bestScore) {
+                bestScore = common.length;
+                bestEmail = emp.email.toLowerCase().trim();
+              }
+            }
+            email = bestEmail;
+          }
+          if (email) {
+            updates.jefe_sitio_email = email;
+          }
+        } else if (data.created_by_id) {
+          // Si jefe_sitio NO está seteado, resolver desde el Employee del creador
+          // Solo si el creador es un jefe de sitio
+          const creator = allEmployees.find(e => e.user_id === data.created_by_id);
+          if (creator && creator.email && creator.role && creator.role.toLowerCase().includes('jefe')) {
+            updates.jefe_sitio = creator.full_name;
+            updates.jefe_sitio_email = creator.email.toLowerCase().trim();
+          }
         }
       } catch (err) {
         console.warn(`[stampSectorOnCreate] Error resolving jefe_sitio_email: ${err.message}`);
