@@ -194,7 +194,7 @@ export default function WorkOrders() {
   };
 
   const visibleOrders = useMemo(() =>
-    filterByUser(orders, ['assigned_name', 'assigned_to', 'created_by'])
+    filterByUser(orders, ['assigned_name', 'assigned_to', 'jefe_sitio'])
   , [orders, filterByUser]);
 
   const filtered = useMemo(() => visibleOrders.filter(o => {

@@ -23,16 +23,21 @@ export default function PortalOperarioApp() {
 
   const misOTs = useMemo(() => {
     if (!currentUser) return [];
-    const myName  = (employeeName || '').toLowerCase();
-    const myEmail = (currentUser.email || '').toLowerCase();
+    // Normaliza: lowercase + sin acentos — "Gastón" matchea "Gaston"
+    const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const myName  = normalize(employeeName);
+    const myPlatformName = normalize(currentUser.full_name);
+    const myEmail = (currentUser.email || '').toLowerCase().trim();
     const myId    = currentUser.id || '';
     return allOTs.filter(ot => {
       if (ot.status === 'cancelada' || ot.status === 'completada') return false;
       if (myId && ot.created_by_id === myId) return true;
-      const assigned = (ot.assigned_to || '').toLowerCase();
-      const assignedName = (ot.assigned_name || '').toLowerCase();
+      const assigned = normalize(ot.assigned_to);
+      const assignedName = normalize(ot.assigned_name);
+      const jefeSitio = normalize(ot.jefe_sitio);
       if (myEmail && (assigned === myEmail || assignedName === myEmail)) return true;
-      if (myName  && (assigned.includes(myName) || assignedName.includes(myName))) return true;
+      if (myName && (assigned.includes(myName) || assignedName.includes(myName) || jefeSitio.includes(myName))) return true;
+      if (myPlatformName && jefeSitio.includes(myPlatformName)) return true;
       return false;
     });
   }, [allOTs, currentUser, employeeName]);

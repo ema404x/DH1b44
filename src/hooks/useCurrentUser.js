@@ -68,18 +68,20 @@ export function useCurrentUser() {
 
     // IMPORTANTE: usar employeeName (ficha de empleado) como fuente principal de nombre.
     // Caer en full_name de plataforma solo si no hay ficha vinculada.
-    const employeeNameLower = employeeName?.toLowerCase() || '';
-    const platformNameLower = currentUser.full_name?.toLowerCase() || '';
-    const email = currentUser.email?.toLowerCase() || '';
+    // Normaliza acentos: "Gastón Massá" debe matchear "Gaston Massa" y viceversa.
+    const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const employeeNameNorm = normalize(employeeName);
+    const platformNameNorm = normalize(currentUser.full_name);
+    const email = currentUser.email?.toLowerCase().trim() || '';
     const userId = currentUser.id || '';
 
     return result.filter(item => {
       if (userId && item.created_by_id && item.created_by_id === userId) return true;
       return fields.some(field => {
-        const val = (item[field] || '').toLowerCase();
-        const matchEmployee = employeeNameLower && val.includes(employeeNameLower);
-        const matchPlatform = platformNameLower && val.includes(platformNameLower);
-        const matchEmail    = email && val === email;
+        const val = normalize(item[field]);
+        const matchEmployee = employeeNameNorm && val.includes(employeeNameNorm);
+        const matchPlatform = platformNameNorm && val.includes(platformNameNorm);
+        const matchEmail = email && val === email;
         return matchEmployee || matchPlatform || matchEmail;
       });
     });

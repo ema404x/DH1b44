@@ -107,7 +107,7 @@ export default function Calendario() {
   });
 
   // Filtrar OT por usuario actual — jefe de sitio solo ve las suyas
-  const orders = filterByUser(rawOrders, ['assigned_to', 'assigned_name']);
+  const orders = filterByUser(rawOrders, ['assigned_to', 'assigned_name', 'jefe_sitio']);
   const informes = filterByUser(rawInformes, ['responsable']);
 
   const updateOT = useMutation({

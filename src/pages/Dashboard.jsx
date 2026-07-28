@@ -188,7 +188,7 @@ export default function Dashboard() {
   , [allPendientes, filterByUser]);
 
   const allUserOrders = useMemo(() =>
-    filterByUser(allOrders, ['assigned_name', 'assigned_to', 'created_by'])
+    filterByUser(allOrders, ['assigned_name', 'assigned_to', 'jefe_sitio'])
   , [allOrders, filterByUser]);
 
   // Fecha de corte según el rango seleccionado
