@@ -47,6 +47,7 @@ const MODULES = [
   { key: 'Inventory', label: 'Inventario', group: 'Administración' },
   { key: 'Asset', label: 'Activos / Pendientes', group: 'Administración' },
   { key: 'InformacionGeneral', label: 'Información General', group: 'Administración' },
+  { key: 'Sectores', label: 'Sectores / Unidades', group: 'Administración' },
   { key: 'Automatizaciones', label: 'Automatizaciones', group: 'Sistema' },
   { key: 'Permisos', label: 'Control de Acceso', group: 'Sistema' },
   { key: 'AuditLog', label: 'Auditoría', group: 'Sistema' },
