@@ -33,5 +33,19 @@ export function useResolveCreator() {
     return userMap[createdById] || fallback;
   };
 
-  return { resolveCreator, employees };
+  /**
+   * Resuelve el responsable visible de una OT.
+   * Si el creador es un usuario real identificado en Employee → "Creada por {nombre}".
+   * Si la OT fue creada por un proceso automático (sistema) → "Jefe de sitio: {nombre}".
+   * Si no hay jefe de sitio → "Responsable: Sin asignar".
+   */
+  const resolveOTOwner = (order) => {
+    const creator = order.created_by_id ? (userMap[order.created_by_id] || null) : null;
+    if (creator) return { name: creator, label: 'Creada por' };
+    const jefe = order.jefe_sitio?.trim();
+    if (jefe) return { name: jefe, label: 'Jefe de sitio' };
+    return { name: 'Sin asignar', label: 'Responsable' };
+  };
+
+  return { resolveCreator, resolveOTOwner, employees };
 }

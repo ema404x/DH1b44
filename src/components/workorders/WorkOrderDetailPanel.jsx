@@ -107,8 +107,8 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [convertingToObra, setConvertingToObra] = useState(false);
   const [assignMode, setAssignMode] = useState('list');
   const queryClient = useQueryClient();
-  const { resolveCreator } = useResolveCreator();
-  const creadorPor = resolveCreator(order.created_by_id);
+  const { resolveOTOwner } = useResolveCreator();
+  const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
 
   const { data: freshOrder, isLoading: loadingFresh, refetch } = useQuery({
     queryKey: ['workorder-detail', order.id],
@@ -345,7 +345,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                 )}
                 <span className="flex items-center gap-1 text-[11px] text-white/55">
                   <User className="h-3 w-3 text-white/30 flex-shrink-0" />
-                  Creada por {creadorPor}
+                  {creadorLabel} {creadorPor}
                 </span>
               </div>
             </div>

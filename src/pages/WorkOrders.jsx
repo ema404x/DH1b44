@@ -45,9 +45,9 @@ const STATUS_LABELS = {
 };
 
 function WorkOrderCard({ order, onOpen, onShowQR }) {
-  const { resolveCreator } = useResolveCreator();
+  const { resolveOTOwner } = useResolveCreator();
   const isOverdue = (() => { try { return order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
-  const creadorPor = resolveCreator(order.created_by_id);
+  const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
 
   return (
     <motion.div
@@ -72,7 +72,7 @@ function WorkOrderCard({ order, onOpen, onShowQR }) {
             {order.assigned_name && <span className="flex items-center gap-1"><User className="h-3 w-3" />{order.assigned_name}</span>}
           </div>
           <p className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
-            <User className="h-2.5 w-2.5" /> Creada por {creadorPor}
+            <User className="h-2.5 w-2.5" /> {creadorLabel} {creadorPor}
           </p>
         </div>
       </div>

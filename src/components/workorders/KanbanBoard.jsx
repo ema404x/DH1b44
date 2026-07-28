@@ -24,9 +24,9 @@ const priorityColors = {
 };
 
 function KanbanCard({ order, index, onOpen, onShowQR }) {
-  const { resolveCreator } = useResolveCreator();
+  const { resolveOTOwner } = useResolveCreator();
   const isOverdue = (() => { try { return order.scheduled_date && order.scheduled_date.length >= 10 && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
-  const creadorPor = resolveCreator(order.created_by_id);
+  const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
 
   return (
     <Draggable draggableId={order.id} index={index}>
@@ -73,7 +73,7 @@ function KanbanCard({ order, index, onOpen, onShowQR }) {
             )}
             <p className="text-[10px] text-muted-foreground/70 flex items-center gap-1 truncate">
               <Wrench className="h-2.5 w-2.5 flex-shrink-0" />
-              <span className="truncate">Creada por {creadorPor}</span>
+              <span className="truncate">{creadorLabel} {creadorPor}</span>
             </p>
           </div>
 
