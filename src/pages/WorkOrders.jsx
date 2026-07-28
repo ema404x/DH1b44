@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Search, Plus, ClipboardList, MapPin,
   Zap, Wrench, TrendingUp,
-  Layers, History, Smartphone, LayoutGrid, Kanban, User, SlidersHorizontal
+  Layers, History, Smartphone, LayoutGrid, Kanban, User, SlidersHorizontal, CheckCircle2
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import KanbanBoard from '@/components/workorders/KanbanBoard';
@@ -44,10 +44,11 @@ const STATUS_LABELS = {
   cancelada: 'Cancelada',
 };
 
-function WorkOrderCard({ order, onOpen, onShowQR }) {
+function WorkOrderCard({ order, onOpen, onShowQR, onComplete, canComplete }) {
   const { resolveOTOwner } = useResolveCreator();
   const isOverdue = (() => { try { return order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
   const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
+  const isTerminal = ['completada', 'cancelada', 'obra'].includes(order.status);
 
   return (
     <motion.div
@@ -81,6 +82,15 @@ function WorkOrderCard({ order, onOpen, onShowQR }) {
         <Badge className="text-xs bg-slate-700 text-slate-200">{STATUS_LABELS[order.status] || order.status}</Badge>
         <Badge variant="secondary" className="text-xs">{order.priority}</Badge>
         {isOverdue && <Badge className="bg-red-500/20 text-red-300 text-xs">VENCIDA</Badge>}
+        {canComplete && !isTerminal && (
+          <Button
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); onComplete(order.id); }}
+            className="ml-auto h-7 px-3 text-xs gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" /> Completar
+          </Button>
+        )}
       </div>
     </motion.div>
   );
@@ -102,8 +112,21 @@ export default function WorkOrders() {
   });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { currentUser, isAdmin, isSuperAdmin } = useCurrentUser();
+  const { currentUser, isAdmin, isSuperAdmin, employeeRole } = useCurrentUser();
   const isGerente = isAdmin || currentUser?.role === 'gerente';
+  const isJefeSitio = ['jefe de sitio', 'jefe_sitio'].includes((employeeRole || '').toLowerCase().trim());
+  const canCompleteOT = isGerente || isJefeSitio;
+
+  const handleComplete = async (id) => {
+    try {
+      const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: 'completar' });
+      toast.success(res.data.mensaje || 'OT completada');
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Error al completar la OT';
+      toast.error(msg);
+    }
+  };
   const { allowed: canCreate } = usePermission('WorkOrder', 'create');
   const { allowed: canDelete } = usePermission('WorkOrder', 'delete');
   const { resolveCreator } = useResolveCreator();
@@ -455,7 +478,14 @@ export default function WorkOrders() {
       ) : (
         <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
           {filtered.map(order => (
-            <WorkOrderCard key={order.id} order={order} onOpen={setSelectedOrder} onShowQR={setQrOrder} />
+            <WorkOrderCard
+              key={order.id}
+              order={order}
+              onOpen={setSelectedOrder}
+              onShowQR={setQrOrder}
+              onComplete={handleComplete}
+              canComplete={canCompleteOT}
+            />
           ))}
         </motion.div>
       ))}

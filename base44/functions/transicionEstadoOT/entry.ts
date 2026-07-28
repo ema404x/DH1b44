@@ -13,6 +13,7 @@ const TRANSICIONES_FIJAS = {
 const TRANSICIONES_FLEXIBLES = {
   'cancelar':       { hacia: 'cancelada' },
   'convertir_obra': { hacia: 'obra' },
+  'completar':      { hacia: 'completada' },
 };
 
 const ESTADOS_TERMINALES = ['completada', 'cancelada', 'obra'];
@@ -25,6 +26,7 @@ const MENSAJES = {
   'rechazar': 'OT rechazada y devuelta al operario',
   'cancelar': 'OT cancelada',
   'convertir_obra': 'OT convertida a Futura Obra',
+  'completar': 'OT completada directamente por el Jefe de Sitio',
 };
 
 Deno.serve(async (req) => {
@@ -87,8 +89,8 @@ Deno.serve(async (req) => {
         esJefe = false;
       }
     }
-    if ((accion === 'aprobar' || accion === 'rechazar') && !esJefe) {
-      return Response.json({ error: 'Solo el Jefe de Sitio, Admin o Gerente puede aprobar o rechazar OTs' }, { status: 403 });
+    if ((accion === 'aprobar' || accion === 'rechazar' || accion === 'completar') && !esJefe) {
+      return Response.json({ error: 'Solo el Jefe de Sitio, Admin o Gerente puede completar o rechazar OTs' }, { status: 403 });
     }
 
     // Validar asignado para "asignar"
@@ -131,7 +133,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (accion === 'aprobar') {
+    if (accion === 'aprobar' || accion === 'completar') {
       updateData.completed_date = new Date().toISOString().split('T')[0];
       updateData.fecha_validacion = new Date().toISOString();
       updateData.validado_por = user.full_name || user.email || 'Jefe de Sitio';
