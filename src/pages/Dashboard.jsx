@@ -160,7 +160,7 @@ function QuickActionCard({ icon: Icon, label, desc, href, color }) {
 }
 
 export default function Dashboard() {
-  const { isAdmin, filterByUser, userPermissions, user } = useCurrentUser();
+  const { isAdmin, filterByUser, userPermissions, user, displayName } = useCurrentUser();
   const queryClient = useQueryClient();
   const handleRefresh = useCallback(() => queryClient.invalidateQueries(), [queryClient]);
   const [dashFilters, setDashFilters] = React.useState({ dateRange: 'all', jefeSitio: '', priority: '' });
@@ -269,7 +269,7 @@ export default function Dashboard() {
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
-  const firstName = user?.full_name?.split(' ')[0] || '';
+  const firstName = (displayName || '').split(' ')[0] || '';
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
