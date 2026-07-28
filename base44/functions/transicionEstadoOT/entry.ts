@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { canManageOT } from "../../shared/roles.ts";
 
 // Transiciones fijas: desde un estado exacto hacia otro
 const TRANSICIONES_FIJAS = {
@@ -88,8 +89,8 @@ Deno.serve(async (req) => {
         const empleados = await base44.asServiceRole.entities.Employee
           .filter({ user_id: user.id }).catch(() => []);
         const emp = empleados && empleados.length > 0 ? empleados[0] : null;
-        const empRole = (emp?.role || '').toLowerCase().trim();
-        esJefe = empRole === 'jefe_sitio' || empRole === 'jefe de sitio';
+        // Robusto: verifica admin-level y jefe de sitio vía helper centralizado
+        esJefe = canManageOT(emp?.role);
       } catch {
         esJefe = false;
       }

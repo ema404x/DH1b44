@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { shouldSyncToGerente } from "../../shared/roles.ts";
 
 Deno.serve(async (req) => {
   try {
@@ -12,12 +13,9 @@ Deno.serve(async (req) => {
     const sb = base44.asServiceRole;
 
     // ── Sincronizar el rol de plataforma según el rol del empleado.
-    //    "Gerencia" / "Administrativo" → "gerente" (rol con visibilidad total de OTs y módulos).
-    //    Cualquier otro rol → "user" (a menos que sea admin, que se respeta).
-    const GERENTE_ROLES = ['gerencia', 'gerente', 'administrativo'];
+    //    Definición centralizada en shared/roles.ts — shouldSyncToGerente().
     async function syncPlatformRole(userId, employeeRole, currentPlatformRole) {
-      const empRoleNorm = (employeeRole || '').toLowerCase().trim();
-      const shouldBe = GERENTE_ROLES.includes(empRoleNorm) ? 'gerente' : 'user';
+      const shouldBe = shouldSyncToGerente(employeeRole) ? 'gerente' : 'user';
       if (currentPlatformRole === 'admin') return;
       if (currentPlatformRole === shouldBe) return;
       try {

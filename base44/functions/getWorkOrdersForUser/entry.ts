@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { isAdminLevelRole, isFieldRole } from "../../shared/roles.ts";
 
 /**
  * Devuelve las OTs que el usuario actual puede ver.
@@ -35,11 +36,10 @@ export default async function(req) {
     const employeeRole = (employee?.role || '').toLowerCase().trim();
     const employeeName = employee?.full_name || user.full_name || '';
 
-    // Roles con visibilidad total dentro del sector
-    const ADMIN_ROLES = ['admin', 'gerente', 'administrativo', 'gerencia'];
+    // Roles con visibilidad total dentro del sector (definición centralizada en shared/roles.ts)
     const isAdminLevel = platformRole === 'admin' ||
                          platformRole === 'gerente' ||
-                         ADMIN_ROLES.includes(employeeRole);
+                         isAdminLevelRole(employeeRole);
 
     // Query WorkOrders via service role (bypassing RLS)
     const allOTs = await base44.asServiceRole.entities.WorkOrder.list('-created_date', 500);
@@ -52,11 +52,10 @@ export default async function(req) {
       return Response.json({ orders: result, total: result.length, role: 'admin' });
     }
 
-    // Filtro 3: roles de campo — filtrar por identidad
-    const FIELD_ROLES = ['jefe_sitio', 'jefe de sitio', 'inspector', 'tecnico', 'supervisor'];
-    const isFieldRole = FIELD_ROLES.includes(employeeRole);
+    // Filtro 3: roles de campo — filtrar por identidad (definición centralizada)
+    const isField = isFieldRole(employeeRole);
 
-    if (!isFieldRole) {
+    if (!isField) {
       // Sin rol de campo ni admin — ver solo lo que creó
       result = result.filter(ot => ot.created_by_id === userId);
       return Response.json({ orders: result, total: result.length, role: 'user' });

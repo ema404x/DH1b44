@@ -2,6 +2,7 @@ import { useContext } from 'react';
 import { AuthContext } from '@/lib/AuthContext';
 import { resolveDisplayName } from '@/lib/utils';
 import { queryClientInstance } from '@/lib/query-client';
+import { isAdminLevelRole, isFieldRole } from '@/lib/roles';
 
 /**
  * Hook que retorna el usuario actual y helpers de permisos.
@@ -24,19 +25,14 @@ export function useCurrentUser() {
   // Nombre a mostrar: nombre en ficha de empleado > nombre de plataforma
   const displayName = employeeName || currentUser?.full_name || currentUser?.email || 'Usuario';
 
-  // Roles que deben ver solo sus propios datos
-  const FIELD_ROLES = ['jefe_sitio', 'jefe de sitio', 'inspector', 'tecnico', 'supervisor'];
-
-  // Roles de empleado que tienen visibilidad total (como admin)
-  const ADMIN_EMPLOYEE_ROLES = ['administrativo', 'admin', 'gerente', 'gerencia'];
-
   // Es "super admin" si:
   // 1. Tiene role=admin en la plataforma y NO tiene rol de campo, O
   // 2. Tiene un rol de empleado con visibilidad total
+  // (Definiciones centralizadas en @/lib/roles — espejo de base44/shared/roles.ts)
   const isSuperAdmin = 
-    (currentUser?.role === 'admin' && !FIELD_ROLES.includes(employeeRole?.toLowerCase?.())) ||
+    (currentUser?.role === 'admin' && !isFieldRole(employeeRole)) ||
     currentUser?.role === 'gerente' ||
-    ADMIN_EMPLOYEE_ROLES.includes(employeeRole?.toLowerCase?.());
+    isAdminLevelRole(employeeRole);
 
   // Alias para compatibilidad — si es superAdmin se llama "admin"
   const isAdmin = isSuperAdmin;

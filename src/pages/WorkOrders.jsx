@@ -30,6 +30,7 @@ import { usePermission } from '@/hooks/usePermission';
 import { getTransitionAction } from '@/lib/workorder-transitions';
 import AdvancedFilters from '@/components/workorders/AdvancedFilters';
 import { useResolveCreator } from '@/hooks/useResolveCreator';
+import { isJefeSitioRole } from '@/lib/roles';
 
 
 
@@ -123,7 +124,7 @@ export default function WorkOrders() {
   const navigate = useNavigate();
   const { currentUser, isAdmin, isSuperAdmin, employeeRole } = useCurrentUser();
   const isGerente = isAdmin || currentUser?.role === 'gerente';
-  const isJefeSitio = ['jefe de sitio', 'jefe_sitio'].includes((employeeRole || '').toLowerCase().trim());
+  const isJefeSitio = isJefeSitioRole(employeeRole);
   const canCompleteOT = isGerente || isJefeSitio;
 
   const handleComplete = async (id) => {
