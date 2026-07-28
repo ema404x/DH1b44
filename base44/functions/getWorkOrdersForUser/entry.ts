@@ -1,0 +1,102 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+
+/**
+ * Devuelve las OTs que el usuario actual puede ver.
+ * Es la ÚNICA fuente de verdad para visibilidad de OTs — centraliza toda la lógica
+ * de filtrado en el backend, sin depender de RLS ni de filtros frontend.
+ *
+ * Reglas:
+ * - Admin / Gerente: ve todas las OTs de su sector.
+ * - Jefe de sitio / campo: ve OTs donde es creador, jefe_sitio_email, assigned_to,
+ *   o donde su nombre aparece en jefe_sitio / assigned_name.
+ */
+export default async function(req) {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const userId = user.id;
+    const userSector = user.data?.sector_id || user.sector_id || 'escuela';
+    const platformRole = user.role;
+
+    // Resolver empleado vinculado para obtener rol y nombre canónico
+    let employee = null;
+    if (userEmail) {
+      const empResults = await base44.asServiceRole.entities.Employee.filter({ email: userEmail });
+      employee = empResults[0] || null;
+    }
+    if (!employee && userId) {
+      const empByUserId = await base44.asServiceRole.entities.Employee.filter({ user_id: userId });
+      employee = empByUserId[0] || null;
+    }
+
+    const employeeRole = (employee?.role || '').toLowerCase().trim();
+    const employeeName = employee?.full_name || user.full_name || '';
+
+    // Roles con visibilidad total dentro del sector
+    const ADMIN_ROLES = ['admin', 'gerente', 'administrativo', 'gerencia'];
+    const isAdminLevel = platformRole === 'admin' ||
+                         platformRole === 'gerente' ||
+                         ADMIN_ROLES.includes(employeeRole);
+
+    // Query WorkOrders via service role (bypassing RLS)
+    const allOTs = await base44.asServiceRole.entities.WorkOrder.list('-created_date', 500);
+
+    // Filtro 1: sector (aislamiento entre sectores)
+    let result = allOTs.filter(ot => (ot.sector_id || 'escuela') === userSector);
+
+    // Filtro 2: si es admin/gerente, ve todo en su sector
+    if (isAdminLevel) {
+      return Response.json({ orders: result, total: result.length, role: 'admin' });
+    }
+
+    // Filtro 3: roles de campo — filtrar por identidad
+    const FIELD_ROLES = ['jefe_sitio', 'jefe de sitio', 'inspector', 'tecnico', 'supervisor'];
+    const isFieldRole = FIELD_ROLES.includes(employeeRole);
+
+    if (!isFieldRole) {
+      // Sin rol de campo ni admin — ver solo lo que creó
+      result = result.filter(ot => ot.created_by_id === userId);
+      return Response.json({ orders: result, total: result.length, role: 'user' });
+    }
+
+    // Normalización para matching de nombres
+    const normalize = (s) => (s || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+    const empNameNorm = normalize(employeeName);
+    const nameParts = empNameNorm.split(/\s+/).filter(p => p.length > 3);
+
+    result = result.filter(ot => {
+      // 1. Creado por este usuario
+      if (ot.created_by_id && ot.created_by_id === userId) return true;
+
+      // 2. Email exacto en campos de email
+      if (ot.jefe_sitio_email && ot.jefe_sitio_email.toLowerCase().trim() === userEmail) return true;
+      if (ot.assigned_to && ot.assigned_to.toLowerCase().trim() === userEmail) return true;
+
+      // 3. Matching de nombres en jefe_sitio y assigned_name
+      const jefeNorm = normalize(ot.jefe_sitio);
+      const assignedNorm = normalize(ot.assigned_name);
+
+      if (empNameNorm && jefeNorm && jefeNorm.includes(empNameNorm)) return true;
+      if (empNameNorm && assignedNorm && assignedNorm.includes(empNameNorm)) return true;
+
+      // Fuzzy: todas las partes del nombre (>3 chars) aparecen en el campo
+      if (nameParts.length >= 2) {
+        if (jefeNorm && nameParts.every(p => jefeNorm.includes(p))) return true;
+        if (assignedNorm && nameParts.every(p => assignedNorm.includes(p))) return true;
+      }
+
+      return false;
+    });
+
+    return Response.json({ orders: result, total: result.length, role: employeeRole });
+  } catch (error) {
+    return Response.json({ error: error.message, stack: error.stack }, { status: 500 });
+  }
+}

@@ -102,7 +102,7 @@ export default function WorkOrders() {
   });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { currentUser, isAdmin, isSuperAdmin, filterByUser } = useCurrentUser();
+  const { currentUser, isAdmin, isSuperAdmin } = useCurrentUser();
   const isGerente = isAdmin || currentUser?.role === 'gerente';
   const { allowed: canCreate } = usePermission('WorkOrder', 'create');
   const { allowed: canDelete } = usePermission('WorkOrder', 'delete');
@@ -119,7 +119,10 @@ export default function WorkOrders() {
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['workorders'],
-    queryFn: () => base44.entities.WorkOrder.list('-created_date', 500)
+    queryFn: async () => {
+      const res = await base44.functions.invoke('getWorkOrdersForUser', {});
+      return res.data.orders || [];
+    }
   });
 
   // Direcciones — fuente canónica de jefes de sitio.
@@ -215,9 +218,9 @@ export default function WorkOrders() {
     }
   };
 
-  const visibleOrders = useMemo(() =>
-    filterByUser(orders, ['assigned_name', 'assigned_to', 'jefe_sitio', 'jefe_sitio_email'])
-  , [orders, filterByUser]);
+  // Las OTs ya vienen filtradas por la función backend getWorkOrdersForUser
+  // (única fuente de verdad — no se re-filtra en el frontend)
+  const visibleOrders = orders;
 
   const filtered = useMemo(() => visibleOrders.filter(o => {
     // Normaliza: lowercase + sin acentos — para que "gaston" matchee "Gastón Massá"
