@@ -45,34 +45,41 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
     staleTime: 5 * 60 * 1000,
   });
 
-  // Set de nombres de jefes (lowercase) para excluirlos del listado de operarios
+  // Normalización accent-insensitive: lowercase + sin diacríticos + whitespace normalizado
+  const normKey = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Set de nombres de jefes (normalizado) para excluirlos del listado de operarios
   const jefeNamesSet = useMemo(() => {
     const set = new Set();
-    const norm = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
-    direcciones?.forEach(d => { if (d.jefe_sitio) set.add(norm(d.jefe_sitio)); });
-    orders.forEach(o => { if (o.jefe_sitio) set.add(norm(o.jefe_sitio)); });
+    direcciones?.forEach(d => { if (d.jefe_sitio) set.add(normKey(d.jefe_sitio)); });
+    orders.forEach(o => { if (o.jefe_sitio) set.add(normKey(o.jefe_sitio)); });
+    employees.forEach(e => {
+      if (e.full_name && e.role && e.role.toLowerCase().includes('jefe')) {
+        set.add(normKey(e.full_name));
+      }
+    });
     return set;
-  }, [orders, direcciones]);
+  }, [orders, direcciones, employees]);
 
   // Operarios asignados — extrae valores únicos de las OTs,
   // excluyendo jefes de sitio (tienen su propio filtro separado)
   const operarios = useMemo(() => {
     const set = new Map();
-    const norm = (s) => s.trim().replace(/\s+/g, ' ');
+    const display = (s) => s.trim().replace(/\s+/g, ' ');
     orders.forEach(o => {
       if (o.assigned_name) {
-        const n = norm(o.assigned_name);
-        if (!jefeNamesSet.has(n.toLowerCase()) && !set.has(n.toLowerCase())) {
-          set.set(n.toLowerCase(), n);
+        const key = normKey(o.assigned_name);
+        if (!jefeNamesSet.has(key) && !set.has(key)) {
+          set.set(key, display(o.assigned_name));
         }
       }
     });
-    // Empleados que no son jefes de sitio — aparecen aunque no tengan OTs asignadas
     employees.forEach(e => {
       if (e.full_name && e.role && !e.role.toLowerCase().includes('jefe')) {
-        const n = norm(e.full_name);
-        if (!jefeNamesSet.has(n.toLowerCase()) && !set.has(n.toLowerCase())) {
-          set.set(n.toLowerCase(), n);
+        const key = normKey(e.full_name);
+        if (!jefeNamesSet.has(key) && !set.has(key)) {
+          set.set(key, e.full_name);
         }
       }
     });
@@ -81,26 +88,26 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
 
   const jefes = useMemo(() => {
     const set = new Map();
-    const norm = (s) => s.trim().replace(/\s+/g, ' ');
-    // Desde Direccion (fuente canónica de jefes de sitio)
-    direcciones?.forEach(d => {
-      if (d.jefe_sitio) {
-        const n = norm(d.jefe_sitio);
-        if (!set.has(n.toLowerCase())) set.set(n.toLowerCase(), n);
-      }
-    });
-    // Desde Empleados con rol jefe de sitio — garantiza que aparezcan aunque no tengan OTs
+    const display = (s) => s.trim().replace(/\s+/g, ' ');
+    // 1. Empleados con rol jefe de sitio — fuente canónica de nombres (prioridad de display)
     employees.forEach(e => {
       if (e.full_name && e.role && e.role.toLowerCase().includes('jefe')) {
-        const n = norm(e.full_name);
-        if (!set.has(n.toLowerCase())) set.set(n.toLowerCase(), n);
+        const key = normKey(e.full_name);
+        if (!set.has(key)) set.set(key, e.full_name);
       }
     });
-    // Desde las OTs (por si hay jefes que no están en Direccion ni Employees)
+    // 2. Desde Direccion — si no existe ya, agregar con el nombre de Direccion
+    direcciones?.forEach(d => {
+      if (d.jefe_sitio) {
+        const key = normKey(d.jefe_sitio);
+        if (!set.has(key)) set.set(key, display(d.jefe_sitio));
+      }
+    });
+    // 3. Desde las OTs — si no existe ya, agregar con el nombre de la OT
     orders.forEach(o => {
       if (o.jefe_sitio) {
-        const n = norm(o.jefe_sitio);
-        if (!set.has(n.toLowerCase())) set.set(n.toLowerCase(), n);
+        const key = normKey(o.jefe_sitio);
+        if (!set.has(key)) set.set(key, display(o.jefe_sitio));
       }
     });
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'es'));
