@@ -21,6 +21,7 @@ import { exportWorkOrderPDF } from '@/utils/exportWorkOrderPDF';
 import LocationEditor from './LocationEditor';
 import { getAvailableActions, ACTION_VARIANTS } from '@/lib/workorder-transitions';
 import { useResolveCreator } from '@/hooks/useResolveCreator';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -109,6 +110,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const queryClient = useQueryClient();
   const { resolveOTOwner } = useResolveCreator();
   const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
+  const { isSuperAdmin } = useCurrentUser();
 
   const { data: freshOrder, isLoading: loadingFresh, refetch } = useQuery({
     queryKey: ['workorder-detail', order.id],
@@ -126,8 +128,12 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     queryFn: () => base44.entities.Employee.list('full_name', 200),
     staleTime: 600_000,
   });
-  // Excluir jefes de sitio — no ejecutan OTs, las validan.
-  const activeEmployees = employees.filter(e => (e.status === 'activo' || !e.status) && e.role !== 'jefe_sitio');
+  // Los jefes de sitio no pueden asignar OTs a otros jefes de sitio — solo a operarios.
+  // Los gerentes/admins sí pueden asignar a cualquier empleado, incluyendo jefes.
+  const isJefeRole = (role) => role && role.toLowerCase().replace(/[\s_]+/g, '').includes('jefe');
+  const activeEmployees = employees
+    .filter(e => (e.status === 'activo' || !e.status))
+    .filter(e => isSuperAdmin || !isJefeRole(e.role));
 
   const saveMutation = useMutation({
     mutationFn: (d) => base44.entities.WorkOrder.update(order.id, d),

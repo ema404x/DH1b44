@@ -6,6 +6,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUbicaciones } from '@/hooks/useUbicaciones';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -98,6 +99,7 @@ function MaterialItem({ item, onUpdate, onRemove }) {
 export default function CrearOT() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { isSuperAdmin } = useCurrentUser();
 
   // Wizard state
   const [step, setStep] = useState(1);
@@ -205,10 +207,15 @@ export default function CrearOT() {
     queryFn: () => base44.entities.Employee.list('full_name', 500),
     staleTime: 300000,
   });
-  // Excluir jefes de sitio — no ejecutan OTs, las validan.
+  // Los jefes de sitio no pueden asignar OTs a otros jefes de sitio — solo a operarios.
+  // Los gerentes/admins sí pueden asignar a cualquier empleado, incluyendo jefes.
+  const isJefeRole = (role) => role && role.toLowerCase().replace(/[\s_]+/g, '').includes('jefe');
   const activeEmployees = useMemo(
-    () => employees.filter(e => (e.status === 'activo' || !e.status) && e.role !== 'jefe_sitio').sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '')),
-    [employees]
+    () => employees
+      .filter(e => (e.status === 'activo' || !e.status))
+      .filter(e => isSuperAdmin || !isJefeRole(e.role))
+      .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '')),
+    [employees, isSuperAdmin]
   );
 
   // ── Mutation ─────────────────────────────────────────────────────────────────
