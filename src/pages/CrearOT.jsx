@@ -847,60 +847,23 @@ export default function CrearOT() {
 
             {/* Persona a cargo del trabajo */}
             <FieldGroup label="Persona a cargo">
-              <div className="rounded-xl border border-border bg-card p-1 flex gap-1 mb-2">
-                <button
-                  onClick={() => setAssignMode('lista')}
-                  className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
-                    assignMode === 'lista' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <User className="h-3.5 w-3.5" /> Seleccionar
-                </button>
-                <button
-                  onClick={() => setAssignMode('texto')}
-                  className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
-                    assignMode === 'texto' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Escribir nombre
-                </button>
-              </div>
-
-              {assignMode === 'lista' ? (
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  <select
-                    value={assignedName}
-                    onChange={e => setAssignedName(e.target.value)}
-                    className="w-full h-11 rounded-xl bg-card border border-border text-foreground text-sm pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-ring appearance-none cursor-pointer"
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={assignedName}
+                  onChange={e => setAssignedName(e.target.value)}
+                  placeholder="Nombre de la persona responsable..."
+                  className="bg-card border-border text-foreground h-11 pl-9"
+                />
+                {assignedName && (
+                  <button
+                    onClick={() => setAssignedName('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    <option value="">Sin asignar...</option>
-                    {activeEmployees.map(emp => (
-                      <option key={emp.id} value={emp.full_name}>
-                        {emp.full_name}{emp.specialty && emp.specialty !== 'general' ? ` — ${emp.specialty}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  <Input
-                    value={assignedName}
-                    onChange={e => setAssignedName(e.target.value)}
-                    placeholder="Nombre de la persona responsable..."
-                    className="bg-card border-border text-foreground h-11 pl-9"
-                  />
-                  {assignedName && (
-                    <button
-                      onClick={() => setAssignedName('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              )}
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
               {autoJefeSitio && !assignedName && (
                 <p className="text-xs text-amber-400/80 mt-1.5 flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3 shrink-0" />
