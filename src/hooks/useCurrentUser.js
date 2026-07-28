@@ -43,71 +43,19 @@ export function useCurrentUser() {
 
   /**
    * Filtra una lista de registros según el usuario actual.
-   * - SuperAdmins y usuarios sin rol de campo: ven todo.
-   * - Roles de campo (jefe_sitio, inspector, etc.): ven solo sus registros
-   *   (donde su nombre/email aparece en alguno de los campos indicados,
-   *    O donde ellos mismos crearon el registro).
+   * El RLS del backend ya garantiza que el usuario solo reciba los registros
+   * que puede ver (created_by_id, jefe_sitio_email, sector_id).
+   * Este filtro solo aplica aislamiento por sector para admins/gerentes
+   * que ven múltiples registros dentro de su sector.
    */
   function filterByUser(list, fields = []) {
     if (!currentUser) return list;
 
-    // Aislar SIEMPRE por sector_id — incluso para admins.
-    // Un admin en sector BAPRO no debe ver registros del sector escuela.
+    // Aislar por sector_id — un admin en sector BAPRO no debe ver registros del sector escuela.
     const userSector = currentUser?.sector_id || currentUser?.data?.sector_id || employeeSector || 'escuela';
-    let result = list.filter(item => {
+    return list.filter(item => {
       const itemSector = item.sector_id || 'escuela';
       return itemSector === userSector;
-    });
-
-    // SuperAdmins ven todo dentro de su sector (no se filtra por assigned_name, etc.)
-    if (isSuperAdmin) return result;
-    // Si no tiene employeeRole asignado, no restringir más allá del sector
-    if (!employeeRole) return result;
-    // Solo restringir por campos si es un rol de campo explícito
-    if (!FIELD_ROLES.includes(employeeRole?.toLowerCase?.())) return result;
-
-    // IMPORTANTE: usar employeeName (ficha de empleado) como fuente principal de nombre.
-    // Caer en full_name de plataforma solo si no hay ficha vinculada.
-    // Normaliza acentos: "Gastón Massá" debe matchear "Gaston Massa" y viceversa.
-    const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    const employeeNameNorm = normalize(employeeName);
-    const platformNameNorm = normalize(currentUser.full_name);
-    const email = currentUser.email?.toLowerCase().trim() || '';
-    const userId = currentUser.id || '';
-
-    // Partes del nombre (longitud > 3) para fuzzy matching.
-    // Permite que "Marco Tarqui" matchee "MARCOS TARQUI LOZANO".
-    const nameParts = employeeNameNorm.split(/\s+/).filter(p => p.length > 3);
-    const platformNameParts = platformNameNorm.split(/\s+/).filter(p => p.length > 3);
-
-    return result.filter(item => {
-      // 1. Creado por este usuario
-      if (userId && item.created_by_id && item.created_by_id === userId) return true;
-
-      // 2. Email exact match — SIEMPRE verificar campos de email.
-      //    Esto alinea el filtro cliente con el RLS (jefe_sitio_email === user.email).
-      const emailFields = ['jefe_sitio_email', 'assigned_to', 'assigned_name'];
-      for (const f of emailFields) {
-        const val = (item[f] || '').toString().toLowerCase().trim();
-        if (val && email && val === email) return true;
-      }
-
-      // 3. Verificar campos especificados por matching de nombres
-      return fields.some(field => {
-        const val = normalize(item[field]);
-        if (!val) return false;
-
-        // Nombre exacto contenido (comportamiento existente)
-        if (employeeNameNorm && val.includes(employeeNameNorm)) return true;
-        if (platformNameNorm && val.includes(platformNameNorm)) return true;
-
-        // Fuzzy: todas las partes del nombre (longitud > 3) aparecen en el valor.
-        // Ej: "marco" + "tarqui" ambos en "marcos tarqui lozano" → match.
-        if (nameParts.length >= 2 && nameParts.every(p => val.includes(p))) return true;
-        if (platformNameParts.length >= 2 && platformNameParts.every(p => val.includes(p))) return true;
-
-        return false;
-      });
     });
   }
 
