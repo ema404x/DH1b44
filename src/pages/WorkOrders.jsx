@@ -131,6 +131,25 @@ export default function WorkOrders() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Empleados — para resolver email y user_id al filtrar por jefe_sitio u operario
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees-filter-lookup'],
+    queryFn: () => base44.entities.Employee.list('-updated_date', 500),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Lookup: nombre normalizado → { email, user_id }
+  const employeeLookup = useMemo(() => {
+    const map = {};
+    const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ');
+    employees.forEach(e => {
+      if (e.full_name) {
+        map[norm(e.full_name)] = { email: (e.email || '').toLowerCase().trim(), user_id: e.user_id || '' };
+      }
+    });
+    return { map, norm };
+  }, [employees]);
+
   // Mapa normalizado: dirección → jefe_sitio
   const addrToJefe = useMemo(() => {
     const map = {};
@@ -151,9 +170,12 @@ export default function WorkOrders() {
     if (!locNorm) return null;
     // Match exacto tras normalización
     if (map[locNorm]) return map[locNorm];
-    // Match por contenido (la dirección de Direccion está contenida en la location de la OT o viceversa)
-    for (const addr of Object.keys(map)) {
-      if (locNorm.includes(addr) || addr.includes(locNorm)) return map[addr];
+    // Match por contenido — solo para ubicaciones con longitud razonable (≥10 chars)
+    // para evitar falsos positivos como "SUM" matcheando cualquier dirección que contenga "SUM"
+    if (locNorm.length >= 10) {
+      for (const addr of Object.keys(map)) {
+        if (addr.length >= 10 && (locNorm.includes(addr) || addr.includes(locNorm))) return map[addr];
+      }
     }
     return null;
   }, [addrToJefe]);
@@ -217,10 +239,36 @@ export default function WorkOrders() {
     // Filtros avanzados (gerentes/admin)
     const matchPriority = !advFilters.priority || o.priority === advFilters.priority;
     const matchType = !advFilters.type || o.type === advFilters.type;
-    const normExact = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
-    const matchOperario = !advFilters.assigned_to || normExact(o.assigned_name) === normExact(advFilters.assigned_to);
-    const resolvedJefe = resolveJefe(o);
-    const matchJefe = !advFilters.jefe_sitio || (resolvedJefe && normExact(resolvedJefe) === normExact(advFilters.jefe_sitio));
+    const normCI = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Operario: verifica assigned_name y assigned_to (puede ser email)
+    const { map: empMap, norm: normEmp } = employeeLookup;
+    const matchOperario = !advFilters.assigned_to || (() => {
+      const filterVal = normCI(advFilters.assigned_to);
+      if (normCI(o.assigned_name) === filterVal) return true;
+      if (normCI(o.assigned_to) === filterVal) return true;
+      // Si assigned_to es un email, matchear contra el email del empleado seleccionado
+      const empInfo = empMap[normEmp(advFilters.assigned_to)];
+      if (empInfo?.email && (o.assigned_to || '').toLowerCase().trim() === empInfo.email) return true;
+      return false;
+    })();
+
+    // Jefe de sitio: verifica jefe_sitio, jefe_sitio_email, created_by_id, y resolveJefe
+    const selectedJefeInfo = advFilters.jefe_sitio ? empMap[normEmp(advFilters.jefe_sitio)] : null;
+    const matchJefe = !advFilters.jefe_sitio || (() => {
+      const filterVal = normCI(advFilters.jefe_sitio);
+      // 1. jefe_sitio directo (name match)
+      if (o.jefe_sitio && normCI(o.jefe_sitio) === filterVal) return true;
+      // 2. jefe_sitio_email match contra el email del jefe seleccionado
+      if (selectedJefeInfo?.email && (o.jefe_sitio_email || '').toLowerCase().trim() === selectedJefeInfo.email) return true;
+      // 3. created_by_id match contra el user_id del jefe seleccionado
+      if (selectedJefeInfo?.user_id && o.created_by_id === selectedJefeInfo.user_id) return true;
+      // 4. resolveJefe como fallback
+      const resolved = resolveJefe(o);
+      if (resolved && normCI(resolved) === filterVal) return true;
+      return false;
+    })();
     const matchDateFrom = !advFilters.date_from || (o.scheduled_date && o.scheduled_date >= advFilters.date_from);
     const matchDateTo = !advFilters.date_to || (o.scheduled_date && o.scheduled_date <= advFilters.date_to);
     const matchOverdue = !advFilters.overdue_only || (() => {

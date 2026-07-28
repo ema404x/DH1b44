@@ -38,6 +38,13 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
   });
   const direcciones = propDirecciones || queriedDirecciones;
 
+  // Empleados — fuente completa de jefes de sitio y operarios
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees-filter'],
+    queryFn: () => base44.entities.Employee.list('-updated_date', 500),
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Set de nombres de jefes (lowercase) para excluirlos del listado de operarios
   const jefeNamesSet = useMemo(() => {
     const set = new Set();
@@ -60,8 +67,17 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
         }
       }
     });
+    // Empleados que no son jefes de sitio — aparecen aunque no tengan OTs asignadas
+    employees.forEach(e => {
+      if (e.full_name && e.role && !e.role.toLowerCase().includes('jefe')) {
+        const n = norm(e.full_name);
+        if (!jefeNamesSet.has(n.toLowerCase()) && !set.has(n.toLowerCase())) {
+          set.set(n.toLowerCase(), n);
+        }
+      }
+    });
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [orders, jefeNamesSet]);
+  }, [orders, jefeNamesSet, employees]);
 
   const jefes = useMemo(() => {
     const set = new Map();
@@ -73,7 +89,14 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
         if (!set.has(n.toLowerCase())) set.set(n.toLowerCase(), n);
       }
     });
-    // Desde las OTs (por si hay jefes que no están en Direccion)
+    // Desde Empleados con rol jefe de sitio — garantiza que aparezcan aunque no tengan OTs
+    employees.forEach(e => {
+      if (e.full_name && e.role && e.role.toLowerCase().includes('jefe')) {
+        const n = norm(e.full_name);
+        if (!set.has(n.toLowerCase())) set.set(n.toLowerCase(), n);
+      }
+    });
+    // Desde las OTs (por si hay jefes que no están en Direccion ni Employees)
     orders.forEach(o => {
       if (o.jefe_sitio) {
         const n = norm(o.jefe_sitio);
@@ -81,7 +104,7 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
       }
     });
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [orders, direcciones]);
+  }, [orders, direcciones, employees]);
 
   const activeCount = [priority, type, assigned_to, jefe_sitio, date_from, date_to].filter(Boolean).length + (overdue_only ? 1 : 0);
 
