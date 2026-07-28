@@ -106,6 +106,9 @@ export default function PendientesTab() {
       qc.invalidateQueries({ queryKey: ['pendientes'] });
       toast.success('Pendiente eliminado');
     },
+    onError: (err) => {
+      toast.error('No se pudo eliminar: ' + (err?.message || 'error de permisos'));
+    },
   });
 
   const openNew = () => { setSelected(null); setDialogOpen(true); };
