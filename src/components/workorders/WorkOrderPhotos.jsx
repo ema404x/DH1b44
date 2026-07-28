@@ -11,13 +11,25 @@ export default function WorkOrderPhotos({ photos = [], onChange }) {
   const handleFiles = async (files) => {
     if (!files?.length) return;
     setUploading(true);
-    const uploaded = [];
-    for (const file of Array.from(files)) {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      uploaded.push(file_url);
+    try {
+      const uploaded = [];
+      for (const file of Array.from(files)) {
+        try {
+          const { file_url } = await base44.integrations.Core.UploadFile({ file });
+          if (file_url) uploaded.push(file_url);
+        } catch (err) {
+          console.error('Error subiendo archivo:', file?.name, err);
+        }
+      }
+      if (uploaded.length) {
+        onChange([...photos, ...uploaded]);
+      }
+    } finally {
+      setUploading(false);
+      // Reset inputs para poder seleccionar la misma foto nuevamente
+      if (cameraRef.current) cameraRef.current.value = '';
+      if (fileRef.current) fileRef.current.value = '';
     }
-    onChange([...photos, ...uploaded]);
-    setUploading(false);
   };
 
   const removePhoto = (idx) => {
