@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { syncAllPlatformRoles } from "../../shared/syncPlatformRoles.ts";
 
 /**
  * Reconciliación automática de empleados ↔ usuarios de plataforma.
@@ -100,6 +101,10 @@ Deno.serve(async (req) => {
       .filter(u => u.email && !employeeEmails.has(u.email.toLowerCase().trim()))
       .map(u => ({ email: u.email, name: u.full_name, role: u.role }));
 
+    // 5. Sincronizar roles de plataforma de todos los usuarios
+    //    (basándose en shared/roles.ts — ADMIN_LEVEL_ROLES)
+    const roleSync = await syncAllPlatformRoles(sb, employees, users);
+
     // Construir detalle final
     const vinculados = employees.filter(e => e.user_id);
     const detalle = vinculados.map(emp => ({
@@ -124,6 +129,7 @@ Deno.serve(async (req) => {
       },
       detalle_correcciones: fixes,
       usuarios_sin_ficha: orphanUsers,
+      sincronizacion_roles: roleSync,
       detalle,
     });
   } catch (error) {

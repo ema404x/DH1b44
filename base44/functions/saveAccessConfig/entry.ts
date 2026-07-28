@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { syncAllPlatformRoles } from "../../shared/syncPlatformRoles.ts";
 
 /**
  * Guarda la configuración completa de control de acceso.
@@ -55,10 +56,24 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Sincronizar roles de plataforma de todos los usuarios
+    // para que el RLS refleje los permisos inmediatamente
+    let roleSync = null;
+    try {
+      roleSync = await syncAllPlatformRoles(base44.asServiceRole);
+    } catch (syncErr) {
+      console.warn('[saveAccessConfig] Platform role sync error:', syncErr.message);
+    }
+
+    const syncMsg = roleSync
+      ? ` ${roleSync.total_synced} usuario(s) actualizado(s).`
+      : '';
+
     return Response.json({
       success: true,
-      message: `Configuración guardada: ${results.length} rol(es) procesados`,
+      message: `Configuración guardada: ${results.length} rol(es) procesado(s).${syncMsg}`,
       results,
+      sincronizacion_roles: roleSync,
     });
 
   } catch (error) {

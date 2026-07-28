@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   Plus, Save, Trash2, Loader2, CheckCircle2, KeyRound,
-  Shield, ChevronDown, ChevronUp, ToggleLeft, ToggleRight
+  Shield, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Users
 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -259,6 +259,7 @@ export default function Permisos() {
   const [showNew, setShowNew] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const { data: roles = [], isLoading } = useQuery({
     queryKey: ['rolePermissions'],
@@ -287,6 +288,22 @@ export default function Permisos() {
 
   const visibleRoles = roles.filter(r => r.role_name !== 'operario_portal');
 
+  const handleSyncUsers = async () => {
+    setSyncing(true);
+    try {
+      const res = await base44.functions.invoke('forzarSincronizacion', {});
+      const sync = res.data?.sincronizacion_roles;
+      const msg = sync
+        ? `Sincronización completa: ${sync.total_synced} usuario(s) actualizado(s), ${sync.already_correct} ya correctos.`
+        : 'Sincronización completada.';
+      toast.success(msg);
+    } catch (err) {
+      toast.error('Error al sincronizar: ' + (err?.message || 'error'));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleSaveAll = async () => {
     if (visibleRoles.length === 0) return;
     setSaving(true);
@@ -299,7 +316,11 @@ export default function Permisos() {
         is_active: r.is_active !== undefined ? r.is_active : true,
       }));
       const res = await base44.functions.invoke('saveAccessConfig', { roles: rolesPayload });
-      toast.success(res.data?.message || 'Configuración sincronizada correctamente');
+      const sync = res.data?.sincronizacion_roles;
+      const msg = sync?.total_synced > 0
+        ? `Sincronizado: ${sync.total_synced} usuario(s) actualizado(s).`
+        : (res.data?.message || 'Configuración guardada correctamente.');
+      toast.success(msg);
       queryClient.invalidateQueries({ queryKey: ['rolePermissions'] });
     } catch (err) {
       toast.error('Error al sincronizar: ' + (err?.message || 'error desconocido'));
@@ -344,6 +365,11 @@ export default function Permisos() {
           <Button variant="outline" size="sm" onClick={handleSaveAll} disabled={saving || visibleRoles.length === 0} className="gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Sincronizar
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleSyncUsers} disabled={syncing} className="gap-2">
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+            <span className="hidden sm:inline">Sincronizar usuarios</span>
+            <span className="sm:hidden">Usuarios</span>
           </Button>
           <Button size="sm" onClick={() => setShowNew(!showNew)} className="gap-2">
             <Plus className="h-4 w-4" /> Nuevo Rol
