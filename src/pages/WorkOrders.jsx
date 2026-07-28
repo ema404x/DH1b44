@@ -106,6 +106,7 @@ export default function WorkOrders() {
   const isGerente = isAdmin || currentUser?.role === 'gerente';
   const { allowed: canCreate } = usePermission('WorkOrder', 'create');
   const { allowed: canDelete } = usePermission('WorkOrder', 'delete');
+  const { resolveCreator } = useResolveCreator();
 
   const handleRefresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['workorders'] });
@@ -197,24 +198,29 @@ export default function WorkOrders() {
   , [orders, filterByUser]);
 
   const filtered = useMemo(() => visibleOrders.filter(o => {
-    const q = search.toLowerCase();
+    // Normaliza: lowercase + sin acentos — para que "gaston" matchee "Gastón Massá"
+    const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const q = norm(search);
+    const creador = norm(resolveCreator(o.created_by_id, ''));
     const matchSearch = !q || 
-      o.title?.toLowerCase().includes(q) ||
-      o.location?.toLowerCase().includes(q) ||
-      o.location_qr_name?.toLowerCase().includes(q) ||
-      o.project_name?.toLowerCase().includes(q) ||
-      o.asset_name?.toLowerCase().includes(q) ||
-      o.assigned_name?.toLowerCase().includes(q) ||
-      o.code?.toLowerCase().includes(q);
+      norm(o.title).includes(q) ||
+      norm(o.location).includes(q) ||
+      norm(o.location_qr_name).includes(q) ||
+      norm(o.project_name).includes(q) ||
+      norm(o.asset_name).includes(q) ||
+      norm(o.assigned_name).includes(q) ||
+      norm(o.code).includes(q) ||
+      norm(o.jefe_sitio).includes(q) ||
+      creador.includes(q);
     const matchStatus = statusTab === 'all' || o.status === statusTab;
 
     // Filtros avanzados (gerentes/admin)
     const matchPriority = !advFilters.priority || o.priority === advFilters.priority;
     const matchType = !advFilters.type || o.type === advFilters.type;
-    const norm = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
-    const matchOperario = !advFilters.assigned_to || norm(o.assigned_name) === norm(advFilters.assigned_to);
+    const normExact = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const matchOperario = !advFilters.assigned_to || normExact(o.assigned_name) === normExact(advFilters.assigned_to);
     const resolvedJefe = resolveJefe(o);
-    const matchJefe = !advFilters.jefe_sitio || (resolvedJefe && norm(resolvedJefe) === norm(advFilters.jefe_sitio));
+    const matchJefe = !advFilters.jefe_sitio || (resolvedJefe && normExact(resolvedJefe) === normExact(advFilters.jefe_sitio));
     const matchDateFrom = !advFilters.date_from || (o.scheduled_date && o.scheduled_date >= advFilters.date_from);
     const matchDateTo = !advFilters.date_to || (o.scheduled_date && o.scheduled_date <= advFilters.date_to);
     const matchOverdue = !advFilters.overdue_only || (() => {
@@ -222,7 +228,7 @@ export default function WorkOrders() {
     })();
 
     return matchSearch && matchStatus && matchPriority && matchType && matchOperario && matchJefe && matchDateFrom && matchDateTo && matchOverdue;
-  }), [visibleOrders, search, statusTab, advFilters, resolveJefe]);
+  }), [visibleOrders, search, statusTab, advFilters, resolveJefe, resolveCreator]);
 
   const stats = useMemo(() => ({
     total: filtered.length,
