@@ -79,6 +79,10 @@
       "type": "string",
       "description": "Jefe de sitio responsable \u2014 vincula la OT a la tablet de su cuadrilla"
     },
+    "jefe_sitio_email": {
+      "type": "string",
+      "description": "Email del jefe de sitio \u2014 usado por RLS para que el jefe vea y edite sus OTs"
+    },
     "scheduled_date": {
       "type": "string",
       "format": "date"
@@ -284,6 +288,9 @@
             },
             {
               "created_by_id": "{{user.id}}"
+            },
+            {
+              "data.jefe_sitio_email": "{{user.email}}"
             }
           ]
         }
@@ -308,6 +315,9 @@
               "user_condition": {
                 "role": "gerente"
               }
+            },
+            {
+              "data.jefe_sitio_email": "{{user.email}}"
             }
           ]
         }
