@@ -12,9 +12,9 @@ Deno.serve(async (req) => {
     const sb = base44.asServiceRole;
 
     // ── Sincronizar el rol de plataforma según el rol del empleado.
-    //    "Gerencia" → "gerente" (rol con visibilidad total de OTs y módulos).
+    //    "Gerencia" / "Administrativo" → "gerente" (rol con visibilidad total de OTs y módulos).
     //    Cualquier otro rol → "user" (a menos que sea admin, que se respeta).
-    const GERENTE_ROLES = ['gerencia', 'gerente'];
+    const GERENTE_ROLES = ['gerencia', 'gerente', 'administrativo'];
     async function syncPlatformRole(userId, employeeRole, currentPlatformRole) {
       const empRoleNorm = (employeeRole || '').toLowerCase().trim();
       const shouldBe = GERENTE_ROLES.includes(empRoleNorm) ? 'gerente' : 'user';
