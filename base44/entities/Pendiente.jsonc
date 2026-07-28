@@ -233,9 +233,32 @@
       ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            }
+          ]
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            }
+          ]
+        }
+      ]
     }
   }
 }
