@@ -6,7 +6,7 @@ import { AuthContext } from '@/lib/AuthContext';
  * Los admins de plataforma (user.role === 'admin') siempre tienen acceso total.
  *
  * @param {string} moduleKey - Clave del módulo (ej: 'WorkOrder', 'Certificado')
- * @param {string} action - Acción a verificar: 'read' | 'create' | 'update' | 'delete' | 'export' | 'approve'
+ * @param {string} action - Acción a verificar: 'read' | 'create' | 'update' | 'delete' | 'export' | 'approve' | 'admin_view'
  * @returns {{ allowed: boolean, loading: boolean }}
  */
 export function usePermission(moduleKey, action = 'read') {

@@ -33,6 +33,10 @@
           },
           "approve": {
             "type": "boolean"
+          },
+          "admin_view": {
+            "type": "boolean",
+            "description": "Ver todos los registros del m\u00f3dulo como un admin (ignora filtros de propietario)"
           }
         }
       }

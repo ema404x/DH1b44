@@ -36,10 +36,20 @@ export default async function(req) {
     const employeeRole = (employee?.role || '').toLowerCase().trim();
     const employeeName = employee?.full_name || user.full_name || '';
 
+    // Verificar permiso admin_view para WorkOrder (configurado en Control de Acceso)
+    let hasAdminView = false;
+    if (employee?.role) {
+      const rolePerms = await base44.asServiceRole.entities.RolePermission.filter({});
+      const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      const match = rolePerms.find(rp => norm(rp.role_name) === norm(employee.role));
+      hasAdminView = match?.permissions?.WorkOrder?.admin_view === true;
+    }
+
     // Roles con visibilidad total dentro del sector (definición centralizada en shared/roles.ts)
     const isAdminLevel = platformRole === 'admin' ||
                          platformRole === 'gerente' ||
-                         isAdminLevelRole(employeeRole);
+                         isAdminLevelRole(employeeRole) ||
+                         hasAdminView;
 
     // Query WorkOrders via service role (bypassing RLS)
     const allOTs = await base44.asServiceRole.entities.WorkOrder.list('-created_date', 500);

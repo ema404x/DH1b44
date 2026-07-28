@@ -58,11 +58,12 @@ const MODULES = [
 
 const GROUPS = ['General', 'Operaciones', 'Reportes', 'Finanzas', 'Administración', 'Sistema'];
 
-const ACTIONS = ['read', 'create', 'update', 'delete', 'export', 'approve'];
-const ACTION_LABELS = { read: 'Ver', create: 'Crear', update: 'Editar', delete: 'Eliminar', export: 'Exportar', approve: 'Aprobar' };
+const ACTIONS = ['read', 'create', 'update', 'delete', 'export', 'approve', 'admin_view'];
+const ACTION_LABELS = { read: 'Ver', create: 'Crear', update: 'Editar', delete: 'Eliminar', export: 'Exportar', approve: 'Aprobar', admin_view: 'Ver Todo' };
 const ACTION_COLORS = {
   read: 'text-blue-400', create: 'text-emerald-400', update: 'text-amber-400',
-  delete: 'text-red-400', export: 'text-purple-400', approve: 'text-cyan-400'
+  delete: 'text-red-400', export: 'text-purple-400', approve: 'text-cyan-400',
+  admin_view: 'text-pink-400'
 };
 
 const GROUP_COLORS = {

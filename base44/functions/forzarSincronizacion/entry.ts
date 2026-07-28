@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
 
     // 5. Sincronizar roles de plataforma de todos los usuarios
     //    (basándose en shared/roles.ts — ADMIN_LEVEL_ROLES)
-    const roleSync = await syncAllPlatformRoles(sb, employees, users);
+    const roleSync = await syncAllPlatformRoles(sb, employees, users, permsMap);
 
     // Construir detalle final
     const vinculados = employees.filter(e => e.user_id);

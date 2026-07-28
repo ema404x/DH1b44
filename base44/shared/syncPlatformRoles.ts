@@ -19,7 +19,24 @@ import { shouldSyncToGerente } from "./roles.ts";
  * @param existingEmployees? - empleados pre-cargados (evita re-fetch)
  * @param existingUsers? - usuarios pre-cargados (evita re-fetch)
  */
-export async function syncAllPlatformRoles(sb, existingEmployees?, existingUsers?) {
+/**
+ * Verifica si un rol tiene el permiso admin_view activo en cualquier módulo.
+ * Match case-insensitive + sin acentos para tolerar diferencias de formato.
+ */
+function roleHasAdminViewAnywhere(rolePermsMap, roleName) {
+  if (!rolePermsMap || !roleName) return false;
+  const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const targetNorm = norm(roleName);
+  let perms = rolePermsMap[roleName];
+  if (!perms) {
+    const key = Object.keys(rolePermsMap).find(k => norm(k) === targetNorm);
+    perms = key ? rolePermsMap[key] : null;
+  }
+  if (!perms) return false;
+  return Object.values(perms).some(modulePerms => modulePerms?.admin_view === true);
+}
+
+export async function syncAllPlatformRoles(sb, existingEmployees?, existingUsers?, rolePermsMap?) {
   const employees = existingEmployees || await sb.entities.Employee.list('-created_date', 2000);
   const users = existingUsers || await sb.entities.User.list('-created_date', 2000);
 
@@ -39,7 +56,7 @@ export async function syncAllPlatformRoles(sb, existingEmployees?, existingUsers
     // Platform admins nunca se tocan
     if (platformUser.role === 'admin') { already_correct++; continue; }
 
-    const shouldBe = shouldSyncToGerente(emp.role) ? 'gerente' : 'user';
+    const shouldBe = (shouldSyncToGerente(emp.role) || roleHasAdminViewAnywhere(rolePermsMap, emp.role)) ? 'gerente' : 'user';
 
     if (platformUser.role === shouldBe) { already_correct++; continue; }
 

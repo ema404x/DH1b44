@@ -60,7 +60,10 @@ Deno.serve(async (req) => {
     // para que el RLS refleje los permisos inmediatamente
     let roleSync = null;
     try {
-      roleSync = await syncAllPlatformRoles(base44.asServiceRole);
+      const allRolePerms = await base44.asServiceRole.entities.RolePermission.filter({});
+      const permsMap = {};
+      allRolePerms.forEach(rp => { permsMap[rp.role_name] = rp.permissions; });
+      roleSync = await syncAllPlatformRoles(base44.asServiceRole, null, null, permsMap);
     } catch (syncErr) {
       console.warn('[saveAccessConfig] Platform role sync error:', syncErr.message);
     }
