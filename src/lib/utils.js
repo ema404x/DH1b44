@@ -28,14 +28,25 @@ export function resolveDisplayName(nameOrEmail, employees = [], fallback) {
   if (!nameOrEmail) return fallback || 'Usuario';
   const str = String(nameOrEmail).trim();
 
-  // Si NO parece un email, retornar directamente (ya es un nombre)
-  if (!isEmail(str)) return str || fallback || 'Usuario';
+  // Normalización: minúsculas sin acentos ni espacios extra
+  const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
-  // Es un email → buscar la ficha de empleado que coincida
-  const email = str.toLowerCase();
-  const emp = employees.find(e => e.email?.toLowerCase().trim() === email);
-  if (emp?.full_name) return emp.full_name;
+  // Si es email → resolver a Employee.full_name
+  if (isEmail(str)) {
+    const email = str.toLowerCase();
+    const emp = employees.find(e => e.email?.toLowerCase().trim() === email);
+    if (emp?.full_name) return emp.full_name;
+    return fallback || str;
+  }
 
-  // No encontrado → retornar fallback o el email original (como último recurso)
-  return fallback || str;
+  // Si es un nombre → buscar match exacto (case/accent-insensitive) en empleados.
+  // Esto garantiza que "GASTON MASSA" se muestre como "Gastón Massa" (nombre canónico).
+  const strNorm = normalize(str);
+  if (strNorm) {
+    const emp = employees.find(e => normalize(e.full_name) === strNorm);
+    if (emp?.full_name) return emp.full_name;
+  }
+
+  // No match → retornar el string original
+  return str || fallback || 'Usuario';
 }

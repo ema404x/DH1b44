@@ -65,12 +65,22 @@ export function useResolveCreator() {
    * Si el creador es un usuario real identificado → "Creada por {nombre}".
    * Si la OT fue creada por un proceso automático (sistema) → "Jefe de sitio: {nombre}".
    * Si no hay jefe de sitio → "Responsable: Sin asignar".
+   *
+   * El nombre del jefe_sitio se resuelve contra la lista de empleados para
+   * mostrar el nombre canónico (tal cual figura en el módulo de Empleados).
    */
+  const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
   const resolveOTOwner = (order) => {
     const creator = order.created_by_id ? resolveCreator(order.created_by_id, null) : null;
     if (creator) return { name: creator, label: 'Creada por' };
     const jefe = order.jefe_sitio?.trim();
-    if (jefe) return { name: jefe, label: 'Jefe de sitio' };
+    if (jefe) {
+      // Resolver al nombre canónico del empleado (case/accent-insensitive)
+      const jefeNorm = normalize(jefe);
+      const emp = employees.find(e => normalize(e.full_name) === jefeNorm);
+      return { name: emp?.full_name || jefe, label: 'Jefe de sitio' };
+    }
     return { name: 'Sin asignar', label: 'Responsable' };
   };
 
