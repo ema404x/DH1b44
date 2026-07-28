@@ -29,15 +29,29 @@ export default function PortalOperarioApp() {
     const myPlatformName = normalize(currentUser.full_name);
     const myEmail = (currentUser.email || '').toLowerCase().trim();
     const myId    = currentUser.id || '';
+    // Partes del nombre para fuzzy matching (longitud > 3)
+    const myNameParts = myName.split(/\s+/).filter(p => p.length > 3);
     return allOTs.filter(ot => {
       if (ot.status === 'cancelada' || ot.status === 'completada') return false;
       if (myId && ot.created_by_id === myId) return true;
+      // Email exact match — el más confiable (alinea con RLS)
+      const jefeEmail = (ot.jefe_sitio_email || '').toLowerCase().trim();
+      if (myEmail && jefeEmail === myEmail) return true;
       const assigned = normalize(ot.assigned_to);
       const assignedName = normalize(ot.assigned_name);
-      const jefeSitio = normalize(ot.jefe_sitio);
       if (myEmail && (assigned === myEmail || assignedName === myEmail)) return true;
-      if (myName && (assigned.includes(myName) || assignedName.includes(myName) || jefeSitio.includes(myName))) return true;
-      if (myPlatformName && jefeSitio.includes(myPlatformName)) return true;
+      // Nombre exacto contenido
+      if (myName && (assigned.includes(myName) || assignedName.includes(myName))) return true;
+      // Fuzzy: todas las partes del nombre aparecen en el campo
+      if (myNameParts.length >= 2) {
+        if (myNameParts.every(p => assigned.includes(p) || assignedName.includes(p))) return true;
+        const jefeSitio = normalize(ot.jefe_sitio);
+        if (jefeSitio && myNameParts.every(p => jefeSitio.includes(p))) return true;
+      }
+      if (myPlatformName) {
+        const jefeSitio = normalize(ot.jefe_sitio);
+        if (jefeSitio.includes(myPlatformName)) return true;
+      }
       return false;
     });
   }, [allOTs, currentUser, employeeName]);

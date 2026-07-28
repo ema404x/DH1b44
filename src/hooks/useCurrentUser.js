@@ -75,14 +75,38 @@ export function useCurrentUser() {
     const email = currentUser.email?.toLowerCase().trim() || '';
     const userId = currentUser.id || '';
 
+    // Partes del nombre (longitud > 3) para fuzzy matching.
+    // Permite que "Marco Tarqui" matchee "MARCOS TARQUI LOZANO".
+    const nameParts = employeeNameNorm.split(/\s+/).filter(p => p.length > 3);
+    const platformNameParts = platformNameNorm.split(/\s+/).filter(p => p.length > 3);
+
     return result.filter(item => {
+      // 1. Creado por este usuario
       if (userId && item.created_by_id && item.created_by_id === userId) return true;
+
+      // 2. Email exact match — SIEMPRE verificar campos de email.
+      //    Esto alinea el filtro cliente con el RLS (jefe_sitio_email === user.email).
+      const emailFields = ['jefe_sitio_email', 'assigned_to', 'assigned_name'];
+      for (const f of emailFields) {
+        const val = (item[f] || '').toString().toLowerCase().trim();
+        if (val && email && val === email) return true;
+      }
+
+      // 3. Verificar campos especificados por matching de nombres
       return fields.some(field => {
         const val = normalize(item[field]);
-        const matchEmployee = employeeNameNorm && val.includes(employeeNameNorm);
-        const matchPlatform = platformNameNorm && val.includes(platformNameNorm);
-        const matchEmail = email && val === email;
-        return matchEmployee || matchPlatform || matchEmail;
+        if (!val) return false;
+
+        // Nombre exacto contenido (comportamiento existente)
+        if (employeeNameNorm && val.includes(employeeNameNorm)) return true;
+        if (platformNameNorm && val.includes(platformNameNorm)) return true;
+
+        // Fuzzy: todas las partes del nombre (longitud > 3) aparecen en el valor.
+        // Ej: "marco" + "tarqui" ambos en "marcos tarqui lozano" → match.
+        if (nameParts.length >= 2 && nameParts.every(p => val.includes(p))) return true;
+        if (platformNameParts.length >= 2 && platformNameParts.every(p => val.includes(p))) return true;
+
+        return false;
       });
     });
   }

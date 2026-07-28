@@ -184,11 +184,11 @@ export default function Dashboard() {
   // Pendientes filtrados: admin ve todos, jefe de sitio solo los suyos
   // filterByUser prioriza employeeName (ficha de empleado) sobre full_name de plataforma
   const pendientes = useMemo(() =>
-    filterByUser(allPendientes, ['jefe_sitio'])
+    filterByUser(allPendientes, ['jefe_sitio', 'jefe_sitio_email'])
   , [allPendientes, filterByUser]);
 
   const allUserOrders = useMemo(() =>
-    filterByUser(allOrders, ['assigned_name', 'assigned_to', 'jefe_sitio'])
+    filterByUser(allOrders, ['assigned_name', 'assigned_to', 'jefe_sitio', 'jefe_sitio_email'])
   , [allOrders, filterByUser]);
 
   // Fecha de corte según el rango seleccionado
