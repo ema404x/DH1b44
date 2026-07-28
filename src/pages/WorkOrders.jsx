@@ -44,7 +44,7 @@ const STATUS_LABELS = {
   cancelada: 'Cancelada',
 };
 
-function WorkOrderCard({ order, onOpen, onShowQR, onComplete, canComplete }) {
+function WorkOrderCard({ order, onOpen, onShowQR, onComplete, onStart, canComplete }) {
   const { resolveOTOwner } = useResolveCreator();
   const isOverdue = (() => { try { return order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
   const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
@@ -82,7 +82,16 @@ function WorkOrderCard({ order, onOpen, onShowQR, onComplete, canComplete }) {
         <Badge className="text-xs bg-slate-700 text-slate-200">{STATUS_LABELS[order.status] || order.status}</Badge>
         <Badge variant="secondary" className="text-xs">{order.priority}</Badge>
         {isOverdue && <Badge className="bg-red-500/20 text-red-300 text-xs">VENCIDA</Badge>}
-        {canComplete && !isTerminal && (
+        {canComplete && !isTerminal && ['pendiente', 'asignada'].includes(order.status) && (
+          <Button
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); onStart(order.id); }}
+            className="ml-auto h-7 px-3 text-xs gap-1 bg-blue-600 hover:bg-blue-500 text-white"
+          >
+            <Zap className="h-3.5 w-3.5" /> Iniciar
+          </Button>
+        )}
+        {canComplete && !isTerminal && !['pendiente', 'asignada'].includes(order.status) && (
           <Button
             size="sm"
             onClick={(e) => { e.stopPropagation(); onComplete(order.id); }}
@@ -124,6 +133,17 @@ export default function WorkOrders() {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Error al completar la OT';
+      toast.error(msg);
+    }
+  };
+
+  const handleStart = async (id) => {
+    try {
+      const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: 'iniciar' });
+      toast.success(res.data.mensaje || 'OT iniciada');
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Error al iniciar la OT';
       toast.error(msg);
     }
   };
@@ -484,6 +504,7 @@ export default function WorkOrders() {
               onOpen={setSelectedOrder}
               onShowQR={setQrOrder}
               onComplete={handleComplete}
+              onStart={handleStart}
               canComplete={canCompleteOT}
             />
           ))}

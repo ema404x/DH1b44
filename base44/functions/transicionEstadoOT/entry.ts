@@ -57,9 +57,14 @@ Deno.serve(async (req) => {
 
     // Validar estado actual
     if (fija) {
-      if (ot.status !== fija.desde) {
+      // 'iniciar' acepta tanto 'pendiente' como 'asignada' — permite arrancar la OT directo
+      const estadosValidos = accion === 'iniciar' ? ['pendiente', 'asignada'] : [fija.desde];
+      if (!estadosValidos.includes(ot.status)) {
+        const msgEstados = estadosValidos.length > 1
+          ? estadosValidos.map(s => `"${s}"`).join(' o ')
+          : `"${fija.desde}"`;
         return Response.json({
-          error: `No se puede "${accion}" porque la OT está en estado "${ot.status}". Debe estar en "${fija.desde}".`
+          error: `No se puede "${accion}" porque la OT está en estado "${ot.status}". Debe estar en ${msgEstados}.`
         }, { status: 409 });
       }
     } else if (flexible) {
