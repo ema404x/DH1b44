@@ -227,47 +227,64 @@
           "user_condition": {
             "role": "admin"
           }
+        },
+        {
+          "user_condition": {
+            "role": "gerente"
+          }
         }
       ]
     },
     "read": {
-      "$and": [
+      "$or": [
         {
-          "data.sector_id": "{{user.data.sector_id}}"
-        },
-        {
-          "$or": [
+          "$and": [
             {
               "user_condition": {
                 "role": "admin"
               }
             },
             {
-              "created_by_id": "{{user.id}}"
-            },
-            {
-              "data.aprobado_por_email": "{{user.email}}"
+              "data.sector_id": "{{user.data.sector_id}}"
             }
           ]
+        },
+        {
+          "$and": [
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            }
+          ]
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.aprobado_por_email": "{{user.email}}"
         }
       ]
     },
     "update": {
-      "$and": [
+      "$or": [
         {
-          "data.sector_id": "{{user.data.sector_id}}"
-        },
-        {
-          "$or": [
-            {
-              "created_by_id": "{{user.id}}"
-            },
+          "$and": [
             {
               "user_condition": {
                 "role": "admin"
               }
+            },
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
             }
           ]
+        },
+        {
+          "created_by_id": "{{user.id}}"
         }
       ]
     },
