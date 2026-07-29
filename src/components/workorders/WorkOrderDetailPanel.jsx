@@ -122,9 +122,9 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     refetchOnMount: 'always',
   });
   // dirtyRef rastrea qué campos fueron modificados localmente y aún no persistieron.
-  // Al sincronizar con freshOrder (refetch), limpiamos el set porque el estado local
-  // coincide con el servidor — previene que un debounce posterior reenvíe campos ya actualizados.
-  useEffect(() => { if (freshOrder) { setData({ ...freshOrder }); dirtyRef.current.clear(); } }, [freshOrder]);
+  // Al sincronizar con freshOrder (refetch), solo sobrescribimos si NO hay edits pendientes —
+  // si los hay, esperamos al flush + invalidación para sincronizar sin perder datos.
+  useEffect(() => { if (freshOrder && dirtyRef.current.size === 0) { setData({ ...freshOrder }); } }, [freshOrder]);
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
@@ -226,11 +226,10 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
 
   const handleStateAction = async (accion) => {
     setStateActionLoading(true);
-    // Limpiar cualquier save debounced pendiente ANTES de la transición —
-    // la máquina de estados setea campos (completed_date, validado_por, fecha_inicio_real, etc.)
-    // que un debounce tardío sobrescribiría con valores stale.
-    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-    dirtyRef.current.clear();
+    // Flush de campos pendientes ANTES de la transición — si no, se pierden
+    // los edits no guardados (notas, checklist, materiales). La máquina de estados
+    // toca status/fechas/validador; el flush toca campos del operario. No se pisan.
+    if (dirtyRef.current.size > 0) flushDirty();
     try {
       const extraData = {};
       if (accion === 'asignar' && data.assigned_name) {
@@ -260,9 +259,8 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const handleConvertToObra = async () => {
     if (!window.confirm('¿Convertir esta OT a Futura Obra? Se creará un pendiente de tipo obra y la OT quedará en estado "Obra".')) return;
     setConvertingToObra(true);
-    // Limpiar save pendiente antes de la transición — mismo motivo que handleStateAction
-    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-    dirtyRef.current.clear();
+    // Flush de campos pendientes antes de convertir — mismo motivo que handleStateAction
+    if (dirtyRef.current.size > 0) flushDirty();
     try {
       await base44.entities.Pendiente.create({
         descripcion: data.title,
