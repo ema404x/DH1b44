@@ -67,19 +67,24 @@ export default function Fichar() {
       } catch { locationName = `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`; }
     }
 
-    await base44.entities.AttendanceLog.create({
-      employee_id: employee.id,
-      employee_name: employee.full_name,
-      type: nextType,
-      timestamp: now,
-      latitude: location?.lat || null,
-      longitude: location?.lng || null,
-      location_name: locationName,
-      device_info: deviceInfo,
-    });
+    try {
+      await base44.entities.AttendanceLog.create({
+        employee_id: employee.id,
+        employee_name: employee.full_name,
+        type: nextType,
+        timestamp: now,
+        latitude: location?.lat || null,
+        longitude: location?.lng || null,
+        location_name: locationName,
+        device_info: deviceInfo,
+      });
 
-    setDone({ type: nextType, timestamp: now, location: locationName });
-    setSubmitting(false);
+      setDone({ type: nextType, timestamp: now, location: locationName });
+    } catch (err) {
+      setError('No se pudo registrar el fichaje. Verificá tu conexión e intentá nuevamente.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) return (

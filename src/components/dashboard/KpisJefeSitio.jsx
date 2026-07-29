@@ -74,6 +74,8 @@ export default function KpisJefeSitio({ filterJefe = '', filterCutoff = null }) 
     filteredOrders.forEach(o => {
       const nombre = o.assigned_name;
       if (!nombre || !jefesSitio.has(nombre)) return;
+      // Inicializar si el jefe tiene OTs pero no pendientes (evita TypeError)
+      if (!jefesMap[nombre]) jefesMap[nombre] = { pendientes: [], orders: [] };
       jefesMap[nombre].orders.push(o);
     });
 

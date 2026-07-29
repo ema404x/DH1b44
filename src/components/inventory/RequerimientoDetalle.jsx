@@ -10,6 +10,7 @@ import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast } from 'sonner';
 import { AlertTriangle, CheckCircle2, Clock, ShoppingCart, Package, Send, MessageSquare, Loader2, FileText, ExternalLink } from 'lucide-react';
 
 const ESTADOS = [
@@ -62,12 +63,17 @@ export default function RequerimientoDetalle({ req, onClose, user }) {
       ...(ocNum && { numero_orden_compra: ocNum }),
       ...(proveedor && { proveedor_seleccionado: proveedor }),
     };
-    await base44.entities.RequerimientoCompra.update(req.id, updates);
-    queryClient.invalidateQueries({ queryKey: ['requerimientos'] });
-    setObservacion('');
-    setEsAlerta(false);
-    setSaving(false);
-    onClose();
+    try {
+      await base44.entities.RequerimientoCompra.update(req.id, updates);
+      queryClient.invalidateQueries({ queryKey: ['requerimientos'] });
+      setObservacion('');
+      setEsAlerta(false);
+      onClose();
+    } catch (err) {
+      toast.error('No se pudo guardar: ' + (err?.message || 'error de conexión'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!req) return null;

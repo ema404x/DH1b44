@@ -13,6 +13,7 @@ export function useEmergencyNotifications(user, onNewEmergency) {
   const permissionRef = useRef('default'); // se actualiza tras pedir permiso
   const flashIntervalRef = useRef(null);
   const audioCtxRef = useRef(null);
+  const originalTitleRef = useRef(null);
   const onNewEmergencyRef = useRef(onNewEmergency);
 
   // Mantener siempre el callback más reciente sin re-suscribirse
@@ -31,7 +32,8 @@ export function useEmergencyNotifications(user, onNewEmergency) {
   // Flash visual en el título de la pestaña (desktop)
   const flashTabTitle = useCallback((emergencyTitle) => {
     if (flashIntervalRef.current) clearInterval(flashIntervalRef.current);
-    const original = document.title;
+    if (originalTitleRef.current === null) originalTitleRef.current = document.title;
+    const original = originalTitleRef.current;
     let show = true;
     let count = 0;
     flashIntervalRef.current = setInterval(() => {
@@ -127,8 +129,8 @@ export function useEmergencyNotifications(user, onNewEmergency) {
       unsubscribe();
       if (flashIntervalRef.current) {
         clearInterval(flashIntervalRef.current);
-        // Restaurar título si se desmonta durante el flash
-        document.title = document.title.replace(/^🚨 EMERGENCIA: .+$/, document.title);
+        // Restaurar título original si se desmonta durante el flash
+        if (originalTitleRef.current !== null) document.title = originalTitleRef.current;
       }
       // Bug fix: close() retorna Promise — capturar para evitar unhandled rejection en cleanup
       if (audioCtxRef.current) {

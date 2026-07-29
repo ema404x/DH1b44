@@ -36,9 +36,15 @@ export default function EmergenciaCard({ emergencia, onUpdate, isAdmin }) {
   const handleDelete = async () => {
     if (!confirm('¿Estás seguro de que querés eliminar esta emergencia?')) return;
     setDeleting(true);
-    await base44.entities.Emergencia.delete(emergencia.id);
-    toast.success('Emergencia eliminada');
-    onUpdate?.();
+    try {
+      await base44.entities.Emergencia.delete(emergencia.id);
+      toast.success('Emergencia eliminada');
+      onUpdate?.();
+    } catch (err) {
+      toast.error('No se pudo eliminar: ' + (err?.message || 'error de permisos o conexión'));
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const tipo = TIPO_CONFIG[emergencia.tipo] || TIPO_CONFIG.otro;
@@ -46,30 +52,35 @@ export default function EmergenciaCard({ emergencia, onUpdate, isAdmin }) {
 
   const cambiarEstado = async (nuevoEstado) => {
     setSaving(true);
-    const updates = { estado: nuevoEstado };
-    if (nuevoEstado === 'resuelta') {
-      const ahora = new Date();
-      updates.fecha_resolucion = ahora.toISOString();
-      const created = new Date(emergencia.created_date);
-      const diffMin = Math.round((ahora.getTime() - created.getTime()) / 60000);
-      updates.tiempo_respuesta_min = Math.max(0, diffMin);
-    }
-    await base44.entities.Emergencia.update(emergencia.id, updates);
-    if (emergencia.work_order_id && nuevoEstado === 'resuelta') {
-      // Completar la OT asociada vía máquina de estados — preserva completed_date,
-      // fecha_validacion, validado_por y permisos. Si falla (ej: permisos), no bloquea
-      // la resolución de la emergencia.
-      try {
-        await base44.functions.invoke('transicionEstadoOT', {
-          ot_id: emergencia.work_order_id, accion: 'completar',
-        });
-      } catch (err) {
-        console.warn('No se pudo completar la OT asociada automáticamente:', err?.response?.data?.error || err?.message);
+    try {
+      const updates = { estado: nuevoEstado };
+      if (nuevoEstado === 'resuelta') {
+        const ahora = new Date();
+        updates.fecha_resolucion = ahora.toISOString();
+        const created = new Date(emergencia.created_date);
+        const diffMin = Math.round((ahora.getTime() - created.getTime()) / 60000);
+        updates.tiempo_respuesta_min = Math.max(0, diffMin);
       }
+      await base44.entities.Emergencia.update(emergencia.id, updates);
+      if (emergencia.work_order_id && nuevoEstado === 'resuelta') {
+        // Completar la OT asociada vía máquina de estados — preserva completed_date,
+        // fecha_validacion, validado_por y permisos. Si falla (ej: permisos), no bloquea
+        // la resolución de la emergencia.
+        try {
+          await base44.functions.invoke('transicionEstadoOT', {
+            ot_id: emergencia.work_order_id, accion: 'completar',
+          });
+        } catch (err) {
+          console.warn('No se pudo completar la OT asociada automáticamente:', err?.response?.data?.error || err?.message);
+        }
+      }
+      toast.success(`Emergencia marcada como ${nuevoEstado}`);
+      onUpdate?.();
+    } catch (err) {
+      toast.error('No se pudo actualizar: ' + (err?.message || 'error de permisos o conexión'));
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    toast.success(`Emergencia marcada como ${nuevoEstado}`);
-    onUpdate?.();
   };
 
   const tiempoTranscurrido = formatDistanceToNow(new Date(emergencia.created_date), { locale: es, addSuffix: true });

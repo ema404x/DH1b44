@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { motion } from 'framer-motion';
 import { Search, Plus, ShoppingCart, AlertTriangle, Clock, Package, Calendar } from 'lucide-react';
+import { toast } from 'sonner';
 import RequerimientoForm from './RequerimientoForm';
 import RequerimientoDetalle from './RequerimientoDetalle';
 import EmptyState from '@/components/shared/EmptyState';
@@ -67,15 +68,20 @@ export default function RequerimientosList({ user }) {
       observacion: 'Requerimiento creado y enviado al sector de compras',
       tiene_alerta: false,
     }];
-    await base44.entities.RequerimientoCompra.create({
-      ...data,
-      numero,
-      estado: 'enviado',
-      historial: historialInicial,
-    });
-    queryClient.invalidateQueries({ queryKey: ['requerimientos'] });
-    setSaving(false);
-    setFormOpen(false);
+    try {
+      await base44.entities.RequerimientoCompra.create({
+        ...data,
+        numero,
+        estado: 'enviado',
+        historial: historialInicial,
+      });
+      queryClient.invalidateQueries({ queryKey: ['requerimientos'] });
+      setFormOpen(false);
+    } catch (err) {
+      toast.error('No se pudo crear el requerimiento: ' + (err?.message || 'error de conexión'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const hasAlerta = (req) => req.historial?.slice(-1)[0]?.tiene_alerta;

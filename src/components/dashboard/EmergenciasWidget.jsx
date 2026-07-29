@@ -92,7 +92,7 @@ export default function EmergenciasWidget() {
                       )}
                       <span className="flex items-center gap-1">
                         <Clock className="h-2.5 w-2.5" />
-                        {formatDistanceToNow(new Date(e.created_date), { locale: es, addSuffix: true })}
+                        {e.created_date ? formatDistanceToNow(new Date(e.created_date), { locale: es, addSuffix: true }) : ''}
                       </span>
                     </div>
                   </div>

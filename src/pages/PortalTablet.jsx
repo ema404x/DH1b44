@@ -47,13 +47,18 @@ function PantallaActivacion({ onSuccess }) {
     if (!codigo.trim()) return;
     setChecking(true);
     setError('');
-    const res = await callFn({ action: 'activateTablet', codigo: codigo.trim() });
-    setChecking(false);
-    if (res?.valid && res.tablet) {
-      onSuccess(res.tablet);
-    } else {
-      setError('Código inválido. Verificá con tu supervisor.');
-      setCodigo('');
+    try {
+      const res = await callFn({ action: 'activateTablet', codigo: codigo.trim() });
+      if (res?.valid && res.tablet) {
+        onSuccess(res.tablet);
+      } else {
+        setError('Código inválido. Verificá con tu supervisor.');
+        setCodigo('');
+      }
+    } catch (err) {
+      setError('Error de conexión. Verificá tu red e intentá nuevamente.');
+    } finally {
+      setChecking(false);
     }
   };
 
