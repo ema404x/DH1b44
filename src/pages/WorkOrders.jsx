@@ -244,16 +244,16 @@ export default function WorkOrders() {
     const order = visibleOrders.find(o => o.id === id);
     if (!order || order.status === newStatus) return;
     const action = getTransitionAction(order.status, newStatus);
+    if (!action) {
+      toast.error('Esa transición de estado no está permitida');
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      return;
+    }
     try {
-      if (action) {
-        // Transición válida — usa la máquina de estados (preserva efectos secundarios)
-        const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: action });
-        toast.success(res.data.mensaje);
-      } else {
-        // Cambio libre — actualiza el estado directamente sin restricciones
-        await base44.entities.WorkOrder.update(id, { status: newStatus });
-        toast.success('Estado actualizado');
-      }
+      // Toda transición de estado pasa por la máquina (transicionEstadoOT) —
+      // preserva permisos, validaciones y efectos secundarios (GPS, fechas, validador).
+      const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: action });
+      toast.success(res.data.mensaje);
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Error al cambiar el estado';

@@ -63,17 +63,24 @@ export default function OTEjecucionModal({ ot, onClose, onSaved }) {
   const handleSave = async (newStatus) => {
     setSaving(newStatus || 'save');
     try {
-      const payload = { notes, checklist, materials_used: materialesUsados, materiales_faltantes: materialesFaltantes };
+      // 1. Guardar campos (notas, checklist, materiales) — update parcial, no toca status
+      await base44.entities.WorkOrder.update(ot.id, {
+        notes, checklist, materials_used: materialesUsados, materiales_faltantes: materialesFaltantes,
+      });
+
+      // 2. Si hay cambio de estado, rutear por la máquina (transicionEstadoOT) —
+      //    preserva fecha_inicio_real, GPS, validador y permisos.
       if (newStatus) {
-        payload.status = newStatus;
-        if (newStatus === 'completada') payload.completed_date = new Date().toISOString().split('T')[0];
-        if (newStatus === 'en_progreso' && !ot.scheduled_date) payload.scheduled_date = new Date().toISOString().split('T')[0];
+        const action = newStatus === 'en_progreso' ? 'iniciar' : 'finalizar';
+        const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: ot.id, accion: action });
+        toast.success(res.data?.mensaje || (action === 'iniciar' ? 'OT iniciada' : 'OT enviada a validación'));
+      } else {
+        toast.success('Cambios guardados');
       }
-      await base44.entities.WorkOrder.update(ot.id, payload);
-      toast.success(newStatus ? `OT ${newStatus === 'en_progreso' ? 'iniciada' : 'completada'}` : 'Cambios guardados');
       onSaved();
     } catch (err) {
-      toast.error('Error al guardar: ' + (err.message || 'intente nuevamente'));
+      const msg = err.response?.data?.error || err.message || 'intente nuevamente';
+      toast.error('Error al guardar: ' + msg);
     } finally {
       setSaving(null);
     }

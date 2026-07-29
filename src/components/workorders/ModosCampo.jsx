@@ -35,12 +35,21 @@ export default function ModoCampo({ currentUser, onOpenOrder }) {
     );
   });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, status }) => base44.entities.WorkOrder.update(id, { status }),
-    onSuccess: () => {
+  // Toda transición de estado pasa por la máquina (transicionEstadoOT) —
+  // preserva permisos, GPS, fecha_inicio_real, validador y efectos secundarios.
+  const transitionMutation = useMutation({
+    mutationFn: async ({ id, accion }) => {
+      const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion });
+      return res.data;
+    },
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['workorders-campo'] });
       qc.invalidateQueries({ queryKey: ['workorders'] });
-      toast.success('Estado actualizado');
+      toast.success(data?.mensaje || 'Estado actualizado');
+    },
+    onError: (err) => {
+      const msg = err.response?.data?.error || err.message || 'Error al cambiar el estado';
+      toast.error(msg);
     },
   });
 
@@ -124,7 +133,7 @@ export default function ModoCampo({ currentUser, onOpenOrder }) {
                       <div className="flex flex-col gap-1.5 flex-shrink-0">
                         {order.status === 'pendiente' && (
                           <Button size="sm" className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
-                            onClick={e => { e.stopPropagation(); updateMutation.mutate({ id: order.id, status: 'en_progreso' }); }}>
+                            onClick={e => { e.stopPropagation(); transitionMutation.mutate({ id: order.id, accion: 'iniciar' }); }}>
                             Iniciar
                           </Button>
                         )}
@@ -143,7 +152,9 @@ export default function ModoCampo({ currentUser, onOpenOrder }) {
                                 onOpenOrder(order);
                                 return;
                               }
-                              updateMutation.mutate({ id: order.id, status: 'completada' });
+                              // Finalizar envía a validación del jefe — el operario completa su parte,
+                              // la máquina de estados preserva fecha_inicio_real y materiales.
+                              transitionMutation.mutate({ id: order.id, accion: 'finalizar' });
                             }}>
                             Completar
                           </Button>

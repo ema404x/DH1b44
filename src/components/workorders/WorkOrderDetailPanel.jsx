@@ -19,7 +19,7 @@ import WorkOrderIncompleteReason from './WorkOrderIncompleteReason';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { exportWorkOrderPDF } from '@/utils/exportWorkOrderPDF';
 import LocationEditor from './LocationEditor';
-import { getAvailableActions, ACTION_VARIANTS } from '@/lib/workorder-transitions';
+import { getAvailableActions, getTransitionAction, ACTION_VARIANTS } from '@/lib/workorder-transitions';
 import { useResolveCreator } from '@/hooks/useResolveCreator';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -121,7 +121,10 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     staleTime: 0,
     refetchOnMount: 'always',
   });
-  useEffect(() => { if (freshOrder) setData({ ...freshOrder }); }, [freshOrder]);
+  // dirtyRef rastrea qué campos fueron modificados localmente y aún no persistieron.
+  // Al sincronizar con freshOrder (refetch), limpiamos el set porque el estado local
+  // coincide con el servidor — previene que un debounce posterior reenvíe campos ya actualizados.
+  useEffect(() => { if (freshOrder) { setData({ ...freshOrder }); dirtyRef.current.clear(); } }, [freshOrder]);
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
@@ -144,58 +147,90 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     },
   });
 
-  const set = useCallback((k, v) => setData(p => ({ ...p, [k]: v })), []);
   const saveTimerRef = useRef(null);
   const latestRef = useRef(data);
   const mountedRef = useRef(true);
+  // dirtyRef: set de nombres de campo modificados localmente que aún no se persistieron.
+  // El save debounced envía SOLO estos campos (no el objeto completo) — evita
+  // sobrescribir cambios concurrentes de la máquina de estados u otros usuarios.
+  const dirtyRef = useRef(new Set());
   useEffect(() => { latestRef.current = data; }, [data]);
-  // Cleanup: al desmontar, si hay un save pendiente (debounce), ejecutarlo inmediatamente
-  // en lugar de cancelarlo — previene pérdida de datos al cerrar el panel rápido.
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
-        // Fire-and-forget: envía el último estado al servidor antes de desmontar
-        saveMutationRef.current.mutate(latestRef.current);
-      }
-    };
-  }, []);
 
   // saveMutationRef evita closures stale en los debounced callbacks
   const saveMutationRef = useRef(saveMutation);
   useEffect(() => { saveMutationRef.current = saveMutation; }, [saveMutation]);
 
+  // flushDirty: envía solo los campos marcados como sucios y limpia el set.
+  // Es la única función que dispara el update — garantiza que nunca se envía
+  // el objeto completo con campos stale o de solo lectura.
+  const flushDirty = useCallback(() => {
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    if (dirtyRef.current.size === 0) return;
+    const patch = {};
+    dirtyRef.current.forEach(k => { patch[k] = latestRef.current[k]; });
+    dirtyRef.current.clear();
+    saveMutationRef.current.mutate(patch);
+  }, []);
+
+  // Cleanup: al desmontar, si hay campos sucios pendientes, flushearlos
+  // inmediatamente — previene pérdida de datos al cerrar el panel rápido.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (dirtyRef.current.size > 0) flushDirty();
+    };
+  }, []);
+
   const saveField = useCallback((k, v) => {
     setData(p => {
       const next = { ...p, [k]: v };
       latestRef.current = next;
+      dirtyRef.current.add(k);
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
-        if (mountedRef.current) saveMutationRef.current.mutate(latestRef.current);
+        if (mountedRef.current) flushDirty();
       }, 400);
       return next;
     });
-  }, []);
+  }, [flushDirty]);
 
   const saveFields = useCallback((fields) => {
     setData(p => {
       const next = { ...p, ...fields };
       latestRef.current = next;
+      Object.keys(fields).forEach(k => dirtyRef.current.add(k));
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
-        if (mountedRef.current) saveMutationRef.current.mutate(latestRef.current);
+        if (mountedRef.current) flushDirty();
       }, 400);
       return next;
     });
-  }, []);
+  }, [flushDirty]);
 
   const [stateActionLoading, setStateActionLoading] = useState(false);
 
+  // Rutea el cambio del dropdown de estado por la máquina de estados (transicionEstadoOT).
+  // Si no existe una transición válida, bloquea y avisa — NUNCA actualiza el status directo.
+  const handleStatusDropdownChange = (newStatus) => {
+    if (newStatus === data.status) return;
+    const action = getTransitionAction(data.status, newStatus);
+    if (!action) {
+      const fromLabel = STATUS_CFG[data.status]?.label || data.status;
+      const toLabel = STATUS_CFG[newStatus]?.label || newStatus;
+      toast.error(`Transición no válida: ${fromLabel} → ${toLabel}`);
+      return;
+    }
+    handleStateAction(action);
+  };
+
   const handleStateAction = async (accion) => {
     setStateActionLoading(true);
+    // Limpiar cualquier save debounced pendiente ANTES de la transición —
+    // la máquina de estados setea campos (completed_date, validado_por, fecha_inicio_real, etc.)
+    // que un debounce tardío sobrescribiría con valores stale.
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    dirtyRef.current.clear();
     try {
       const extraData = {};
       if (accion === 'asignar' && data.assigned_name) {
@@ -225,6 +260,9 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const handleConvertToObra = async () => {
     if (!window.confirm('¿Convertir esta OT a Futura Obra? Se creará un pendiente de tipo obra y la OT quedará en estado "Obra".')) return;
     setConvertingToObra(true);
+    // Limpiar save pendiente antes de la transición — mismo motivo que handleStateAction
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    dirtyRef.current.clear();
     try {
       await base44.entities.Pendiente.create({
         descripcion: data.title,
@@ -281,7 +319,15 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const save = () => {
     if (checklistBlocked) { toast.warning(`Faltan ${checklist.length - doneCount} tarea(s)`); return; }
     if (photosBlocked) { toast.warning('Falta foto obligatoria'); return; }
-    saveMutation.mutate(data);
+    // Computar todos los campos modificados comparando contra freshOrder (estado del servidor)
+    // y flushearlos en un solo update parcial — nunca envía el objeto completo.
+    const base = freshOrder || order;
+    const BUILT_IN = ['id', 'created_date', 'updated_date', 'created_by_id'];
+    Object.keys(data).forEach(k => {
+      if (BUILT_IN.includes(k)) return;
+      if (JSON.stringify(data[k]) !== JSON.stringify(base[k])) dirtyRef.current.add(k);
+    });
+    flushDirty();
   };
 
   return (
@@ -372,7 +418,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
           <div className="flex-shrink-0 grid grid-cols-3 gap-2 px-4 py-3 bg-slate-900/80 border-b border-white/6">
             <div>
               <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Estado</p>
-              <Select value={data.status} onValueChange={v => saveField('status', v)}>
+              <Select value={data.status} onValueChange={handleStatusDropdownChange}>
                 <SelectTrigger className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg">
                   <SelectValue />
                 </SelectTrigger>
@@ -534,7 +580,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                 className="w-full bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500/50 min-h-[90px]"
                 placeholder="Agregar observaciones..."
                 value={data.notes || ''}
-                onChange={e => set('notes', e.target.value)}
+                onChange={e => saveField('notes', e.target.value)}
               />
             </CollapseSection>
 

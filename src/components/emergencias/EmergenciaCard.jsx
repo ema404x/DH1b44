@@ -56,7 +56,16 @@ export default function EmergenciaCard({ emergencia, onUpdate, isAdmin }) {
     }
     await base44.entities.Emergencia.update(emergencia.id, updates);
     if (emergencia.work_order_id && nuevoEstado === 'resuelta') {
-      await base44.entities.WorkOrder.update(emergencia.work_order_id, { status: 'completada' });
+      // Completar la OT asociada vía máquina de estados — preserva completed_date,
+      // fecha_validacion, validado_por y permisos. Si falla (ej: permisos), no bloquea
+      // la resolución de la emergencia.
+      try {
+        await base44.functions.invoke('transicionEstadoOT', {
+          ot_id: emergencia.work_order_id, accion: 'completar',
+        });
+      } catch (err) {
+        console.warn('No se pudo completar la OT asociada automáticamente:', err?.response?.data?.error || err?.message);
+      }
     }
     setSaving(false);
     toast.success(`Emergencia marcada como ${nuevoEstado}`);

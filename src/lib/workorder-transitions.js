@@ -16,6 +16,7 @@ const DRAG_TRANSITIONS = {
 const FLEXIBLE_TARGETS = {
   'cancelada': 'cancelar',
   'obra': 'convertir_obra',
+  'completada': 'completar',
 };
 
 const TERMINAL_STATES = ['completada', 'cancelada', 'obra'];
