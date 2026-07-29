@@ -78,14 +78,19 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
       latitude: form.latitude ? parseFloat(form.latitude) : null,
       longitude: form.longitude ? parseFloat(form.longitude) : null,
     };
-    if (editing) {
-      await onUpdate(editing.id, payload);
-      toast.success('Ubicación actualizada');
-    } else {
-      await onCreate(payload);
+    try {
+      if (editing) {
+        await onUpdate(editing.id, payload);
+        toast.success('Ubicación actualizada');
+      } else {
+        await onCreate(payload);
+      }
+      setDialogOpen(false);
+    } catch (err) {
+      toast.error('No se pudo guardar la ubicación');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setDialogOpen(false);
   };
 
   const handleToggle = (loc, val) => onUpdate(loc.id, { is_active: val });

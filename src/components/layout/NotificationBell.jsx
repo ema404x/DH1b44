@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { isPast, parseISO, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const TYPE_CONFIG = {
   info:    { icon: Info,          bg: 'bg-blue-500/15',    icon_color: 'text-blue-400',    border: 'border-blue-500/30',    dot: 'bg-blue-400'    },
@@ -236,9 +237,12 @@ export default function NotificationBell() {
                 {notifications.some(n => !n.read) && (
                   <button
                     onClick={async () => {
-                      // Bug fix: no disparar N mutaciones en paralelo — serializar para evitar race conditions
                       const unread = notifications.filter(n => !n.read);
-                      await Promise.all(unread.map(n => base44.entities.Notification.update(n.id, { read: true })));
+                      try {
+                        await Promise.all(unread.map(n => base44.entities.Notification.update(n.id, { read: true })));
+                      } catch (err) {
+                        toast.error('No se pudieron marcar todas como leídas');
+                      }
                       qc.invalidateQueries({ queryKey: ['notifications'] });
                     }}
                     className="text-xs text-primary hover:text-primary/80 font-medium transition-colors flex items-center gap-1">

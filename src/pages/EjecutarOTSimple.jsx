@@ -105,20 +105,25 @@ export default function EjecutarOTSimple() {
   const handleCompletar = async () => {
     setSaving(true);
     setGpsStatus('capturando');
-    const gpsData = await capturar();
-    setGpsStatus(gpsData.gps_status);
-    await callFn({
-      action: 'updateWorkOrder',
-      workOrderId: otId,
-      updates: {
-        status: 'completada',
-        completed_date: new Date().toISOString().split('T')[0],
-        ...(photos.length > 0 && { photos }),
-        ...gpsData,
-      },
-    });
-    setPhase('done');
-    setSaving(false);
+    try {
+      const gpsData = await capturar();
+      setGpsStatus(gpsData.gps_status);
+      await callFn({
+        action: 'updateWorkOrder',
+        workOrderId: otId,
+        updates: {
+          status: 'completada',
+          completed_date: new Date().toISOString().split('T')[0],
+          ...(photos.length > 0 && { photos }),
+          ...gpsData,
+        },
+      });
+      setPhase('done');
+    } catch (err) {
+      setGpsStatus('no_disponible');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ── Loading ──

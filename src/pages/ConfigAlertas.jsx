@@ -71,14 +71,24 @@ function ConfigCard({ config, onSave, onDelete, onTest }) {
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave(form);
-    setSaving(false);
+    try {
+      await onSave(form);
+    } catch (err) {
+      toast.error('No se pudo guardar la configuración');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleTest = async () => {
     setTesting(true);
-    await onTest(form);
-    setTesting(false);
+    try {
+      await onTest(form);
+    } catch (err) {
+      toast.error('No se pudo enviar la notificación de prueba');
+    } finally {
+      setTesting(false);
+    }
   };
 
   return (

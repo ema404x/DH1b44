@@ -85,20 +85,25 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
   const handleCompletar = async () => {
     setSaving(true);
     setGpsStatus('capturando');
-    const gpsData = await capturar();
-    setGpsStatus(gpsData.gps_status);
-    const res = await callFn({
-      action: 'updateWorkOrder',
-      workOrderId: order.id,
-      updates: {
-        status: 'completada',
-        completed_date: new Date().toISOString().split('T')[0],
-        ...(photos.length > 0 && { photos: [...(order.photos || []), ...photos] }),
-        ...gpsData,
-      },
-    });
-    setSaving(false);
-    onCompleted({ ...order, status: 'completada', ...res.workOrder });
+    try {
+      const gpsData = await capturar();
+      setGpsStatus(gpsData.gps_status);
+      const res = await callFn({
+        action: 'updateWorkOrder',
+        workOrderId: order.id,
+        updates: {
+          status: 'completada',
+          completed_date: new Date().toISOString().split('T')[0],
+          ...(photos.length > 0 && { photos: [...(order.photos || []), ...photos] }),
+          ...gpsData,
+        },
+      });
+      onCompleted({ ...order, status: 'completada', ...res.workOrder });
+    } catch (err) {
+      setGpsStatus('no_disponible');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const pr = PRIORITY_STYLE[order.priority] || PRIORITY_STYLE.media;

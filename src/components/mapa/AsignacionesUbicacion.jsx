@@ -53,10 +53,15 @@ export default function AsignacionesUbicacion({ locations, employees, logs, onUp
 
   const saveAssignments = async () => {
     setSaving(true);
-    await onUpdate(selectedLoc.id, { assigned_employees: tempAssigned });
-    setSaving(false);
-    setDialogOpen(false);
-    toast.success('Asignaciones guardadas');
+    try {
+      await onUpdate(selectedLoc.id, { assigned_employees: tempAssigned });
+      setDialogOpen(false);
+      toast.success('Asignaciones guardadas');
+    } catch (err) {
+      toast.error('No se pudieron guardar las asignaciones');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const allEmployeeNames = useMemo(() =>
