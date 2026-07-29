@@ -14,7 +14,7 @@ export default function MetricasOperacion({ orders, projects, materials, assets,
   const completadas = orders.filter(o => o.status === 'completada').length;
   const eficiencia = totalOrders > 0 ? Math.round((completadas / totalOrders) * 100) : 0;
   const urgentes = orders.filter(o => ['urgente', 'alta'].includes(o.priority) && !['completada', 'cancelada'].includes(o.status)).length;
-  const vencidas = orders.filter(o => o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada', 'cancelada'].includes(o.status)).length;
+  const vencidas = orders.filter(o => { try { return o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada', 'cancelada'].includes(o.status); } catch { return false; } }).length;
   const activosOk = assets.filter(a => a.status === 'operativo').length;
   const totalAssets = assets.length;
   const stockOk = materials.filter(m => m.stock > m.min_stock || m.min_stock === 0).length;

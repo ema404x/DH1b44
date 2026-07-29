@@ -191,6 +191,14 @@ export default function Dashboard() {
     filterByUser(allOrders, ['assigned_name', 'assigned_to', 'jefe_sitio', 'jefe_sitio_email'])
   , [allOrders, filterByUser]);
 
+  // KPIs de pendientes memoizados (evita recalcular 4 filters por render)
+  const pendientesKpis = useMemo(() => {
+    const activos = pendientes.filter(p => ['pendiente', 'asignado', 'en_progreso'].includes(p.estado));
+    const resueltos = pendientes.filter(p => p.estado === 'resuelto');
+    const urgentes = pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto');
+    return { activos: activos.length, resueltos: resueltos.length, urgentes: urgentes.length };
+  }, [pendientes]);
+
   // Fecha de corte según el rango seleccionado
   const filterCutoff = useMemo(() => {
     if (dashFilters.dateRange === '7d')  return subDays(new Date(), 7);
@@ -254,8 +262,9 @@ export default function Dashboard() {
     const lowStockItems  = materials.filter(m => m.stock <= m.min_stock && m.min_stock > 0);
     const overdueAssets  = assets.filter(a => { try { return a.next_maintenance && isPast(parseISO(a.next_maintenance)); } catch { return false; } });
     const completedThisMonth = orders.filter(o => o.completed_date && parseISO(o.completed_date) >= thisMonth && o.status === 'completada').length;
-    const efficiency     = orders.length > 0 ? Math.round((orders.filter(o => o.status === 'completada').length / orders.length) * 100) : 0;
-    const urgentOrders   = orders.filter(o => ['pendiente', 'asignada', 'en_progreso'].includes(o.status) && ['urgente', 'alta'].includes(o.priority));
+    const validOrders     = orders.filter(o => o.status !== 'cancelada');
+    const efficiency     = validOrders.length > 0 ? Math.round((orders.filter(o => o.status === 'completada').length / validOrders.length) * 100) : 0;
+    const urgentOrders   = orders.filter(o => ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'].includes(o.status) && ['urgente', 'alta'].includes(o.priority));
     const recentProjects = filteredProjects.filter(p => p.status === 'en_progreso').slice(0, 5);
     const hasAlerts      = overdueOrders > 0 || lowStockItems.length > 0 || overdueAssets.length > 0;
 
@@ -368,7 +377,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={metrics.activeClients}            subtitle={`${clients.length} en total`}                        icon={Users}         color="primary" />}
           {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={metrics.urgentOrders.length}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={metrics.urgentOrders.length > 0 ? 'red' : 'green'} />}
-          {canRead('Asset')     && <KpiCard href="/activos"    title="Pendientes SAP"  value={pendientes.filter(p => ['pendiente','asignado','en_progreso'].includes(p.estado)).length} subtitle={`${pendientes.filter(p => p.estado === 'resuelto').length} resueltos`} icon={Wrench} color="amber" alert={pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto').length > 0 ? pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto').length : undefined} />}
+          {canRead('Asset')     && <KpiCard href="/activos"    title="Pendientes SAP"  value={pendientesKpis.activos} subtitle={`${pendientesKpis.resueltos} resueltos`} icon={Wrench} color="amber" alert={pendientesKpis.urgentes > 0 ? pendientesKpis.urgentes : undefined} />}
           {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={materials.length}                  subtitle={`${metrics.lowStockItems.length} bajo mínimo`}      icon={Package}       color={metrics.lowStockItems.length > 0 ? 'red' : 'green'} />}
         </div>
       </div>

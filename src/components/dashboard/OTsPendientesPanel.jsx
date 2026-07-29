@@ -48,7 +48,7 @@ export default function OTsPendientesPanel({ orders }) {
           <div className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4 text-amber-500" />
             <CardTitle className="text-sm font-semibold">Órdenes de Trabajo</CardTitle>
-            <span className="h-5 px-1.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold flex items-center">
+            <span className="h-5 px-1.5 rounded-full bg-amber-500/15 text-amber-400 text-[10px] font-bold flex items-center">
               {active.length} activas
             </span>
           </div>

@@ -77,7 +77,7 @@ export default function CertificadosPanel({ filterCutoff = null }) {
           <div className="flex items-center gap-2">
             <FileCheck className="h-4 w-4 text-emerald-500" />
             <CardTitle className="text-sm font-semibold">Certificados este Mes</CardTitle>
-            <span className="h-5 px-1.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center">
+            <span className="h-5 px-1.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold flex items-center">
               {thisMonthCerts.length}
             </span>
           </div>

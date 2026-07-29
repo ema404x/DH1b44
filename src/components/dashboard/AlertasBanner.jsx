@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 const TIPO_CONFIG = {
   garantia_activo:   { icon: ShieldAlert, color: 'text-purple-400', glow: 'shadow-purple-500/20', bg: 'bg-purple-500/10', border: 'border-purple-500/30', label: 'Garantía', href: '/activos' },
@@ -53,6 +54,7 @@ export default function AlertasBanner() {
   const marcarLeida = useMutation({
     mutationFn: (id) => base44.entities.AlertaLog.update(id, { leida: true }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alertas-activas'] }),
+    onError: () => toast.error('No se pudo marcar la alerta'),
   });
 
   const marcarTodasLeidas = useMutation({
@@ -61,7 +63,8 @@ export default function AlertasBanner() {
       const todas = await base44.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 500);
       await Promise.all(todas.map(a => base44.entities.AlertaLog.update(a.id, { leida: true })));
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['alertas-activas'] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['alertas-activas'] }); toast.success('Alertas marcadas como leídas'); },
+    onError: () => toast.error('No se pudieron marcar las alertas'),
   });
 
   if (alertas.length === 0) return null;
@@ -159,7 +162,7 @@ export default function AlertasBanner() {
               <div className="flex items-center gap-1 flex-shrink-0">
                 {alerta.fecha_alerta && (
                   <span className="text-[10px] text-muted-foreground/60 hidden sm:block">
-                    {formatDistanceToNow(parseISO(alerta.fecha_alerta), { addSuffix: true, locale: es })}
+                    {(() => { try { return formatDistanceToNow(parseISO(alerta.fecha_alerta), { addSuffix: true, locale: es }); } catch { return ''; } })()}
                   </span>
                 )}
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
