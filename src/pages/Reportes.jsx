@@ -64,6 +64,18 @@ export default function Reportes() {
   const [resumenSemanal, setResumenSemanal] = useState(null);
   const [loadingResumen, setLoadingResumen] = useState(false);
   const [resumenFecha, setResumenFecha] = useState(null);
+  const [exportingPDF, setExportingPDF] = useState(false);
+
+  const handleExportPDF = async () => {
+    setExportingPDF(true);
+    try {
+      await exportKPIsPDF({ orders: filteredOrders, timeLogs: filteredTimeLogs, materials, assets: [], dateFrom, dateTo });
+    } catch (e) {
+      console.error('Error exportando PDF:', e);
+    } finally {
+      setExportingPDF(false);
+    }
+  };
 
   const fetchResumenSemanal = async () => {
     setLoadingResumen(true);
@@ -115,24 +127,64 @@ export default function Reportes() {
     return map;
   }, [locations]);
 
-  // Filter data
-  const filteredOrders = useMemo(() => {
+  // Rango de fechas con "hasta" ajustado a fin del día (incluye registros de hoy)
+  const dateRange = useMemo(() => {
     const from = new Date(dateFrom);
     const to = new Date(dateTo);
+    to.setHours(23, 59, 59, 999);
+    return { from, to };
+  }, [dateFrom, dateTo]);
+
+  // Resuelve comuna de una OT: lookup en LocationData o campo directo en la OT
+  const resolveComuna = (o) => {
+    const loc = locationLookup[o.location_qr_name] || locationLookup[o.location] || {};
+    return loc.comuna || o.comuna || null;
+  };
+  // Resuelve jefe de sitio: lookup en LocationData o campo directo en la OT
+  const resolveJefe = (o) => {
+    const loc = locationLookup[o.location_qr_name] || locationLookup[o.location] || {};
+    return loc.jefe_sitio || o.jefe_sitio || null;
+  };
+
+  // Filter data — OTs
+  const filteredOrders = useMemo(() => {
+    const { from, to } = dateRange;
     return orders.filter(o => {
       const date = o.created_date ? new Date(o.created_date) : null;
       const inRange = !date || (date >= from && date <= to);
       const inProject = projectFilter === 'all' || o.project_name === projectFilter;
       const matchTecnico = tecnicoFilter === 'all' || o.assigned_name === tecnicoFilter;
-
-      // Jefe: buscamos en la ubicación de la orden
-      const loc = locationLookup[o.location_qr_name] || locationLookup[o.location] || {};
-      const matchJefe = jefeFilter === 'all' || loc.jefe_sitio === jefeFilter;
-      const matchComuna = comunaFilter === 'all' || loc.comuna === comunaFilter;
+      const matchJefe = jefeFilter === 'all' || resolveJefe(o) === jefeFilter;
+      const matchComuna = comunaFilter === 'all' || resolveComuna(o) === comunaFilter;
 
       return inRange && inProject && matchComuna && matchJefe && matchTecnico;
     });
-  }, [orders, dateFrom, dateTo, projectFilter, comunaFilter, jefeFilter, tecnicoFilter, locationLookup]);
+  }, [orders, dateRange, projectFilter, comunaFilter, jefeFilter, tecnicoFilter, locationLookup]);
+
+  // Filter data — Pendientes (mismos criterios que OTs, usando campos directos)
+  const filteredPendientes = useMemo(() => {
+    const { from, to } = dateRange;
+    return pendientes.filter(p => {
+      const date = p.created_date ? new Date(p.created_date) : null;
+      const inRange = !date || (date >= from && date <= to);
+      const matchComuna = comunaFilter === 'all' || p.comuna === comunaFilter;
+      const matchJefe = jefeFilter === 'all' || p.jefe_sitio === jefeFilter;
+      // Pendientes no tienen project_name directo; si hay filtro de proyecto, descartar
+      const matchProject = projectFilter === 'all' || (p.proyecto_nombre && p.proyecto_nombre === projectFilter);
+      return inRange && matchComuna && matchJefe && matchProject;
+    });
+  }, [pendientes, dateRange, comunaFilter, jefeFilter, projectFilter]);
+
+  // Filter data — TimeLogs (respeta rango de fechas y técnico seleccionado)
+  const filteredTimeLogs = useMemo(() => {
+    const { from, to } = dateRange;
+    return timeLogs.filter(l => {
+      const date = l.created_date ? new Date(l.created_date) : null;
+      const inRange = !date || (date >= from && date <= to);
+      const matchTecnico = tecnicoFilter === 'all' || (l.employee_name || l.user_name) === tecnicoFilter;
+      return inRange && matchTecnico;
+    });
+  }, [timeLogs, dateRange, tecnicoFilter]);
 
   // Gráficos por mes
   const months = eachMonthOfInterval({ start: new Date(dateFrom), end: new Date(dateTo) });
@@ -147,7 +199,7 @@ export default function Reportes() {
       mes: format(month, 'MMM yy', { locale: es }),
       total: monthOrders.length,
       completadas: monthOrders.filter(o => o.status === 'completada').length,
-      pendientes: monthOrders.filter(o => ['pendiente', 'asignada'].includes(o.status)).length,
+      pendientes: monthOrders.filter(o => !['completada', 'cancelada'].includes(o.status)).length,
       en_progreso: monthOrders.filter(o => o.status === 'en_progreso').length,
     };
   });
@@ -192,37 +244,71 @@ export default function Reportes() {
     .sort((a, b) => b.costo - a.costo)
     .slice(0, 6);
 
-  // KPIs Pendientes
-  const pendientesActivos = pendientes.filter(p => !['resuelto', 'cancelado'].includes(p.estado));
-  const pendientesResueltos = pendientes.filter(p => p.estado === 'resuelto');
-  const tasaResolucionPend = pendientes.length > 0 ? Math.round((pendientesResueltos.length / pendientes.length) * 100) : 0;
+  // KPIs Pendientes (respeta filtros globales)
+  const pendientesActivos = filteredPendientes.filter(p => !['resuelto', 'cancelado'].includes(p.estado));
+  const pendientesResueltos = filteredPendientes.filter(p => p.estado === 'resuelto');
+  const tasaResolucionPend = filteredPendientes.length > 0 ? Math.round((pendientesResueltos.length / filteredPendientes.length) * 100) : 0;
 
   // Vencidos: fecha_limite pasada y no resuelto
   const hoy = new Date();
   const pendientesVencidos = pendientesActivos.filter(p => p.fecha_limite && new Date(p.fecha_limite) < hoy);
 
+  // MTTR — Tiempo medio de resolución (días) para pendientes resueltos en el período
+  const mttrPendientes = useMemo(() => {
+    const tiempos = pendientesResueltos
+      .map(p => {
+        try {
+          if (!p.fecha_resolucion || !p.fecha_asignacion) return null;
+          const dias = (new Date(p.fecha_resolucion) - new Date(p.fecha_asignacion)) / (1000 * 60 * 60 * 24);
+          return dias >= 0 ? dias : null;
+        } catch { return null; }
+      })
+      .filter(d => d !== null);
+    return tiempos.length > 0 ? Math.round((tiempos.reduce((a, b) => a + b, 0) / tiempos.length) * 10) / 10 : null;
+  }, [pendientesResueltos]);
+
+  // Aging — Distribución de pendientes activos por antigüedad (días desde creación)
+  const agingPendientes = useMemo(() => {
+    const buckets = { '0-7d': 0, '8-30d': 0, '31-60d': 0, '>60d': 0 };
+    pendientesActivos.forEach(p => {
+      try {
+        const dias = Math.floor((hoy - new Date(p.created_date)) / (1000 * 60 * 60 * 24));
+        if (dias <= 7) buckets['0-7d']++;
+        else if (dias <= 30) buckets['8-30d']++;
+        else if (dias <= 60) buckets['31-60d']++;
+        else buckets['>60d']++;
+      } catch {}
+    });
+    return Object.entries(buckets).map(([rango, count]) => ({ rango, count }));
+  }, [pendientesActivos, hoy]);
+
+  // Backlog ratio — pendientes activos vs resueltos en el período
+  const backlogRatio = pendientesResueltos.length > 0
+    ? Math.round((pendientesActivos.length / pendientesResueltos.length) * 10) / 10
+    : null;
+
   // Pendientes por estado
   const pendientesPorEstado = ['pendiente', 'asignado', 'en_progreso', 'resuelto', 'cancelado'].map(estado => ({
     name: { pendiente: 'Pendiente', asignado: 'Asignado', en_progreso: 'En Progreso', resuelto: 'Resuelto', cancelado: 'Cancelado' }[estado],
-    value: pendientes.filter(p => p.estado === estado).length,
+    value: filteredPendientes.filter(p => p.estado === estado).length,
   })).filter(d => d.value > 0);
 
   // Pendientes por tipo
   const pendientesPorTipo = ['mantenimiento', 'obra', 'inspeccion', 'emergencia'].map(tipo => ({
     name: { mantenimiento: 'Mantenimiento', obra: 'Obra', inspeccion: 'Inspección', emergencia: 'Emergencia' }[tipo],
-    value: pendientes.filter(p => p.tipo === tipo).length,
+    value: filteredPendientes.filter(p => p.tipo === tipo).length,
   })).filter(d => d.value > 0);
 
   // Pendientes por prioridad
   const pendientesPorPrioridad = ['urgente', 'alta', 'media', 'baja'].map(p => ({
     name: { urgente: 'Urgente', alta: 'Alta', media: 'Media', baja: 'Baja' }[p],
-    total: pendientes.filter(x => x.prioridad === p).length,
-    resueltos: pendientes.filter(x => x.prioridad === p && x.estado === 'resuelto').length,
+    total: filteredPendientes.filter(x => x.prioridad === p).length,
+    resueltos: filteredPendientes.filter(x => x.prioridad === p && x.estado === 'resuelto').length,
   })).filter(d => d.total > 0).map(d => ({ ...d, eficiencia: Math.round((d.resueltos / d.total) * 100) }));
 
-  // Pendientes por jefe de sitio
+  // Pendientes por jefe de sitio (nombre completo, sin truncar)
   const pendientesPorJefe = Object.entries(
-    pendientes.reduce((acc, p) => {
+    filteredPendientes.reduce((acc, p) => {
       const j = p.jefe_sitio || 'Sin asignar';
       if (!acc[j]) acc[j] = { total: 0, resueltos: 0, vencidos: 0 };
       acc[j].total++;
@@ -231,7 +317,7 @@ export default function Reportes() {
       return acc;
     }, {})
   ).map(([jefe, data]) => ({
-    jefe: jefe.split(' ').slice(0, 2).join(' '),
+    jefe,
     ...data,
     eficiencia: data.total > 0 ? Math.round((data.resueltos / data.total) * 100) : 0,
   })).sort((a, b) => b.total - a.total).slice(0, 8);
@@ -239,15 +325,18 @@ export default function Reportes() {
   // Pendientes por comuna
   const pendientesPorComuna = ['8A', '8B', '10A'].map(c => ({
     comuna: c,
-    total: pendientes.filter(p => p.comuna === c).length,
-    resueltos: pendientes.filter(p => p.comuna === c && p.estado === 'resuelto').length,
-    activos: pendientes.filter(p => p.comuna === c && !['resuelto','cancelado'].includes(p.estado)).length,
+    total: filteredPendientes.filter(p => p.comuna === c).length,
+    resueltos: filteredPendientes.filter(p => p.comuna === c && p.estado === 'resuelto').length,
+    activos: filteredPendientes.filter(p => p.comuna === c && !['resuelto','cancelado'].includes(p.estado)).length,
   })).filter(d => d.total > 0);
 
-  // KPIs
+  // KPIs — Eficiencia excluye OTs canceladas (no contabilizan contra cumplimiento)
   const completadas = filteredOrders.filter(o => o.status === 'completada').length;
-  const eficiencia = filteredOrders.length > 0 ? Math.round((completadas / filteredOrders.length) * 100) : 0;
-  const horasPromedio = timeLogs.length > 0 ? Math.round(timeLogs.reduce((s, l) => s + (l.hours || 0), 0) / timeLogs.length * 10) / 10 : 0;
+  const canceladas = filteredOrders.filter(o => o.status === 'cancelada').length;
+  const otsValidas = filteredOrders.length - canceladas;
+  const eficiencia = otsValidas > 0 ? Math.round((completadas / otsValidas) * 100) : 0;
+  // Horas promedio respeta filtros (período + técnico)
+  const horasPromedio = filteredTimeLogs.length > 0 ? Math.round(filteredTimeLogs.reduce((s, l) => s + (l.hours || 0), 0) / filteredTimeLogs.length * 10) / 10 : 0;
   const costoMaterialTotal = filteredOrders.reduce((s, o) => s + (o.materials_used || []).reduce((ms, m) => ms + (m.quantity * m.unit_cost || 0), 0), 0);
 
   const container = {
@@ -280,6 +369,10 @@ export default function Reportes() {
             </h1>
             <p className="text-slate-400 mt-1">Análisis integral de proyectos, operaciones e inventario</p>
           </div>
+          <Button onClick={handleExportPDF} disabled={exportingPDF} className="gap-2 bg-teal-600 hover:bg-teal-500">
+            {exportingPDF ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exportingPDF ? 'Generando...' : 'Exportar PDF'}
+          </Button>
         </div>
       </motion.div>
 
@@ -577,7 +670,7 @@ export default function Reportes() {
             {/* KPIs Pendientes */}
             <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <motion.div variants={item}>
-                <KpiMetric title="Total Pendientes" value={pendientes.length} subtitle={`${pendientesActivos.length} activos`} icon={ClipboardList} color="blue" />
+                <KpiMetric title="Total Pendientes" value={filteredPendientes.length} subtitle={`${pendientesActivos.length} activos`} icon={ClipboardList} color="blue" />
               </motion.div>
               <motion.div variants={item}>
                 <KpiMetric title="Tasa Resolución" value={`${tasaResolucionPend}%`} subtitle={`${pendientesResueltos.length} resueltos`} icon={CheckCircle2} color="green" />
@@ -586,7 +679,40 @@ export default function Reportes() {
                 <KpiMetric title="Vencidos" value={pendientesVencidos.length} subtitle="Fecha límite superada" icon={AlertTriangle} color="red" />
               </motion.div>
               <motion.div variants={item}>
-                <KpiMetric title="Sin Asignar" value={pendientes.filter(p => !p.jefe_sitio && !['resuelto','cancelado'].includes(p.estado)).length} subtitle="Requieren atención" icon={Target} color="amber" />
+                <KpiMetric title="Sin Asignar" value={filteredPendientes.filter(p => !p.jefe_sitio && !['resuelto','cancelado'].includes(p.estado)).length} subtitle="Requieren atención" icon={Target} color="amber" />
+              </motion.div>
+            </motion.div>
+
+            {/* Métricas profesionales: MTTR, Aging, Backlog */}
+            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <motion.div variants={item}>
+                <KpiMetric title="MTTR (días)" value={mttrPendientes !== null ? `${mttrPendientes}d` : '—'} subtitle="Tiempo medio de resolución" icon={Clock} color="purple" />
+              </motion.div>
+              <motion.div variants={item}>
+                <KpiMetric title="Backlog Ratio" value={backlogRatio !== null ? `${backlogRatio}x` : '—'} subtitle="Activos / resueltos período" icon={Activity} color="blue" />
+              </motion.div>
+              <motion.div variants={item} className="col-span-2 lg:col-span-1">
+                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg border-slate-700/50">
+                  <CardContent className="pt-5 pb-5">
+                    <div className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">Aging de Pendientes Activos</div>
+                    <div className="space-y-2">
+                      {agingPendientes.map(a => {
+                        const maxCount = Math.max(...agingPendientes.map(x => x.count), 1);
+                        const pct = (a.count / maxCount) * 100;
+                        const color = a.rango === '0-7d' ? 'bg-emerald-500' : a.rango === '8-30d' ? 'bg-amber-500' : a.rango === '31-60d' ? 'bg-orange-500' : 'bg-red-500';
+                        return (
+                          <div key={a.rango} className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-400 w-12 flex-shrink-0">{a.rango}</span>
+                            <div className="flex-1 bg-slate-700/50 rounded-full h-3 overflow-hidden">
+                              <div className={`h-3 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-xs text-white font-bold w-6 text-right tabular-nums">{a.count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
               </motion.div>
             </motion.div>
 

@@ -5,25 +5,33 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
 
     const isScheduled = req.headers.get('x-automation-trigger') === 'scheduled';
+    let sectorFilter: string | null = null;
     if (!isScheduled) {
       const user = await base44.auth.me();
       if (!user || user.role !== 'admin') {
         return Response.json({ error: 'Forbidden' }, { status: 403 });
       }
+      // Aislar datos por sector del admin (multi-tenant)
+      sectorFilter = (user as any).data?.sector_id || null;
     }
 
     const sb = base44.asServiceRole;
     const ahora = new Date();
     const hace7dias = new Date(ahora); hace7dias.setDate(ahora.getDate() - 7);
 
-    // Traer datos
-    const [pendientes, ots, emergencias, users, usageLogs] = await Promise.all([
+    // Traer datos (filtrados por sector en triggers manuales)
+    const sectorMatch = (e: any) => !sectorFilter || !e.sector_id || e.sector_id === sectorFilter;
+    const [allPendientes, allOts, allEmergencias, users, allUsageLogs] = await Promise.all([
       sb.entities.Pendiente.list('-created_date', 500),
       sb.entities.WorkOrder.list('-created_date', 500),
       sb.entities.Emergencia.list('-created_date', 50),
       sb.entities.User.list(),
       sb.entities.AppUsageLog.list('-created_date', 500),
     ]);
+    const pendientes = allPendientes.filter(sectorMatch);
+    const ots = allOts.filter(sectorMatch);
+    const emergencias = allEmergencias.filter(sectorMatch);
+    const usageLogs = allUsageLogs.filter(sectorMatch);
 
     // ── Tiempo de uso de la app por usuario (últimos 7 días) ────────────────
     const usoMap = {};
@@ -56,8 +64,11 @@ Deno.serve(async (req) => {
       emergenciasActivas: emergencias.filter(e => e.estado === 'activa' || e.estado === 'en_atencion').length,
     };
 
-    // Enviar email a admins con RESEND_API_KEY
-    const adminEmails = users.filter(u => u.role === 'admin' && u.email).map(u => u.email);
+    // Enviar email a admins con RESEND_API_KEY (filtrados por sector en triggers manuales)
+    const adminEmails = users
+      .filter(u => u.role === 'admin' && u.email)
+      .filter(u => !sectorFilter || !(u as any).data?.sector_id || (u as any).data.sector_id === sectorFilter)
+      .map(u => u.email);
     
     let emailsEnviados = 0;
     const apiKey = Deno.env.get('RESEND_API_KEY');
