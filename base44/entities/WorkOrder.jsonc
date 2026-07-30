@@ -278,14 +278,28 @@
           "data.jefe_sitio_email": "{{user.email}}"
         },
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            }
+          ]
         },
         {
-          "user_condition": {
-            "role": "gerente"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            }
+          ]
         }
       ]
     },
@@ -298,21 +312,42 @@
           "data.jefe_sitio_email": "{{user.email}}"
         },
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            }
+          ]
         },
         {
-          "user_condition": {
-            "role": "gerente"
-          }
+          "$and": [
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            }
+          ]
         }
       ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     }
   }
 }
