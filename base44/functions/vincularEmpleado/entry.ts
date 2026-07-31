@@ -16,6 +16,10 @@ Deno.serve(async (req) => {
     //    Definición centralizada en shared/roles.ts — shouldSyncToGerente().
     async function syncPlatformRole(userId, employeeRole, currentPlatformRole) {
       const shouldBe = shouldSyncToGerente(employeeRole) ? 'gerente' : 'user';
+      if (shouldBe !== 'gerente' && shouldBe !== 'user') {
+        console.error(`[vincularEmpleado] shouldBe inesperado: ${shouldBe} — abort sync`);
+        return;
+      }
       if (currentPlatformRole === 'admin') return;
       if (currentPlatformRole === shouldBe) return;
       try {
