@@ -131,9 +131,6 @@
     "update": {
       "$or": [
         {
-          "data.user_id": "{{user.id}}"
-        },
-        {
           "$and": [
             {
               "data.sector_id": "{{user.data.sector_id}}"
