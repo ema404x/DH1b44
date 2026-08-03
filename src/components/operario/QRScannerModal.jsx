@@ -82,12 +82,17 @@ export default function QRScannerModal({ open, onClose, onResult }) {
   };
 
   const cleanup = () => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().catch(() => {});
-      scannerRef.current.clear().catch(() => {});
+    try {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current.clear().catch(() => {});
+      }
+    } catch {
+      // ignore — solo nos importa cerrar
+    } finally {
       scannerRef.current = null;
+      onClose();
     }
-    onClose();
   };
 
   if (!open) return null;
