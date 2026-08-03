@@ -141,12 +141,19 @@ Deno.serve(async (req) => {
     const mesLabel = `${MESES_ES[targetM - 1]} ${targetY}`;
 
     // ── Obtener abonos a procesar ───────────────────────────────────────────
+    // Al regenerar, incluir también abonos completados cuya vigencia cubre
+    // el mes objetivo (pueden haberse completado en una generación previa
+    // del mismo mes y quedar excluidos si solo se busca estado: 'activo').
     let abonos;
     if (abono_id) {
       const a = await base44.asServiceRole.entities.AbonoMaestro.get(abono_id);
       abonos = a ? [a] : [];
     } else {
       abonos = await base44.asServiceRole.entities.AbonoMaestro.filter({ estado: 'activo' });
+      if (regenerar) {
+        const completados = await base44.asServiceRole.entities.AbonoMaestro.filter({ estado: 'completado' });
+        abonos = [...abonos, ...completados];
+      }
     }
 
     if (comunas.length > 0) {
