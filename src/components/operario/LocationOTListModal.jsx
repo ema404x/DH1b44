@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, X, Play, Flag, Lock, CheckCircle2, ClipboardList } from 'lucide-react';
+import { MapPin, X, Play, Flag, Lock, CheckCircle2, ClipboardList, Loader2 } from 'lucide-react';
 
 const TYPE_LABEL = {
   mantenimiento_preventivo: 'Mant. Preventivo',
@@ -19,11 +19,12 @@ const STATUS_BADGE = {
   cancelada:   { label: 'Cancelada',   cls: 'bg-red-400/10 text-red-400 border-red-400/20' },
 };
 
-export default function LocationOTListModal({ open, onClose, orders, locationName, onSelect }) {
+export default function LocationOTListModal({ open, onClose, orders, locationName, onSelect, loading }) {
   if (!open) return null;
 
-  const activas = orders.filter(o => !['completada', 'cancelada'].includes(o.status));
-  const completadas = orders.filter(o => o.status === 'completada');
+  const safeOrders = orders || [];
+  const activas = safeOrders.filter(o => !['completada', 'cancelada'].includes(o.status));
+  const completadas = safeOrders.filter(o => o.status === 'completada');
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -45,7 +46,13 @@ export default function LocationOTListModal({ open, onClose, orders, locationNam
 
         {/* Lista scrolleable */}
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
-          {orders.length === 0 && (
+          {loading && (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-7 w-7 animate-spin text-primary" />
+            </div>
+          )}
+
+          {!loading && safeOrders.length === 0 && (
             <div className="text-center py-10">
               <ClipboardList className="h-12 w-12 text-slate-700 mx-auto mb-2" />
               <p className="text-sm text-slate-500">No hay OTs en esta ubicación</p>
