@@ -7,6 +7,7 @@ import { Loader2, ClipboardList, MapPin, Play, Flag, Lock, Clock, CheckCircle2, 
 import { toast } from 'sonner';
 import ReporteForm from '@/components/operario/ReporteForm';
 import QRScannerModal from '@/components/operario/QRScannerModal';
+import LocationOTListModal from '@/components/operario/LocationOTListModal';
 
 export default function PortalOperarioApp() {
   const { currentUser, displayName, employeeName } = useCurrentUser();
@@ -14,6 +15,7 @@ export default function PortalOperarioApp() {
   const [processing, setProcessing] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // { ot, accion }
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [locOTs, setLocOTs] = useState(null); // { orders, name } cuando se escanea un QR de ubicación
   const { capturar } = useGeolocalizacion();
   const queryClient = useQueryClient();
 
@@ -111,24 +113,35 @@ export default function PortalOperarioApp() {
 
   const handleQRScan = (result) => {
     setScannerOpen(false);
-    let foundOT = null;
     if (result.type === 'ot') {
-      foundOT = allOTs.find(o => o.id === result.value);
-    } else if (result.type === 'loc') {
-      foundOT = allOTs.find(o => o.location_qr_id === result.value);
-    }
-    if (foundOT) {
-      if (foundOT.status === 'pendiente' || foundOT.status === 'asignada') {
-        setConfirmAction({ ot: foundOT, accion: 'iniciar' });
-      } else if (foundOT.status === 'en_progreso') {
-        setReporteOT(foundOT);
-      } else if (foundOT.status === 'pendiente_validacion') {
-        toast.info('Esta OT ya está enviada al jefe para validación');
+      const foundOT = allOTs.find(o => o.id === result.value);
+      if (foundOT) {
+        actOnOT(foundOT);
       } else {
-        toast.info(`La OT "${foundOT.title}" está ${foundOT.status}`);
+        toast.error('No se encontró una OT asignada a vos con ese código QR');
+      }
+    } else if (result.type === 'loc') {
+      const locOTs = allOTs.filter(o => o.location_qr_id === result.value);
+      if (locOTs.length === 0) {
+        toast.error('No hay OTs generadas para esta ubicación');
+      } else {
+        const name = locOTs[0]?.location || 'Ubicación escaneada';
+        setLocOTs({ orders: locOTs, name });
       }
     } else {
-      toast.error('No se encontró una OT asignada a vos con ese código QR');
+      toast.error('Código QR no reconocido');
+    }
+  };
+
+  const actOnOT = (foundOT) => {
+    if (foundOT.status === 'pendiente' || foundOT.status === 'asignada') {
+      setConfirmAction({ ot: foundOT, accion: 'iniciar' });
+    } else if (foundOT.status === 'en_progreso') {
+      setReporteOT(foundOT);
+    } else if (foundOT.status === 'pendiente_validacion') {
+      toast.info('Esta OT ya está enviada al jefe para validación');
+    } else {
+      toast.info(`La OT "${foundOT.title}" está ${foundOT.status}`);
     }
   };
 
@@ -247,6 +260,17 @@ export default function PortalOperarioApp() {
         onClose={() => setScannerOpen(false)}
         onResult={handleQRScan}
       />
+
+      {/* Lista de OTs de una ubicación escaneada */}
+      {locOTs && (
+        <LocationOTListModal
+          open={!!locOTs}
+          onClose={() => setLocOTs(null)}
+          orders={locOTs.orders}
+          locationName={locOTs.name}
+          onSelect={(ot) => { setLocOTs(null); actOnOT(ot); }}
+        />
+      )}
     </div>
   );
 }
