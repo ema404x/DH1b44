@@ -32,14 +32,23 @@ async function generateOneCertificate(base44, abono, mesInfo, currentNum) {
   const { mesFormato, mesLabel, numeroEnContrato } = mesInfo;
   const numero = currentNum + 1;
 
-  const certItems = abono.items?.length
+  // Los items del abono pueden representar el TOTAL del contrato (extraídos del PDF)
+  // o el MONTO MENSUAL (si el usuario usó auto-fill). Solo usamos los items
+  // si su suma coincide con el monto mensual; si suman el total del ADA/OC,
+  // generamos un item único con el monto mensual calculado.
+  const itemsSum = abono.items?.length
+    ? abono.items.reduce((acc, it) => acc + parseMonto(it.importe_total), 0)
+    : 0;
+  const itemsMatchMonthly = itemsSum > 0 && Math.abs(itemsSum - montoMensual) < 1;
+
+  const certItems = (abono.items?.length && itemsMatchMonthly)
     ? abono.items.map((it, idx) => ({
         numero: idx + 1,
         descripcion: it.descripcion || `Abono mensual – ${mesLabel}`,
         um: it.um || 'MES',
         cantidad: parseFloat(it.cantidad) || 1,
         importe_unitario: parseMonto(it.importe_unitario),
-        importe_total: parseMonto(it.importe_total) || (parseFloat(it.cantidad) || 1) * parseMonto(it.importe_unitario),
+        importe_total: parseMonto(it.importe_total),
       }))
     : [{
         numero: 1,
@@ -50,7 +59,7 @@ async function generateOneCertificate(base44, abono, mesInfo, currentNum) {
         importe_total: montoMensual,
       }];
 
-  const subtotalReal = certItems.reduce((acc, it) => acc + (it.importe_total || 0), 0) || montoMensual;
+  const subtotalReal = montoMensual;
   const todayStr = new Date().toISOString().split('T')[0];
 
   const newCert = {
