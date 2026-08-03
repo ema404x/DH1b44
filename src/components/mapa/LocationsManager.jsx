@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, QrCode, MapPin, Pencil, Trash2, Building2, Search, CheckCheck } from 'lucide-react';
-import QRCodeModal from '@/components/shared/QRCodeModal';
+import LocationQRModal from '@/components/mapa/LocationQRModal';
+import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 
 const COLOR_OPTIONS = [
@@ -37,6 +38,8 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [qrLoc, setQrLoc] = useState(null);
+  const [qrOTs, setQrOTs] = useState([]);
+  const [loadingOTs, setLoadingOTs] = useState(false);
   const [saving, setSaving] = useState(false);
   const cardRefs = useRef({});
 
@@ -68,7 +71,19 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
   const openEdit = (loc) => { setEditing(loc); setForm({ ...loc }); setDialogOpen(true); };
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  const getQROTUrl = (loc) => `${window.location.origin}/portal-operario?loc=${loc.id}`;
+  const openQRModal = async (loc) => {
+    setQrLoc(loc);
+    setQrOTs([]);
+    setLoadingOTs(true);
+    try {
+      const ots = await base44.entities.WorkOrder.filter({ location_qr_id: loc.id }, '-created_date', 200);
+      setQrOTs(ots);
+    } catch {
+      setQrOTs([]);
+    } finally {
+      setLoadingOTs(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('El nombre es requerido'); return; }
@@ -224,7 +239,7 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
 
                   {/* Actions */}
                    <div className="flex items-center justify-end gap-0.5 pt-2 border-t border-border/50">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600" onClick={() => setQrLoc(loc)} title="QR Orden de Trabajo">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600" onClick={() => openQRModal(loc)} title="QR Orden de Trabajo">
                       <QrCode className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(loc)} title="Editar">
@@ -255,13 +270,13 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
         </div>
       )}
 
-      {/* QR Orden de Trabajo */}
-      <QRCodeModal
+      {/* QR + OTs de la ubicación */}
+      <LocationQRModal
         open={!!qrLoc}
         onClose={() => setQrLoc(null)}
-        title={qrLoc?.name || ''}
-        subtitle={qrLoc?.address || qrLoc?.project_name || 'Escanear para ver las OTs del establecimiento'}
-        value={qrLoc ? getQROTUrl(qrLoc) : ''}
+        location={qrLoc}
+        workOrders={qrOTs}
+        isLoadingOTs={loadingOTs}
       />
 
       {/* Form Dialog */}
