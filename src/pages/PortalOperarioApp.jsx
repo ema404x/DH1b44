@@ -3,15 +3,17 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
-import { Loader2, ClipboardList, MapPin, Play, Flag, Lock, Clock, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Loader2, ClipboardList, MapPin, Play, Flag, Lock, Clock, CheckCircle2, ArrowRight, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 import ReporteForm from '@/components/operario/ReporteForm';
+import QRScannerModal from '@/components/operario/QRScannerModal';
 
 export default function PortalOperarioApp() {
   const { currentUser, displayName, employeeName } = useCurrentUser();
   const [reporteOT, setReporteOT] = useState(null);
   const [processing, setProcessing] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // { ot, accion }
+  const [scannerOpen, setScannerOpen] = useState(false);
   const { capturar } = useGeolocalizacion();
   const queryClient = useQueryClient();
 
@@ -107,6 +109,29 @@ export default function PortalOperarioApp() {
     if (ok) setReporteOT(null);
   };
 
+  const handleQRScan = (result) => {
+    setScannerOpen(false);
+    let foundOT = null;
+    if (result.type === 'ot') {
+      foundOT = allOTs.find(o => o.id === result.value);
+    } else if (result.type === 'loc') {
+      foundOT = allOTs.find(o => o.location_qr_id === result.value);
+    }
+    if (foundOT) {
+      if (foundOT.status === 'pendiente' || foundOT.status === 'asignada') {
+        setConfirmAction({ ot: foundOT, accion: 'iniciar' });
+      } else if (foundOT.status === 'en_progreso') {
+        setReporteOT(foundOT);
+      } else if (foundOT.status === 'pendiente_validacion') {
+        toast.info('Esta OT ya está enviada al jefe para validación');
+      } else {
+        toast.info(`La OT "${foundOT.title}" está ${foundOT.status}`);
+      }
+    } else {
+      toast.error('No se encontró una OT asignada a vos con ese código QR');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -123,10 +148,17 @@ export default function PortalOperarioApp() {
         <div className="h-11 w-11 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center">
           <ClipboardList className="h-5 w-5 text-primary" />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold text-white">Mis Órdenes de Trabajo</h1>
           <p className="text-xs text-slate-400">{displayName} · {misOTs.length} activa{misOTs.length !== 1 ? 's' : ''}</p>
         </div>
+        <button
+          onClick={() => setScannerOpen(true)}
+          className="h-11 w-11 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center hover:bg-primary/25 transition-colors shrink-0"
+          title="Escanear QR"
+        >
+          <ScanLine className="h-5 w-5 text-primary" />
+        </button>
       </div>
 
       {/* Stepper visual del flujo */}
@@ -208,6 +240,13 @@ export default function PortalOperarioApp() {
           processing={processing === confirmAction.ot.id}
         />
       )}
+
+      {/* Escáner QR */}
+      <QRScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onResult={handleQRScan}
+      />
     </div>
   );
 }
