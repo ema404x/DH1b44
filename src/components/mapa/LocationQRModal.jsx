@@ -64,7 +64,7 @@ export default function LocationQRModal({ open, onClose, location }) {
       if (!canvas) return;
       QRCode.toCanvas(canvas, qrValue, {
         width: 200, margin: 2,
-        color: { dark: '#0a1628', light: '#ffffff' },
+        color: { dark: '#000000', light: '#ffffff' },
         errorCorrectionLevel: 'M',
       }).then(() => setQrReady(true)).catch(() => {});
     }, 100);

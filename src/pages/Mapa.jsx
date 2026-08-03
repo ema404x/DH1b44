@@ -25,7 +25,7 @@ export default function Mapa() {
 
   const { data: locations = [], isLoading: locLoading } = useQuery({
     queryKey: ['locations'],
-    queryFn: () => base44.entities.LocationQR.list('-created_date', 200),
+    queryFn: () => base44.entities.LocationQR.list('-created_date', 500),
     staleTime: 30000,
   });
 
