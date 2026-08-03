@@ -30,7 +30,9 @@ async function generateOneCertificate(base44, abono, mesInfo, currentNum) {
   const montoMensual = parseMonto(abono.monto_mensual) || (montoTotalContrato / duracionMeses);
 
   const { mesFormato, mesLabel, numeroEnContrato } = mesInfo;
-  const numero = currentNum + 1;
+  // El número de certificado es secuencial DENTRO del contrato (por OC/ADA):
+  // mes 1 del contrato = cert N° 1, mes 2 = N° 2, etc.
+  const numero = numeroEnContrato;
 
   // Los items del abono pueden representar el TOTAL del contrato (extraídos del PDF)
   // o el MONTO MENSUAL (si el usuario usó auto-fill). Solo usamos los items
