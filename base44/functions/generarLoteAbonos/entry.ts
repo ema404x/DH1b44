@@ -202,9 +202,17 @@ Deno.serve(async (req) => {
       }
 
       // Si regenerar, eliminar certificados automáticos previos de este mes
+      // y sus solicitudes de aprobación vinculadas
       if (existingForMonth.length > 0 && regenerar) {
         for (const c of existingForMonth) {
           if (c.generado_automaticamente) {
+            // Borrar solicitud vinculada antes de borrar el certificado
+            try {
+              const sols = await base44.asServiceRole.entities.SolicitudCertificado.filter({ certificado_id: c.id });
+              for (const sol of sols) {
+                await base44.asServiceRole.entities.SolicitudCertificado.delete(sol.id);
+              }
+            } catch (_) { /* no bloquear si falla */ }
             await base44.asServiceRole.entities.Certificado.delete(c.id);
           }
         }
@@ -221,6 +229,35 @@ Deno.serve(async (req) => {
         const res = await generateOneCertificate(base44, abono, mesInfo, currentNum);
         currentNum = res.nextNum;
         totalGenerated++;
+
+        // ── Crear solicitud de aprobación vinculada ───────────────────────
+        const sectorId = abono.sector_id || user.data?.sector_id || 'escuela';
+        const numeroSol = `CERT-${res.id.slice(-6).toUpperCase()}`;
+        try {
+          await base44.asServiceRole.entities.SolicitudCertificado.create({
+            numero: numeroSol,
+            titulo: `Certificado N°${res.numero} — ${abono.contratista || abono.emprendimiento || ''} (${abono.comuna || ''})`,
+            establecimiento: abono.emprendimiento || abono.obra_servicio || '',
+            jefe_sitio: user.full_name || user.email || 'Sistema',
+            jefe_sitio_email: user.email || '',
+            descripcion_trabajo: abono.obra_servicio || `Abono mensual ${mesLabel}`,
+            monto_solicitado: res.monto || 0,
+            porcentaje_avance: 0,
+            periodo: mesLabel,
+            estado: 'enviada',
+            prioridad: 'normal',
+            certificado_id: res.id,
+            sector_id: sectorId,
+            historial: [{
+              fecha: new Date().toISOString(),
+              estado: 'enviada',
+              usuario: user.full_name || user.email || 'Sistema',
+              comentario: `Certificado automático N°${res.numero} — ${mesLabel}`,
+            }],
+          });
+        } catch (solErr) {
+          console.log(`Error creando solicitud para ${abono.contratista}:`, solErr.message);
+        }
 
         // ── Actualizar progreso del abono (sin query adicional) ───────────
         const completado = numeroEnContrato >= duracionMeses;
