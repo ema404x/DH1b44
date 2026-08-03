@@ -72,6 +72,28 @@ Deno.serve(async (req) => {
       qrSkipped++;
     }
 
+    // PASO 3: Direccion → LocationQR (crear QRs faltantes para Gestión de Ubicaciones)
+    const qrToCreate = [];
+    for (const d of direcciones) {
+      const key = norm(d.direccion);
+      if (qrMap.has(key)) continue;
+      qrToCreate.push({
+        name: d.direccion,
+        address: d.direccion,
+        project_name: d.jefe_sitio || '',
+        color: 'blue',
+        is_active: d.estado !== 'inactivo',
+        event_type: 'ambos',
+        assigned_employees: d.jefe_sitio ? [d.jefe_sitio] : [],
+      });
+      qrMap.set(key, d); // evitar duplicados en el mismo lote
+    }
+
+    let qrCreados = [];
+    if (qrToCreate.length > 0) {
+      qrCreados = await base44.asServiceRole.entities.LocationQR.bulkCreate(qrToCreate);
+    }
+
     // Crear en lote
     let creados = [];
     if (toCreate.length > 0) {
@@ -86,6 +108,9 @@ Deno.serve(async (req) => {
         creados_desde_direccion: fromDireccion,
         qr_sin_direccion_ni_comuna: qrSkipped,
         total_creados: creados.length,
+        locationqr_previo: locationQRs.length,
+        locationqr_creados: qrCreados.length,
+        locationqr_final: locationQRs.length + qrCreados.length,
       },
       qr_para_revision_manual: qrSkippedList,
     });
