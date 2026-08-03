@@ -38,8 +38,6 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [qrLoc, setQrLoc] = useState(null);
-  const [qrOTs, setQrOTs] = useState([]);
-  const [loadingOTs, setLoadingOTs] = useState(false);
   const [saving, setSaving] = useState(false);
   const cardRefs = useRef({});
 
@@ -71,18 +69,8 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
   const openEdit = (loc) => { setEditing(loc); setForm({ ...loc }); setDialogOpen(true); };
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  const openQRModal = async (loc) => {
+  const openQRModal = (loc) => {
     setQrLoc(loc);
-    setQrOTs([]);
-    setLoadingOTs(true);
-    try {
-      const ots = await base44.entities.WorkOrder.filter({ location_qr_id: loc.id }, '-created_date', 200);
-      setQrOTs(ots);
-    } catch {
-      setQrOTs([]);
-    } finally {
-      setLoadingOTs(false);
-    }
   };
 
   const handleSave = async () => {
@@ -275,8 +263,6 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
         open={!!qrLoc}
         onClose={() => setQrLoc(null)}
         location={qrLoc}
-        workOrders={qrOTs}
-        isLoadingOTs={loadingOTs}
       />
 
       {/* Form Dialog */}

@@ -3,7 +3,19 @@ import QRCode from 'qrcode';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Download, Printer, Copy, Check, ClipboardList, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
+import { Download, Copy, Check, ClipboardList, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+
+/**
+ * Deriva la URL base de la app desde el pathname actual.
+ * Ej: /apps/myapp/mapa → /apps/myapp  |  /mapa → (vacío)
+ */
+function getAppBaseUrl() {
+  const path = window.location.pathname.replace(/\/$/, '');
+  const segments = path.split('/').filter(Boolean);
+  segments.pop(); // quitar el último segmento (ruta actual)
+  return segments.length > 0 ? '/' + segments.join('/') : '';
+}
 
 const STATUS_CONFIG = {
   pendiente: { label: 'Pendiente', cls: 'bg-slate-500/15 text-slate-400 border-slate-500/30', icon: Clock },
@@ -15,12 +27,34 @@ const STATUS_CONFIG = {
   cancelada: { label: 'Cancelada', cls: 'bg-red-500/15 text-red-400 border-red-500/30', icon: AlertCircle },
 };
 
-export default function LocationQRModal({ open, onClose, location, workOrders, isLoadingOTs }) {
+export default function LocationQRModal({ open, onClose, location }) {
   const canvasRef = useRef(null);
   const [copied, setCopied] = useState(false);
   const [qrReady, setQrReady] = useState(false);
+  const [workOrders, setWorkOrders] = useState([]);
+  const [isLoadingOTs, setIsLoadingOTs] = useState(false);
 
-  const qrValue = location ? `${window.location.origin}/portal-operario?loc=${location.id}` : '';
+  const qrValue = location ? `${window.location.origin}${getAppBaseUrl()}/portal-operario?loc=${location.id}` : '';
+
+  // Cargar OTs de la ubicación via backend (service role, sin RLS)
+  useEffect(() => {
+    if (!open || !location) return;
+    let cancelled = false;
+    setIsLoadingOTs(true);
+    setWorkOrders([]);
+    base44.functions.invoke('publicFichar', {
+      action: 'getWorkOrderForLocation',
+      locationId: location.id,
+    }).then(res => {
+      if (cancelled) return;
+      setWorkOrders(res.data?.workOrders || []);
+    }).catch(() => {
+      if (!cancelled) setWorkOrders([]);
+    }).finally(() => {
+      if (!cancelled) setIsLoadingOTs(false);
+    });
+    return () => { cancelled = true; };
+  }, [open, location]);
 
   useEffect(() => {
     if (!open || !qrValue) return;

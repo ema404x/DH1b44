@@ -50,6 +50,9 @@ Deno.serve(async (req) => {
       const { locationId: locId } = body;
       if (!locId) return Response.json({ error: 'locationId requerido' }, { status: 400 });
 
+      // Normalizar texto: lowercase + sin acentos + trimmed
+      const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
       // Buscar location por ID directamente; buscar OTs vinculadas en paralelo
       const [locResults, ordersById] = await Promise.all([
         sb.entities.LocationQR.filter({ id: locId }).catch(() => []),
@@ -59,20 +62,28 @@ Deno.serve(async (req) => {
       const location = locResults[0] || null;
       if (!location) return Response.json({ workOrders: [], workOrder: null, locationName: '' });
 
-      // Filtrar OTs activas del resultado exacto por ID
+      // 1) OTs activas vinculadas por location_qr_id
       let activeOrders = ordersById.filter(o => !['completada', 'cancelada'].includes(o.status));
 
-      // Si no hay OTs vinculadas por ID, hacer fallback por nombre (limitado)
+      // 2) Si no hay, buscar también por location_qr_name (nombre denormalizado)
+      if (activeOrders.length === 0 && location.name) {
+        const ordersByName = await sb.entities.WorkOrder.filter({ location_qr_name: location.name }).catch(() => []);
+        activeOrders = ordersByName.filter(o => !['completada', 'cancelada'].includes(o.status));
+      }
+
+      // 3) Fallback final: matching difuso por campo location (texto libre)
       if (activeOrders.length === 0) {
         const fallbackOrders = await sb.entities.WorkOrder.list('-created_date', 500).catch(() => []);
-        const locNameLower = location.name.toLowerCase();
-        const locAddrLower = (location.address || '').toLowerCase();
+        const locNameNorm = normalize(location.name);
+        const locAddrNorm = normalize(location.address);
         activeOrders = fallbackOrders.filter(o => {
           if (['completada', 'cancelada'].includes(o.status)) return false;
-          const oLocLower = (o.location || '').toLowerCase();
+          const oLocNorm = normalize(o.location);
+          const oLocQrNameNorm = normalize(o.location_qr_name);
           return (
-            (oLocLower && (oLocLower.includes(locNameLower) || locNameLower.includes(oLocLower))) ||
-            (locAddrLower && oLocLower && oLocLower.includes(locAddrLower)) ||
+            (oLocNorm && locNameNorm && (oLocNorm.includes(locNameNorm) || locNameNorm.includes(oLocNorm))) ||
+            (oLocQrNameNorm && locNameNorm && (oLocQrNameNorm.includes(locNameNorm) || locNameNorm.includes(oLocQrNameNorm))) ||
+            (locAddrNorm && oLocNorm && oLocNorm.includes(locAddrNorm)) ||
             (location.project_name && o.project_name === location.project_name)
           );
         });
