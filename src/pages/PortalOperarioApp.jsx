@@ -112,18 +112,10 @@ export default function PortalOperarioApp() {
   };
 
   const handleQRScan = async (result) => {
-    console.log('[QR] handleQRScan recibió:', result);
     setScannerOpen(false);
-    if (result.type === 'ot') {
-      const foundOT = allOTs.find(o => o.id === result.value);
-      if (foundOT) {
-        actOnOT(foundOT);
-      } else {
-        toast.error('No se encontró una OT asignada a vos con ese código QR');
-      }
-    } else if (result.type === 'loc') {
-      // Consultar al backend (service role) para traer TODAS las OTs activas de la ubicación,
-      // sin depender del RLS que filtra solo las del usuario actual.
+
+    // Tipo 'loc' — buscar OTs de la ubicación via backend (service role, sin RLS)
+    if (result.type === 'loc') {
       setLocOTs({ orders: [], name: 'Cargando…', loading: true });
       try {
         const res = await base44.functions.invoke('publicFichar', {
@@ -141,6 +133,47 @@ export default function PortalOperarioApp() {
       } catch {
         setLocOTs(null);
         toast.error('Error al buscar OTs de la ubicación');
+      }
+      return;
+    }
+
+    // Tipo 'ot' o 'raw' (ID crudo) — buscar la OT via backend (service role) para evitar RLS
+    const otId = result.value;
+    if (otId) {
+      try {
+        const res = await base44.functions.invoke('publicFichar', {
+          action: 'getWorkOrder',
+          workOrderId: otId,
+        });
+        const foundOT = res.data?.workOrder;
+        if (foundOT) {
+          actOnOT(foundOT);
+        } else {
+          // Si no se encontró por ID directo y era 'raw', intentar como ubicación
+          if (result.type === 'raw') {
+            setLocOTs({ orders: [], name: 'Cargando…', loading: true });
+            try {
+              const locRes = await base44.functions.invoke('publicFichar', {
+                action: 'getWorkOrderForLocation',
+                locationId: otId,
+              });
+              const orders = locRes.data?.workOrders || [];
+              if (orders.length > 0) {
+                setLocOTs({ orders, name: locRes.data.locationName || 'Ubicación escaneada' });
+              } else {
+                setLocOTs(null);
+                toast.error('Código QR no reconocido');
+              }
+            } catch {
+              setLocOTs(null);
+              toast.error('Código QR no reconocido');
+            }
+          } else {
+            toast.error('No se encontró la OT con ese código QR');
+          }
+        }
+      } catch {
+        toast.error('Error al buscar la OT');
       }
     } else {
       toast.error('Código QR no reconocido');

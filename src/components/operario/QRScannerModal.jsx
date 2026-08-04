@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { X, ScanLine, Camera, AlertCircle } from 'lucide-react';
+import { X, ScanLine, Camera, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 /**
  * Modal de escaneo QR para OTs.
  * Escanea un código QR que contiene una URL tipo:
- *   /portal-operario?loc=<location_qr_id>
- *   /ejecutar-ot-simple?ot=<work_order_id>
+ *   https://app.base44.com/portal-operario?loc=<location_qr_id>
+ *   https://app.base44.com/ejecutar-ot-simple?ot=<work_order_id>
+ * También soporta IDs crudos o URLs relativas.
  * Llama onResult(parsedData) al escanear.
  */
 export default function QRScannerModal({ open, onClose, onResult }) {
@@ -14,15 +15,26 @@ export default function QRScannerModal({ open, onClose, onResult }) {
   const scannerRef = useRef(null);
   const [error, setError] = useState(null);
   const [scanning, setScanning] = useState(false);
+  const [scanFlash, setScanFlash] = useState(false);
   const stopRef = useRef(false);
+
+  // Refs para siempre tener los callbacks más recientes (evita stale closure)
+  const onResultRef = useRef(onResult);
+  const onCloseRef = useRef(onClose);
+  onResultRef.current = onResult;
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
     stopRef.current = false;
     setError(null);
     setScanning(false);
+    setScanFlash(false);
+
+    let cancelled = false;
 
     const startScanner = async () => {
+      if (cancelled) return;
       try {
         const html5QrCode = new Html5Qrcode(containerId);
         scannerRef.current = html5QrCode;
@@ -41,21 +53,33 @@ export default function QRScannerModal({ open, onClose, onResult }) {
           { facingMode: 'environment' },
           config,
           (decodedText) => {
-            if (stopRef.current) return;
-            console.log('[QR] Código detectado:', decodedText);
+            if (stopRef.current || cancelled) return;
             stopRef.current = true;
-            handleScan(decodedText);
+            // Feedback visual de éxito
+            setScanFlash(true);
+            // Vibración si está disponible
+            if (navigator.vibrate) navigator.vibrate(100);
+            // Procesar y notificar
+            const parsed = parseQRContent(decodedText);
+            try {
+              onResultRef.current(parsed);
+            } catch (e) {
+              console.error('[QR] Error en onResult:', e);
+            }
+            // Cerrar scanner tras un breve delay para que el flash sea visible
+            setTimeout(() => {
+              cleanupScanner();
+              onCloseRef.current();
+            }, 350);
           },
-          (err) => {
-            // Callback por cada frame sin QR — normal, no hacemos nada.
-            // Pero si es un error real de decode, logueamos para debug.
-            if (err && typeof err !== 'string') console.warn('QR decode err:', err);
+          () => {
+            // Callback por cada frame sin QR — normal, ignorar.
           }
         );
-        setScanning(true);
+        if (!cancelled) setScanning(true);
       } catch (err) {
         console.error('QR scanner start error:', err);
-        setError('No se pudo acceder a la cámara. Verificá los permisos del navegador.');
+        if (!cancelled) setError('No se pudo acceder a la cámara. Verificá los permisos del navegador.');
       }
     };
 
@@ -63,49 +87,22 @@ export default function QRScannerModal({ open, onClose, onResult }) {
     const timer = setTimeout(startScanner, 300);
 
     return () => {
+      cancelled = true;
       clearTimeout(timer);
       stopRef.current = true;
+      cleanupScanner();
+    };
+  }, [open]);
+
+  const cleanupScanner = () => {
+    try {
       if (scannerRef.current) {
         scannerRef.current.stop().catch(() => {});
         scannerRef.current.clear().catch(() => {});
         scannerRef.current = null;
       }
-    };
-  }, [open]);
-
-  const handleScan = (decodedText) => {
-    try {
-      const url = new URL(decodedText);
-      const params = url.searchParams;
-      const loc = params.get('loc');
-      const ot = params.get('ot');
-
-      if (loc) {
-        onResult({ type: 'loc', value: loc });
-      } else if (ot) {
-        onResult({ type: 'ot', value: ot });
-      } else {
-        // QR sin parámetros conocidos — pasar el texto crudo
-        onResult({ type: 'raw', value: decodedText });
-      }
     } catch {
-      // No es una URL — intentar como ID crudo
-      onResult({ type: 'raw', value: decodedText });
-    }
-    cleanup();
-  };
-
-  const cleanup = () => {
-    try {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
-        scannerRef.current.clear().catch(() => {});
-      }
-    } catch {
-      // ignore — solo nos importa cerrar
-    } finally {
-      scannerRef.current = null;
-      onClose();
+      // ignore
     }
   };
 
@@ -113,7 +110,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={cleanup} />
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
@@ -121,7 +118,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
             <ScanLine className="h-5 w-5 text-primary" />
             <h3 className="text-sm font-bold text-white">Escanear QR</h3>
           </div>
-          <button onClick={cleanup} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-slate-400 hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -141,9 +138,15 @@ export default function QRScannerModal({ open, onClose, onResult }) {
             </div>
           )}
           {/* Overlay scan frame */}
-          {scanning && !error && (
+          {scanning && !error && !scanFlash && (
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
               <div className="w-56 h-56 border-2 border-primary/70 rounded-2xl shadow-[0_0_20px_rgba(99,102,241,0.3)]" />
+            </div>
+          )}
+          {/* Flash de éxito */}
+          {scanFlash && (
+            <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/20 backdrop-blur-sm">
+              <CheckCircle2 className="h-16 w-16 text-emerald-400 drop-shadow-lg" />
             </div>
           )}
         </div>
@@ -151,10 +154,49 @@ export default function QRScannerModal({ open, onClose, onResult }) {
         {/* Footer */}
         <div className="px-4 py-3 text-center">
           <p className="text-xs text-slate-400">
-            Apuntá la cámara al código QR de la orden de trabajo
+            {scanFlash ? '¡Código detectado!' : 'Apuntá la cámara al código QR de la orden de trabajo'}
           </p>
         </div>
       </div>
     </div>
   );
+}
+
+/**
+ * Parser robusto del contenido del QR.
+ * Soporta URLs completas, URLs relativas, y IDs crudos.
+ * Extrae parámetros `loc` y `ot` con regex fallback.
+ */
+function parseQRContent(decodedText) {
+  const text = (decodedText || '').trim();
+
+  // Intentar parsear como URL (completa o relativa)
+  try {
+    const url = new URL(text);
+    const loc = url.searchParams.get('loc');
+    const ot = url.searchParams.get('ot');
+    if (loc) return { type: 'loc', value: loc, raw: text };
+    if (ot) return { type: 'ot', value: ot, raw: text };
+  } catch {
+    // No es una URL válida absoluta — intentar como URL relativa
+    try {
+      const url = new URL(text, window.location.origin);
+      const loc = url.searchParams.get('loc');
+      const ot = url.searchParams.get('ot');
+      if (loc) return { type: 'loc', value: loc, raw: text };
+      if (ot) return { type: 'ot', value: ot, raw: text };
+    } catch {
+      // Continuar con regex
+    }
+  }
+
+  // Regex fallback: buscar ?loc=XXX o ?ot=XXX o &loc=XXX o &ot=XXX en el texto
+  const locMatch = text.match(/[?&]loc=([^&\s]+)/);
+  if (locMatch) return { type: 'loc', value: locMatch[1], raw: text };
+
+  const otMatch = text.match(/[?&]ot=([^&\s]+)/);
+  if (otMatch) return { type: 'ot', value: otMatch[1], raw: text };
+
+  // Último recurso: texto crudo
+  return { type: 'raw', value: text, raw: text };
 }
