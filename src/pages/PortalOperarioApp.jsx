@@ -112,7 +112,9 @@ export default function PortalOperarioApp() {
   };
 
   const handleQRScan = async (result) => {
-    setScannerOpen(false);
+    // Nota: NO cerramos el scanner acá — el scanner se cierra solo tras 350ms
+    // (mostrando el flash verde de "código detectado"). Si lo cerramos acá,
+    // el flash nunca se ve y el feedback visual se pierde.
 
     // Tipo 'loc' — buscar OTs de la ubicación via backend (service role, sin RLS)
     if (result.type === 'loc') {
@@ -139,44 +141,40 @@ export default function PortalOperarioApp() {
 
     // Tipo 'ot' o 'raw' (ID crudo) — buscar la OT via backend (service role) para evitar RLS
     const otId = result.value;
-    if (otId) {
-      try {
-        const res = await base44.functions.invoke('publicFichar', {
-          action: 'getWorkOrder',
-          workOrderId: otId,
-        });
-        const foundOT = res.data?.workOrder;
-        if (foundOT) {
-          actOnOT(foundOT);
-        } else {
-          // Si no se encontró por ID directo y era 'raw', intentar como ubicación
-          if (result.type === 'raw') {
-            setLocOTs({ orders: [], name: 'Cargando…', loading: true });
-            try {
-              const locRes = await base44.functions.invoke('publicFichar', {
-                action: 'getWorkOrderForLocation',
-                locationId: otId,
-              });
-              const orders = locRes.data?.workOrders || [];
-              if (orders.length > 0) {
-                setLocOTs({ orders, name: locRes.data.locationName || 'Ubicación escaneada' });
-              } else {
-                setLocOTs(null);
-                toast.error('Código QR no reconocido');
-              }
-            } catch {
-              setLocOTs(null);
-              toast.error('Código QR no reconocido');
-            }
-          } else {
-            toast.error('No se encontró la OT con ese código QR');
-          }
-        }
-      } catch {
-        toast.error('Error al buscar la OT');
-      }
-    } else {
+    if (!otId) {
       toast.error('Código QR no reconocido');
+      return;
+    }
+
+    const loadingToast = toast.loading('Buscando orden de trabajo…');
+    try {
+      // 1) Intentar como OT por ID directo
+      const res = await base44.functions.invoke('publicFichar', {
+        action: 'getWorkOrder',
+        workOrderId: otId,
+      });
+      const foundOT = res.data?.workOrder;
+      if (foundOT) {
+        toast.dismiss(loadingToast);
+        actOnOT(foundOT);
+        return;
+      }
+
+      // 2) No encontrada por ID — si era 'raw' o 'ot', intentar como ubicación
+      const locRes = await base44.functions.invoke('publicFichar', {
+        action: 'getWorkOrderForLocation',
+        locationId: otId,
+      });
+      const orders = locRes.data?.workOrders || [];
+      toast.dismiss(loadingToast);
+      if (orders.length > 0) {
+        setLocOTs({ orders, name: locRes.data.locationName || 'Ubicación escaneada' });
+      } else {
+        toast.error('No se encontró ninguna OT ni ubicación con ese código QR');
+      }
+    } catch {
+      toast.dismiss(loadingToast);
+      toast.error('Error al buscar la OT');
     }
   };
 
