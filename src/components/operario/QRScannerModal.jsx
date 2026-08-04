@@ -24,10 +24,18 @@ export default function QRScannerModal({ open, onClose, onResult }) {
 
     const startScanner = async () => {
       try {
-        const html5QrCode = new Html5Qrcode(containerId, { verbose: false });
+        const html5QrCode = new Html5Qrcode(containerId);
         scannerRef.current = html5QrCode;
 
-        const config = { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 };
+        const config = {
+          fps: 15,
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            return { width: Math.floor(minEdge * 0.7), height: Math.floor(minEdge * 0.7) };
+          },
+          aspectRatio: 1.0,
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        };
 
         await html5QrCode.start(
           { facingMode: 'environment' },
@@ -37,10 +45,15 @@ export default function QRScannerModal({ open, onClose, onResult }) {
             stopRef.current = true;
             handleScan(decodedText);
           },
-          () => {}
+          (err) => {
+            // Callback por cada frame sin QR — normal, no hacemos nada.
+            // Pero si es un error real de decode, logueamos para debug.
+            if (err && typeof err !== 'string') console.warn('QR decode err:', err);
+          }
         );
         setScanning(true);
       } catch (err) {
+        console.error('QR scanner start error:', err);
         setError('No se pudo acceder a la cámara. Verificá los permisos del navegador.');
       }
     };
