@@ -23,15 +23,21 @@ Deno.serve(async (req) => {
     const updates = {};
 
     // ── Stamping de sector_id si falta ──
+    // Fallback 'SIN_SECTOR' (NO 'escuela'): un registro cuyo creador no resuelve
+    // sector no debe colarse en el sector escuela. El centinela SIN_SECTOR es
+    // consistente con el backfill y detectable con un solo filtro.
     if (!data.sector_id) {
-      let sector = 'escuela';
+      let sector = 'SIN_SECTOR';
       if (data.created_by_id) {
         try {
           const creator = await sb.entities.User.get(data.created_by_id);
-          sector = creator?.sector_id || creator?.data?.sector_id || 'escuela';
-        } catch (_) { /* usar default */ }
+          sector = creator?.sector_id || creator?.data?.sector_id || 'SIN_SECTOR';
+        } catch (_) { /* queda SIN_SECTOR */ }
       }
       updates.sector_id = sector;
+      if (sector === 'SIN_SECTOR') {
+        console.warn(`[stampSectorOnCreate] SIN_SECTOR — entidad=${entityName} id=${entityId} created_by_id=${data.created_by_id || 'ninguno'}`);
+      }
     }
 
     // ── Stamping de jefe_sitio y jefe_sitio_email para WorkOrder y Pendiente ──

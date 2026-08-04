@@ -46,6 +46,10 @@
     },
     "notas": {
       "type": "string"
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Se estampa desde el creador; sin default."
     }
   },
   "required": [

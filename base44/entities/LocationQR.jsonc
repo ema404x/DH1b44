@@ -59,6 +59,10 @@
         "type": "string"
       },
       "description": "Nombres de empleados/cuadrilla asignados a esta ubicaci\u00f3n"
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Se estampa desde el creador; sin default."
     }
   },
   "required": [
