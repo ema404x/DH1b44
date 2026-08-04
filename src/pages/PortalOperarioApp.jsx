@@ -112,6 +112,7 @@ export default function PortalOperarioApp() {
   };
 
   const handleQRScan = async (result) => {
+    console.log('[QR] handleQRScan recibió:', result);
     setScannerOpen(false);
     if (result.type === 'ot') {
       const foundOT = allOTs.find(o => o.id === result.value);

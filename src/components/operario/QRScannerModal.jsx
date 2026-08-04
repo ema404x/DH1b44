@@ -42,6 +42,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
           config,
           (decodedText) => {
             if (stopRef.current) return;
+            console.log('[QR] Código detectado:', decodedText);
             stopRef.current = true;
             handleScan(decodedText);
           },
