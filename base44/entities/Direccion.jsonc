@@ -62,7 +62,9 @@
         "role": "admin"
       }
     },
-    "read": {},
+    "read": {
+      "data.sector_id": "{{user.data.sector_id}}"
+    },
     "update": {
       "user_condition": {
         "role": "admin"
