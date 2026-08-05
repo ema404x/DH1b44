@@ -52,6 +52,7 @@ Deno.serve(async (req) => {
         direccion_id: d.id,
         estado: d.estado || 'activo',
         ubic_tecnica: '',
+        sector_id: d.sector_id || 'SIN_SECTOR', // hereda el sector de la Direccion (no cae en default escuela)
       };
       if (qr && qr.latitude && qr.longitude) {
         record.gps_latitude = qr.latitude;
@@ -85,6 +86,7 @@ Deno.serve(async (req) => {
         is_active: d.estado !== 'inactivo',
         event_type: 'ambos',
         assigned_employees: d.jefe_sitio ? [d.jefe_sitio] : [],
+        sector_id: d.sector_id || 'SIN_SECTOR', // hereda el sector de la Direccion (no cae en SIN_SECTOR silencioso)
       });
       qrMap.set(key, d); // evitar duplicados en el mismo lote
     }
