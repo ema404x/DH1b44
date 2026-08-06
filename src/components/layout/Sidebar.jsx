@@ -346,13 +346,6 @@ export default function Sidebar({ open, onOpenChange }) {
 
   return (
     <>
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-3.5 left-4 z-50 h-9 w-9 rounded-lg bg-card shadow-md border border-border flex items-center justify-center"
-      >
-        <Menu className="h-4 w-4" />
-      </button>
-
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseMobile} />

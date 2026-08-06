@@ -94,7 +94,7 @@ export default function AppLayout() {
       <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${mainPaddingClass}`}>
         <MobileHeader />
         {/* Top bar */}
-        <header className="h-14 border-b border-white/8 flex items-center gap-3 pl-14 pr-4 lg:pl-5 lg:pr-5 flex-shrink-0 z-30"
+        <header className="hidden lg:flex h-14 border-b border-white/8 items-center gap-3 pl-5 pr-5 flex-shrink-0 z-30"
           style={{ background: 'rgba(10,22,40,0.85)', backdropFilter: 'blur(12px)' }}>
           <div className="flex-1 max-w-md">
             <GlobalSearch />

@@ -1,5 +1,9 @@
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import GlobalSearch from './GlobalSearch';
+import NotificationBell from './NotificationBell';
+import UserMenu from './UserMenu';
+import SectorSwitcher from './SectorSwitcher';
 
 const ROUTE_TITLES = {
   '/': 'Inicio',
@@ -52,9 +56,12 @@ function getPageTitle(pathname) {
 }
 
 /**
- * MobileHeader — fixed top bar visible only on mobile.
- * Shows a Back button when not on the root path, with the
- * current page title centered.
+ * MobileHeader — única barra superior en móvil/tablet (<lg).
+ * - Izquierda: marca en root, "Atrás" en subpáginas (único punto de toque arriba-izq,
+ *   sin solapamiento con el drawer).
+ * - Centro: título de la página (solo en subpáginas).
+ * - Derecha: cambio de sector (admin), buscador, notificaciones y usuario — compactos.
+ * El drawer de navegación se abre desde el botón "Más" de la barra inferior.
  */
 export default function MobileHeader() {
   const navigate = useNavigate();
@@ -62,30 +69,48 @@ export default function MobileHeader() {
   const isRoot = location.pathname === '/';
   const title = getPageTitle(location.pathname);
 
+  // Volver robusto: si hay historial previo en la app, retrocede; si no, va al inicio.
+  const handleBack = () => {
+    const st = window.history.state;
+    if (st && typeof st.idx === 'number' && st.idx > 0) navigate(-1);
+    else navigate('/');
+  };
+
   return (
     <header
-      className="lg:hidden relative flex items-center px-3 border-b border-border bg-card/95 backdrop-blur-xl flex-shrink-0 z-30"
+      className="lg:hidden relative flex items-center px-2 border-b border-border bg-card/95 backdrop-blur-xl flex-shrink-0 z-30"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         height: 'calc(2.75rem + env(safe-area-inset-top))',
       }}
     >
-      {!isRoot ? (
+      {isRoot ? (
+        <div className="flex items-center h-11 px-2 z-10">
+          <span className="text-sm font-semibold text-foreground">DH1</span>
+        </div>
+      ) : (
         <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 h-11 px-2 -ml-2 rounded-lg active:bg-muted transition-colors z-10"
+          onClick={handleBack}
+          aria-label="Volver"
+          className="flex items-center gap-1.5 h-11 px-2 -ml-1 rounded-lg active:bg-muted transition-colors z-10"
         >
           <ArrowLeft className="h-5 w-5" />
           <span className="text-sm font-medium">Atrás</span>
         </button>
-      ) : (
-        <div className="flex items-center h-11 px-2 z-10">
-          <span className="text-sm font-semibold text-foreground">DH1</span>
-        </div>
       )}
-      <span className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-foreground truncate max-w-[55%] pointer-events-none">
-        {title}
-      </span>
+
+      {!isRoot && (
+        <span className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-foreground truncate max-w-[42%] pointer-events-none">
+          {title}
+        </span>
+      )}
+
+      <div className="flex items-center gap-0.5 ml-auto">
+        <SectorSwitcher />
+        <GlobalSearch variant="icon" />
+        <NotificationBell />
+        <UserMenu />
+      </div>
     </header>
   );
 }

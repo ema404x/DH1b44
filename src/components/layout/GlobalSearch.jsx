@@ -12,7 +12,7 @@ const categoryConfig = {
   materials: { label: 'Inventario', icon: Package, path: '/inventario', color: 'text-purple-500' },
 };
 
-export default function GlobalSearch() {
+export default function GlobalSearch({ variant = 'bar' }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [everOpened, setEverOpened] = useState(false);
@@ -63,15 +63,25 @@ export default function GlobalSearch() {
 
   return (
     <>
-      {/* Trigger */}
-      <button
-        onClick={() => openSearch()}
-        className="flex items-center gap-2 px-3 h-9 rounded-lg border border-white/10 bg-white/5 text-sm text-slate-400 hover:bg-white/10 hover:text-white transition-colors w-full max-w-xs"
-      >
-        <Search className="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="flex-1 text-left">Buscar...</span>
-        <kbd className="hidden sm:inline-flex text-[10px] bg-muted border border-border rounded px-1.5 py-0.5 font-mono">⌘K</kbd>
-      </button>
+      {/* Trigger — icono compacto en móvil/tablet, barra con texto en desktop */}
+      {variant === 'icon' ? (
+        <button
+          onClick={() => openSearch()}
+          aria-label="Buscar"
+          className="flex items-center justify-center h-11 w-11 rounded-lg active:bg-muted hover:bg-white/10 transition-colors text-slate-300"
+        >
+          <Search className="h-5 w-5" />
+        </button>
+      ) : (
+        <button
+          onClick={() => openSearch()}
+          className="flex items-center gap-2 px-3 h-9 rounded-lg border border-white/10 bg-white/5 text-sm text-slate-400 hover:bg-white/10 hover:text-white transition-colors w-full max-w-xs"
+        >
+          <Search className="h-3.5 w-3.5 flex-shrink-0" />
+          <span className="flex-1 text-left">Buscar...</span>
+          <kbd className="hidden sm:inline-flex text-[10px] bg-muted border border-border rounded px-1.5 py-0.5 font-mono">⌘K</kbd>
+        </button>
+      )}
 
       {/* Modal */}
       {open && (
