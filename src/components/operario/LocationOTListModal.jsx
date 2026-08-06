@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, X, Play, Flag, Lock, CheckCircle2, ClipboardList, Loader2, AlertCircle } from 'lucide-react';
+import { MapPin, X, Play, Flag, Lock, CheckCircle2, ClipboardList, Loader2, AlertCircle, ScanLine } from 'lucide-react';
 
 const TYPE_LABEL = {
   mantenimiento_preventivo: 'Mant. Preventivo',
@@ -19,7 +19,7 @@ const STATUS_BADGE = {
   cancelada:   { label: 'Cancelada',   cls: 'bg-red-400/10 text-red-400 border-red-400/20' },
 };
 
-export default function LocationOTListModal({ open, onClose, orders, locationName, onSelect, loading, error, onRetry }) {
+export default function LocationOTListModal({ open, onClose, orders, locationName, onSelect, loading, error, onRetry, onScanAnother }) {
   if (!open) return null;
 
   const safeOrders = orders || [];
@@ -41,6 +41,12 @@ export default function LocationOTListModal({ open, onClose, orders, locationNam
               {error ? 'Error al cargar' : `${activas.length} OT activa${activas.length !== 1 ? 's' : ''}`}
             </p>
           </div>
+          {onScanAnother && (
+            <button onClick={onScanAnother} title="Escanear otra ubicación"
+              className="h-9 w-9 flex items-center justify-center rounded-lg bg-primary/15 border border-primary/25 hover:bg-primary/25 transition-colors shrink-0">
+              <ScanLine className="h-5 w-5 text-primary" />
+            </button>
+          )}
           <button onClick={onClose} className="text-slate-400 hover:text-white shrink-0">
             <X className="h-5 w-5" />
           </button>

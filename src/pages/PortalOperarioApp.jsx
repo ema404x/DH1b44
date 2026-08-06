@@ -289,13 +289,6 @@ export default function PortalOperarioApp() {
         />
       )}
 
-      {/* Escáner QR */}
-      <QRScannerModal
-        open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onResult={handleQRScan}
-      />
-
       {/* Lista de OTs de una ubicación escaneada */}
       {locOTs && (
         <LocationOTListModal
@@ -306,9 +299,17 @@ export default function PortalOperarioApp() {
           loading={locOTs.loading}
           error={locOTs.error}
           onRetry={handleRetryLoc}
+          onScanAnother={() => setScannerOpen(true)}
           onSelect={(ot) => { setLocOTs(null); actOnOT(ot); }}
         />
       )}
+
+      {/* Escáner QR — renderado después para que quede por encima del modal de ubicación */}
+      <QRScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onResult={handleQRScan}
+      />
     </div>
   );
 }
