@@ -76,7 +76,7 @@ export default function PortalOperarioApp() {
     // Marcar processing antes del GPS para feedback inmediato (captura puede tardar hasta 8s)
     setProcessing(ot.id);
     const gps = await capturar();
-    const extraData = { assigned_name: displayName /*, assigned_to: currentUser?.id */ };
+    const extraData = { assigned_name: displayName, assigned_to: currentUser?.id };
     if (gps.gps_status === 'capturado') {
       extraData.gps = { latitude: gps.gps_latitude, longitude: gps.gps_longitude, accuracy: gps.gps_accuracy };
     } else {

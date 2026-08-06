@@ -58,13 +58,24 @@ export default async function(req) {
     // Filtro 1: sector (aislamiento entre sectores)
     let result = allOTs.filter(ot => (ot.sector_id || 'escuela') === userSector);
 
-    // Filtro 2: admin/gerente y roles de campo ven todas las OTs de su sector.
-    // Modelo basado en ubicación: cualquier operario del sector puede ver y
-    // auto-asignarse OTs pendientes/asignadas; las en_progreso las ve pero no puede
-    // reiniciarlas (lo bloquea la máquina de estados en transicionEstadoOT).
-    // El aislamiento entre sectores ya quedó garantizado en Filtro 1.
-    if (isAdminLevel || isField) {
-      return Response.json({ orders: result, total: result.length, role: isAdminLevel ? 'admin' : employeeRole });
+    // Filtro 2: admin/gerente ven todas las OTs de su sector.
+    if (isAdminLevel) {
+      return Response.json({ orders: result, total: result.length, role: 'admin' });
+    }
+
+    // Roles de campo: solo las OTs asignadas a ellos (assigned_to === userId),
+    // las que crearon, o las que tienen su email como jefe_sitio. NO ven todas
+    // las del sector — el descubrimiento de OTs nuevas se hace escaneando el QR
+    // de la ubicación (LocationOTListModal → publicFichar.getWorkOrderForLocation),
+    // y al iniciar la OT el backend estampa assigned_to = user.id para que pase
+    // a estar visible acá.
+    if (isField) {
+      result = result.filter(ot =>
+        (ot.assigned_to && ot.assigned_to === userId) ||
+        (ot.created_by_id && ot.created_by_id === userId) ||
+        (ot.jefe_sitio_email && ot.jefe_sitio_email.toLowerCase().trim() === userEmail)
+      );
+      return Response.json({ orders: result, total: result.length, role: employeeRole });
     }
 
     // Sin rol de campo ni admin — ver solo lo que creó
