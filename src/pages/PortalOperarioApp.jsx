@@ -82,10 +82,13 @@ export default function PortalOperarioApp() {
     } else {
       extraData.gps_status = gps.gps_status;
     }
-    const ok = await ejecutarTransicion(ot, 'iniciar', extraData);
-    // Abrir la ejecución directo: el operario sigue trabajando la OT sin depender
-    // de que reaparezca en la lista (getWorkOrdersForUser refetchea async).
-    if (ok) setReporteOT({ ...ot, status: 'en_progreso', assigned_name: displayName });
+    await ejecutarTransicion(ot, 'iniciar', extraData);
+    // "Iniciar" solo arranca la OT. El reporte de cierre se completa después,
+    // cuando el operario toque "Finalizar y Reportar" en la tarjeta de En Progreso.
+    // Abrir el ReporteForm acá forzaba el cierre inmediato de una OT que recién
+    // empezaba — el operario veía la lista cerrarse y aparecer el reporte ("se
+    // sale todo y ya"). La query se invalida en ejecutarTransicion, así la OT
+    // pasa a verse en "En Progreso" sin abrir ningún modal.
   };
 
   const handleReporteSaved = async (ot, reporteData) => {
