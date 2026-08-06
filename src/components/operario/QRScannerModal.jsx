@@ -121,9 +121,9 @@ export default function QRScannerModal({ open, onClose, onResult }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-sm max-h-[90vh] flex flex-col bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-2">
             <ScanLine className="h-5 w-5 text-primary" />
             <h3 className="text-sm font-bold text-white">Escanear QR</h3>
@@ -135,7 +135,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
 
         {/* Scanner area */}
         <div className="relative">
-          <div id={containerId} className="w-full aspect-square bg-black" />
+          <div id={containerId} className="w-full aspect-square max-h-[55vh] bg-black shrink-0" />
           {!scanning && !error && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
               <Camera className="h-10 w-10 text-slate-600 animate-pulse" />
@@ -183,7 +183,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 text-center">
+        <div className="px-4 py-3 text-center shrink-0">
           <p className="text-xs text-slate-400">
             {scanFlash ? '¡Código detectado!' : 'Apuntá la cámara al código QR de la orden de trabajo'}
           </p>

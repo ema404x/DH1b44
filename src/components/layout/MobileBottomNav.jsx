@@ -35,7 +35,7 @@ export default function MobileBottomNav({ onMore }) {
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       aria-label="Navegación principal"
     >
-      <div className="mx-auto max-w-md flex items-stretch border-t border-border bg-card/95 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.25)]">
+      <div className="flex items-stretch border-t border-border bg-card/95 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.25)]">
         {items.map((item) => {
           const active = isActive(item.path);
           return (
