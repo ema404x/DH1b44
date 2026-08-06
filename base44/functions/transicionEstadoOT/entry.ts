@@ -148,6 +148,21 @@ Deno.serve(async (req) => {
     }
 
     if (accion === 'iniciar') {
+      // Si la OT ya está asignada a alguien, solo ese operario puede iniciarla.
+      // Las pendientes (sin asignar) pueden ser auto-asignadas por quien la inicia.
+      // Admins/gerentes pueden iniciar cualquier OT de su sector.
+      if (!callerEsAdmin) {
+        const normName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        const yaAsignadaA = ot.assigned_name || ot.assigned_to;
+        const esElAsignado =
+          (ot.assigned_to && extra_data.assigned_to && ot.assigned_to === extra_data.assigned_to) ||
+          (ot.assigned_name && extra_data.assigned_name &&
+            normName(ot.assigned_name) === normName(extra_data.assigned_name));
+        if (yaAsignadaA && !esElAsignado) {
+          return Response.json({ error: 'Esta OT está asignada a otro operario' }, { status: 403 });
+        }
+      }
+
       if (extra_data.gps) {
         updateData.gps_latitude = extra_data.gps.latitude;
         updateData.gps_longitude = extra_data.gps.longitude;
@@ -159,12 +174,16 @@ Deno.serve(async (req) => {
       }
       updateData.fecha_inicio_real = new Date().toISOString();
 
-      // El que inicia la OT pasa a ser el operario que la trabaja — solo si
-      // estaba sin asignar. Así un operario del sector puede agarrar una OT
-      // libre escaneando su QR, y la OT queda visible para él en getWorkOrdersForUser.
+      // El que inicia la OT pasa a ser el operario que la trabaja.
+      // - assigned_to siempre se setea (si viene y difiere) para que la OT quede
+      //   visible para el operario en getWorkOrdersForUser (filtro por assigned_to).
+      // - assigned_name solo se reclama si la OT estaba sin asignar — respeta
+      //   asignaciones previas hechas por el jefe.
+      if (extra_data.assigned_to && ot.assigned_to !== extra_data.assigned_to) {
+        updateData.assigned_to = extra_data.assigned_to;
+      }
       if (extra_data.assigned_name && !ot.assigned_name) {
         updateData.assigned_name = extra_data.assigned_name;
-        if (extra_data.assigned_to) updateData.assigned_to = extra_data.assigned_to;
       }
     }
 

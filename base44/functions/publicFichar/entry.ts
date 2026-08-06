@@ -62,13 +62,21 @@ Deno.serve(async (req) => {
       const location = locResults[0] || null;
       if (!location) return Response.json({ workOrders: [], workOrder: null, locationName: '' });
 
+      // Aislamiento por sector: las OTs de la ubicación deben pertenecer al mismo
+      // sector que ella. Si la ubicación o la OT no tienen sector (legacy), no se
+      // bloquea (deuda de migración). Evita fugas cross-sector en el fallback difuso.
+      const locSector = location.sector_id;
+      const sameSector = (o) => !locSector || !o.sector_id || o.sector_id === locSector;
+
       // 1) OTs activas vinculadas por location_qr_id
-      let activeOrders = ordersById.filter(o => !['completada', 'cancelada'].includes(o.status));
+      let activeOrders = ordersById.filter(o =>
+        !['completada', 'cancelada'].includes(o.status) && sameSector(o));
 
       // 2) Si no hay, buscar también por location_qr_name (nombre denormalizado)
       if (activeOrders.length === 0 && location.name) {
         const ordersByName = await sb.entities.WorkOrder.filter({ location_qr_name: location.name }).catch(() => []);
-        activeOrders = ordersByName.filter(o => !['completada', 'cancelada'].includes(o.status));
+        activeOrders = ordersByName.filter(o =>
+          !['completada', 'cancelada'].includes(o.status) && sameSector(o));
       }
 
       // 3) Fallback final: matching difuso por campo location (texto libre)
@@ -78,6 +86,7 @@ Deno.serve(async (req) => {
         const locAddrNorm = normalize(location.address);
         activeOrders = fallbackOrders.filter(o => {
           if (['completada', 'cancelada'].includes(o.status)) return false;
+          if (!sameSector(o)) return false;
           const oLocNorm = normalize(o.location);
           const oLocQrNameNorm = normalize(o.location_qr_name);
           return (

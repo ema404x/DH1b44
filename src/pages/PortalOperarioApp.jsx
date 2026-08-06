@@ -168,10 +168,29 @@ export default function PortalOperarioApp() {
     }
   };
 
+  const normName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const isOwnerOf = (ot) =>
+    ot.assigned_to === currentUser?.id ||
+    (ot.assigned_name && normName(ot.assigned_name) === normName(displayName));
+
   const actOnOT = (foundOT) => {
-    if (foundOT.status === 'pendiente' || foundOT.status === 'asignada') {
+    if (foundOT.status === 'pendiente') {
+      setConfirmAction({ ot: foundOT, accion: 'iniciar' });
+    } else if (foundOT.status === 'asignada') {
+      // Solo el operario al que el jefe le asignó la OT puede iniciarla.
+      // Las asignadas sin nombre (edge) se tratan como libres.
+      if (foundOT.assigned_name && !isOwnerOf(foundOT)) {
+        toast.info(`Esta OT está asignada a ${foundOT.assigned_name}`);
+        return;
+      }
       setConfirmAction({ ot: foundOT, accion: 'iniciar' });
     } else if (foundOT.status === 'en_progreso') {
+      // Solo el operario que está trabajando la OT puede reportarla/cerrarla.
+      // Otro operario que escanea la misma ubicación la ve pero no puede actuar.
+      if (foundOT.assigned_name && !isOwnerOf(foundOT)) {
+        toast.info('Esta OT la está trabajando otro operario');
+        return;
+      }
       setReporteOT(foundOT);
     } else if (foundOT.status === 'pendiente_validacion') {
       toast.info('Esta OT ya está enviada al jefe para validación');

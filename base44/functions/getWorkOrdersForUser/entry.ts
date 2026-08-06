@@ -78,8 +78,8 @@ export default async function(req) {
       return Response.json({ orders: result, total: result.length, role: employeeRole });
     }
 
-    // Sin rol de campo ni admin — ver solo lo que creó
-    result = result.filter(ot => ot.created_by_id === userId);
+    // Sin rol de campo ni admin — ver las que creó o las que le asignaron
+    result = result.filter(ot => ot.created_by_id === userId || ot.assigned_to === userId);
     return Response.json({ orders: result, total: result.length, role: 'user' });
   } catch (error) {
     return Response.json({ error: error.message, stack: error.stack }, { status: 500 });
