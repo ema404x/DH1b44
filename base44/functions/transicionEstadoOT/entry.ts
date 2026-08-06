@@ -51,9 +51,24 @@ Deno.serve(async (req) => {
       return Response.json({ error: `Acción "${accion}" no válida. Acciones permitidas: ${todas.join(', ')}` }, { status: 400 });
     }
 
-    const ot = await base44.entities.WorkOrder.get(ot_id);
+    // Lectura con asServiceRole: la RLS de WorkOrder no tiene rama para el operario
+    // (solo creador / jefe_sitio_email / admin+sector / gerente+sector), así que un
+    // operario que escanea una OT libre recibe null → 404 → "no pasa nada".
+    // Los permisos de la transición ya los controla la función explícitamente (login
+    // obligatorio + canManageOT), así que la lectura no debe chocar con la RLS.
+    const ot = await base44.asServiceRole.entities.WorkOrder.get(ot_id);
     if (!ot) {
       return Response.json({ error: 'Orden de trabajo no encontrada' }, { status: 404 });
+    }
+
+    // Aislamiento por sector: la OT debe ser del mismo sector del que la opera
+    // (salvo admin/gerente de plataforma). Evita que el bypass de RLS abra una fuga
+    // cross-sector. Si la OT o el usuario no tienen sector cargado, no se bloquea
+    // (deuda pendiente de migración de registros viejos sin sector).
+    const callerSector = user?.data?.sector_id || user?.sector_id;
+    const callerEsAdmin = ['admin', 'gerente'].includes(user.role || '');
+    if (!callerEsAdmin && ot.sector_id && callerSector && ot.sector_id !== callerSector) {
+      return Response.json({ error: 'Esta OT pertenece a otro sector' }, { status: 403 });
     }
 
     // Validar estado actual
@@ -182,7 +197,9 @@ Deno.serve(async (req) => {
       updateData.rechazo_comentario = extra_data.rechazo_comentario.trim();
     }
 
-    const actualizada = await base44.entities.WorkOrder.update(ot_id, updateData);
+    // Escritura con asServiceRole por el mismo motivo que la lectura: el update
+    // autenticado lo bloquea la RLS para el operario. El sector ya se validó arriba.
+    const actualizada = await base44.asServiceRole.entities.WorkOrder.update(ot_id, updateData);
 
     return Response.json({
       success: true,

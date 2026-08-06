@@ -50,6 +50,7 @@ export default async function(req) {
                          platformRole === 'gerente' ||
                          isAdminLevelRole(employeeRole) ||
                          hasAdminView;
+    const isField = isFieldRole(employeeRole);
 
     // Query WorkOrders via service role (bypassing RLS)
     const allOTs = await base44.asServiceRole.entities.WorkOrder.list('-created_date', 500);
@@ -57,54 +58,18 @@ export default async function(req) {
     // Filtro 1: sector (aislamiento entre sectores)
     let result = allOTs.filter(ot => (ot.sector_id || 'escuela') === userSector);
 
-    // Filtro 2: si es admin/gerente, ve todo en su sector
-    if (isAdminLevel) {
-      return Response.json({ orders: result, total: result.length, role: 'admin' });
+    // Filtro 2: admin/gerente y roles de campo ven todas las OTs de su sector.
+    // Modelo basado en ubicación: cualquier operario del sector puede ver y
+    // auto-asignarse OTs pendientes/asignadas; las en_progreso las ve pero no puede
+    // reiniciarlas (lo bloquea la máquina de estados en transicionEstadoOT).
+    // El aislamiento entre sectores ya quedó garantizado en Filtro 1.
+    if (isAdminLevel || isField) {
+      return Response.json({ orders: result, total: result.length, role: isAdminLevel ? 'admin' : employeeRole });
     }
 
-    // Filtro 3: roles de campo — filtrar por identidad (definición centralizada)
-    const isField = isFieldRole(employeeRole);
-
-    if (!isField) {
-      // Sin rol de campo ni admin — ver solo lo que creó
-      result = result.filter(ot => ot.created_by_id === userId);
-      return Response.json({ orders: result, total: result.length, role: 'user' });
-    }
-
-    // Normalización para matching de nombres
-    const normalize = (s) => (s || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim();
-    const empNameNorm = normalize(employeeName);
-    const nameParts = empNameNorm.split(/\s+/).filter(p => p.length > 3);
-
-    result = result.filter(ot => {
-      // 1. Creado por este usuario
-      if (ot.created_by_id && ot.created_by_id === userId) return true;
-
-      // 2. Email exacto en campos de email
-      if (ot.jefe_sitio_email && ot.jefe_sitio_email.toLowerCase().trim() === userEmail) return true;
-      if (ot.assigned_to && ot.assigned_to.toLowerCase().trim() === userEmail) return true;
-
-      // 3. Matching de nombres en jefe_sitio y assigned_name
-      const jefeNorm = normalize(ot.jefe_sitio);
-      const assignedNorm = normalize(ot.assigned_name);
-
-      if (empNameNorm && jefeNorm && jefeNorm.includes(empNameNorm)) return true;
-      if (empNameNorm && assignedNorm && assignedNorm.includes(empNameNorm)) return true;
-
-      // Fuzzy: todas las partes del nombre (>3 chars) aparecen en el campo
-      if (nameParts.length >= 2) {
-        if (jefeNorm && nameParts.every(p => jefeNorm.includes(p))) return true;
-        if (assignedNorm && nameParts.every(p => assignedNorm.includes(p))) return true;
-      }
-
-      return false;
-    });
-
-    return Response.json({ orders: result, total: result.length, role: employeeRole });
+    // Sin rol de campo ni admin — ver solo lo que creó
+    result = result.filter(ot => ot.created_by_id === userId);
+    return Response.json({ orders: result, total: result.length, role: 'user' });
   } catch (error) {
     return Response.json({ error: error.message, stack: error.stack }, { status: 500 });
   }
