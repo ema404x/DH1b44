@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, ClipboardList, RefreshCw, FolderKanban, LayoutGrid, HardHat } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
+import { hasModulePermission } from '@/lib/roles';
 
 // Destinos primarios que siempre viven en la barra inferior (mobile-first, Material 3).
 // El resto de módulos queda accesible vía el botón "Más" que abre el drawer.
@@ -27,7 +28,7 @@ export default function MobileBottomNav({ onMore }) {
     if (user?.role === 'admin') return true;
     if (!userPermissions) return item.path === '/';
     if (!item.module) return true;
-    return userPermissions[item.module]?.read === true;
+    return hasModulePermission(userPermissions[item.module], 'read');
   };
 
   // Máx 4 destinos + "Más" para no comprimir en pantallas chicas.

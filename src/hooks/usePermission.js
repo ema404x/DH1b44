@@ -1,5 +1,6 @@
 import { useContext } from 'react';
 import { AuthContext } from '@/lib/AuthContext';
+import { hasModulePermission } from '@/lib/roles';
 
 /**
  * Retorna si el usuario actual tiene permiso para una acción en un módulo.
@@ -34,6 +35,6 @@ export function usePermission(moduleKey, action = 'read') {
     return { allowed: false, loading: false, vinculationFailed: false };
   }
 
-  const allowed = userPermissions?.[moduleKey]?.[action] === true;
+  const allowed = hasModulePermission(userPermissions?.[moduleKey], action);
   return { allowed, loading: false, vinculationFailed: false };
 }

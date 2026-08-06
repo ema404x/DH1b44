@@ -36,3 +36,16 @@ export function isJefeSitioRole(employeeRole) {
 export function canManageOT(employeeRole) {
   return isAdminLevelRole(employeeRole) || isJefeSitioRole(employeeRole);
 }
+
+/**
+ * Evalúa si un módulo tiene permiso para una acción.
+ * admin_view implica read: un rol que puede "ver todo" también puede ver (read).
+ * Centraliza la lógica usada por ProtectedPage (usePermission), Sidebar y la
+ * barra inferior móvil, para que los tres puntos de control sean consistentes.
+ */
+export function hasModulePermission(modulePerms, action) {
+  if (!modulePerms) return false;
+  if (modulePerms[action] === true) return true;
+  if (action === 'read' && modulePerms.admin_view === true) return true;
+  return false;
+}

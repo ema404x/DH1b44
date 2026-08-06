@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { useForoNotificaciones } from '@/hooks/useForoNotificaciones';
 import { useAprobacionPendientes } from '@/hooks/useAprobacionPendientes';
+import { hasModulePermission } from '@/lib/roles';
 
 const navGroups = [
   {
@@ -99,7 +100,7 @@ const routeToModule = {
   '/empleados': 'Employee', '/mapa': 'Mapa', '/mapa-jefes': 'MapaJefes',
   '/inventario': 'Inventory', '/alertas': 'Alertas', '/permisos': 'Permisos',
   '/auditoria': 'AuditLog', '/seguridad': 'Seguridad', '/sectores': 'Sectores', '/calefaccion': 'Calefaccion',
-  '/rutinas': 'Rutinas', '/mis-ots': null, '/foro': null, '/tutorial': null, '/importar': 'ImportarDatos',
+  '/rutinas': 'Rutinas', '/mis-ots': null, '/foro': 'Foro', '/tutorial': null, '/importar': 'ImportarDatos',
 };
 
 const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesAprobacion }) {
@@ -231,11 +232,12 @@ export default function Sidebar({ open, onOpenChange }) {
       items: group.items.filter(item => {
         if (isAdmin) return true;
         if (!userPermissions) {
-          return item.path === '/' || item.path === '/tutorial' || item.path === '/calendario';
+          // Mientras los permisos no llegan, mostrar solo lo no protegido + Dashboard.
+          return item.path === '/' || routeToModule[item.path] === null;
         }
         const moduleKey = routeToModule[item.path];
         if (!moduleKey) return true;
-        return userPermissions[moduleKey]?.read === true;
+        return hasModulePermission(userPermissions[moduleKey], 'read');
       })
     })).filter(group => group.items.length > 0);
   }, [user?.role, userPermissions]);
