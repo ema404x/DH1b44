@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
-import { Loader2, ClipboardList, MapPin, Play, Flag, Lock, Clock, CheckCircle2, ArrowRight, ScanLine, History } from 'lucide-react';
+import { Loader2, ClipboardList, MapPin, Play, Flag, Lock, Clock, CheckCircle2, ArrowRight, ScanLine, History, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 import ReporteForm from '@/components/operario/ReporteForm';
 import QRScannerModal from '@/components/operario/QRScannerModal';
@@ -22,11 +22,33 @@ export default function PortalOperarioApp() {
   const { capturar } = useGeolocalizacion();
   const queryClient = useQueryClient();
 
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+
+  const CACHE_KEY = `mis-ots-cache-${currentUser?.id || 'anon'}`;
+
   const { data: allOTs = [], isLoading } = useQuery({
     queryKey: ['workorders-operario'],
-    queryFn: () => base44.functions.invoke('getWorkOrdersForUser', {})
-              .then(r => r.data?.orders || []),
+    queryFn: async () => {
+      try {
+        const res = await base44.functions.invoke('getWorkOrdersForUser');
+        const orders = res.data?.orders || [];
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ orders, cachedAt: Date.now() })); } catch {}
+        return orders;
+      } catch (err) {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) return JSON.parse(cached).orders;
+        throw err;
+      }
+    },
     staleTime: 1000 * 60 * 5,
+    retry: false,
   });
 
   const misOTs = useMemo(() => {
@@ -130,6 +152,19 @@ export default function PortalOperarioApp() {
     if (ok) setReporteOT(null);
   };
 
+  // OTs cacheadas para una ubicación (por id) — solo lectura offline
+  const otsDesdeCacheParaUbicacion = (locId) => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+      const orders = cached?.orders || [];
+      const activas = orders.filter(o =>
+        o.location_qr_id === locId && !['completada', 'cancelada'].includes(o.status)
+      );
+      const nombre = activas[0]?.location_qr_name || activas[0]?.location || 'Ubicación escaneada';
+      return { orders: activas, name: nombre };
+    } catch { return { orders: [], name: 'Ubicación escaneada' }; }
+  };
+
   const handleQRScan = async (result) => {
     // Nota: NO cerramos el scanner acá — el scanner se cierra solo tras 350ms
     // (mostrando el flash verde de "código detectado"). Si lo cerramos acá,
@@ -137,6 +172,12 @@ export default function PortalOperarioApp() {
 
     // Tipo 'loc' — buscar OTs de la ubicación via backend (service role, sin RLS)
     if (result.type === 'loc') {
+      // Sin conexión: resolver desde el cache (solo lectura)
+      if (!navigator.onLine) {
+        const { orders, name } = otsDesdeCacheParaUbicacion(result.value);
+        setLocOTs({ orders, name, loading: false, locId: result.value, error: false, offline: true });
+        return;
+      }
       setLocOTs({ orders: [], name: 'Cargando…', loading: true, locId: result.value, error: false });
       try {
         const res = await base44.functions.invoke('publicFichar', {
@@ -147,7 +188,9 @@ export default function PortalOperarioApp() {
         const orders = data.workOrders || [];
         setLocOTs({ orders, name: data.locationName || 'Ubicación escaneada', loading: false, locId: result.value, error: false });
       } catch {
-        setLocOTs({ orders: [], name: 'Ubicación escaneada', loading: false, locId: result.value, error: true });
+        // La red falló: caer al cache en vez de dejar la lista vacía
+        const c = otsDesdeCacheParaUbicacion(result.value);
+        setLocOTs({ orders: c.orders, name: c.name, loading: false, locId: result.value, error: false, offline: true });
       }
       return;
     }
@@ -226,6 +269,10 @@ export default function PortalOperarioApp() {
     } else if (foundOT.status === 'en_progreso') {
       // Solo el operario que está trabajando la OT puede reportarla/cerrarla.
       // Otro operario que escanea la misma ubicación la ve pero no puede actuar.
+      if (!isOnline) {
+        toast.error('Necesitás conexión para finalizar esta OT.');
+        return;
+      }
       if (foundOT.assigned_name && !isOwnerOf(foundOT)) {
         toast.info('Esta OT la está trabajando otro operario');
         return;
@@ -248,6 +295,14 @@ export default function PortalOperarioApp() {
 
   return (
     <div className="min-h-screen flex flex-col gap-5">
+
+      {/* Banner offline */}
+      {!isOnline && (
+        <div className="flex items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-medium px-3 py-2">
+          <WifiOff className="h-4 w-4 shrink-0" />
+          Sin conexión — mostrando tus OTs guardadas.
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center gap-3">
@@ -322,6 +377,7 @@ export default function PortalOperarioApp() {
               processing={processing === ot.id}
               onIniciar={undefined}
               onFinalizar={() => setReporteOT(ot)}
+              offline={!isOnline}
             />
           ))}
         </Seccion>
@@ -337,6 +393,7 @@ export default function PortalOperarioApp() {
               processing={processing === ot.id}
               onIniciar={() => setConfirmAction({ ot, accion: 'iniciar' })}
               onFinalizar={undefined}
+              offline={!isOnline}
             />
           ))}
         </Seccion>
@@ -387,6 +444,7 @@ export default function PortalOperarioApp() {
           }}
           onCancel={() => setConfirmAction(null)}
           processing={processing === confirmAction.ot.id}
+          offline={!isOnline}
         />
       )}
 
@@ -399,6 +457,7 @@ export default function PortalOperarioApp() {
           locationName={locOTs.name}
           loading={locOTs.loading}
           error={locOTs.error}
+          offline={locOTs.offline}
           onRetry={handleRetryLoc}
           onScanAnother={() => setScannerOpen(true)}
           onSelect={(ot) => { setLocOTs(null); actOnOT(ot); }}
@@ -476,7 +535,7 @@ const STEPS = [
   { key: 'completada', label: 'Completada', color: '#10b981' },
 ];
 
-function OTCard({ ot, onIniciar, onFinalizar, processing, locked }) {
+function OTCard({ ot, onIniciar, onFinalizar, processing, locked, offline }) {
   const badge = STATUS_BADGE[ot.status] || STATUS_BADGE.pendiente;
   const rail = LANE[ot.status] || '#3b82f6';
   const prio = PRIORITY[ot.priority];
@@ -527,6 +586,11 @@ function OTCard({ ot, onIniciar, onFinalizar, processing, locked }) {
             <Lock className="h-4 w-4" />
             Esperando validación
           </div>
+        ) : offline ? (
+          <div className="flex items-center justify-center gap-2 h-11 rounded-lg bg-white/5 border border-white/10 text-slate-500 text-xs font-medium text-center px-2">
+            <WifiOff className="h-4 w-4 shrink-0" />
+            Necesitás conexión para {onIniciar ? 'iniciar' : 'finalizar'}.
+          </div>
         ) : onIniciar ? (
           <button
             onClick={onIniciar}
@@ -551,7 +615,7 @@ function OTCard({ ot, onIniciar, onFinalizar, processing, locked }) {
   );
 }
 
-function ConfirmDialog({ ot, accion, onConfirm, onCancel, processing }) {
+function ConfirmDialog({ ot, accion, onConfirm, onCancel, processing, offline }) {
   const textos = {
     iniciar: {
       titulo: '¿Iniciar orden de trabajo?',
@@ -578,10 +642,10 @@ function ConfirmDialog({ ot, accion, onConfirm, onCancel, processing }) {
           </button>
           <button
             onClick={onConfirm}
-            disabled={processing}
+            disabled={processing || offline}
             className="flex-1 h-11 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : t.boton}
+            {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : offline ? 'Necesitás conexión' : t.boton}
           </button>
         </div>
       </div>

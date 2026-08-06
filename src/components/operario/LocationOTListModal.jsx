@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, X, Play, Flag, Lock, CheckCircle2, ClipboardList, Loader2, AlertCircle, ScanLine } from 'lucide-react';
+import { MapPin, X, Play, Flag, Lock, CheckCircle2, ClipboardList, Loader2, AlertCircle, ScanLine, WifiOff } from 'lucide-react';
 
 const TYPE_LABEL = {
   mantenimiento_preventivo: 'Mant. Preventivo',
@@ -19,7 +19,7 @@ const STATUS_BADGE = {
   cancelada:   { label: 'Cancelada',   cls: 'bg-red-400/10 text-red-400 border-red-400/20' },
 };
 
-export default function LocationOTListModal({ open, onClose, orders, locationName, onSelect, loading, error, onRetry, onScanAnother }) {
+export default function LocationOTListModal({ open, onClose, orders, locationName, onSelect, loading, error, onRetry, onScanAnother, offline }) {
   if (!open) return null;
 
   const safeOrders = orders || [];
@@ -39,6 +39,7 @@ export default function LocationOTListModal({ open, onClose, orders, locationNam
             <h3 className="text-sm font-bold text-white truncate">{locationName || 'Ubicación'}</h3>
             <p className="text-xs text-slate-500">
               {error ? 'Error al cargar' : `${activas.length} OT activa${activas.length !== 1 ? 's' : ''}`}
+              {offline && <span className="text-amber-400 font-medium"> · sin conexión</span>}
             </p>
           </div>
           {onScanAnother && (
@@ -72,9 +73,19 @@ export default function LocationOTListModal({ open, onClose, orders, locationNam
 
           {!loading && !error && safeOrders.length === 0 && (
             <div className="text-center py-10 flex flex-col items-center gap-2">
-              <ClipboardList className="h-12 w-12 text-slate-700" />
-              <p className="text-sm text-slate-400">No hay OTs activas en esta ubicación</p>
-              <p className="text-xs text-slate-600">Acercá un código cuando haya tareas asignadas</p>
+              {offline ? (
+                <>
+                  <WifiOff className="h-12 w-12 text-amber-400/70" />
+                  <p className="text-sm text-slate-300">Sin conexión y sin OTs guardadas de esta ubicación</p>
+                  <p className="text-xs text-slate-600">Conectate una vez para descargarlas.</p>
+                </>
+              ) : (
+                <>
+                  <ClipboardList className="h-12 w-12 text-slate-700" />
+                  <p className="text-sm text-slate-400">No hay OTs activas en esta ubicación</p>
+                  <p className="text-xs text-slate-600">Acercá un código cuando haya tareas asignadas</p>
+                </>
+              )}
             </div>
           )}
 
