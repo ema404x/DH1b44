@@ -63,24 +63,43 @@ export default async function(req) {
       return Response.json({ orders: result, total: result.length, role: 'admin' });
     }
 
-    // Roles de campo: solo las OTs asignadas a ellos (assigned_to === userId),
-    // las que crearon, o las que tienen su email como jefe_sitio. NO ven todas
-    // las del sector — el descubrimiento de OTs nuevas se hace escaneando el QR
-    // de la ubicación (LocationOTListModal → publicFichar.getWorkOrderForLocation),
-    // y al iniciar la OT el backend estampa assigned_to = user.id para que pase
-    // a estar visible acá.
+    // Roles de campo: solo las OTs asignadas a ellos, las que crearon, o las que
+    // tienen su email como jefe_sitio. NO ven todas las del sector — el descubrimiento
+    // de OTs nuevas se hace escaneando el QR de la ubicación (LocationOTListModal →
+    // publicFichar.getWorkOrderForLocation), y al iniciar la OT el backend estampa
+    // assigned_to = user.id para que pase a estar visible acá.
+    //
+    // ADEMÁS match por nombre: el jefe suele asignar la OT tipeando el nombre del
+    // operario en el panel de detalle (WorkOrderDetailPanel), lo que setea
+    // assigned_name pero VACÍA assigned_to. Sin este match por nombre, el operario
+    // no vería esas OTs en su lista proactivamente (solo las encontraría escaneando
+    // el QR). Comparamos con normalización (lowercase, sin acentos) para tolerar
+    // diferencias de mayúsculas/acentos entre el nombre del Employee y lo que tipeó
+    // el jefe.
     if (isField) {
+      const normName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      const myName = normName(employeeName);
       result = result.filter(ot =>
         (ot.assigned_to && ot.assigned_to === userId) ||
         (ot.created_by_id && ot.created_by_id === userId) ||
-        (ot.jefe_sitio_email && ot.jefe_sitio_email.toLowerCase().trim() === userEmail)
+        (ot.jefe_sitio_email && ot.jefe_sitio_email.toLowerCase().trim() === userEmail) ||
+        (myName && normName(ot.assigned_name) === myName)
       );
       return Response.json({ orders: result, total: result.length, role: employeeRole });
     }
 
     // Sin rol de campo ni admin — ver las que creó o las que le asignaron
-    result = result.filter(ot => ot.created_by_id === userId || ot.assigned_to === userId);
-    return Response.json({ orders: result, total: result.length, role: 'user' });
+    // (mismo match por nombre por la misma razón: assigned_to suele quedar vacío).
+    {
+      const normName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      const myName = normName(employeeName);
+      result = result.filter(ot =>
+        ot.created_by_id === userId ||
+        (ot.assigned_to && ot.assigned_to === userId) ||
+        (myName && normName(ot.assigned_name) === myName)
+      );
+      return Response.json({ orders: result, total: result.length, role: 'user' });
+    }
   } catch (error) {
     return Response.json({ error: error.message, stack: error.stack }, { status: 500 });
   }
