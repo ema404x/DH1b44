@@ -1,13 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
-import { Loader2, ClipboardList, MapPin, Play, Flag, Lock, Clock, CheckCircle2, ArrowRight, ScanLine } from 'lucide-react';
+import { Loader2, ClipboardList, MapPin, Play, Flag, Lock, Clock, CheckCircle2, ArrowRight, ScanLine, History } from 'lucide-react';
 import { toast } from 'sonner';
 import ReporteForm from '@/components/operario/ReporteForm';
 import QRScannerModal from '@/components/operario/QRScannerModal';
 import LocationOTListModal from '@/components/operario/LocationOTListModal';
+import MisOrdenesFiltros from '@/components/operario/MisOrdenesFiltros';
 
 export default function PortalOperarioApp() {
   const { currentUser, displayName } = useCurrentUser();
@@ -16,6 +17,8 @@ export default function PortalOperarioApp() {
   const [confirmAction, setConfirmAction] = useState(null); // { ot, accion }
   const [scannerOpen, setScannerOpen] = useState(false);
   const [locOTs, setLocOTs] = useState(null); // { orders, name } cuando se escanea un QR de ubicación
+  const [filtros, setFiltros] = useState({ texto: '', tipo: 'todos', prioridad: 'todos' });
+  const [vista, setVista] = useState('activas'); // 'activas' | 'historial'
   const { capturar } = useGeolocalizacion();
   const queryClient = useQueryClient();
 
@@ -32,16 +35,46 @@ export default function PortalOperarioApp() {
     return allOTs.filter(ot => ot.status !== 'cancelada' && ot.status !== 'completada');
   }, [allOTs]);
 
+  // Historial: OTs terminales (completadas / canceladas) que el operario trabajó.
+  const historial = useMemo(() =>
+    allOTs.filter(ot => ot.status === 'cancelada' || ot.status === 'completada'),
+  [allOTs]);
+
+  const aplicarFiltros = useCallback((lista) => {
+    const q = filtros.texto
+      ? filtros.texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      : '';
+    return lista.filter(ot => {
+      if (q) {
+        const blob = [ot.title, ot.location, ot.code, ot.asset_name, ot.project_name]
+          .filter(Boolean).join(' ')
+          .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (!blob.includes(q)) return false;
+      }
+      if (filtros.tipo !== 'todos' && ot.type !== filtros.tipo) return false;
+      if (filtros.prioridad !== 'todos' && ot.priority !== filtros.prioridad) return false;
+      return true;
+    });
+  }, [filtros]);
+
+  const misOTsFiltradas = useMemo(() => aplicarFiltros(misOTs), [misOTs, aplicarFiltros]);
+  const historialFiltrado = useMemo(() => aplicarFiltros(historial), [historial, aplicarFiltros]);
+
+  const limpiarFiltros = () => {
+    setFiltros({ texto: '', tipo: 'todos', prioridad: 'todos' });
+    setVista('activas');
+  };
+
   // Separar por fase del flujo
   const { porIniciar, enProgreso, enValidacion } = useMemo(() => {
     const ini = [], prog = [], val = [];
-    for (const ot of misOTs) {
+    for (const ot of misOTsFiltradas) {
       if (ot.status === 'pendiente_validacion') val.push(ot);
       else       if (ot.status === 'en_progreso') prog.push(ot);
       else ini.push(ot); // pendiente, asignada
     }
     return { porIniciar: ini, enProgreso: prog, enValidacion: val };
-  }, [misOTs]);
+  }, [misOTsFiltradas]);
 
   const ejecutarTransicion = async (ot, accion, extraData = {}) => {
     setProcessing(ot.id);
@@ -245,6 +278,38 @@ export default function PortalOperarioApp() {
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Completada</span>
       </div>
 
+      {/* Filtros + toggle Activas/Historial */}
+      <MisOrdenesFiltros
+        filtros={filtros}
+        onChange={setFiltros}
+        onLimpiar={limpiarFiltros}
+        vista={vista}
+        onVistaChange={setVista}
+        counts={{ activas: misOTs.length, historial: historial.length }}
+      />
+
+      {vista === 'historial' ? (
+        <div>
+          {historialFiltrado.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {historialFiltrado.map(ot => <HistorialCard key={ot.id} ot={ot} />)}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-500">
+              <History className="h-12 w-12 text-slate-700" />
+              <p className="text-sm font-medium">
+                {historial.length === 0 ? 'Todavía no completaste ninguna orden' : 'Ninguna orden coincide con los filtros'}
+              </p>
+              {historial.length > 0 && (
+                <button onClick={limpiarFiltros} className="text-xs text-primary hover:underline">
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
       {/* SECCIÓN 1: En progreso (prioridad — el operario debe terminar lo que empezó) */}
       {enProgreso.length > 0 && (
         <Seccion titulo="En Progreso" subtitulo="Terminá estas antes de empezar nuevas" icon={Clock} color="sky">
@@ -285,11 +350,20 @@ export default function PortalOperarioApp() {
       )}
 
       {/* Empty state */}
-      {misOTs.length === 0 && (
+      {misOTsFiltradas.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-500">
           <CheckCircle2 className="h-12 w-12 text-slate-700" />
-          <p className="text-sm font-medium">No tenés órdenes asignadas</p>
+          <p className="text-sm font-medium">
+            {misOTs.length === 0 ? 'No tenés órdenes asignadas' : 'Ninguna orden coincide con los filtros'}
+          </p>
+          {misOTs.length > 0 && (
+            <button onClick={limpiarFiltros} className="text-xs text-primary hover:underline">
+              Limpiar filtros
+            </button>
+          )}
         </div>
+      )}
+      </>
       )}
 
       {/* Formulario de reporte */}
@@ -364,6 +438,8 @@ const STATUS_BADGE = {
   asignada:    { label: 'Asignada',    cls: 'bg-blue-400/10 text-blue-400 border-blue-400/20' },
   en_progreso: { label: 'En Progreso', cls: 'bg-sky-400/10 text-sky-400 border-sky-400/20' },
   pendiente_validacion: { label: 'En Validación', cls: 'bg-amber-400/10 text-amber-400 border-amber-400/20' },
+  completada: { label: 'Completada', cls: 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' },
+  cancelada:  { label: 'Cancelada',  cls: 'bg-red-400/10 text-red-400 border-red-400/20' },
 };
 
 function OTCard({ ot, onIniciar, onFinalizar, processing, locked }) {
@@ -455,6 +531,41 @@ function ConfirmDialog({ ot, accion, onConfirm, onCancel, processing }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+const formatFecha = (d) => {
+  try {
+    if (!d) return '';
+    return new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch {
+    return d || '';
+  }
+};
+
+function HistorialCard({ ot }) {
+  const badge = STATUS_BADGE[ot.status] || STATUS_BADGE.completada;
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-2 opacity-85">
+      <div className="flex items-center justify-between gap-2">
+        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge.cls}`}>
+          {badge.label}
+        </span>
+        {ot.completed_date && (
+          <span className="text-[11px] text-slate-500 tabular-nums">{formatFecha(ot.completed_date)}</span>
+        )}
+      </div>
+      <h3 className="text-sm font-semibold text-white leading-snug">{ot.title}</h3>
+      {ot.location && (
+        <div className="flex items-center gap-1 text-xs text-slate-400">
+          <MapPin className="h-3 w-3" />
+          <span className="truncate">{ot.location}</span>
+        </div>
+      )}
+      {ot.validado_por && (
+        <p className="text-[11px] text-slate-500">Validado por {ot.validado_por}</p>
+      )}
     </div>
   );
 }
