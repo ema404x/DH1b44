@@ -43,9 +43,19 @@ export function canManageOT(employeeRole) {
  * Centraliza la lógica usada por ProtectedPage (usePermission), Sidebar y la
  * barra inferior móvil, para que los tres puntos de control sean consistentes.
  */
-export function hasModulePermission(modulePerms, action) {
-  if (!modulePerms) return false;
+// Módulos que eran de acceso libre antes de tener su propia clave de permiso.
+// Mientras un rol no los tenga configurados explícitamente, se concede read
+// (migración no-rompe-nada). Una vez que el admin guarda, el valor explícito persiste.
+const MIGRATION_DEFAULT_READ = new Set(['MisOrdenes']);
+
+export function hasModulePermission(modulePerms, action, moduleKey) {
+  // Módulo ausente de los permisos del rol (rol creado antes de la clave).
+  if (!modulePerms) {
+    return action === 'read' && MIGRATION_DEFAULT_READ.has(moduleKey);
+  }
   if (modulePerms[action] === true) return true;
   if (action === 'read' && modulePerms.admin_view === true) return true;
+  // Módulo presente pero sin la acción definida (rol viejo sin la clave read).
+  if (action === 'read' && modulePerms.read === undefined && MIGRATION_DEFAULT_READ.has(moduleKey)) return true;
   return false;
 }

@@ -10,7 +10,7 @@ import { hasModulePermission } from '@/lib/roles';
 const PRIMARY = [
   { label: 'Inicio', icon: LayoutDashboard, path: '/', module: 'Dashboard' },
   // Pantalla principal del operario/jefe de sitio — visible solo para no-admins.
-  { label: 'Mis Órdenes', icon: HardHat, path: '/mis-ots', module: null, nonAdmin: true },
+  { label: 'Mis Órdenes', icon: HardHat, path: '/mis-ots', module: 'MisOrdenes', nonAdmin: true },
   { label: 'Órdenes', icon: ClipboardList, path: '/ordenes', module: 'WorkOrder' },
   { label: 'Rutinas', icon: RefreshCw, path: '/rutinas', module: 'Rutinas' },
   { label: 'Proyectos', icon: FolderKanban, path: '/proyectos', module: 'Project' },
@@ -24,11 +24,13 @@ export default function MobileBottomNav({ onMore }) {
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
   const allowed = (item) => {
-    if (item.nonAdmin) return user?.role !== 'admin';
+    // nonAdmin oculta el item a admins (usan el módulo admin completo),
+    // pero para no-admins sigue sujeto al permiso del módulo.
+    if (item.nonAdmin && user?.role === 'admin') return false;
     if (user?.role === 'admin') return true;
-    if (!userPermissions) return item.path === '/';
+    if (!userPermissions) return item.path === '/' || !!item.nonAdmin;
     if (!item.module) return true;
-    return hasModulePermission(userPermissions[item.module], 'read');
+    return hasModulePermission(userPermissions[item.module], 'read', item.module);
   };
 
   // Máx 4 destinos + "Más" para no comprimir en pantallas chicas.

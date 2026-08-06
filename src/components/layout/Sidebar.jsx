@@ -100,7 +100,7 @@ const routeToModule = {
   '/empleados': 'Employee', '/mapa': 'Mapa', '/mapa-jefes': 'MapaJefes',
   '/inventario': 'Inventory', '/alertas': 'Alertas', '/permisos': 'Permisos',
   '/auditoria': 'AuditLog', '/seguridad': 'Seguridad', '/sectores': 'Sectores', '/calefaccion': 'Calefaccion',
-  '/rutinas': 'Rutinas', '/mis-ots': null, '/foro': 'Foro', '/tutorial': null, '/importar': 'ImportarDatos',
+  '/rutinas': 'Rutinas', '/mis-ots': 'MisOrdenes', '/foro': 'Foro', '/tutorial': null, '/importar': 'ImportarDatos',
 };
 
 const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesAprobacion }) {
@@ -232,12 +232,13 @@ export default function Sidebar({ open, onOpenChange }) {
       items: group.items.filter(item => {
         if (isAdmin) return true;
         if (!userPermissions) {
-          // Mientras los permisos no llegan, mostrar solo lo no protegido + Dashboard.
-          return item.path === '/' || routeToModule[item.path] === null;
+          // Mientras los permisos no llegan: no protegido + Dashboard + MisOrdenes.
+          const mk = routeToModule[item.path];
+          return mk === null || mk === 'Dashboard' || mk === 'MisOrdenes';
         }
         const moduleKey = routeToModule[item.path];
         if (!moduleKey) return true;
-        return hasModulePermission(userPermissions[moduleKey], 'read');
+        return hasModulePermission(userPermissions[moduleKey], 'read', moduleKey);
       })
     })).filter(group => group.items.length > 0);
   }, [user?.role, userPermissions]);

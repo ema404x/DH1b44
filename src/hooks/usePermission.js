@@ -26,7 +26,9 @@ export function usePermission(moduleKey, action = 'read') {
   // nunca llegaron. Conceder acceso mínimo al Dashboard para no bloquear al usuario.
   // El reintento en background completará los permisos reales.
   if (userPermissions === null) {
-    if (moduleKey === 'Dashboard') return { allowed: true, loading: false, vinculationFailed: false };
+    // Dashboard y MisOrdenes (portal del operario) son la pantalla base —
+    // se conceden incluso en estado inconsistente para no bloquear al usuario.
+    if (moduleKey === 'Dashboard' || moduleKey === 'MisOrdenes') return { allowed: true, loading: false, vinculationFailed: false };
     return { allowed: false, loading: false, vinculationFailed: false };
   }
 
@@ -35,6 +37,6 @@ export function usePermission(moduleKey, action = 'read') {
     return { allowed: false, loading: false, vinculationFailed: false };
   }
 
-  const allowed = hasModulePermission(userPermissions?.[moduleKey], action);
+  const allowed = hasModulePermission(userPermissions?.[moduleKey], action, moduleKey);
   return { allowed, loading: false, vinculationFailed: false };
 }

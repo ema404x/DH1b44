@@ -24,6 +24,7 @@ const MODULES = [
   { key: 'Foro', label: 'Foro de Comunicaciones', group: 'General' },
   { key: 'Project', label: 'Proyectos', group: 'Operaciones' },
   { key: 'WorkOrder', label: 'Órdenes de Trabajo', group: 'Operaciones' },
+  { key: 'MisOrdenes', label: 'Mis Órdenes de Trabajo', group: 'Operaciones' },
   { key: 'Pendientes', label: 'Pendientes SAP', group: 'Operaciones' },
   { key: 'Emergencias', label: 'Emergencias', group: 'Operaciones' },
   { key: 'Mapa', label: 'Mapa de Ubicaciones', group: 'Operaciones' },
@@ -109,7 +110,12 @@ function RoleCard({ role, onDelete, onToggle, deleteIsPending }) {
     const normalized = { ...perms };
     MODULES.forEach(mod => {
       if (!normalized[mod.key]) {
-        normalized[mod.key] = ACTIONS.reduce((acc, act) => ({ ...acc, [act]: false }), {});
+        const def = ACTIONS.reduce((acc, act) => ({ ...acc, [act]: false }), {});
+        // Migración: MisOrdenes era de acceso libre — preservar read=true al
+        // inicializar, para que la UI refleje el acceso actual y el admin pueda
+        // desmarcar para revocar.
+        if (mod.key === 'MisOrdenes') def.read = true;
+        normalized[mod.key] = def;
       }
     });
     return normalized;

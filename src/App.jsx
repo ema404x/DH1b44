@@ -152,7 +152,7 @@ const AuthenticatedApp = () => {
         <Route path="/calefaccion" element={<ProtectedPage moduleKey="Calefaccion"><Calefaccion /></ProtectedPage>} />
         <Route path="/rutinas" element={<ProtectedPage moduleKey="Rutinas"><Rutinas /></ProtectedPage>} />
         <Route path="/sectores" element={<ProtectedPage moduleKey="Sectores"><Sectores /></ProtectedPage>} />
-        <Route path="/mis-ots" element={<PortalOperarioApp />} />
+        <Route path="/mis-ots" element={<ProtectedPage moduleKey="MisOrdenes"><PortalOperarioApp /></ProtectedPage>} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
