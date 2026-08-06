@@ -19,6 +19,8 @@ import WorkOrderIncompleteReason from './WorkOrderIncompleteReason';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { exportWorkOrderPDF } from '@/utils/exportWorkOrderPDF';
 import LocationEditor from './LocationEditor';
+import ReporteOperarioResumen from './ReporteOperarioResumen';
+import RechazoOTModal from './RechazoOTModal';
 import { getAvailableActions, getTransitionAction, ACTION_VARIANTS } from '@/lib/workorder-transitions';
 import { useResolveCreator } from '@/hooks/useResolveCreator';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -107,6 +109,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [convertingToObra, setConvertingToObra] = useState(false);
   const [assignMode, setAssignMode] = useState('list');
+  const [rechazoOpen, setRechazoOpen] = useState(false);
   const queryClient = useQueryClient();
   const { resolveOTOwner } = useResolveCreator();
   const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
@@ -241,15 +244,17 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     // los edits no guardados (notas, checklist, materiales). La máquina de estados
     // toca status/fechas/validador; el flush toca campos del operario. No se pisan.
     if (dirtyRef.current.size > 0) flushDirty();
+    // Rechazo → abre el modal limpio (exige motivo visible para el operario).
+    // El prompt() del navegador no daba feedback al operario ni validación decente.
+    if (accion === 'rechazar') {
+      setStateActionLoading(false);
+      setRechazoOpen(true);
+      return;
+    }
     try {
       const extraData = {};
       if (accion === 'asignar' && data.assigned_name) {
         extraData.assigned_name = data.assigned_name;
-      }
-      if (accion === 'rechazar') {
-        const comentario = prompt('Motivo del rechazo:');
-        if (!comentario || !comentario.trim()) { setStateActionLoading(false); return; }
-        extraData.rechazo_comentario = comentario.trim();
       }
       const res = await base44.functions.invoke('transicionEstadoOT', {
         ot_id: order.id, accion, extra_data: extraData,
@@ -257,10 +262,34 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       toast.success(res.data.mensaje);
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
-      if (accion === 'aprobar' || accion === 'rechazar') queryClient.invalidateQueries({ queryKey: ['workorders-validacion'] });
+      if (accion === 'aprobar') queryClient.invalidateQueries({ queryKey: ['workorders-validacion'] });
       if (accion === 'aprobar' || accion === 'cancelar' || accion === 'convertir_obra' || accion === 'completar') onClose();
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Error al cambiar el estado';
+      toast.error(msg);
+    } finally {
+      setStateActionLoading(false);
+    }
+  };
+
+  // Confirmación del rechazo desde el modal — exige comentario no vacío.
+  const confirmarRechazo = async (comentario) => {
+    setRechazoOpen(false);
+    setStateActionLoading(true);
+    if (dirtyRef.current.size > 0) flushDirty();
+    try {
+      const res = await base44.functions.invoke('transicionEstadoOT', {
+        ot_id: order.id, accion: 'rechazar',
+        extra_data: { rechazo_comentario: comentario.trim() },
+      });
+      toast.success(res.data.mensaje);
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-validacion'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-operario'] });
+      onClose();
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Error al rechazar la OT';
       toast.error(msg);
     } finally {
       setStateActionLoading(false);
@@ -473,7 +502,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
           </div>
 
           {/* ── STATE MACHINE ACTIONS ────────────────────────────────────── */}
-          {getAvailableActions(data.status).length > 0 && (
+          {getAvailableActions(data.status).length > 0 && data.status !== 'pendiente_validacion' && (
             <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-slate-900/80 border-b border-white/6">
               {getAvailableActions(data.status).map(act => (
                 <button
@@ -491,6 +520,18 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
 
           {/* ── BODY ─────────────────────────────────────────────────────── */}
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
+
+            {/* ── Reporte del operario (solo en validación) ──
+                El jefe revisa la tarea resuelta antes de aprobar/rechazar.
+                Reemplaza la barra superior de acciones en este estado. */}
+            {data.status === 'pendiente_validacion' && (
+              <ReporteOperarioResumen
+                ot={data}
+                onAprobar={() => handleStateAction('aprobar')}
+                onRechazar={() => setRechazoOpen(true)}
+                loading={stateActionLoading}
+              />
+            )}
 
             {/* ── Sin ubicación — editor destacado ── */}
             {(!data.location || data.location.trim() === '') && (
@@ -669,6 +710,13 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
         title={data.title}
         subtitle={data.location || data.asset_name || `OT ${data.code || ''}`}
         value={`${window.location.origin}/orden-trabajo?ot=${data.id}`}
+      />
+
+      <RechazoOTModal
+        open={rechazoOpen}
+        onClose={() => setRechazoOpen(false)}
+        onConfirm={confirmarRechazo}
+        loading={stateActionLoading}
       />
     </>
   );
