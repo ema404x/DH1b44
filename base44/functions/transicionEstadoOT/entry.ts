@@ -188,12 +188,17 @@ Deno.serve(async (req) => {
     }
 
     if (accion === 'finalizar') {
+      // El reporte de cierre reemplaza el estado anterior (no acumula). Si la OT
+      // fue rechazada y el operario re-finaliza, los faltantes y fotos del reporte
+      // anterior se descartan y queda exactamente lo que envía el operario ahora —
+      // coincide con ReporteForm, que inicializa photos desde ot.photos y faltantes
+      // desde [] y envía la lista completa que el operario ve en pantalla.
       if (extra_data.materials_used !== undefined) updateData.materials_used = extra_data.materials_used;
       if (extra_data.materiales_faltantes !== undefined) {
-        updateData.materiales_faltantes = [...(ot.materiales_faltantes || []), ...extra_data.materiales_faltantes];
+        updateData.materiales_faltantes = extra_data.materiales_faltantes;
       }
-      if (extra_data.notes) updateData.notes = extra_data.notes;
-      if (extra_data.photos) updateData.photos = [...(ot.photos || []), ...extra_data.photos];
+      if (extra_data.notes !== undefined) updateData.notes = extra_data.notes;
+      if (extra_data.photos !== undefined) updateData.photos = extra_data.photos;
 
       if (extra_data.materiales_faltantes && extra_data.materiales_faltantes.length > 0) {
         const sinMotivo = extra_data.materiales_faltantes.filter(m => !m.motivo || !m.motivo.trim());
