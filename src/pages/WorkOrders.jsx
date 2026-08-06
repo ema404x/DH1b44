@@ -166,7 +166,12 @@ export default function WorkOrders() {
     queryFn: async () => {
       const res = await base44.functions.invoke('getWorkOrdersForUser', {});
       return res.data.orders || [];
-    }
+    },
+    // Esta lista es la fuente del total visible — forzar datos frescos al montar
+    // y al volver a la pestaña, sin servir cache stale (evita totales desactualizados).
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   // Direcciones — fuente canónica de jefes de sitio.
