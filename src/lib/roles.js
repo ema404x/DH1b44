@@ -6,7 +6,7 @@
 
 export const ADMIN_LEVEL_ROLES = ['admin', 'gerente', 'gerencia', 'administrativo'];
 export const GERENTE_SYNC_ROLES = ['gerente', 'gerencia', 'administrativo'];
-export const FIELD_ROLES = ['jefe_sitio', 'jefe de sitio', 'inspector', 'tecnico', 'supervisor'];
+export const FIELD_ROLES = ['jefe_sitio', 'jefe de sitio', 'inspector', 'tecnico', 'supervisor', 'operario', 'operario_portal'];
 export const JEFE_SITIO_ROLES = ['jefe_sitio', 'jefe de sitio'];
 
 export function normalizeRole(role) {

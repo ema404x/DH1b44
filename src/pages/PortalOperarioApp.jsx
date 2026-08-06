@@ -10,7 +10,7 @@ import QRScannerModal from '@/components/operario/QRScannerModal';
 import LocationOTListModal from '@/components/operario/LocationOTListModal';
 
 export default function PortalOperarioApp() {
-  const { currentUser, displayName, employeeName } = useCurrentUser();
+  const { currentUser, displayName } = useCurrentUser();
   const [reporteOT, setReporteOT] = useState(null);
   const [processing, setProcessing] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // { ot, accion }
@@ -21,44 +21,16 @@ export default function PortalOperarioApp() {
 
   const { data: allOTs = [], isLoading } = useQuery({
     queryKey: ['workorders-operario'],
-    queryFn: () => base44.entities.WorkOrder.list('-created_date', 500),
+    queryFn: () => base44.functions.invoke('getWorkOrdersForUser', {})
+              .then(r => r.data?.orders || []),
     staleTime: 1000 * 60 * 5,
   });
 
   const misOTs = useMemo(() => {
-    if (!currentUser) return [];
-    // Normaliza: lowercase + sin acentos — "Gastón" matchea "Gaston"
-    const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    const myName  = normalize(employeeName);
-    const myPlatformName = normalize(currentUser.full_name);
-    const myEmail = (currentUser.email || '').toLowerCase().trim();
-    const myId    = currentUser.id || '';
-    // Partes del nombre para fuzzy matching (longitud > 3)
-    const myNameParts = myName.split(/\s+/).filter(p => p.length > 3);
-    return allOTs.filter(ot => {
-      if (ot.status === 'cancelada' || ot.status === 'completada') return false;
-      if (myId && ot.created_by_id === myId) return true;
-      // Email exact match — el más confiable (alinea con RLS)
-      const jefeEmail = (ot.jefe_sitio_email || '').toLowerCase().trim();
-      if (myEmail && jefeEmail === myEmail) return true;
-      const assigned = normalize(ot.assigned_to);
-      const assignedName = normalize(ot.assigned_name);
-      if (myEmail && (assigned === myEmail || assignedName === myEmail)) return true;
-      // Nombre exacto contenido
-      if (myName && (assigned.includes(myName) || assignedName.includes(myName))) return true;
-      // Fuzzy: todas las partes del nombre aparecen en el campo
-      if (myNameParts.length >= 2) {
-        if (myNameParts.every(p => assigned.includes(p) || assignedName.includes(p))) return true;
-        const jefeSitio = normalize(ot.jefe_sitio);
-        if (jefeSitio && myNameParts.every(p => jefeSitio.includes(p))) return true;
-      }
-      if (myPlatformName) {
-        const jefeSitio = normalize(ot.jefe_sitio);
-        if (jefeSitio.includes(myPlatformName)) return true;
-      }
-      return false;
-    });
-  }, [allOTs, currentUser, employeeName]);
+    // La identidad la resuelve el backend (getWorkOrdersForUser, service-role).
+    // Acá solo descartamos estados terminales.
+    return allOTs.filter(ot => ot.status !== 'cancelada' && ot.status !== 'completada');
+  }, [allOTs]);
 
   // Separar por fase del flujo
   const { porIniciar, enProgreso, enValidacion } = useMemo(() => {

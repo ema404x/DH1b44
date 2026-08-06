@@ -19,7 +19,7 @@ export const ADMIN_LEVEL_ROLES = ['admin', 'gerente', 'gerencia', 'administrativ
 export const GERENTE_SYNC_ROLES = ['gerente', 'gerencia', 'administrativo'];
 
 // Roles de campo — ven solo sus propias OTs/registros.
-export const FIELD_ROLES = ['jefe_sitio', 'jefe de sitio', 'inspector', 'tecnico', 'supervisor'];
+export const FIELD_ROLES = ['jefe_sitio', 'jefe de sitio', 'inspector', 'tecnico', 'supervisor', 'operario', 'operario_portal'];
 
 // Roles que pueden ejecutar acciones de cierre en OTs (jefe de sitio).
 export const JEFE_SITIO_ROLES = ['jefe_sitio', 'jefe de sitio'];
