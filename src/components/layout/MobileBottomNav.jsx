@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, RefreshCw, FolderKanban, LayoutGrid } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, RefreshCw, FolderKanban, LayoutGrid, HardHat } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils';
 // El resto de módulos queda accesible vía el botón "Más" que abre el drawer.
 const PRIMARY = [
   { label: 'Inicio', icon: LayoutDashboard, path: '/', module: 'Dashboard' },
+  // Pantalla principal del operario/jefe de sitio — visible solo para no-admins.
+  { label: 'Mis Órdenes', icon: HardHat, path: '/mis-ots', module: null, nonAdmin: true },
   { label: 'Órdenes', icon: ClipboardList, path: '/ordenes', module: 'WorkOrder' },
   { label: 'Rutinas', icon: RefreshCw, path: '/rutinas', module: 'Rutinas' },
   { label: 'Proyectos', icon: FolderKanban, path: '/proyectos', module: 'Project' },
@@ -21,13 +23,15 @@ export default function MobileBottomNav({ onMore }) {
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
   const allowed = (item) => {
+    if (item.nonAdmin) return user?.role !== 'admin';
     if (user?.role === 'admin') return true;
     if (!userPermissions) return item.path === '/';
     if (!item.module) return true;
     return userPermissions[item.module]?.read === true;
   };
 
-  const items = PRIMARY.filter(allowed);
+  // Máx 4 destinos + "Más" para no comprimir en pantallas chicas.
+  const items = PRIMARY.filter(allowed).slice(0, 4);
 
   return (
     <nav

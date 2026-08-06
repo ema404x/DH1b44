@@ -1,6 +1,9 @@
 import * as React from "react"
 
-const MOBILE_BREAKPOINT = 768
+// Alineado con el breakpoint del chrome (lg: = 1024px). Así tablet (768–1023px)
+// recibe layout móvil consistente en páginas Y chrome, sin contenido desktop denso
+// debajo de la barra inferior.
+const MOBILE_BREAKPOINT = 1024
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(undefined)
