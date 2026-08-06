@@ -71,15 +71,17 @@ export default function MisOrdenesFiltros({ filtros, onChange, onLimpiar, vista,
         >
           {PRIORIDADES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
         </select>
-        {hayFiltros && (
-          <button
-            onClick={onLimpiar}
-            className="h-10 px-3 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors flex items-center gap-1.5"
-          >
-            <X className="h-4 w-4" />
-            Limpiar
-          </button>
-        )}
+        <button
+          onClick={onLimpiar}
+          className={`h-10 px-3 rounded-lg border text-sm font-medium transition-colors flex items-center gap-1.5 ${
+            hayFiltros
+              ? 'bg-primary/15 border-primary/30 text-primary hover:bg-primary/25'
+              : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+          }`}
+        >
+          <X className="h-4 w-4" />
+          Limpiar panel
+        </button>
       </div>
     </div>
   );
