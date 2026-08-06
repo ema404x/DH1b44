@@ -16,6 +16,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
   const [error, setError] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [scanFlash, setScanFlash] = useState(false);
+  const [unrecognized, setUnrecognized] = useState(false);
   const stopRef = useRef(false);
 
   // Refs para siempre tener los callbacks más recientes (evita stale closure)
@@ -30,6 +31,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
     setError(null);
     setScanning(false);
     setScanFlash(false);
+    setUnrecognized(false);
 
     let cancelled = false;
 
@@ -55,12 +57,20 @@ export default function QRScannerModal({ open, onClose, onResult }) {
           (decodedText) => {
             if (stopRef.current || cancelled) return;
             stopRef.current = true;
+            const parsed = parseQRContent(decodedText);
+            // QR no reconocido — no cerrar el escáner; mensaje accionable
+            if (parsed.type === 'unknown') {
+              setUnrecognized(true);
+              if (navigator.vibrate) navigator.vibrate(80);
+              // Reanudar detección para que pueda escanear otro código
+              setTimeout(() => { if (!cancelled) stopRef.current = false; }, 600);
+              return;
+            }
             // Feedback visual de éxito
             setScanFlash(true);
             // Vibración si está disponible
             if (navigator.vibrate) navigator.vibrate(100);
             // Procesar y notificar
-            const parsed = parseQRContent(decodedText);
             try {
               onResultRef.current(parsed);
             } catch (e) {
@@ -137,6 +147,27 @@ export default function QRScannerModal({ open, onClose, onResult }) {
               <p className="text-sm text-slate-300">{error}</p>
             </div>
           )}
+          {unrecognized && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-slate-900/95 p-6 text-center">
+              <AlertCircle className="h-10 w-10 text-amber-400" />
+              <p className="text-sm font-medium text-slate-200">Este código QR no corresponde a una OT ni a una ubicación</p>
+              <p className="text-xs text-slate-500">Apuntá a otro código o cerrá el escáner</p>
+              <div className="flex gap-2 mt-1">
+                <button
+                  onClick={() => { setUnrecognized(false); stopRef.current = false; }}
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold"
+                >
+                  Reintentar
+                </button>
+                <button
+                  onClick={() => onCloseRef.current()}
+                  className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 text-xs font-semibold"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          )}
           {/* Overlay scan frame */}
           {scanning && !error && !scanFlash && (
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
@@ -170,33 +201,32 @@ export default function QRScannerModal({ open, onClose, onResult }) {
 function parseQRContent(decodedText) {
   const text = (decodedText || '').trim();
 
-  // Intentar parsear como URL (completa o relativa)
-  try {
-    const url = new URL(text);
-    const loc = url.searchParams.get('loc');
-    const ot = url.searchParams.get('ot');
-    if (loc) return { type: 'loc', value: loc, raw: text };
-    if (ot) return { type: 'ot', value: ot, raw: text };
-  } catch {
-    // No es una URL válida absoluta — intentar como URL relativa
+  // Probar URL absoluta y, si falla, relativa. ubicacion == alias de loc.
+  const tryUrl = (urlStr, base) => {
     try {
-      const url = new URL(text, window.location.origin);
-      const loc = url.searchParams.get('loc');
-      const ot = url.searchParams.get('ot');
+      const url = base ? new URL(urlStr, base) : new URL(urlStr);
+      const loc = url.searchParams.get('loc') || url.searchParams.get('ubicacion');
+      const ot  = url.searchParams.get('ot');
       if (loc) return { type: 'loc', value: loc, raw: text };
-      if (ot) return { type: 'ot', value: ot, raw: text };
-    } catch {
-      // Continuar con regex
-    }
-  }
+      if (ot)  return { type: 'ot',  value: ot,  raw: text };
+      // Tiene params pero no son loc/ot/ubicacion → QR no reconocido (ej. ?id=)
+      if ([...url.searchParams.keys()].length > 0) return { type: 'unknown', raw: text };
+      return null; // URL sin params → seguir
+    } catch { return null; }
+  };
+  const abs = tryUrl(text);            if (abs) return abs;
+  const rel = tryUrl(text, window.location.origin); if (rel) return rel;
 
-  // Regex fallback: buscar ?loc=XXX o ?ot=XXX o &loc=XXX o &ot=XXX en el texto
-  const locMatch = text.match(/[?&]loc=([^&\s]+)/);
+  // Regex fallback: ?loc= / ?ubicacion= / ?ot=
+  const locMatch = text.match(/[?&](?:loc|ubicacion)=([^&\s]+)/);
   if (locMatch) return { type: 'loc', value: locMatch[1], raw: text };
 
   const otMatch = text.match(/[?&]ot=([^&\s]+)/);
   if (otMatch) return { type: 'ot', value: otMatch[1], raw: text };
 
-  // Último recurso: texto crudo
+  // Query con otros params (?id=, etc.) → no reconocido
+  if (/[?&][a-z_]+=/i.test(text)) return { type: 'unknown', raw: text };
+
+  // Último recurso: texto crudo (puede ser un ID de OT)
   return { type: 'raw', value: text, raw: text };
 }

@@ -90,7 +90,7 @@ export default function PortalOperarioApp() {
 
     // Tipo 'loc' — buscar OTs de la ubicación via backend (service role, sin RLS)
     if (result.type === 'loc') {
-      setLocOTs({ orders: [], name: 'Cargando…', loading: true });
+      setLocOTs({ orders: [], name: 'Cargando…', loading: true, locId: result.value, error: false });
       try {
         const res = await base44.functions.invoke('publicFichar', {
           action: 'getWorkOrderForLocation',
@@ -98,15 +98,9 @@ export default function PortalOperarioApp() {
         });
         const data = res.data || {};
         const orders = data.workOrders || [];
-        if (orders.length === 0) {
-          setLocOTs(null);
-          toast.error('No hay OTs activas para esta ubicación');
-        } else {
-          setLocOTs({ orders, name: data.locationName || 'Ubicación escaneada' });
-        }
+        setLocOTs({ orders, name: data.locationName || 'Ubicación escaneada', loading: false, locId: result.value, error: false });
       } catch {
-        setLocOTs(null);
-        toast.error('Error al buscar OTs de la ubicación');
+        setLocOTs({ orders: [], name: 'Ubicación escaneada', loading: false, locId: result.value, error: true });
       }
       return;
     }
@@ -147,6 +141,19 @@ export default function PortalOperarioApp() {
     } catch {
       toast.dismiss(loadingToast);
       toast.error('Error al buscar la OT');
+    }
+  };
+
+  const handleRetryLoc = async () => {
+    if (!locOTs?.locId) return;
+    const locId = locOTs.locId;
+    setLocOTs({ orders: [], name: 'Cargando…', loading: true, locId, error: false });
+    try {
+      const res = await base44.functions.invoke('publicFichar', { action: 'getWorkOrderForLocation', locationId: locId });
+      const data = res.data || {};
+      setLocOTs({ orders: data.workOrders || [], name: data.locationName || 'Ubicación escaneada', loading: false, locId, error: false });
+    } catch {
+      setLocOTs({ orders: [], name: 'Ubicación escaneada', loading: false, locId, error: true });
     }
   };
 
@@ -286,6 +293,8 @@ export default function PortalOperarioApp() {
           orders={locOTs.orders}
           locationName={locOTs.name}
           loading={locOTs.loading}
+          error={locOTs.error}
+          onRetry={handleRetryLoc}
           onSelect={(ot) => { setLocOTs(null); actOnOT(ot); }}
         />
       )}

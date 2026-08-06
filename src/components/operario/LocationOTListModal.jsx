@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, X, Play, Flag, Lock, CheckCircle2, ClipboardList, Loader2 } from 'lucide-react';
+import { MapPin, X, Play, Flag, Lock, CheckCircle2, ClipboardList, Loader2, AlertCircle } from 'lucide-react';
 
 const TYPE_LABEL = {
   mantenimiento_preventivo: 'Mant. Preventivo',
@@ -19,7 +19,7 @@ const STATUS_BADGE = {
   cancelada:   { label: 'Cancelada',   cls: 'bg-red-400/10 text-red-400 border-red-400/20' },
 };
 
-export default function LocationOTListModal({ open, onClose, orders, locationName, onSelect, loading }) {
+export default function LocationOTListModal({ open, onClose, orders, locationName, onSelect, loading, error, onRetry }) {
   if (!open) return null;
 
   const safeOrders = orders || [];
@@ -37,7 +37,9 @@ export default function LocationOTListModal({ open, onClose, orders, locationNam
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-bold text-white truncate">{locationName || 'Ubicación'}</h3>
-            <p className="text-xs text-slate-500">{activas.length} OT activa{activas.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-slate-500">
+              {error ? 'Error al cargar' : `${activas.length} OT activa${activas.length !== 1 ? 's' : ''}`}
+            </p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white shrink-0">
             <X className="h-5 w-5" />
@@ -52,10 +54,21 @@ export default function LocationOTListModal({ open, onClose, orders, locationNam
             </div>
           )}
 
-          {!loading && safeOrders.length === 0 && (
-            <div className="text-center py-10">
-              <ClipboardList className="h-12 w-12 text-slate-700 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">No hay OTs en esta ubicación</p>
+          {!loading && error && (
+            <div className="text-center py-10 flex flex-col items-center gap-3">
+              <AlertCircle className="h-12 w-12 text-red-400/80" />
+              <p className="text-sm text-slate-300">No pudimos cargar las OTs de esta ubicación</p>
+              <button onClick={onRetry} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold">
+                Reintentar
+              </button>
+            </div>
+          )}
+
+          {!loading && !error && safeOrders.length === 0 && (
+            <div className="text-center py-10 flex flex-col items-center gap-2">
+              <ClipboardList className="h-12 w-12 text-slate-700" />
+              <p className="text-sm text-slate-400">No hay OTs activas en esta ubicación</p>
+              <p className="text-xs text-slate-600">Acercá un código cuando haya tareas asignadas</p>
             </div>
           )}
 
