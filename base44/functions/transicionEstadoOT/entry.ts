@@ -151,6 +151,11 @@ Deno.serve(async (req) => {
       // Si la OT ya está asignada a alguien, solo ese operario puede iniciarla.
       // Las pendientes (sin asignar) pueden ser auto-asignadas por quien la inicia.
       // Admins/gerentes pueden iniciar cualquier OT de su sector.
+      // Excepción: si el asignado es el propio jefe de sitio (assigned_name === jefe_sitio),
+      // es una OT de cuadrilla — el jefe la asigna a sí mismo para representar el trabajo
+      // de su cuadrilla, no a un operario específico. Cualquier operario que escanea la
+      // ubicación puede iniciarla. Sin esto, el operario ve "se sale todo" porque el
+      // check lo bloquea aunque esté en el sitio correcto.
       if (!callerEsAdmin) {
         const normName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
         const yaAsignadaA = ot.assigned_name || ot.assigned_to;
@@ -158,7 +163,8 @@ Deno.serve(async (req) => {
           (ot.assigned_to && extra_data.assigned_to && ot.assigned_to === extra_data.assigned_to) ||
           (ot.assigned_name && extra_data.assigned_name &&
             normName(ot.assigned_name) === normName(extra_data.assigned_name));
-        if (yaAsignadaA && !esElAsignado) {
+        const esCuadrilla = normName(ot.assigned_name) && normName(ot.assigned_name) === normName(ot.jefe_sitio);
+        if (yaAsignadaA && !esElAsignado && !esCuadrilla) {
           return Response.json({ error: 'Esta OT está asignada a otro operario' }, { status: 403 });
         }
       }

@@ -180,9 +180,12 @@ export default function PortalOperarioApp() {
     if (foundOT.status === 'pendiente') {
       setConfirmAction({ ot: foundOT, accion: 'iniciar' });
     } else if (foundOT.status === 'asignada') {
-      // Solo el operario al que el jefe le asignó la OT puede iniciarla.
+      // Solo el operario al que el jefe le asignó la OT puede iniciarla,
+      // SALVO si el asignado es el propio jefe de sitio (OT de cuadrilla) —
+      // en ese caso cualquier operario que escanea la ubicación puede iniciarla.
       // Las asignadas sin nombre (edge) se tratan como libres.
-      if (foundOT.assigned_name && !isOwnerOf(foundOT)) {
+      const esCuadrilla = normName(foundOT.assigned_name) && normName(foundOT.assigned_name) === normName(foundOT.jefe_sitio);
+      if (foundOT.assigned_name && !isOwnerOf(foundOT) && !esCuadrilla) {
         toast.info(`Esta OT está asignada a ${foundOT.assigned_name}`);
         return;
       }
