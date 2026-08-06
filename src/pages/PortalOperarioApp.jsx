@@ -51,6 +51,13 @@ export default function PortalOperarioApp() {
         accion,
         extra_data: extraData,
       });
+      // La función responde 200 con { error } en algunos casos (estado inválido,
+      // falta de permiso, checklist incompleto). Hay que chequearlo explícitamente,
+      // si no el toast de éxito pisa al error y parece que "no pasa nada".
+      if (res.data?.error) {
+        toast.error(res.data.error);
+        return false;
+      }
       toast.success(res.data.mensaje);
       queryClient.invalidateQueries({ queryKey: ['workorders-operario'] });
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
@@ -69,13 +76,16 @@ export default function PortalOperarioApp() {
     // Marcar processing antes del GPS para feedback inmediato (captura puede tardar hasta 8s)
     setProcessing(ot.id);
     const gps = await capturar();
-    const extraData = {};
+    const extraData = { assigned_name: displayName /*, assigned_to: currentUser?.id */ };
     if (gps.gps_status === 'capturado') {
       extraData.gps = { latitude: gps.gps_latitude, longitude: gps.gps_longitude, accuracy: gps.gps_accuracy };
     } else {
       extraData.gps_status = gps.gps_status;
     }
-    await ejecutarTransicion(ot, 'iniciar', extraData);
+    const ok = await ejecutarTransicion(ot, 'iniciar', extraData);
+    // Abrir la ejecución directo: el operario sigue trabajando la OT sin depender
+    // de que reaparezca en la lista (getWorkOrdersForUser refetchea async).
+    if (ok) setReporteOT({ ...ot, status: 'en_progreso', assigned_name: displayName });
   };
 
   const handleReporteSaved = async (ot, reporteData) => {

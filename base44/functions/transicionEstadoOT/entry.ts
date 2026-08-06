@@ -143,6 +143,14 @@ Deno.serve(async (req) => {
         updateData.gps_status = extra_data.gps_status || 'denegado';
       }
       updateData.fecha_inicio_real = new Date().toISOString();
+
+      // El que inicia la OT pasa a ser el operario que la trabaja — solo si
+      // estaba sin asignar. Así un operario del sector puede agarrar una OT
+      // libre escaneando su QR, y la OT queda visible para él en getWorkOrdersForUser.
+      if (extra_data.assigned_name && !ot.assigned_name) {
+        updateData.assigned_name = extra_data.assigned_name;
+        if (extra_data.assigned_to) updateData.assigned_to = extra_data.assigned_to;
+      }
     }
 
     if (accion === 'finalizar') {
