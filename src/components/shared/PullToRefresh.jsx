@@ -41,6 +41,13 @@ export default function PullToRefresh({ onRefresh, children }) {
 
     const onTouchStart = (e) => {
       if (scrollEl.scrollTop > 0 || refreshingRef.current) return;
+      // Si el toque empieza sobre un elemento interactivo (botón, link, input...),
+      // no iniciamos el pull — dejamos que el click se procese normalmente. Sin esto,
+      // un tap en un botón superior (con scroll en top) activa el pull y el
+      // preventDefault del touchmove cancela el click + muestra el spinner de recarga
+      // ("se aprieta como para volver a cargar la pantalla").
+      const target = e.touches[0].target;
+      if (target && target.closest && target.closest('button, a, [role="button"], input, select, textarea, label, [data-no-pull]')) return;
       startYRef.current = e.touches[0].clientY;
       pullingRef.current = true;
     };
