@@ -19,7 +19,7 @@ const FLEXIBLE_TARGETS = {
   'completada': 'completar',
 };
 
-const TERMINAL_STATES = ['completada', 'cancelada', 'obra'];
+const TERMINAL_STATES = ['completada', 'cancelada'];
 
 /**
  * Dada una transición drag-and-drop (fromStatus → toStatus),
@@ -52,7 +52,9 @@ export function getAvailableActions(status) {
     ],
     completada: [],
     cancelada: [],
-    obra: [],
+    obra: [
+      { accion: 'completar', label: 'Completar', variant: 'emerald' },
+    ],
   };
   return actions[status] || [];
 }

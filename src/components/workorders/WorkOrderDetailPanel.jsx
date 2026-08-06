@@ -138,12 +138,23 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     .filter(e => (e.status === 'activo' || !e.status))
     .filter(e => isSuperAdmin || !isJefeRole(e.role));
 
+  const closeAfterSaveRef = useRef(false);
   const saveMutation = useMutation({
     mutationFn: (d) => base44.entities.WorkOrder.update(order.id, d),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
       toast.success('Guardado');
+      if (closeAfterSaveRef.current) {
+        closeAfterSaveRef.current = false;
+        onClose();
+      }
+    },
+    onError: () => {
+      if (closeAfterSaveRef.current) {
+        closeAfterSaveRef.current = false;
+        toast.error('Error al guardar');
+      }
     },
   });
 
@@ -325,6 +336,8 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       if (BUILT_IN.includes(k)) return;
       if (JSON.stringify(data[k]) !== JSON.stringify(base[k])) dirtyRef.current.add(k);
     });
+    if (dirtyRef.current.size === 0) { onClose(); return; }
+    closeAfterSaveRef.current = true;
     flushDirty();
   };
 

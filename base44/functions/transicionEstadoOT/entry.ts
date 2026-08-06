@@ -17,7 +17,7 @@ const TRANSICIONES_FLEXIBLES = {
   'completar':      { hacia: 'completada' },
 };
 
-const ESTADOS_TERMINALES = ['completada', 'cancelada', 'obra'];
+const ESTADOS_TERMINALES = ['completada', 'cancelada'];
 
 const MENSAJES = {
   'asignar': 'OT asignada correctamente',

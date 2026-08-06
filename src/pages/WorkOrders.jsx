@@ -49,7 +49,7 @@ function WorkOrderCard({ order, onOpen, onShowQR, onComplete, onStart, canComple
   const { resolveOTOwner } = useResolveCreator();
   const isOverdue = (() => { try { return order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
   const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
-  const isTerminal = ['completada', 'cancelada', 'obra'].includes(order.status);
+  const isTerminal = ['completada', 'cancelada'].includes(order.status);
 
   return (
     <motion.div
