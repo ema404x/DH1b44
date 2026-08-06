@@ -104,6 +104,28 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Debe asignar un operario antes de cambiar el estado a "Asignada"' }, { status: 400 });
     }
 
+    // Validar checklist y fotos obligatorias antes de cerrar la OT (completar/aprobar).
+    // Centralizado en el backend: cubre TODOS los caminos (tarjeta, kanban, dropdown, panel)
+    // y evita cerrar OTs con tareas pendientes. Si la OT se cierra incompleta a propósito,
+    // debe registrar motivos_incompleto (escape hatch del flujo "incompleto").
+    if (accion === 'completar' || accion === 'aprobar') {
+      const motivosIncompleto = (ot.motivos_incompleto || []).filter(m => m.texto && m.texto.trim());
+      if (motivosIncompleto.length === 0) {
+        const checklist = ot.checklist || [];
+        const pendientes = checklist.filter(t => !t.completed);
+        if (pendientes.length > 0) {
+          return Response.json({
+            error: `No se puede completar: faltan ${pendientes.length} tarea(s) del checklist. Si la OT queda incompleta, registrá el motivo en "Motivos Incompleto".`
+          }, { status: 400 });
+        }
+        if (ot.require_photos && (ot.photos || []).length === 0) {
+          return Response.json({
+            error: 'No se puede completar: la OT requiere al menos una foto'
+          }, { status: 400 });
+        }
+      }
+    }
+
     const updateData = { status: nuevoEstado };
 
     if (accion === 'asignar' && extra_data.assigned_name) {

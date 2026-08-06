@@ -258,7 +258,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
       if (accion === 'aprobar' || accion === 'rechazar') queryClient.invalidateQueries({ queryKey: ['workorders-validacion'] });
-      if (accion === 'aprobar' || accion === 'cancelar' || accion === 'convertir_obra') onClose();
+      if (accion === 'aprobar' || accion === 'cancelar' || accion === 'convertir_obra' || accion === 'completar') onClose();
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Error al cambiar el estado';
       toast.error(msg);
@@ -273,28 +273,41 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     // Flush de campos pendientes antes de convertir — mismo motivo que handleStateAction
     if (dirtyRef.current.size > 0) flushDirty();
     try {
-      await base44.entities.Pendiente.create({
-        descripcion: data.title,
-        tipo: 'obra',
-        estado: 'pendiente',
-        prioridad: data.priority || 'media',
-        establecimiento: data.location_qr_name || '',
-        sitio: data.location || '',
-        jefe_sitio: data.assigned_name || '',
-        materiales_necesarios: (data.materials_used || []).map(m => m.material_name).filter(Boolean).join(', '),
-        observaciones: data.description || '',
-        fecha_limite: data.scheduled_date || undefined,
-      });
-      // Actualizar el estado vía máquina de estados
+      // 1) Primero el cambio de estado (acción principal). Si falla, no se crea
+      //    ningún pendiente huérfano.
       await base44.functions.invoke('transicionEstadoOT', { ot_id: order.id, accion: 'convertir_obra' });
+      // 2) Luego crear el pendiente de tipo obra, propagando sector_id y
+      //    jefe_sitio_email de la OT original — preserva aislamiento entre sectores
+      //    y visibilidad del jefe por RLS.
+      try {
+        await base44.entities.Pendiente.create({
+          descripcion: data.title,
+          tipo: 'obra',
+          estado: 'pendiente',
+          prioridad: data.priority || 'media',
+          establecimiento: data.location_qr_name || '',
+          sitio: data.location || '',
+          jefe_sitio: data.assigned_name || '',
+          jefe_sitio_email: data.jefe_sitio_email || '',
+          sector_id: data.sector_id,
+          materiales_necesarios: (data.materials_used || []).map(m => m.material_name).filter(Boolean).join(', '),
+          observaciones: data.description || '',
+          fecha_limite: data.scheduled_date || undefined,
+        });
+      } catch (e) {
+        // La OT ya quedó en estado "obra" (acción principal OK). El pendiente es
+        // tracking secundario — no se revierte el estado. Avisar al usuario.
+        console.error('Pendiente de obra no se pudo crear (OT ya convertida):', e);
+        toast.warning('OT convertida, pero no se pudo crear el pendiente de obra asociado');
+      }
       queryClient.invalidateQueries({ queryKey: ['pendientes'] });
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
       toast.success('OT convertida a Futura Obra correctamente');
       onClose();
     } catch (err) {
-      console.error('Error al convertir OT a Futura Obra:', err);
-      toast.error('Error al convertir la OT');
+      const msg = err.response?.data?.error || err.message || 'Error al convertir la OT';
+      toast.error(msg);
     } finally {
       setConvertingToObra(false);
     }
