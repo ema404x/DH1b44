@@ -254,7 +254,7 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-slate-800" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
           <button
             type="submit"
             disabled={saving}

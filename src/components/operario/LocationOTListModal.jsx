@@ -29,7 +29,7 @@ export default function LocationOTListModal({ open, onClose, orders, locationNam
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md max-h-[85vh] flex flex-col bg-slate-900 border border-slate-700 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-md max-h-[85vh] flex flex-col bg-slate-900 border border-slate-700 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-800 shrink-0">
           <div className="h-10 w-10 bg-primary/15 rounded-xl flex items-center justify-center shrink-0">

@@ -66,7 +66,8 @@ export default function PortalOperarioApp() {
   };
 
   const handleIniciar = async (ot) => {
-    // Capturar GPS antes de enviar
+    // Marcar processing antes del GPS para feedback inmediato (captura puede tardar hasta 8s)
+    setProcessing(ot.id);
     const gps = await capturar();
     const extraData = {};
     if (gps.gps_status === 'capturado') {
@@ -199,7 +200,7 @@ export default function PortalOperarioApp() {
       </div>
 
       {/* Stepper visual del flujo */}
-      <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-900/40 rounded-lg p-2.5 border border-slate-800">
+      <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-900/40 rounded-lg p-2.5 border border-slate-800 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-400" /> Asignada</span>
         <ArrowRight className="h-3 w-3" />
         <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-400" /> En Progreso</span>
