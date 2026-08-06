@@ -181,11 +181,21 @@ Deno.serve(async (req) => {
       updateData.fecha_inicio_real = new Date().toISOString();
 
       // El que inicia la OT pasa a ser el operario que la trabaja.
-      // - assigned_to siempre se setea (si viene y difiere) para que la OT quede
-      //   visible para el operario en getWorkOrdersForUser (filtro por assigned_to).
+      // - Para el operario (no admin): SIEMPRE estampamos assigned_to = user.id
+      //   usando el usuario del backend (siempre disponible), NO extra_data.assigned_to
+      //   que puede venir vacío si el frontend no resolvió currentUser a tiempo.
+      //   Sin esto, la OT pasa a en_progreso pero assigned_to queda null → la OT
+      //   desaparece de la vista del operario en getWorkOrdersForUser (no matchea
+      //   por assigned_to ni por assigned_name) → "se sale todo y ya".
+      // - Para admin/gerente: respetamos extra_data.assigned_to si viene (no se
+      //   auto-asigna si el jefe inicia desde el kanban sin reclamarla).
       // - assigned_name solo se reclama si la OT estaba sin asignar — respeta
-      //   asignaciones previas hechas por el jefe.
-      if (extra_data.assigned_to && ot.assigned_to !== extra_data.assigned_to) {
+      //   asignaciones previas hechas por el jefe (ej. cuadrilla a nombre del jefe).
+      if (!callerEsAdmin) {
+        if (ot.assigned_to !== user.id) {
+          updateData.assigned_to = user.id;
+        }
+      } else if (extra_data.assigned_to && ot.assigned_to !== extra_data.assigned_to) {
         updateData.assigned_to = extra_data.assigned_to;
       }
       if (extra_data.assigned_name && !ot.assigned_name) {
