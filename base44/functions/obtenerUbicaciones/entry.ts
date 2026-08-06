@@ -1,12 +1,11 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 
 /**
- * obtenerUbicaciones — devuelve todas las LocationData, Direccion y LocationQR
- * usando service role (sin RLS), para que TODOS los usuarios vean el listado
- * completo de direcciones sin depender de su sector_id o rol.
+ * obtenerUbicaciones — devuelve LocationData, Direccion y LocationQR
+ * scopeadas al SECTOR del usuario autenticado, usando service role.
  *
- * Realiza el join LocationData ↔ Direccion via direccion_id server-side,
- * devolviendo cada LocationData con su dirección real resuelta.
+ * Fail CLOSED: si el caller no tiene sector_id, se devuelve listado vacío
+ * (nunca "todo"). El join LocationData ↔ Direccion se hace server-side.
  */
 export default async function(req) {
   try {
@@ -18,13 +17,20 @@ export default async function(req) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Resolver el sector del caller y FAIL CLOSED si no tiene
+    const me = await base44.auth.me();
+    const callerSector = me?.data?.sector_id || me?.sector_id;
+    if (!callerSector) {
+      return Response.json({ locations: [], direcciones: [], locationQRs: [], total: 0 });
+    }
+
     const sb = base44.asServiceRole;
 
-    // Fetch en paralelo: LocationData, Direccion y LocationQR
+    // Fetch en paralelo, FILTRADO por sector del caller
     const [locationData, direcciones, locationQRs] = await Promise.all([
-      sb.entities.LocationData.list('-created_date', 5000),
-      sb.entities.Direccion.list('-direccion', 5000),
-      sb.entities.LocationQR.list('name', 5000),
+      sb.entities.LocationData.filter({ sector_id: callerSector }, '-created_date', 5000),
+      sb.entities.Direccion.filter({ sector_id: callerSector }, '-direccion', 5000),
+      sb.entities.LocationQR.filter({ sector_id: callerSector }, 'name', 5000),
     ]);
 
     // Indexar direcciones por id para el join O(1)
@@ -67,7 +73,7 @@ export default async function(req) {
         estado: ld.estado || 'activo',
         gps_latitude: ld.gps_latitude || null,
         gps_longitude: ld.gps_longitude || null,
-        sector_id: ld.sector_id || 'escuela',
+        sector_id: ld.sector_id || '',
         location_qr_id: qr?.id || '',
         location_qr_name: qr?.name || '',
         project_name: qr?.project_name || '',
