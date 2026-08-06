@@ -25,24 +25,24 @@ export default function MisOrdenesFiltros({ filtros, onChange, onLimpiar, vista,
   return (
     <div className="space-y-3">
       {/* Toggle Activas / Historial */}
-      <div className="flex gap-1 p-1 bg-slate-900/50 rounded-xl border border-slate-800">
+      <div className="flex gap-1 p-1 bg-[#111827] rounded-xl border border-white/5">
         <button
           onClick={() => onVistaChange('activas')}
           className={`flex-1 h-10 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
-            vista === 'activas' ? 'bg-primary text-primary-foreground' : 'text-slate-400 hover:text-white'
+            vista === 'activas' ? 'bg-[#2563eb] text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
           }`}
         >
           <ClipboardList className="h-4 w-4" />
-          Activas {counts?.activas != null && <span className="opacity-70">({counts.activas})</span>}
+          Activas {counts?.activas != null && <span className="opacity-70 tabular-nums">({counts.activas})</span>}
         </button>
         <button
           onClick={() => onVistaChange('historial')}
           className={`flex-1 h-10 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
-            vista === 'historial' ? 'bg-primary text-primary-foreground' : 'text-slate-400 hover:text-white'
+            vista === 'historial' ? 'bg-[#2563eb] text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-white hover:bg-white/5'
           }`}
         >
           <History className="h-4 w-4" />
-          Historial {counts?.historial != null && <span className="opacity-70">({counts.historial})</span>}
+          Historial {counts?.historial != null && <span className="opacity-70 tabular-nums">({counts.historial})</span>}
         </button>
       </div>
 
@@ -54,20 +54,20 @@ export default function MisOrdenesFiltros({ filtros, onChange, onLimpiar, vista,
             value={filtros.texto}
             onChange={e => onChange({ ...filtros, texto: e.target.value })}
             placeholder="Buscar por título, ubicación o código…"
-            className="w-full h-10 pl-9 pr-3 rounded-lg bg-slate-900/60 border border-slate-800 text-sm text-white placeholder:text-slate-500 focus:border-primary/50 focus:outline-none"
+            className="w-full h-10 pl-9 pr-3 rounded-lg bg-[#111827] border border-white/5 text-sm text-white placeholder:text-slate-500 focus:border-[#2563eb] focus:outline-none transition-colors"
           />
         </div>
         <select
           value={filtros.tipo}
           onChange={e => onChange({ ...filtros, tipo: e.target.value })}
-          className="h-10 px-3 rounded-lg bg-slate-900/60 border border-slate-800 text-sm text-white focus:border-primary/50 focus:outline-none"
+          className="h-10 px-3 rounded-lg bg-[#111827] border border-white/5 text-sm text-white focus:border-[#2563eb] focus:outline-none transition-colors"
         >
           {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
         <select
           value={filtros.prioridad}
           onChange={e => onChange({ ...filtros, prioridad: e.target.value })}
-          className="h-10 px-3 rounded-lg bg-slate-900/60 border border-slate-800 text-sm text-white focus:border-primary/50 focus:outline-none"
+          className="h-10 px-3 rounded-lg bg-[#111827] border border-white/5 text-sm text-white focus:border-[#2563eb] focus:outline-none transition-colors"
         >
           {PRIORIDADES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
         </select>
@@ -75,8 +75,8 @@ export default function MisOrdenesFiltros({ filtros, onChange, onLimpiar, vista,
           onClick={onLimpiar}
           className={`h-10 px-3 rounded-lg border text-sm font-medium transition-colors flex items-center gap-1.5 ${
             hayFiltros
-              ? 'bg-primary/15 border-primary/30 text-primary hover:bg-primary/25'
-              : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+              ? 'border-white/20 text-white hover:bg-white/10'
+              : 'border-white/10 text-slate-400 hover:bg-white/5'
           }`}
         >
           <X className="h-4 w-4" />

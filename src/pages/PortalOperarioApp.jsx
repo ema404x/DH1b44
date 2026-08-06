@@ -251,8 +251,8 @@ export default function PortalOperarioApp() {
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="h-11 w-11 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center">
-          <ClipboardList className="h-5 w-5 text-primary" />
+        <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <ClipboardList className="h-5 w-5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold text-white">Mis Órdenes de Trabajo</h1>
@@ -260,22 +260,24 @@ export default function PortalOperarioApp() {
         </div>
         <button
           onClick={() => setScannerOpen(true)}
-          className="h-11 w-11 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center hover:bg-primary/25 transition-colors shrink-0"
+          className="h-11 w-11 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] flex items-center justify-center transition-colors shrink-0 shadow-lg shadow-blue-500/20"
           title="Escanear QR"
         >
-          <ScanLine className="h-5 w-5 text-primary" />
+          <ScanLine className="h-5 w-5 text-white" />
         </button>
       </div>
 
-      {/* Stepper visual del flujo */}
-      <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-900/40 rounded-lg p-2.5 border border-slate-800 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-400" /> Asignada</span>
-        <ArrowRight className="h-3 w-3" />
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-400" /> En Progreso</span>
-        <ArrowRight className="h-3 w-3" />
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" /> Validación</span>
-        <ArrowRight className="h-3 w-3" />
-        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Completada</span>
+      {/* Stepper — carril de fases */}
+      <div className="flex items-center gap-1 bg-[#111827] rounded-xl p-2 border border-white/5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {STEPS.map((s, i) => (
+          <React.Fragment key={s.key}>
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg shrink-0">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color, boxShadow: `0 0 8px ${s.color}80` }} />
+              <span className="text-xs font-medium text-slate-300 whitespace-nowrap">{s.label}</span>
+            </div>
+            {i < STEPS.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-slate-600 shrink-0" />}
+          </React.Fragment>
+        ))}
       </div>
 
       {/* Filtros + toggle Activas/Historial */}
@@ -414,17 +416,16 @@ export default function PortalOperarioApp() {
 }
 
 function Seccion({ titulo, subtitulo, icon: Icon, color, children }) {
-  const colorMap = {
-    blue:  'text-blue-400 border-blue-400/20',
-    sky:   'text-sky-400 border-sky-400/20',
-    amber: 'text-amber-400 border-amber-400/20',
-  };
+  const colorHex = { blue: '#3b82f6', sky: '#0ea5e9', amber: '#f59e0b' }[color] || '#3b82f6';
+  const count = React.Children.count(children);
   return (
     <div>
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className={`h-4 w-4 ${colorMap[color].split(' ')[0]}`} />
+      <div className="flex items-center gap-2.5 mb-2.5">
+        <span className="h-7 w-1 rounded-full" style={{ backgroundColor: colorHex }} />
+        <Icon className="h-4 w-4" style={{ color: colorHex }} />
         <h2 className="text-sm font-bold text-white">{titulo}</h2>
-        <span className="text-xs text-slate-500">· {subtitulo}</span>
+        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-white/5 text-slate-400 tabular-nums">{count}</span>
+        <span className="text-xs text-slate-500 truncate">· {subtitulo}</span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {children}
@@ -434,7 +435,7 @@ function Seccion({ titulo, subtitulo, icon: Icon, color, children }) {
 }
 
 const STATUS_BADGE = {
-  pendiente:   { label: 'Pendiente',   cls: 'bg-amber-400/10 text-amber-400 border-amber-400/20' },
+  pendiente:   { label: 'Pendiente',   cls: 'bg-blue-400/10 text-blue-400 border-blue-400/20' },
   asignada:    { label: 'Asignada',    cls: 'bg-blue-400/10 text-blue-400 border-blue-400/20' },
   en_progreso: { label: 'En Progreso', cls: 'bg-sky-400/10 text-sky-400 border-sky-400/20' },
   pendiente_validacion: { label: 'En Validación', cls: 'bg-amber-400/10 text-amber-400 border-amber-400/20' },
@@ -442,19 +443,72 @@ const STATUS_BADGE = {
   cancelada:  { label: 'Cancelada',  cls: 'bg-red-400/10 text-red-400 border-red-400/20' },
 };
 
+// Riel de color por fase (Status Lane)
+const LANE = {
+  pendiente: '#3b82f6',
+  asignada: '#3b82f6',
+  en_progreso: '#0ea5e9',
+  pendiente_validacion: '#f59e0b',
+  completada: '#10b981',
+  cancelada: '#ef4444',
+};
+
+const PRIORITY = {
+  urgente: { label: 'Urgente', cls: 'bg-orange-500 text-white' },
+  alta:    { label: 'Alta',    cls: 'bg-red-500/80 text-white' },
+  media:   { label: 'Media',   cls: 'bg-slate-600 text-white' },
+  baja:    { label: 'Baja',    cls: 'bg-slate-700 text-slate-300' },
+};
+
+const TYPE_LABEL = {
+  mantenimiento_preventivo: 'Mant. Preventivo',
+  mantenimiento_correctivo: 'Mant. Correctivo',
+  instalacion: 'Instalación',
+  inspeccion: 'Inspección',
+  reparacion: 'Reparación',
+  emergencia: 'Emergencia',
+};
+
+const STEPS = [
+  { key: 'asignada', label: 'Asignada', color: '#3b82f6' },
+  { key: 'en_progreso', label: 'En Progreso', color: '#0ea5e9' },
+  { key: 'validacion', label: 'Validación', color: '#f59e0b' },
+  { key: 'completada', label: 'Completada', color: '#10b981' },
+];
+
 function OTCard({ ot, onIniciar, onFinalizar, processing, locked }) {
   const badge = STATUS_BADGE[ot.status] || STATUS_BADGE.pendiente;
+  const rail = LANE[ot.status] || '#3b82f6';
+  const prio = PRIORITY[ot.priority];
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
-      <div>
-        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge.cls} mb-2`}>
+    <div className="relative bg-[#1a2333] border border-white/5 rounded-xl pl-5 pr-4 py-4 flex flex-col gap-3 overflow-hidden card-lift">
+      {/* Riel de color por fase */}
+      <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: rail }} />
+
+      {/* Badge de estado + chip de prioridad */}
+      <div className="flex items-start justify-between gap-2">
+        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge.cls}`}>
           {badge.label}
         </span>
+        {prio && (
+          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${prio.cls}`}>
+            {prio.label}
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
         <h3 className="text-sm font-semibold text-white leading-snug">{ot.title}</h3>
+        {(TYPE_LABEL[ot.type] || ot.code) && (
+          <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+            {TYPE_LABEL[ot.type] && <span className="font-medium text-slate-400">{TYPE_LABEL[ot.type]}</span>}
+            {ot.code && <span className="tabular-nums">· {ot.code}</span>}
+          </div>
+        )}
         {ot.location && (
-          <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
-            <MapPin className="h-3 w-3" />
+          <div className="flex items-center gap-1 text-xs text-slate-400 mt-1.5">
+            <MapPin className="h-3 w-3 shrink-0" />
             <span className="truncate">{ot.location}</span>
           </div>
         )}
@@ -466,10 +520,10 @@ function OTCard({ ot, onIniciar, onFinalizar, processing, locked }) {
         )}
       </div>
 
-      {/* Botón único grande según el estado */}
+      {/* Acción según el estado */}
       <div className="mt-auto">
         {locked ? (
-          <div className="flex items-center justify-center gap-2 h-12 rounded-lg bg-slate-800/50 border border-slate-700/50 text-slate-500 text-sm font-medium">
+          <div className="flex items-center justify-center gap-2 h-11 rounded-lg bg-white/5 border border-white/10 text-slate-500 text-sm font-medium">
             <Lock className="h-4 w-4" />
             Esperando validación
           </div>
@@ -477,7 +531,7 @@ function OTCard({ ot, onIniciar, onFinalizar, processing, locked }) {
           <button
             onClick={onIniciar}
             disabled={processing}
-            className="w-full h-12 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full h-11 rounded-lg bg-[#2563eb] text-white text-sm font-bold hover:bg-[#1d4ed8] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
             Iniciar
@@ -486,7 +540,7 @@ function OTCard({ ot, onIniciar, onFinalizar, processing, locked }) {
           <button
             onClick={onFinalizar}
             disabled={processing}
-            className="w-full h-12 rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full h-11 rounded-lg bg-[#059669] text-white text-sm font-bold hover:bg-[#047857] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Flag className="h-5 w-5" />}
             Finalizar y Reportar
@@ -546,8 +600,10 @@ const formatFecha = (d) => {
 
 function HistorialCard({ ot }) {
   const badge = STATUS_BADGE[ot.status] || STATUS_BADGE.completada;
+  const rail = LANE[ot.status] || '#10b981';
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-2 opacity-85">
+    <div className="relative bg-[#1a2333] border border-white/5 rounded-xl pl-5 pr-4 py-4 flex flex-col gap-2 overflow-hidden">
+      <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: rail }} />
       <div className="flex items-center justify-between gap-2">
         <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge.cls}`}>
           {badge.label}
