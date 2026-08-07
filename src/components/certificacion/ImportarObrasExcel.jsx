@@ -5,25 +5,104 @@ import { Button } from '@/components/ui/button';
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, Download, Info } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
-// Mapeo exacto de columnas del Excel de Actas
+// --- Helpers de extracción robusta (precisión) ---
+// Normaliza un encabezado: mayúsculas, sin acentos, símbolos → espacio, colapsa espacios.
+const normKey = (s) => String(s == null ? '' : s)
+  .toUpperCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^A-Z0-9 ]/g, ' ')
+  .replace(/\s+/g, ' ').trim();
+
+// Busca el valor de una columna con tolerancia: 1) exacto (case/trim),
+// 2) normalizado igual, 3) normalizado contiene el token.
+// Acepta varios alias por campo para soportar variantes del Excel real.
+function pick(row, tokens) {
+  const arr = Array.isArray(tokens) ? tokens : [tokens];
+  const entries = Object.entries(row);
+  // 1) exacto case-insensitive (respeta encabezados literales como "%")
+  for (const [k, v] of entries) {
+    if (arr.some(t => k.trim().toUpperCase() === String(t).toUpperCase())) return v;
+  }
+  // 2) normalizado igual
+  for (const [k, v] of entries) {
+    const nk = normKey(k);
+    if (arr.some(t => nk && nk === normKey(t))) return v;
+  }
+  // 3) normalizado contiene (más laxo, último recurso)
+  for (const [k, v] of entries) {
+    const nk = normKey(k);
+    if (!nk) continue;
+    if (arr.some(t => { const nt = normKey(t); return nt && nk.includes(nt); })) return v;
+  }
+  return undefined;
+}
+
+// Parseo de números en formato es-AR ("876.435,98") o numéricos directos.
+function parseNum(v) {
+  if (v == null || v === '') return 0;
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  let s = String(v).trim().replace(/[^0-9.,-]/g, '');
+  if (!s) return 0;
+  const dots = (s.match(/\./g) || []).length;
+  const commas = (s.match(/,/g) || []).length;
+  let norm;
+  if (commas > 0) {
+    // coma decimal, puntos de miles → "876.435,98" => "876435.98"
+    norm = s.replace(/\./g, '').replace(',', '.');
+  } else if (dots > 1) {
+    // varios puntos = separadores de miles sin coma → "1.234.567" => "1234567"
+    norm = s.replace(/\./g, '');
+  } else if (dots === 1) {
+    const [ent, dec] = s.split('.');
+    // "1.234" (3 dec) → miles en AR; "1.23" (2 dec) → decimal
+    if (dec && dec.length === 3 && /^\d+$/.test(ent)) norm = s.replace('.', '');
+    else norm = s;
+  } else {
+    norm = s;
+  }
+  const n = parseFloat(norm);
+  return isNaN(n) ? 0 : n;
+}
+
+// Parseo de fechas: Date de Excel (cellDates), serial de Excel, dd/mm/yyyy, yyyy-mm-dd.
+function parseDate(v) {
+  if (v == null || v === '') return undefined;
+  if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString().split('T')[0];
+  if (typeof v === 'number') {
+    const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/); // dd/mm/yyyy
+  if (m) {
+    let [, d, mo, y] = m;
+    if (y.length === 2) y = '20' + y;
+    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/); // yyyy-mm-dd
+  if (m) {
+    let [, y, mo, d] = m;
+    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  try {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  } catch { /* ignora */ }
+  return undefined;
+}
+
+function toString(v) {
+  if (v == null) return '';
+  // Nros grandes en notación científica o float → enteros legibles
+  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(v);
+  return String(v).trim();
+}
+
+// Mapeo robusto de columnas del Excel de Actas (tolera variantes de encabezados)
 function mapRow(row, comuna) {
-  const get = (key) => {
-    const found = Object.entries(row).find(([k]) =>
-      k.trim().toUpperCase() === key.toUpperCase()
-    );
-    return found ? found[1] : undefined;
-  };
+  const get = (tokens) => pick(row, tokens);
 
-  const toDateStr = (val) => {
-    if (!val) return undefined;
-    try {
-      const d = new Date(val);
-      if (isNaN(d.getTime())) return undefined;
-      return d.toISOString().split('T')[0];
-    } catch { return undefined; }
-  };
-
-  const avanceRaw = parseFloat(get('%')) || 0;
+  const avanceRaw = parseNum(get(['%', '% AVANCE', 'AVANCE', 'AVANCE %', 'PORCENTAJE', 'PORCENTAJE DE AVANCE', 'PORCENT']));
   const avance = avanceRaw <= 1 && avanceRaw > 0 ? avanceRaw * 100 : avanceRaw; // normalizar a 0-100
 
   // Tramo y color según % de avance
@@ -40,36 +119,40 @@ function mapRow(row, comuna) {
     color_avance = 'amarillo';
   }
 
-  // Determinar estado según observaciones del Excel
-  const obs = (get('OBSERVACIONES') || '').toUpperCase();
+  // Determinar estado según observaciones (normalizado, sin acentos)
+  const obs = normKey(get(['OBSERVACIONES', 'OBSERVACION', 'OBS', 'NOTAS', 'ESTADO']));
   let estado_cobro = 'pendiente';
   let prioridad = 'normal';
-  if (obs.includes('LISTO PARA CERTIFICAR')) {
+  if (obs.includes('LISTO') && obs.includes('CERTIFIC')) {
     estado_cobro = 'listo_certificar'; prioridad = 'alta';
-  } else if (obs.includes('FALTA CARGAR ACTAS') || obs.includes('FALTAN ACTAS') || obs.includes('FALTA CARGAR')) {
+  } else if (obs.includes('FALTA') && obs.includes('MEIN')) {
+    estado_cobro = 'falta_aprobar_mein';
+  } else if (obs.includes('FALTA') && obs.includes('ACTA')) {
     estado_cobro = 'faltan_actas';
-  } else if (obs.includes('OBSERVADO') || obs.includes('OBSERVACION')) {
+  } else if (obs.includes('OBSERV')) {
     estado_cobro = 'observado';
   }
 
+  const montoBase = parseNum(get(['MONTO BASE', 'MONTO BASE FEB-23', 'MONTO BASE FEB 23', 'MONTO CONTRATO', 'MONTO CONTRATADO', 'MONTO', 'IMPORTE']));
+
   const obj = {
-    titulo:           get('TITULO DE OBRA EN SAP') || '',
-    direccion:        get('DIRECCION') || '',
-    establecimiento:  get('ESTABLECIMIENTO') || '',
+    titulo:           toString(get(['TITULO DE OBRA EN SAP', 'TITULO DE OBRA', 'TITULO OBRA', 'TITULO', 'OBRA EN SAP', 'OBRA'])) || '',
+    direccion:        toString(get(['DIRECCION', 'DIRECCION DE OBRA', 'DOMICILIO'])) || '',
+    establecimiento:  toString(get(['ESTABLECIMIENTO', 'ESCUELA', 'ESTABLECIMIENTO DE OBRA'])) || '',
     comuna:           comuna,
-    jefe_sitio:       get('JEFE DE SITIO') || '',
-    inspector:        get('INSPECTOR') || '',
-    oc_numero:        get('N° MTOM') ? String(get('N° MTOM')) : '',
-    ada_numero:       get('N° MEIN') ? String(get('N° MEIN')) : '',
-    monto_contrato:   parseFloat(get('MONTO BASE FEB-23')) || 0,
+    jefe_sitio:       toString(get(['JEFE DE SITIO', 'JEFE SITIO', 'JEFE DE OBRA', 'JEFE'])) || '',
+    inspector:        toString(get(['INSPECTOR', 'INSPECCION', 'SUPERVISOR'])) || '',
+    oc_numero:        toString(get(['N° MTOM', 'Nº MTOM', 'MTOM', 'NRO MTOM', 'NUMERO MTOM', 'N MTOM', 'ORDEN MTOM', 'MTOM N'])),
+    ada_numero:       toString(get(['N° MEIN', 'Nº MEIN', 'MEIN', 'NRO MEIN', 'NUMERO MEIN', 'N MEIN', 'ORDEN MEIN', 'MEIN N', 'ADA'])),
+    monto_contrato:   montoBase,
     porcentaje_avance: avance,
-    plazo_dias:       parseFloat(get('Plazo')) || 0,
-    fecha_inicio:     toDateStr(get('Acta de inicio')),
-    fecha_fin_estimada: toDateStr(get('Acta de recepcion')),
-    notas:            get('OBSERVACIONES') || '',
+    plazo_dias:       parseNum(get(['PLAZO', 'PLAZO DIAS', 'PLAZO DE OBRA', 'DIAS'])),
+    fecha_inicio:     parseDate(get(['ACTA DE INICIO', 'INICIO', 'FECHA INICIO', 'ACTA INICIO', 'INICIO DE OBRA'])),
+    fecha_fin_estimada: parseDate(get(['ACTA DE RECEPCION', 'ACTA DE RECEPCION PROVISIONAL', 'RECEPCION', 'RECEPCION PROVISIONAL', 'FECHA RECEPCION', 'FIN', 'FECHA FIN', 'ACTA RECEPCION'])),
+    notas:            toString(get(['OBSERVACIONES', 'OBSERVACION', 'OBS', 'NOTAS'])) || '',
     estado_cobro,
     prioridad,
-    monto_a_cobrar:   parseFloat(get('MONTO BASE FEB-23')) || 0,
+    monto_a_cobrar:   montoBase,
     color_avance,
     tramo_certificacion,
   };
