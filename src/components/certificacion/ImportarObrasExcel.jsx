@@ -252,14 +252,17 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
   const handleImport = async () => {
     if (!preview.length) return;
     setImporting(true);
-    // Obtener OCs existentes vía backend function (bypassa RLS) para dedup
-    let existingOCs = new Set();
+    // Mapa de obras existentes por N° MTOM (para upsert, bypassa RLS).
+    // Re-importar el Excel mensual => si la obra ya está, se actualiza; si no, se crea.
+    const existingMap = new Map();
     try {
       const res = await base44.functions.invoke('gestionarObrasCertificacion', { action: 'list' });
-      existingOCs = new Set((res.data.obras || []).map(o => o.oc_numero).filter(Boolean));
-    } catch { /* si falla, continuar sin check de duplicados */ }
+      (res.data.obras || []).forEach(o => {
+        if (o.oc_numero) existingMap.set(String(o.oc_numero).trim(), o);
+      });
+    } catch { /* si falla, todo será create */ }
 
-    let ok = 0, skipped = 0, failed = 0;
+    let created = 0, updated = 0, failed = 0;
     const detalles = [];
     for (const { obra, sheetName, rowIndex } of preview) {
       // Limpieza final: nunca enviar null/undefined (rompe enums en la creación)
@@ -277,26 +280,30 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
         if (clean[f] !== undefined) clean[f] = String(clean[f]).trim();
       });
 
-      // Dedup contra DB (por N° MTOM) — evita re-importar lo ya cargado
-      if (clean.oc_numero && existingOCs.has(clean.oc_numero)) {
-        skipped++;
-        detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'skipped', motivo: `MTOM ${clean.oc_numero} ya existía` });
-        continue;
-      }
+      const key = clean.oc_numero ? String(clean.oc_numero) : '';
+      const existing = key ? existingMap.get(key) : null;
       try {
-        await base44.functions.invoke('gestionarObrasCertificacion', { action: 'create', data: clean });
-        if (clean.oc_numero) existingOCs.add(clean.oc_numero);
-        ok++;
-        detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'ok' });
+        if (existing) {
+          await base44.functions.invoke('gestionarObrasCertificacion', {
+            action: 'update', id: existing.id, data: clean,
+          });
+          updated++;
+          detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'ok', motivo: 'actualizada' });
+        } else {
+          const res = await base44.functions.invoke('gestionarObrasCertificacion', { action: 'create', data: clean });
+          if (key && res?.data?.obra?.id) existingMap.set(key, { id: res.data.obra.id });
+          created++;
+          detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'ok', motivo: 'creada' });
+        }
       } catch (err) {
         failed++;
-        const motivo = err?.response?.data?.error || err?.message || 'Error al crear';
+        const motivo = err?.response?.data?.error || err?.message || 'Error al guardar';
         detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'failed', motivo });
       }
     }
     setImporting(false);
-    setResult({ ok, skipped, failed, detalles });
-    if (ok > 0) onImported();
+    setResult({ ok: created + updated, created, updated, failed, detalles });
+    if (created + updated > 0) onImported();
   };
 
   // Agrupar preview por hoja para mostrar en tabla
@@ -429,37 +436,32 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
           {/* Resultado */}
           {result && (
             <div className="space-y-3">
-              <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${result.failed === 0 && result.skipped === 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}>
+              <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${result.failed === 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}>
                 {result.failed === 0
                   ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
                   : <AlertCircle className="h-5 w-5 shrink-0 text-amber-400" />}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold">
-                    {result.ok} de {preview.length} obras importadas
-                    {result.skipped > 0 && <span className="text-amber-400"> · {result.skipped} omitida(s)</span>}
+                    {result.ok} de {preview.length} obras procesadas
+                    {result.created > 0 && <span className="text-emerald-400"> · {result.created} nuevas</span>}
+                    {result.updated > 0 && <span className="text-sky-400"> · {result.updated} actualizadas</span>}
                     {result.failed > 0 && <span className="text-red-400"> · {result.failed} fallida(s)</span>}
                   </p>
                 </div>
               </div>
 
-              {/* Detalle de filas omitidas / fallidas */}
-              {result.detalles?.some(d => d.estado !== 'ok') && (
+              {/* Detalle de filas fallidas */}
+              {result.detalles?.some(d => d.estado === 'failed') && (
                 <div className="max-h-56 overflow-y-auto rounded-xl border border-border divide-y divide-border">
-                  {result.detalles.filter(d => d.estado !== 'ok').map((d, i) => (
+                  {result.detalles.filter(d => d.estado === 'failed').map((d, i) => (
                     <div key={i} className="flex items-start gap-2 px-3 py-2 text-xs">
-                      <span className={`shrink-0 mt-0.5 font-bold ${d.estado === 'skipped' ? 'text-amber-400' : 'text-red-400'}`}>
-                        {d.estado === 'skipped' ? '⊘' : '✕'}
-                      </span>
+                      <span className="shrink-0 mt-0.5 font-bold text-red-400">✕</span>
                       <div className="min-w-0">
                         <p className="text-foreground truncate">
                           <span className="text-muted-foreground">{d.sheet} · fila {d.row}:</span>{' '}
                           {d.titulo || '(sin título)'}
                         </p>
-                        {d.motivo && (
-                          <p className={`text-[11px] ${d.estado === 'skipped' ? 'text-amber-400/80' : 'text-red-400/80'}`}>
-                            {d.motivo}
-                          </p>
-                        )}
+                        {d.motivo && <p className="text-[11px] text-red-400/80">{d.motivo}</p>}
                       </div>
                     </div>
                   ))}
