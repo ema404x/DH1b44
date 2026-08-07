@@ -78,7 +78,8 @@ export async function exportCertificadoPDF(form) {
   const itemsToRender = allItems;
 
   const pdfSubtotal = hasMedicion ? totalPresente : subtotalContrato;
-  const baseDeduccion = parseMonto(form.monto_contratado) > 0 ? parseMonto(form.monto_contratado) : subtotalContrato;
+  // Base para deducciones: el monto parcial a certificar (pdfSubtotal), no el total contratado.
+  const baseDeduccion = pdfSubtotal;
   const pdfAnticipo = Math.round(form._anticipo_monto != null
     ? parseMonto(form._anticipo_monto)
     : (anticipo_pct > 0 ? baseDeduccion * (anticipo_pct / 100) : 0));

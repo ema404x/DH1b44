@@ -209,14 +209,16 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
     : 0;
   const totalSaldo = hasMedicion ? Math.max(0, subtotal - totalPresente) : 0;
   const baseCalculo = hasMedicion ? totalPresente : subtotal;
-  // Las deducciones en % se calculan sobre el monto total contratado
+  // Las deducciones en % se calculan sobre el monto parcial a certificar (baseCalculo),
+  // NO sobre el total contratado. Ej: si de $40M se certifica 50% ($20M), el anticipo
+  // del 20% se aplica sobre los $20M que se certifican, no sobre los $40M del contrato.
   const anticipo = form.anticipo_monto_manual != null
     ? form.anticipo_monto_manual
-    : (form.anticipo_pct > 0 ? montoContratado * (form.anticipo_pct / 100) : 0);
-  // El fondo de reparo se calcula sobre el monto contratado (campo manual si existe, sino suma de ítems)
+    : (form.anticipo_pct > 0 ? baseCalculo * (form.anticipo_pct / 100) : 0);
+  // El fondo de reparo se calcula sobre el monto a certificar (campo manual si existe)
   const fondoReparoMonto = form.fondo_reparo_monto_manual != null
     ? form.fondo_reparo_monto_manual
-    : (form.fondo_reparo_pct > 0 ? montoContratado * (form.fondo_reparo_pct / 100) : 0);
+    : (form.fondo_reparo_pct > 0 ? baseCalculo * (form.fondo_reparo_pct / 100) : 0);
   const fondoReparo = form.fondo_reparo_aplicar ? fondoReparoMonto : 0;
   const totalNeto = baseCalculo - anticipo - fondoReparo;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
