@@ -182,16 +182,29 @@ function detectarComuna(sheetName) {
   return null;
 }
 
+// Detecta filas de TOTAL / SUBTOTAL del Excel que no son obras reales.
+// El Excel trae filas como "TOTAL", "TOTAL PARA CERTIFICAR", "TOTAL GENERAL"
+// con un título pero sin MTOM/dirección/jefe → no deben importarse como obras.
+function esFilaResumen(obra) {
+  const t = (obra.titulo || '').toUpperCase().trim();
+  if (!t) return false;
+  if (/^(TOTAL|SUBTOTAL|TOTALES|SUB TOTAL|SALDO|GRAN TOTAL|TOTAL GENERAL|TOTAL PARA CERTIFICAR|SUMA)\b/.test(t)) return true;
+  // Sin MTOM, sin dirección, sin jefe y sin establecimiento → no es una obra real
+  if (!obra.oc_numero && !obra.direccion && !obra.jefe_sitio && !obra.establecimiento) return true;
+  return false;
+}
+
 export default function ImportarObrasExcel({ open, onClose, onImported }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState([]);   // [{obra, sheetName, rowIndex}]
   const [errors, setErrors] = useState([]);
+  const [ignored, setIgnored] = useState([]);    // filas de TOTAL/subtotal descartadas
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
   const fileRef = useRef();
 
   const reset = () => {
-    setFile(null); setPreview([]); setErrors([]); setResult(null);
+    setFile(null); setPreview([]); setErrors([]); setIgnored([]); setResult(null);
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -207,6 +220,7 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
       const wb = XLSX.read(ev.target.result, { type: 'array', cellDates: true });
       const allRows = [];
       const errs = [];
+      const ignoredRows = [];
 
       wb.SheetNames.forEach(sheetName => {
         const comuna = detectarComuna(sheetName);
@@ -219,12 +233,18 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
             errs.push(`${sheetName} fila ${i + 2}: falta "TITULO DE OBRA EN SAP"`);
             return;
           }
+          // Descartar filas de TOTAL / SUBTOTAL (no son obras reales)
+          if (esFilaResumen(obra)) {
+            ignoredRows.push({ sheet: sheetName, row: i + 2, titulo: obra.titulo });
+            return;
+          }
           allRows.push({ obra, sheetName, rowIndex: i + 2 });
         });
       });
 
       setPreview(allRows);
       setErrors(errs);
+      setIgnored(ignoredRows);
     };
     reader.readAsArrayBuffer(f);
   };
@@ -338,6 +358,17 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
               </p>
               {errors.slice(0, 5).map((e, i) => <p key={i} className="text-xs text-red-300">• {e}</p>)}
               {errors.length > 5 && <p className="text-xs text-red-300">...y {errors.length - 5} más</p>}
+            </div>
+          )}
+
+          {/* Filas de totales ignoradas */}
+          {ignored.length > 0 && (
+            <div className="flex items-start gap-2 px-4 py-2.5 rounded-xl border border-sky-500/30 bg-sky-500/5">
+              <Info className="h-4 w-4 text-sky-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-sky-300">
+                <span className="font-medium text-sky-200">{ignored.length} fila(s) de totales ignorada(s)</span> (no son obras reales):
+                <span className="text-sky-400/70"> {ignored.slice(0, 4).map(i => `"${i.titulo}"`).join(', ')}{ignored.length > 4 ? '…' : ''}</span>
+              </div>
             </div>
           )}
 
