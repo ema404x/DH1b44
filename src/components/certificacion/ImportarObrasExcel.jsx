@@ -157,8 +157,8 @@ function mapRow(row, comuna) {
     tramo_certificacion,
   };
 
-  // Limpiar undefined
-  Object.keys(obj).forEach(k => { if (obj[k] === undefined) delete obj[k]; });
+  // Limpiar undefined y null — un enum (ej: comuna) en null rompe la validación al crear.
+  Object.keys(obj).forEach(k => { if (obj[k] === undefined || obj[k] === null) delete obj[k]; });
   return obj;
 }
 
@@ -232,26 +232,50 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
   const handleImport = async () => {
     if (!preview.length) return;
     setImporting(true);
-    // Obtener OCs existentes vía backend function (bypassa RLS)
+    // Obtener OCs existentes vía backend function (bypassa RLS) para dedup
     let existingOCs = new Set();
     try {
       const res = await base44.functions.invoke('gestionarObrasCertificacion', { action: 'list' });
       existingOCs = new Set((res.data.obras || []).map(o => o.oc_numero).filter(Boolean));
     } catch { /* si falla, continuar sin check de duplicados */ }
-    let ok = 0, fail = 0, skipped = 0;
-    for (const { obra } of preview) {
-      if (obra.oc_numero && existingOCs.has(obra.oc_numero)) {
+
+    let ok = 0, skipped = 0, failed = 0;
+    const detalles = [];
+    for (const { obra, sheetName, rowIndex } of preview) {
+      // Limpieza final: nunca enviar null/undefined (rompe enums en la creación)
+      const clean = {};
+      for (const [k, v] of Object.entries(obra)) {
+        if (v === undefined || v === null) continue;
+        clean[k] = v;
+      }
+      // Asegurar tipos numéricos (evita rechazos por string donde se espera number)
+      ['monto_contrato', 'monto_a_cobrar', 'porcentaje_avance', 'plazo_dias'].forEach(f => {
+        if (clean[f] !== undefined) clean[f] = Number(clean[f]) || 0;
+      });
+      // Asegurar strings en campos de texto
+      ['oc_numero', 'ada_numero', 'titulo', 'jefe_sitio', 'inspector'].forEach(f => {
+        if (clean[f] !== undefined) clean[f] = String(clean[f]).trim();
+      });
+
+      // Dedup contra DB (por N° MTOM) — evita re-importar lo ya cargado
+      if (clean.oc_numero && existingOCs.has(clean.oc_numero)) {
         skipped++;
+        detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'skipped', motivo: `MTOM ${clean.oc_numero} ya existía` });
         continue;
       }
       try {
-        await base44.functions.invoke('gestionarObrasCertificacion', { action: 'create', data: obra });
-        if (obra.oc_numero) existingOCs.add(obra.oc_numero);
+        await base44.functions.invoke('gestionarObrasCertificacion', { action: 'create', data: clean });
+        if (clean.oc_numero) existingOCs.add(clean.oc_numero);
         ok++;
-      } catch { fail++; }
+        detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'ok' });
+      } catch (err) {
+        failed++;
+        const motivo = err?.response?.data?.error || err?.message || 'Error al crear';
+        detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'failed', motivo });
+      }
     }
     setImporting(false);
-    setResult({ ok, fail, skipped });
+    setResult({ ok, skipped, failed, detalles });
     if (ok > 0) onImported();
   };
 
@@ -373,13 +397,43 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
 
           {/* Resultado */}
           {result && (
-            <div className={`flex items-center gap-3 px-4 py-4 rounded-xl border ${result.fail === 0 && result.skipped === 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}>
-              <CheckCircle2 className={`h-5 w-5 shrink-0 ${result.fail === 0 && result.skipped === 0 ? 'text-emerald-400' : 'text-amber-400'}`} />
-              <div>
-                <p className="text-sm font-semibold">{result.ok} obras importadas correctamente</p>
-                {result.skipped > 0 && <p className="text-xs text-amber-400">{result.skipped} duplicada(s) omitida(s) — N° MTOM ya existente</p>}
-                {result.fail > 0 && <p className="text-xs text-muted-foreground">{result.fail} filas fallaron</p>}
+            <div className="space-y-3">
+              <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${result.failed === 0 && result.skipped === 0 ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}>
+                {result.failed === 0
+                  ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
+                  : <AlertCircle className="h-5 w-5 shrink-0 text-amber-400" />}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold">
+                    {result.ok} de {preview.length} obras importadas
+                    {result.skipped > 0 && <span className="text-amber-400"> · {result.skipped} omitida(s)</span>}
+                    {result.failed > 0 && <span className="text-red-400"> · {result.failed} fallida(s)</span>}
+                  </p>
+                </div>
               </div>
+
+              {/* Detalle de filas omitidas / fallidas */}
+              {result.detalles?.some(d => d.estado !== 'ok') && (
+                <div className="max-h-56 overflow-y-auto rounded-xl border border-border divide-y divide-border">
+                  {result.detalles.filter(d => d.estado !== 'ok').map((d, i) => (
+                    <div key={i} className="flex items-start gap-2 px-3 py-2 text-xs">
+                      <span className={`shrink-0 mt-0.5 font-bold ${d.estado === 'skipped' ? 'text-amber-400' : 'text-red-400'}`}>
+                        {d.estado === 'skipped' ? '⊘' : '✕'}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-foreground truncate">
+                          <span className="text-muted-foreground">{d.sheet} · fila {d.row}:</span>{' '}
+                          {d.titulo || '(sin título)'}
+                        </p>
+                        {d.motivo && (
+                          <p className={`text-[11px] ${d.estado === 'skipped' ? 'text-amber-400/80' : 'text-red-400/80'}`}>
+                            {d.motivo}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
