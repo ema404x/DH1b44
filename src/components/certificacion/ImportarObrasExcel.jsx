@@ -252,15 +252,25 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
   const handleImport = async () => {
     if (!preview.length) return;
     setImporting(true);
-    // Mapa de obras existentes por N° MTOM (para upsert, bypassa RLS).
-    // Re-importar el Excel mensual => si la obra ya está, se actualiza; si no, se crea.
+    // Obras existentes (bypassa RLS) para upsert por N° MTOM + limpieza de filas TOTAL bogus.
     const existingMap = new Map();
+    const bogusToDelete = [];
     try {
       const res = await base44.functions.invoke('gestionarObrasCertificacion', { action: 'list' });
       (res.data.obras || []).forEach(o => {
+        // TOTAL / SUBTOTAL de importaciones previas → eliminar (no son obras reales)
+        const t = (o.titulo || '').toUpperCase().trim();
+        if (/^(TOTAL|SUBTOTAL|TOTALES|SUB TOTAL|SALDO|GRAN TOTAL|TOTAL GENERAL|TOTAL PARA CERTIFICAR|SUMA)\b/.test(t)) {
+          bogusToDelete.push(o.id);
+          return;
+        }
         if (o.oc_numero) existingMap.set(String(o.oc_numero).trim(), o);
       });
     } catch { /* si falla, todo será create */ }
+    // Borrar obras TOTAL bogus dejadas por importaciones previas (con el mapeo antiguo)
+    for (const id of bogusToDelete) {
+      try { await base44.functions.invoke('gestionarObrasCertificacion', { action: 'delete', id }); } catch {}
+    }
 
     let created = 0, updated = 0, failed = 0;
     const detalles = [];
@@ -279,6 +289,10 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
       ['oc_numero', 'ada_numero', 'titulo', 'jefe_sitio', 'inspector'].forEach(f => {
         if (clean[f] !== undefined) clean[f] = String(clean[f]).trim();
       });
+      // Traer la obra al ciclo activo — importaciones previas pueden haberla dejado
+      // archivada en un ciclo anterior, por lo que no se veía en la lista activa.
+      clean.ciclo = '';
+      clean.ciclo_archivado = false;
 
       const key = clean.oc_numero ? String(clean.oc_numero) : '';
       const existing = key ? existingMap.get(key) : null;
