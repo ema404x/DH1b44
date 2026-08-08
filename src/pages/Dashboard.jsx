@@ -89,6 +89,18 @@ function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, hr
   return href ? <Link to={href} className="block h-full">{inner}</Link> : inner;
 }
 
+function KpiCardSkeleton() {
+  return (
+    <div className="rounded-2xl border border-border bg-card shadow-sm p-5 h-full">
+      <div className="flex items-start justify-between mb-4">
+        <div className="h-10 w-10 rounded-xl skeleton" />
+      </div>
+      <div className="h-8 w-24 skeleton mb-2" />
+      <div className="h-3 w-28 skeleton" />
+    </div>
+  );
+}
+
 function ActivityFeed({ orders }) {
   const recent = useMemo(() =>
     [...orders]
@@ -178,8 +190,22 @@ export default function Dashboard() {
   const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),    staleTime: 60000, refetchInterval: 120000, enabled: canRead('Invoice') });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),   staleTime: 120000, refetchInterval: 120000, enabled: canRead('Inventory') });
   const { data: assets = [] }    = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 100),      staleTime: 120000, refetchInterval: 120000, enabled: canRead('Asset') });
-  const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: () => base44.entities.Pendiente.list('-updated_date', 200), staleTime: 60000, refetchInterval: 120000, enabled: canRead('Asset') });
+  const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: () => base44.entities.Pendiente.list('-updated_date', 200), staleTime: 60000, refetchInterval: 120000, enabled: canRead('Pendientes') });
   const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 80),    staleTime: 120000, refetchInterval: 120000, enabled: canRead('Employee') });
+
+  // KPIs agregados en backend sobre el TOTAL del sector (sin truncar).
+  // Solo admins (ven todo el sector); los jefes siguen con filterByUser
+  // client-side porque el backend no filtra por jefe. Fix del subreporte por
+  // listas truncadas (.list 100/150/200).
+  const useBackendKpis = user?.role === 'admin';
+  const { data: kpis, isLoading: kpisLoading } = useQuery({
+    queryKey: ['dashboard-metrics'],
+    queryFn: async () => (await base44.functions.invoke('getDashboardMetrics')).data,
+    staleTime: 60000, refetchInterval: 120000, retry: 1,
+    enabled: useBackendKpis,
+  });
+  const B = (useBackendKpis && kpis) ? kpis : null;
+  const kpiVal = (b, c) => (B != null && b != null ? b : c);
 
   // Pendientes filtrados: admin ve todos, jefe de sitio solo los suyos
   // filterByUser prioriza employeeName (ficha de empleado) sobre full_name de plataforma
@@ -296,8 +322,8 @@ export default function Dashboard() {
             {greeting}{firstName ? `, ${firstName}` : ''} <span className="text-2xl">👋</span>
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {canRead('WorkOrder') && <>{metrics.pendingOrders} OTs pendientes · {metrics.inProgressOrders} en progreso</>}
-            {canRead('WorkOrder') && metrics.overdueOrders > 0 && <span className="text-red-400 font-semibold"> · ⚠ {metrics.overdueOrders} vencidas</span>}
+            {canRead('WorkOrder') && <>{kpiVal(kpis?.pendingOrders, metrics.pendingOrders)} OTs pendientes · {kpiVal(kpis?.inProgressOrders, metrics.inProgressOrders)} en progreso</>}
+            {canRead('WorkOrder') && kpiVal(kpis?.overdueOrders, metrics.overdueOrders) > 0 && <span className="text-red-400 font-semibold"> · ⚠ {kpiVal(kpis?.overdueOrders, metrics.overdueOrders)} vencidas</span>}
           </p>
         </div>
         {canRead('WorkOrder') && (
@@ -323,25 +349,31 @@ export default function Dashboard() {
       <DashboardFilters filters={dashFilters} onChange={setDashFilters} jefes={jefesOptions} />
 
       {/* ── CRITICAL ALERTS ── */}
-      {metrics.hasAlerts && (
-        <div className="flex flex-wrap gap-2">
-          {metrics.overdueOrders > 0 && canRead('WorkOrder') && (
-            <Link to="/ordenes" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/25 text-red-300 text-sm hover:bg-red-500/25 transition-all">
-              <AlertTriangle className="h-3.5 w-3.5" /> {metrics.overdueOrders} OT{metrics.overdueOrders > 1 ? 's' : ''} vencida{metrics.overdueOrders > 1 ? 's' : ''}
-            </Link>
-          )}
-          {metrics.lowStockItems.length > 0 && canRead('Inventory') && (
-            <Link to="/inventario" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/25 text-amber-300 text-sm hover:bg-amber-500/25 transition-all">
-              <Package className="h-3.5 w-3.5" /> {metrics.lowStockItems.length} material{metrics.lowStockItems.length > 1 ? 'es' : ''} bajo stock
-            </Link>
-          )}
-          {metrics.overdueAssets.length > 0 && canRead('Asset') && (
-            <Link to="/activos" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-500/15 border border-orange-500/25 text-orange-300 text-sm hover:bg-orange-500/25 transition-all">
-              <Wrench className="h-3.5 w-3.5" /> {metrics.overdueAssets.length} mantenimiento{metrics.overdueAssets.length > 1 ? 's' : ''} vencido{metrics.overdueAssets.length > 1 ? 's' : ''}
-            </Link>
-          )}
-        </div>
-      )}
+      {(() => {
+        const _overdue = kpiVal(kpis?.overdueOrders, metrics.overdueOrders);
+        const _lowStock = kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length);
+        const _overdueAssets = kpiVal(kpis?.overdueAssets, metrics.overdueAssets.length);
+        if (!(_overdue > 0 || _lowStock > 0 || _overdueAssets > 0)) return null;
+        return (
+          <div className="flex flex-wrap gap-2">
+            {_overdue > 0 && canRead('WorkOrder') && (
+              <Link to="/ordenes" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/25 text-red-300 text-sm hover:bg-red-500/25 transition-all">
+                <AlertTriangle className="h-3.5 w-3.5" /> {_overdue} OT{_overdue > 1 ? 's' : ''} vencida{_overdue > 1 ? 's' : ''}
+              </Link>
+            )}
+            {_lowStock > 0 && canRead('Inventory') && (
+              <Link to="/inventario" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/25 text-amber-300 text-sm hover:bg-amber-500/25 transition-all">
+                <Package className="h-3.5 w-3.5" /> {_lowStock} material{_lowStock > 1 ? 'es' : ''} bajo stock
+              </Link>
+            )}
+            {_overdueAssets > 0 && canRead('Asset') && (
+              <Link to="/activos" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-500/15 border border-orange-500/25 text-orange-300 text-sm hover:bg-orange-500/25 transition-all">
+                <Wrench className="h-3.5 w-3.5" /> {_overdueAssets} mantenimiento{_overdueAssets > 1 ? 's' : ''} vencido{_overdueAssets > 1 ? 's' : ''}
+              </Link>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── ACCESOS RÁPIDOS ── */}
       {(() => {
@@ -367,19 +399,27 @@ export default function Dashboard() {
       {/* ── INDICADORES (KPI GRID) ── */}
       <div>
         <SectionHeader title="Indicadores" subtitle="Resumen general del período" />
+        {kpisLoading ? (
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => <KpiCardSkeleton key={i} />)}
+          </div>
+        ) : (
+        <>
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="OTs Pendientes"   value={metrics.pendingOrders}          subtitle={`${metrics.completedThisMonth} completadas este mes`}  icon={ClipboardList} color="amber"  alert={metrics.overdueOrders > 0 ? metrics.overdueOrders : undefined} />}
-          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="En Progreso"      value={metrics.inProgressOrders}        subtitle={`${metrics.efficiency}% de eficiencia total`}          icon={Activity}      color="purple" />}
-          {canRead('Project')    && <KpiCard href="/proyectos"   title="Proyectos"        value={metrics.activeProjects}         subtitle={`${projects.length} en total`}                          icon={FolderKanban}  color="blue"   />}
-          {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos del Mes" value={fmt(metrics.revenueThisMonth)} subtitle={`${fmt(metrics.pendingInvoices)} por cobrar`}         icon={DollarSign}    color="green"  trend={metrics.revenueTrend} />}
+          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="OTs Pendientes"   value={kpiVal(kpis?.pendingOrders, metrics.pendingOrders)}          subtitle={`${kpiVal(kpis?.completedThisMonth, metrics.completedThisMonth)} completadas este mes`}  icon={ClipboardList} color="amber"  alert={kpiVal(kpis?.overdueOrders, metrics.overdueOrders) > 0 ? kpiVal(kpis?.overdueOrders, metrics.overdueOrders) : undefined} />}
+          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="En Progreso"      value={kpiVal(kpis?.inProgressOrders, metrics.inProgressOrders)}        subtitle={`${kpiVal(kpis?.efficiency, metrics.efficiency)}% de eficiencia total`}          icon={Activity}      color="purple" />}
+          {canRead('Project')    && <KpiCard href="/proyectos"   title="Proyectos"        value={kpiVal(kpis?.activeProjects, metrics.activeProjects)}         subtitle={`${kpiVal(kpis?.totalProjects, projects.length)} en total`}                          icon={FolderKanban}  color="blue"   />}
+          {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos del Mes" value={fmt(kpiVal(kpis?.revenueThisMonth, metrics.revenueThisMonth))} subtitle={`${fmt(kpiVal(kpis?.pendingInvoices, metrics.pendingInvoices))} por cobrar`}         icon={DollarSign}    color="green"  trend={kpiVal(kpis?.revenueTrend, metrics.revenueTrend)} />}
         </div>
         <div className="h-4" />
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={metrics.activeClients}            subtitle={`${clients.length} en total`}                        icon={Users}         color="primary" />}
-          {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={metrics.urgentOrders.length}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={metrics.urgentOrders.length > 0 ? 'red' : 'green'} />}
-          {canRead('Asset')     && <KpiCard href="/activos"    title="Pendientes SAP"  value={pendientesKpis.activos} subtitle={`${pendientesKpis.resueltos} resueltos`} icon={Wrench} color="amber" alert={pendientesKpis.urgentes > 0 ? pendientesKpis.urgentes : undefined} />}
-          {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={materials.length}                  subtitle={`${metrics.lowStockItems.length} bajo mínimo`}      icon={Package}       color={metrics.lowStockItems.length > 0 ? 'red' : 'green'} />}
+          {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={kpiVal(kpis?.activeClients, metrics.activeClients)}            subtitle={`${kpiVal(kpis?.totalClients, clients.length)} en total`}                        icon={Users}         color="primary" />}
+          {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={kpiVal(kpis?.urgentOrders, metrics.urgentOrders.length)}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={kpiVal(kpis?.urgentOrders, metrics.urgentOrders.length) > 0 ? 'red' : 'green'} />}
+          {canRead('Pendientes') && <KpiCard href="/activos"    title="Pendientes SAP"  value={kpiVal(kpis?.pendientesActivos, pendientesKpis.activos)} subtitle={`${kpiVal(kpis?.pendientesResueltos, pendientesKpis.resueltos)} resueltos`} icon={Wrench} color="amber" alert={kpiVal(kpis?.pendientesUrgentes, pendientesKpis.urgentes) > 0 ? kpiVal(kpis?.pendientesUrgentes, pendientesKpis.urgentes) : undefined} />}
+          {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={kpiVal(kpis?.totalMaterials, materials.length)}                  subtitle={`${kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length)} bajo mínimo`}      icon={Package}       color={kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length) > 0 ? 'red' : 'green'} />}
         </div>
+        </>
+        )}
       </div>
 
       {/* ── OPERACIÓN ── */}
