@@ -18,6 +18,8 @@ import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { useOperarioClave } from '@/hooks/useOperarioClave';
+import OperarioClavePrompt from '@/components/operario/OperarioClavePrompt';
 
 // ── Helper: llamar funciones públicas via SDK (no requiere auth) ─────────────
 const callPublicFn = async (fnName, payload) => {
@@ -245,6 +247,7 @@ export default function EjecutarOrdenPublica() {
   const [activeSection, setActiveSection] = useState('checklist');
   const [gpsData, setGpsData] = useState(null); // { lat, lng, accuracy, timestamp } | 'denied' | 'unavailable'
   const [gpsLoading, setGpsLoading] = useState(false);
+  const { promptOpen: clavePromptOpen, requireClave, onPromptSuccess, onPromptClose } = useOperarioClave();
 
   const loadOrder = (ot, locName) => {
     if (['completada', 'cancelada'].includes(ot.status)) {
@@ -335,44 +338,47 @@ export default function EjecutarOrdenPublica() {
     );
   });
 
-  const handleGuardar = async () => {
+  const handleGuardar = () => {
     if (!firma) { toast.error('Necesitás firmar antes de guardar'); return; }
-    setSaving(true);
-    setGpsLoading(true);
+    requireClave(async (clave) => {
+      setSaving(true);
+      setGpsLoading(true);
 
-    // Capturar GPS antes de guardar (con timeout de seguridad)
-    const gps = await Promise.race([
-      captureGPS(),
-      new Promise(resolve => setTimeout(() => resolve({ status: 'no_disponible' }), 10000))
-    ]);
-    setGpsData(gps);
-    setGpsLoading(false);
+      // Capturar GPS antes de guardar (con timeout de seguridad)
+      const gps = await Promise.race([
+        captureGPS(),
+        new Promise(resolve => setTimeout(() => resolve({ status: 'no_disponible' }), 10000))
+      ]);
+      setGpsData(gps);
+      setGpsLoading(false);
 
-    try {
-      const allPhotos = [...fotosAntes, ...fotosDespues];
-      await callPublicFn('publicFichar', {
-        action: 'updateWorkOrder',
-        workOrderId: order.id,
-        updates: {
-          checklist,
-          photos: allPhotos,
-          signature_url: firma.signatureUrl,
-          signature_name: firma.signatureName,
-          status: allDone ? 'completada' : 'en_progreso',
-          completed_date: allDone ? new Date().toISOString().split('T')[0] : undefined,
-          // Datos GPS
-          gps_latitude: gps.lat ?? null,
-          gps_longitude: gps.lng ?? null,
-          gps_accuracy: gps.accuracy ?? null,
-          gps_timestamp: gps.timestamp ?? null,
-          gps_status: gps.status,
-        },
-      });
-      setPhase('done');
-    } catch (e) {
-      toast.error('Error al guardar: ' + e.message);
-    }
-    setSaving(false);
+      try {
+        const allPhotos = [...fotosAntes, ...fotosDespues];
+        await callPublicFn('publicFichar', {
+          action: 'updateWorkOrder',
+          password: clave,
+          workOrderId: order.id,
+          updates: {
+            checklist,
+            photos: allPhotos,
+            signature_url: firma.signatureUrl,
+            signature_name: firma.signatureName,
+            status: allDone ? 'completada' : 'en_progreso',
+            completed_date: allDone ? new Date().toISOString().split('T')[0] : undefined,
+            // Datos GPS
+            gps_latitude: gps.lat ?? null,
+            gps_longitude: gps.lng ?? null,
+            gps_accuracy: gps.accuracy ?? null,
+            gps_timestamp: gps.timestamp ?? null,
+            gps_status: gps.status,
+          },
+        });
+        setPhase('done');
+      } catch (e) {
+        toast.error('Error al guardar: ' + e.message);
+      }
+      setSaving(false);
+    });
   };
 
   const tc = order ? (typeConfig[order.type] || typeConfig.mantenimiento_correctivo) : null;
@@ -723,6 +729,10 @@ export default function EjecutarOrdenPublica() {
           )}
         </div>
       </div>
+
+      {clavePromptOpen && (
+        <OperarioClavePrompt onSuccess={onPromptSuccess} onClose={onPromptClose} />
+      )}
     </div>
   );
 }

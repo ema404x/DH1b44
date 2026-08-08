@@ -54,6 +54,8 @@ Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  // Solo admin puede encriptar/desencriptar con la clave maestra de la app
+  if (user.role !== 'admin') return Response.json({ error: 'Forbidden: se requieren permisos de administrador' }, { status: 403 });
 
   const { action, plaintext, ciphertext } = await req.json();
 

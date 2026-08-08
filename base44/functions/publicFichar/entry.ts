@@ -139,10 +139,19 @@ Deno.serve(async (req) => {
       return Response.json({ valid: password === storedPassword });
     }
 
-    // UPDATE work order — validar OT activa y whitelist de campos
+    // UPDATE work order — requiere la clave de operario (secreto compartido)
+    // para evitar que un atacante anónimo modifique OTs arbitrarias.
+    // Solo campos operables por el operario; los de validación/rechazo son
+    // exclusivos del jefe de sitio (vía transicionEstadoOT, autenticado).
     if (action === 'updateWorkOrder') {
-      const { workOrderId, updates } = body;
+      const { workOrderId, updates, password } = body;
       if (!workOrderId || !updates) return Response.json({ error: 'Parámetros requeridos' }, { status: 400 });
+
+      const storedPassword = Deno.env.get('OPERARIO_PASSWORD');
+      if (!storedPassword) return Response.json({ error: 'Servicio no configurado' }, { status: 503 });
+      if (!password || password !== storedPassword) {
+        return Response.json({ error: 'Clave de operario requerida' }, { status: 401 });
+      }
 
       const existing = await sb.entities.WorkOrder.filter({ id: workOrderId }).catch(() => []);
       const workOrder = existing[0];
@@ -156,7 +165,6 @@ Deno.serve(async (req) => {
         'completed_date', 'gps_latitude', 'gps_longitude', 'gps_accuracy',
         'gps_timestamp', 'gps_status', 'fecha_inicio_real', 'notes',
         'materials_used', 'materiales_faltantes', 'motivos_incompleto',
-        'rechazo_comentario', 'validado_por', 'fecha_validacion',
       ];
       const safeUpdates = {};
       for (const key of ALLOWED_FIELDS) {

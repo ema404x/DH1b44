@@ -9,6 +9,7 @@ import {
   MapPin, ClipboardList, ChevronRight, Wrench
 } from 'lucide-react';
 import EjecutarOTEnPortal from '@/components/workorders/EjecutarOTEnPortal';
+import { setClave } from '@/lib/operarioClave';
 
 const callFn = async (payload) => {
   const res = await base44.functions.invoke('publicFichar', payload);
@@ -45,6 +46,7 @@ function PantallaClave({ locationName, onSuccess, onError }) {
     const res = await callFn({ action: 'verifyOperarioPassword', password: clave.trim() });
     setChecking(false);
     if (res?.valid) {
+      setClave(clave.trim()); // cachea la clave para reenviarla en updateWorkOrder
       onSuccess();
     } else {
       setError('Clave incorrecta. Consultá con tu supervisor.');

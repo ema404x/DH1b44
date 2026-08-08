@@ -6,6 +6,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { CheckCircle2, Loader2, AlertTriangle, Camera, X, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
+import { useOperarioClave } from '@/hooks/useOperarioClave';
+import OperarioClavePrompt from '@/components/operario/OperarioClavePrompt';
 
 const callFn = async (payload) => {
   const res = await base44.functions.invoke('publicFichar', payload);
@@ -88,6 +90,7 @@ export default function EjecutarOTSimple() {
   const [showDesc, setShowDesc] = useState(true);
   const [gpsStatus, setGpsStatus] = useState(null); // null | 'capturando' | 'capturado' | 'denegado' | 'no_disponible'
   const { capturar } = useGeolocalizacion();
+  const { promptOpen: clavePromptOpen, requireClave, onPromptSuccess, onPromptClose } = useOperarioClave();
 
   useEffect(() => {
     if (!otId) { setPhase('not_found'); return; }
@@ -102,28 +105,31 @@ export default function EjecutarOTSimple() {
       .catch(() => setPhase('not_found'));
   }, [otId]);
 
-  const handleCompletar = async () => {
-    setSaving(true);
-    setGpsStatus('capturando');
-    try {
-      const gpsData = await capturar();
-      setGpsStatus(gpsData.gps_status);
-      await callFn({
-        action: 'updateWorkOrder',
-        workOrderId: otId,
-        updates: {
-          status: 'completada',
-          completed_date: new Date().toISOString().split('T')[0],
-          ...(photos.length > 0 && { photos }),
-          ...gpsData,
-        },
-      });
-      setPhase('done');
-    } catch (err) {
-      setGpsStatus('no_disponible');
-    } finally {
-      setSaving(false);
-    }
+  const handleCompletar = () => {
+    requireClave(async (clave) => {
+      setSaving(true);
+      setGpsStatus('capturando');
+      try {
+        const gpsData = await capturar();
+        setGpsStatus(gpsData.gps_status);
+        await callFn({
+          action: 'updateWorkOrder',
+          password: clave,
+          workOrderId: otId,
+          updates: {
+            status: 'completada',
+            completed_date: new Date().toISOString().split('T')[0],
+            ...(photos.length > 0 && { photos }),
+            ...gpsData,
+          },
+        });
+        setPhase('done');
+      } catch (err) {
+        setGpsStatus('no_disponible');
+      } finally {
+        setSaving(false);
+      }
+    });
   };
 
   // ── Loading ──
@@ -265,6 +271,9 @@ export default function EjecutarOTSimple() {
         </div>
       </div>
 
+      {clavePromptOpen && (
+        <OperarioClavePrompt onSuccess={onPromptSuccess} onClose={onPromptClose} />
+      )}
     </div>
   );
 }

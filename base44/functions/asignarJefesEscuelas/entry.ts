@@ -8,6 +8,10 @@ Deno.serve(async (req) => {
     if (!user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    // Solo admin/gerente pueden reasignar jefes de sitio masivamente
+    if (user.role !== 'admin' && user.role !== 'gerente') {
+      return Response.json({ error: 'Forbidden: se requieren permisos de administrador' }, { status: 403 });
+    }
 
     const formData = await req.formData();
     const file = formData.get('file');
