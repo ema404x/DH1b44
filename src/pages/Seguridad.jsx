@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Lock, HardDrive, AlertTriangle, CheckCircle2, Activity, History } from 'lucide-react';
+import { Shield, Lock, HardDrive, AlertTriangle, CheckCircle2, Activity, History, KeyRound } from 'lucide-react';
 import TwoFactorSetup from '@/components/security/TwoFactorSetup';
 import BackupManager from '@/components/security/BackupManager';
 import SessionAudit from '@/components/security/SessionAudit';
 import SensitiveChangesLog from '@/components/security/SensitiveChangesLog';
 import SuspiciousActivityAlerts from '@/components/security/SuspiciousActivityAlerts';
 import AuditSystemCheck from '@/components/audit/AuditSystemCheck';
+import OperarioPasswordPanel from '@/components/security/OperarioPasswordPanel';
 
 export default function Seguridad() {
   return (
@@ -54,7 +55,7 @@ export default function Seguridad() {
       </div>
 
       <Tabs defaultValue="2fa" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="2fa" className="gap-2">
             <Lock className="h-4 w-4" />
             <span className="hidden sm:inline">2FA</span>
@@ -82,6 +83,10 @@ export default function Seguridad() {
           <TabsTrigger value="auditoria" className="gap-2">
             <Shield className="h-4 w-4" />
             <span className="hidden sm:inline">Auditoría</span>
+          </TabsTrigger>
+          <TabsTrigger value="operarios" className="gap-2">
+            <KeyRound className="h-4 w-4" />
+            <span className="hidden sm:inline">Operarios</span>
           </TabsTrigger>
         </TabsList>
 
@@ -164,6 +169,16 @@ export default function Seguridad() {
             <p className="text-sm text-blue-800">Escanea el sistema en busca de inconsistencias, duplicados de email, configuraciones incompletas, y otras anomalías.</p>
           </Card>
           <AuditSystemCheck />
+        </TabsContent>
+
+        <TabsContent value="operarios" className="space-y-4">
+          <Card className="p-6 bg-blue-50 border-blue-200">
+            <h3 className="font-bold text-blue-900 mb-2">Clave de Operarios de Campo</h3>
+            <p className="text-sm text-blue-800">
+              Define la clave compartida que los operarios usan para fichar y completar órdenes desde los portales públicos (fichar, ejecutar OT, tablets). Al cambiarla acá, la nueva clave toma efecto inmediatamente sin necesidad de redeployar.
+            </p>
+          </Card>
+          <OperarioPasswordPanel />
         </TabsContent>
       </Tabs>
 

@@ -1,5 +1,26 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
+const OPERARIO_SALT = 'b44-operario-salt-v1';
+
+async function sha256Hex(text) {
+  const data = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Verifica la clave de operario contra el hash en SecurityConfig (editable desde
+// el Centro de Seguridad). Si no hay hash en DB, cae al secreto de plataforma
+// OPERARIO_PASSWORD (migración no-ruptura). Devuelve { valid, configured }.
+async function verificarClaveOperario(base44, password) {
+  if (!password) return { valid: false, configured: false };
+  const cfg = await base44.asServiceRole.entities.SecurityConfig.list().catch(() => []);
+  const dbHash = cfg[0]?.operario_password_hash;
+  const env = Deno.env.get('OPERARIO_PASSWORD');
+  if (!dbHash && !env) return { valid: false, configured: false };
+  const valid = dbHash ? (await sha256Hex(password + OPERARIO_SALT)) === dbHash : password === env;
+  return { valid, configured: true };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -128,15 +149,12 @@ Deno.serve(async (req) => {
       return Response.json({ file_url: result.file_url });
     }
 
-    // VERIFY operario password (stored as secret, never hardcoded)
+    // VERIFY operario password — hash en DB (Centro de Seguridad) con fallback al secreto
     if (action === 'verifyOperarioPassword') {
       const { password } = body;
-      const storedPassword = Deno.env.get('OPERARIO_PASSWORD');
-      if (!storedPassword) {
-        return Response.json({ error: 'Servicio no configurado' }, { status: 503 });
-      }
-      if (!password) return Response.json({ valid: false }, { status: 400 });
-      return Response.json({ valid: password === storedPassword });
+      const { valid, configured } = await verificarClaveOperario(base44, password);
+      if (!configured) return Response.json({ error: 'Servicio no configurado' }, { status: 503 });
+      return Response.json({ valid });
     }
 
     // UPDATE work order — requiere la clave de operario (secreto compartido)
@@ -147,9 +165,9 @@ Deno.serve(async (req) => {
       const { workOrderId, updates, password } = body;
       if (!workOrderId || !updates) return Response.json({ error: 'Parámetros requeridos' }, { status: 400 });
 
-      const storedPassword = Deno.env.get('OPERARIO_PASSWORD');
-      if (!storedPassword) return Response.json({ error: 'Servicio no configurado' }, { status: 503 });
-      if (!password || password !== storedPassword) {
+      const { valid, configured } = await verificarClaveOperario(base44, password);
+      if (!configured) return Response.json({ error: 'Servicio no configurado' }, { status: 503 });
+      if (!valid) {
         return Response.json({ error: 'Clave de operario requerida' }, { status: 401 });
       }
 

@@ -1,0 +1,42 @@
+{
+  "name": "SecurityConfig",
+  "type": "object",
+  "properties": {
+    "operario_password_hash": {
+      "type": "string",
+      "description": "Hash SHA-256 (con salt) de la clave compartida de operario. Nunca se guarda el texto plano."
+    },
+    "operario_password_updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima actualizaci\u00f3n de la clave de operario"
+    },
+    "operario_password_updated_by": {
+      "type": "string",
+      "description": "Email del administrador que actualiz\u00f3 la clave"
+    }
+  },
+  "required": [],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
