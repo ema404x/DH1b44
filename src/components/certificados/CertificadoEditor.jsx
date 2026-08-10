@@ -438,7 +438,7 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
             />
             <p className="text-xs text-muted-foreground mt-1">Ya abonado en certificados previos</p>
           </Field>
-          <Field label="% Avance de Obra">
+          <Field label="% Avance de Certificación">
             <div className="flex gap-2">
               <Input type="number" min="0" max="100" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', +e.target.value)} />
               <Button
