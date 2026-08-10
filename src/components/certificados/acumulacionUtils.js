@@ -141,8 +141,8 @@ export function matchAnteriorDesdeCert(items, certAnterior) {
 //  - baseCalculo = monto PARCIAL a certificar (totalPresente si hay medición;
 //    sino el total del contrato). Base de anticipo y fondo de reparo.
 //  - Anticipo y fondo de reparo → sobre baseCalculo (el parcial).
-//  - % pagado anteriormente → sobre el TOTAL del contrato (subtotalContrato),
-//    no sobre el parcial: representa dinero ya cobrado en certificados previos.
+//  - % pagado anteriormente → sobre el PARCIAL a certificar (baseCalculo),
+//    igual que anticipo y fondo de reparo. Todas las deducciones sobre la misma base.
 //  - Saldo pendiente = max(0, contrato − acumulado). Llega a 0 al 100%.
 export function calcularTotales(form) {
   const items = (form && form.items) || [];
@@ -186,8 +186,9 @@ export function calcularTotales(form) {
         : 0;
   const fondoReparo = form.fondo_reparo_aplicar ? fondoReparoMonto : 0;
 
-  // % pagado anteriormente: sobre el TOTAL del contrato (no el parcial).
-  const pagadoAnteriormente = anteriorPorB;
+  // % pagado anteriormente: deducción sobre el PARCIAL a certificar (baseCalculo),
+  // igual que anticipo y fondo de reparo. Coherente: nunca genera neto negativo.
+  const pagadoAnteriormente = pctB > 0 ? Math.round(baseCalculo * (pctB / 100)) : 0;
 
   const totalNeto = baseCalculo - anticipo - fondoReparo - pagadoAnteriormente;
 
