@@ -283,9 +283,13 @@ export default function PortalOperarioApp() {
     ot.assigned_to === currentUser?.id ||
     (ot.assigned_name && normName(ot.assigned_name) === normName(displayName));
 
+  // Devuelve true si abrió un diálogo (accionable), false si solo notificó.
+  // El modal de ubicación se cierra solo si abrió algo — si no, queda abierto
+  // con el toast visible explicando por qué, evitando el "se sale todo y ya".
   const actOnOT = (foundOT) => {
     if (foundOT.status === 'pendiente') {
       setConfirmAction({ ot: foundOT, accion: 'iniciar' });
+      return true;
     } else if (foundOT.status === 'asignada') {
       // Solo el operario al que el jefe le asignó la OT puede iniciarla,
       // SALVO si el asignado es el propio jefe de sitio (OT de cuadrilla) —
@@ -294,25 +298,29 @@ export default function PortalOperarioApp() {
       const esCuadrilla = normName(foundOT.assigned_name) && normName(foundOT.assigned_name) === normName(foundOT.jefe_sitio);
       if (foundOT.assigned_name && !isOwnerOf(foundOT) && !esCuadrilla) {
         toast.info(`Esta OT está asignada a ${foundOT.assigned_name}`);
-        return;
+        return false;
       }
       setConfirmAction({ ot: foundOT, accion: 'iniciar' });
+      return true;
     } else if (foundOT.status === 'en_progreso') {
       // Solo el operario que está trabajando la OT puede reportarla/cerrarla.
       // Otro operario que escanea la misma ubicación la ve pero no puede actuar.
       if (!isOnline) {
         toast.error('Necesitás conexión para finalizar esta OT.');
-        return;
+        return false;
       }
       if (foundOT.assigned_name && !isOwnerOf(foundOT)) {
         toast.info('Esta OT la está trabajando otro operario');
-        return;
+        return false;
       }
       setReporteOT(foundOT);
+      return true;
     } else if (foundOT.status === 'pendiente_validacion') {
       toast.info('Esta OT ya está enviada al jefe para validación');
+      return false;
     } else {
       toast.info(`La OT "${foundOT.title}" está ${foundOT.status}`);
+      return false;
     }
   };
 
@@ -493,7 +501,7 @@ export default function PortalOperarioApp() {
           offline={locOTs.offline}
           onRetry={handleRetryLoc}
           onScanAnother={() => setScannerOpen(true)}
-          onSelect={(ot) => { setLocOTs(null); actOnOT(ot); }}
+          onSelect={(ot) => { if (actOnOT(ot)) setLocOTs(null); }}
         />
       )}
 

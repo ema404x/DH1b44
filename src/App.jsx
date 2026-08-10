@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "@/components/ui/sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
@@ -183,6 +184,11 @@ function App() {
             } />
           </Routes>
         </Router>
+        {/* Toaster de sonner — usado por PortalOperarioApp, AppLayout y otros.
+            Sin este, todos los toast.success/error/info son silenciosos y el
+            operario ve "se sale todo y ya" sin feedback al clickear una OT
+            no accionable (en_progreso de otro / pendiente_validacion). */}
+        <SonnerToaster position="top-center" richColors closeButton />
       </QueryClientProvider>
     </ErrorBoundary>
   );
