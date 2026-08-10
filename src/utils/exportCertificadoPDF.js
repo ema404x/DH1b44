@@ -339,7 +339,7 @@ export async function exportCertificadoPDF(form) {
     doc.text(fondoLabel, W - M, y, { align: 'right' }); y += 7;
   }
   if (pdfPagadoAnteriormente > 0) {
-    doc.text(`Ya pagado anteriormente (${porcentaje_pagado_anteriormente}%):   -${fmt(pdfPagadoAnteriormente)}`, W - M, y, { align: 'right' }); y += 7;
+    doc.text(`Ya pagado anteriormente (${porcentaje_pagado_anteriormente}% · s/ total cto.):   ${fmt(pdfPagadoAnteriormente)}`, W - M, y, { align: 'right' }); y += 7;
   }
 
   doc.setFillColor(15, 28, 46);

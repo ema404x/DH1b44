@@ -249,9 +249,9 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
               </div>
             )}
             {pagadoAnteriormente > 0 && (
-              <div className="flex justify-between gap-8 text-muted-foreground">
-                <span>Ya pagado anteriormente ({form.porcentaje_pagado_anteriormente ?? 0}%):</span>
-                <span>-{fmt(pagadoAnteriormente)}</span>
+              <div className="flex justify-between gap-8 text-muted-foreground italic">
+                <span>Ya pagado anteriormente ({form.porcentaje_pagado_anteriormente ?? 0}% · s/ total cto.):</span>
+                <span>{fmt(pagadoAnteriormente)}</span>
               </div>
             )}
             <div className="flex justify-between gap-8 bg-primary text-primary-foreground font-bold rounded-lg px-3 py-2 text-base">

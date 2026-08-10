@@ -629,9 +629,9 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
             </div>
           )}
           {pagadoAnteriormente > 0 && (
-            <div className="flex justify-between w-full text-xs text-muted-foreground">
-              <span>Ya pagado anteriormente ({form.porcentaje_pagado_anteriormente}%):</span>
-              <span className="text-destructive">-{fmt(pagadoAnteriormente)}</span>
+            <div className="flex justify-between w-full text-xs text-muted-foreground italic">
+              <span>Ya pagado anteriormente ({form.porcentaje_pagado_anteriormente}% · s/ total cto.):</span>
+              <span>{fmt(pagadoAnteriormente)}</span>
             </div>
           )}
           <div className="w-full border-t pt-2 flex justify-between font-bold">
