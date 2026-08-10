@@ -71,9 +71,13 @@ export async function exportCertificadoPDF(form) {
     ? Math.round(allItems.reduce((acc, it) => acc + round0(it.med_presente_importe), 0))
     : 0;
   // Saldo pendiente = contrato − acumulado (anterior + presente), no solo − presente.
-  // Cuando el acumulado de certificación llega al 100%, el saldo es 0.
+  // El acumulado anterior: por ítem (autoritativo) con fallback al % pagado
+  // anteriormente del encabezado (legacy). Cuando el acumulado llega al 100%, saldo 0.
   const totalAcumAnterior = Math.round(allItems.reduce((acc, it) => acc + round0(it.med_acum_anterior_importe), 0));
-  const acumuladoTotal = totalAcumAnterior + totalPresente;
+  const pctB = parseMonto(form.porcentaje_pagado_anteriormente) || 0;
+  const anteriorPorB = pctB > 0 ? Math.round(subtotalContrato * (pctB / 100)) : 0;
+  const acumuladoAnterior = Math.max(totalAcumAnterior, anteriorPorB);
+  const acumuladoTotal = acumuladoAnterior + totalPresente;
   const totalSaldo = hasMedicion ? Math.max(0, subtotalContrato - acumuladoTotal) : 0;
   const anticipo_pct = parseMonto(form.anticipo_pct) ?? 0;
   const fondo_reparo_pct = parseMonto(form.fondo_reparo_pct) ?? 0;

@@ -187,17 +187,21 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
     : subtotal;
   // hasMedicion = true SOLO si algún ítem fue explícitamente editado por el usuario
   const hasMedicion = form.items.some(it => it._med_editado);
-  // Acumulado real por ítem (fuente autoritativa — no el % manual del encabezado).
-  // totalAcumAnterior = ya certificado en certs previos; totalPresente = este cert.
+  // Acumulado anterior: por ítem (fuente autoritativa) con fallback al % manual
+  // del encabezado (legacy) si los ítems no tienen acumulado anterior cargado.
   const totalAcumAnterior = form.items.reduce((acc, it) => acc + (it.med_acum_anterior_importe || 0), 0);
   const totalPresente = hasMedicion
     ? form.items.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0)
     : 0;
-  // Saldo pendiente = lo que falta para llegar al 100% del contrato, descontando
-  // el acumulado ANTERIOR + el presente (no solo el presente). Así, cuando el
-  // acumulado de certificación llega al 100%, el saldo es 0.
-  const acumuladoTotal = totalAcumAnterior + totalPresente;
-  const totalSaldo = hasMedicion ? Math.max(0, montoContratado - acumuladoTotal) : 0;
+  const anteriorPorB = form.porcentaje_pagado_anteriormente > 0
+    ? subtotal * (form.porcentaje_pagado_anteriormente / 100)
+    : 0;
+  const acumuladoAnterior = Math.max(totalAcumAnterior, anteriorPorB);
+  // Saldo pendiente = contrato − acumulado (anterior + presente). Base = suma de
+  // ítems (mismo base que el % de avance y que el "Total contrato" mostrado).
+  // Cuando el acumulado de certificación llega al 100%, el saldo es 0.
+  const acumuladoTotal = acumuladoAnterior + totalPresente;
+  const totalSaldo = hasMedicion ? Math.max(0, subtotal - acumuladoTotal) : 0;
   const baseCalculo = hasMedicion ? totalPresente : subtotal;
   // Las deducciones en % se calculan sobre el monto parcial a certificar (baseCalculo),
   // NO sobre el total contratado. Ej: si de $40M se certifica 50% ($20M), el anticipo
@@ -218,11 +222,11 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
   const totalNeto = baseCalculo - anticipo - fondoReparo - pagadoAnteriormente;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
-  // Progresión de certificación sobre el total del contrato:
-  // % anterior (real, desde el acumulado por ítem) + % actual (este cert) = % final.
+  // Progresión de certificación sobre el total del contrato (base = suma de ítems):
+  // % anterior (real, con fallback a B) + % actual (este cert) = % final.
   // El acumulado no debe superar el 100% del contrato (sobrecertificación).
-  const pctAnterior = montoContratado > 0 ? (totalAcumAnterior / montoContratado) * 100 : 0;
-  const pctActual = montoContratado > 0 ? (totalPresente / montoContratado) * 100 : 0;
+  const pctAnterior = subtotal > 0 ? (acumuladoAnterior / subtotal) * 100 : 0;
+  const pctActual = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
   const pctFinal = pctAnterior + pctActual;
   const pctRestante = Math.max(0, 100 - pctFinal);
   const overCertContrato = pctFinal > 100.01;
