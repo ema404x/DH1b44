@@ -212,6 +212,15 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
   const totalNeto = baseCalculo - anticipo - fondoReparo - pagadoAnteriormente;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
+  // Progresión de certificación sobre el total del contrato:
+  // % anterior (ya pagado en certs previos) + % actual (este cert) = % final acumulado.
+  // El acumulado no debe superar el 100% del contrato (sobrecertificación).
+  const pctAnterior = Math.max(0, form.porcentaje_pagado_anteriormente || 0);
+  const pctActual = montoContratado > 0 ? (totalPresente / montoContratado) * 100 : 0;
+  const pctFinal = pctAnterior + pctActual;
+  const pctRestante = Math.max(0, 100 - pctFinal);
+  const overCertContrato = pctFinal > 100.01;
+
 
   const aplicarCantidadMasiva = (cant) => {
     if (cant === '' || cant === null || cant === undefined) return;
@@ -457,16 +466,39 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
       {hasMedicion && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-blue-800">Resumen de certificación</span>
-            <span className="text-2xl font-bold text-blue-700">{pctCertificado.toFixed(1)}%</span>
+            <span className="text-sm font-semibold text-blue-800">Progresión de certificación</span>
+            <span className={`text-2xl font-bold ${overCertContrato ? 'text-red-600' : 'text-blue-700'}`}>{pctFinal.toFixed(1)}%</span>
           </div>
-          {/* Barra de progreso */}
-          <div className="w-full bg-blue-100 rounded-full h-3 overflow-hidden">
-            <div
-              className="h-3 rounded-full bg-blue-600 transition-all duration-300"
-              style={{ width: `${Math.min(100, pctCertificado)}%` }}
-            />
+          {/* Barra apilada: % anterior (verde) + % actual (azul) sobre el contrato */}
+          <div className="w-full bg-blue-100 rounded-full h-3 overflow-hidden flex">
+            <div className="h-3 bg-emerald-500 transition-all duration-300" style={{ width: `${Math.min(100, pctAnterior)}%` }} title={`Pagado anteriormente: ${pctAnterior.toFixed(1)}%`} />
+            <div className="h-3 bg-blue-600 transition-all duration-300" style={{ width: `${Math.min(100, pctActual)}%` }} title={`Este certificado: ${pctActual.toFixed(1)}%`} />
           </div>
+          {/* Desglose: anterior + actual = final · restante */}
+          <div className="grid grid-cols-4 gap-2 text-xs">
+            <div className="bg-white rounded-md p-2 border border-emerald-200 text-center">
+              <div className="text-muted-foreground mb-0.5">% Anterior</div>
+              <div className="font-bold text-emerald-600 tabular-nums">{pctAnterior.toFixed(1)}%</div>
+            </div>
+            <div className="bg-blue-600 rounded-md p-2 text-center">
+              <div className="text-blue-100 mb-0.5">% Actual</div>
+              <div className="font-bold text-white tabular-nums">{pctActual.toFixed(1)}%</div>
+            </div>
+            <div className="bg-white rounded-md p-2 border border-blue-300 text-center">
+              <div className="text-muted-foreground mb-0.5">% Final</div>
+              <div className={`font-bold tabular-nums ${overCertContrato ? 'text-red-600' : 'text-blue-700'}`}>{pctFinal.toFixed(1)}%</div>
+            </div>
+            <div className="bg-white rounded-md p-2 border border-orange-200 text-center">
+              <div className="text-muted-foreground mb-0.5">% Restante</div>
+              <div className="font-bold text-orange-600 tabular-nums">{pctRestante.toFixed(1)}%</div>
+            </div>
+          </div>
+          {overCertContrato && (
+            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              El acumulado ({pctFinal.toFixed(1)}%) supera el 100% del contrato. Revisá el % pagado anteriormente o lo certificado ahora.
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-3 text-xs">
             <div className="bg-white rounded-md p-2 border border-blue-100 text-center">
               <div className="text-muted-foreground mb-0.5">Total contrato</div>
