@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { X, Loader2, Package, AlertTriangle, Camera } from 'lucide-react';
 import { toast } from 'sonner';
+import BodyPortal from '@/components/operario/BodyPortal';
 
 const MOTIVOS_PREDEFINIDOS = [
   'Sin stock en pañol',
@@ -97,6 +98,7 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
   };
 
   return (
+    <BodyPortal>
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <form
@@ -265,5 +267,6 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
         </div>
       </form>
     </div>
+    </BodyPortal>
   );
 }

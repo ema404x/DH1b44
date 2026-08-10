@@ -1,5 +1,6 @@
 import React from 'react';
 import { MapPin, X, Play, Flag, Lock, CheckCircle2, ClipboardList, Loader2, AlertCircle, ScanLine, WifiOff } from 'lucide-react';
+import BodyPortal from '@/components/operario/BodyPortal';
 
 const TYPE_LABEL = {
   mantenimiento_preventivo: 'Mant. Preventivo',
@@ -19,7 +20,7 @@ const STATUS_BADGE = {
   cancelada:   { label: 'Cancelada',   cls: 'bg-red-400/10 text-red-400 border-red-400/20' },
 };
 
-export default function LocationOTListModal({ open, onClose, orders, locationName, onSelect, loading, error, onRetry, onScanAnother, offline }) {
+export default function LocationOTListModal({ open, onClose, orders, locationName, onSelect, loading, error, onRetry, onScanAnother, offline, resolveAction }) {
   if (!open) return null;
 
   const safeOrders = orders || [];
@@ -27,6 +28,7 @@ export default function LocationOTListModal({ open, onClose, orders, locationNam
   const completadas = safeOrders.filter(o => o.status === 'completada');
 
   return (
+    <BodyPortal>
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md max-h-[85vh] flex flex-col bg-slate-900 border border-slate-700 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
@@ -96,11 +98,19 @@ export default function LocationOTListModal({ open, onClose, orders, locationNam
               </p>
               {activas.map(ot => {
                 const badge = STATUS_BADGE[ot.status] || STATUS_BADGE.pendiente;
+                // resolveAction(ot) → { canAct, reason }. Si la OT no es accionable
+                // para este operario, se muestra como fila bloqueada con el motivo
+                // (no es un botón) — evita el "clickear y que se salga todo".
+                const action = resolveAction ? resolveAction(ot) : { canAct: true };
                 return (
-                  <button
+                  <div
                     key={ot.id}
-                    onClick={() => onSelect(ot)}
-                    className="w-full bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 text-left hover:border-primary/40 hover:bg-slate-800 transition-colors flex items-center gap-3"
+                    onClick={action.canAct ? () => onSelect(ot) : undefined}
+                    className={
+                      action.canAct
+                        ? "w-full bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 text-left hover:border-primary/40 hover:bg-slate-800 transition-colors flex items-center gap-3 cursor-pointer"
+                        : "w-full bg-slate-800/30 border border-slate-700/30 rounded-xl p-3 flex items-center gap-3 opacity-70 cursor-not-allowed"
+                    }
                   >
                     <div className="flex-1 min-w-0">
                       <span className={`inline-block px-1.5 py-0.5 rounded-full text-[9px] font-semibold border ${badge.cls} mb-1.5`}>
@@ -113,21 +123,26 @@ export default function LocationOTListModal({ open, onClose, orders, locationNam
                           <MapPin className="h-3 w-3 shrink-0" /> {ot.location}
                         </p>
                       )}
+                      {!action.canAct && action.reason && (
+                        <p className="text-[10px] text-slate-500 mt-1 flex items-center gap-1">
+                          <Lock className="h-3 w-3 shrink-0" /> {action.reason}
+                        </p>
+                      )}
                     </div>
-                    {ot.status === 'pendiente' || ot.status === 'asignada' ? (
+                    {action.canAct && (ot.status === 'pendiente' || ot.status === 'asignada') ? (
                       <div className="h-9 w-9 rounded-lg bg-blue-600/15 border border-blue-600/30 flex items-center justify-center shrink-0">
                         <Play className="h-4 w-4 text-blue-400" />
                       </div>
-                    ) : ot.status === 'en_progreso' ? (
+                    ) : action.canAct && ot.status === 'en_progreso' ? (
                       <div className="h-9 w-9 rounded-lg bg-emerald-600/15 border border-emerald-600/30 flex items-center justify-center shrink-0">
                         <Flag className="h-4 w-4 text-emerald-400" />
                       </div>
-                    ) : ot.status === 'pendiente_validacion' ? (
-                      <div className="h-9 w-9 rounded-lg bg-purple-600/15 border border-purple-600/30 flex items-center justify-center shrink-0">
-                        <Lock className="h-4 w-4 text-purple-400" />
+                    ) : !action.canAct ? (
+                      <div className="h-9 w-9 rounded-lg bg-slate-700/30 border border-slate-700/40 flex items-center justify-center shrink-0">
+                        <Lock className="h-4 w-4 text-slate-500" />
                       </div>
                     ) : null}
-                  </button>
+                  </div>
                 );
               })}
             </>
@@ -149,5 +164,6 @@ export default function LocationOTListModal({ open, onClose, orders, locationNam
         </div>
       </div>
     </div>
+    </BodyPortal>
   );
 }

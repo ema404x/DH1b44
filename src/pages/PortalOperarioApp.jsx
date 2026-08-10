@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import ReporteForm from '@/components/operario/ReporteForm';
 import QRScannerModal from '@/components/operario/QRScannerModal';
 import LocationOTListModal from '@/components/operario/LocationOTListModal';
+import BodyPortal from '@/components/operario/BodyPortal';
 import MisOrdenesFiltros from '@/components/operario/MisOrdenesFiltros';
 
 export default function PortalOperarioApp() {
@@ -283,6 +284,26 @@ export default function PortalOperarioApp() {
     ot.assigned_to === currentUser?.id ||
     (ot.assigned_name && normName(ot.assigned_name) === normName(displayName));
 
+  // Clasifica si el operario puede actuar sobre una OT de la ubicación escaneada.
+  // Devuelve { canAct, reason }. Lo usa LocationOTListModal para mostrar las OTs
+  // no accionables como filas bloqueadas con el motivo (en vez de un botón que al
+  // clickearlo solo cierra y parece "se sale todo y ya").
+  const resolveAction = (ot) => {
+    if (ot.status === 'pendiente') return { canAct: true };
+    // Asignada → cualquier operario que escanea puede iniciarla. La asignación
+    // del jefe es una sugerencia, no un lock; al iniciar, el escaneador pasa a ser
+    // el trabajador (lo resuelve transicionEstadoOT).
+    if (ot.status === 'asignada') return { canAct: true };
+    if (ot.status === 'en_progreso') {
+      if (!isOnline) return { canAct: false, reason: 'Sin conexión' };
+      if (ot.assigned_name && !isOwnerOf(ot))
+        return { canAct: false, reason: `La trabaja ${ot.assigned_name}` };
+      return { canAct: true };
+    }
+    if (ot.status === 'pendiente_validacion') return { canAct: false, reason: 'En validación' };
+    return { canAct: false, reason: ot.status || 'No disponible' };
+  };
+
   // Devuelve true si abrió un diálogo (accionable), false si solo notificó.
   // El modal de ubicación se cierra solo si abrió algo — si no, queda abierto
   // con el toast visible explicando por qué, evitando el "se sale todo y ya".
@@ -291,15 +312,9 @@ export default function PortalOperarioApp() {
       setConfirmAction({ ot: foundOT, accion: 'iniciar' });
       return true;
     } else if (foundOT.status === 'asignada') {
-      // Solo el operario al que el jefe le asignó la OT puede iniciarla,
-      // SALVO si el asignado es el propio jefe de sitio (OT de cuadrilla) —
-      // en ese caso cualquier operario que escanea la ubicación puede iniciarla.
-      // Las asignadas sin nombre (edge) se tratan como libres.
-      const esCuadrilla = normName(foundOT.assigned_name) && normName(foundOT.assigned_name) === normName(foundOT.jefe_sitio);
-      if (foundOT.assigned_name && !isOwnerOf(foundOT) && !esCuadrilla) {
-        toast.info(`Esta OT está asignada a ${foundOT.assigned_name}`);
-        return false;
-      }
+      // Cualquier operario que escanea la OT puede iniciarla — la asignación del
+      // jefe es una sugerencia, no un lock. Al iniciar, el escaneador pasa a ser
+      // el trabajador (lo resuelve transicionEstadoOT en el backend).
       setConfirmAction({ ot: foundOT, accion: 'iniciar' });
       return true;
     } else if (foundOT.status === 'en_progreso') {
@@ -502,6 +517,7 @@ export default function PortalOperarioApp() {
           onRetry={handleRetryLoc}
           onScanAnother={() => setScannerOpen(true)}
           onSelect={(ot) => { if (actOnOT(ot)) setLocOTs(null); }}
+          resolveAction={resolveAction}
         />
       )}
 
@@ -667,6 +683,7 @@ function ConfirmDialog({ ot, accion, onConfirm, onCancel, processing, offline })
   const t = textos[accion] || textos.iniciar;
 
   return (
+    <BodyPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5">
@@ -691,6 +708,7 @@ function ConfirmDialog({ ot, accion, onConfirm, onCancel, processing, offline })
         </div>
       </div>
     </div>
+    </BodyPortal>
   );
 }
 

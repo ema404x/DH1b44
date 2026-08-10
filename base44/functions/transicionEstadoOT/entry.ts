@@ -148,26 +148,11 @@ Deno.serve(async (req) => {
     }
 
     if (accion === 'iniciar') {
-      // Si la OT ya está asignada a alguien, solo ese operario puede iniciarla.
-      // Las pendientes (sin asignar) pueden ser auto-asignadas por quien la inicia.
-      // Admins/gerentes pueden iniciar cualquier OT de su sector.
-      // Excepción: si el asignado es el propio jefe de sitio (assigned_name === jefe_sitio),
-      // es una OT de cuadrilla — el jefe la asigna a sí mismo para representar el trabajo
-      // de su cuadrilla, no a un operario específico. Cualquier operario que escanea la
-      // ubicación puede iniciarla. Sin esto, el operario ve "se sale todo" porque el
-      // check lo bloquea aunque esté en el sitio correcto.
-      if (!callerEsAdmin) {
-        const normName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-        const yaAsignadaA = ot.assigned_name || ot.assigned_to;
-        const esElAsignado =
-          (ot.assigned_to && extra_data.assigned_to && ot.assigned_to === extra_data.assigned_to) ||
-          (ot.assigned_name && extra_data.assigned_name &&
-            normName(ot.assigned_name) === normName(extra_data.assigned_name));
-        const esCuadrilla = normName(ot.assigned_name) && normName(ot.assigned_name) === normName(ot.jefe_sitio);
-        if (yaAsignadaA && !esElAsignado && !esCuadrilla) {
-          return Response.json({ error: 'Esta OT está asignada a otro operario' }, { status: 403 });
-        }
-      }
+      // Cualquier operario que escanea la OT puede iniciarla, sin importar a quién
+      // esté asignada — la asignación del jefe es una sugerencia, no un lock. Al
+      // iniciar, el operario que escanea pasa a ser el trabajador (assigned_to +
+      // assigned_name) en el bloque de abajo. Los admins/gerentes respetan
+      // extra_data.assigned_to (inician desde el kanban sin reclamarla).
 
       if (extra_data.gps) {
         updateData.gps_latitude = extra_data.gps.latitude;
@@ -181,25 +166,26 @@ Deno.serve(async (req) => {
       updateData.fecha_inicio_real = new Date().toISOString();
 
       // El que inicia la OT pasa a ser el operario que la trabaja.
-      // - Para el operario (no admin): SIEMPRE estampamos assigned_to = user.id
-      //   usando el usuario del backend (siempre disponible), NO extra_data.assigned_to
-      //   que puede venir vacío si el frontend no resolvió currentUser a tiempo.
-      //   Sin esto, la OT pasa a en_progreso pero assigned_to queda null → la OT
-      //   desaparece de la vista del operario en getWorkOrdersForUser (no matchea
-      //   por assigned_to ni por assigned_name) → "se sale todo y ya".
-      // - Para admin/gerente: respetamos extra_data.assigned_to si viene (no se
-      //   auto-asigna si el jefe inicia desde el kanban sin reclamarla).
-      // - assigned_name solo se reclama si la OT estaba sin asignar — respeta
-      //   asignaciones previas hechas por el jefe (ej. cuadrilla a nombre del jefe).
+      // - Operario (no admin): assigned_to = user.id (usuario del backend, siempre
+      //   disponible) y assigned_name = displayName del que escanea (sobreescribe la
+      //   asignación previa del jefe). Sin esto, assigned_name quedaría con el
+      //   operario original y assigned_to con el que escaneó → mismatch visible.
+      // - Admin/gerente: respeta extra_data.assigned_to y solo completa
+      //   assigned_name si estaba vacío (no pisa la asignación del jefe).
       if (!callerEsAdmin) {
         if (ot.assigned_to !== user.id) {
           updateData.assigned_to = user.id;
         }
-      } else if (extra_data.assigned_to && ot.assigned_to !== extra_data.assigned_to) {
-        updateData.assigned_to = extra_data.assigned_to;
-      }
-      if (extra_data.assigned_name && !ot.assigned_name) {
-        updateData.assigned_name = extra_data.assigned_name;
+        if (extra_data.assigned_name && ot.assigned_name !== extra_data.assigned_name) {
+          updateData.assigned_name = extra_data.assigned_name;
+        }
+      } else {
+        if (extra_data.assigned_to && ot.assigned_to !== extra_data.assigned_to) {
+          updateData.assigned_to = extra_data.assigned_to;
+        }
+        if (extra_data.assigned_name && !ot.assigned_name) {
+          updateData.assigned_name = extra_data.assigned_name;
+        }
       }
     }
 
