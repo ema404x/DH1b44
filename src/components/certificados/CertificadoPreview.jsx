@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download, Send, Loader2 } from 'lucide-react';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 import { toast } from 'sonner';
+import { calcularTotales } from './acumulacionUtils';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d || '—'; } };
@@ -17,36 +18,17 @@ const parseMonto = (v) => {
 export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
   const [exporting, setExporting] = useState(false);
 
-  const subtotal = (form.items || []).reduce((a, i) => {
-    return a + (i.importe_total || (i.cantidad * i.importe_unitario) || 0);
-  }, 0);
-  const hasMedicion = (form.items || []).some(i => {
-    if (i._med_editado) return true;
-    const total = i.importe_total || (i.cantidad * i.importe_unitario) || 0;
-    return i.med_presente_importe != null && i.med_presente_importe !== total;
-  });
-  const totalPresente = hasMedicion
-    ? (form.items || []).reduce((a, i) => a + (i.med_presente_importe || 0), 0)
-    : 0;
-  const pdfSubtotal = hasMedicion ? totalPresente : subtotal;
-
-  // Base para deducciones: monto parcial a certificar (pdfSubtotal), no el total contratado.
-  // Usar los montos ya calculados por el editor si están disponibles (evita divergencia)
-  const anticipo = form._anticipo_monto != null
-    ? parseMonto(form._anticipo_monto)
-    : (form.anticipo_pct > 0 ? pdfSubtotal * ((form.anticipo_pct ?? 0) / 100) : 0);
-  const fondoReparo = form.fondo_reparo_aplicar
-    ? (form._fondo_reparo_monto != null
-        ? parseMonto(form._fondo_reparo_monto)
-        : (form.fondo_reparo_pct > 0 ? pdfSubtotal * ((form.fondo_reparo_pct ?? 0) / 100) : 0))
-    : 0;
-  // El % pagado anteriormente se calcula sobre el TOTAL del contrato (subtotal),
-  // no sobre el monto parcial a certificar (pdfSubtotal) como sí lo hacen
-  // anticipo y fondo de reparo.
-  const pagadoAnteriormente = form._pagado_anteriormente_monto != null
-    ? parseMonto(form._pagado_anteriormente_monto)
-    : (form.porcentaje_pagado_anteriormente > 0 ? subtotal * ((form.porcentaje_pagado_anteriormente ?? 0) / 100) : 0);
-  const totalNeto = pdfSubtotal - anticipo - fondoReparo - pagadoAnteriormente;
+  // Cálculo centralizado en acumulacionUtils → editor, vista previa y PDF
+  // producen números idénticos (una sola fuente de verdad).
+  const T = calcularTotales(form);
+  const subtotal = T.subtotalContrato;
+  const hasMedicion = T.hasMedicion;
+  const totalPresente = T.totalPresente;
+  const pdfSubtotal = T.baseCalculo;
+  const anticipo = T.anticipo;
+  const fondoReparo = T.fondoReparo;
+  const pagadoAnteriormente = T.pagadoAnteriormente;
+  const totalNeto = T.totalNeto;
 
   const handleExportPDF = async () => {
     setExporting(true);

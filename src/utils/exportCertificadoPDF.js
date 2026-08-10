@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import { calcularTotales } from '../components/certificados/acumulacionUtils';
 
 // Parsea montos con precisión: maneja strings "1.098.000", "1,5", números JS, etc.
 const parseMonto = (v) => {
@@ -56,52 +57,30 @@ async function loadImageAsBase64(url) {
 export async function exportCertificadoPDF(form) {
   const allItems = form.items || [];
 
-  const hasMedicion = allItems.some(it => {
-    if (it._med_editado) return true;
-    const total = it.importe_total || (it.cantidad * it.importe_unitario) || 0;
-    return it.med_presente_importe != null && it.med_presente_importe !== total;
-  });
-
-  const subtotalContrato = Math.round(allItems.reduce((acc, it) => {
-    const total = round0(it.importe_total) || Math.round(parseMonto(it.cantidad) * round0(it.importe_unitario));
-    return acc + total;
-  }, 0));
-
-  const totalPresente = hasMedicion
-    ? Math.round(allItems.reduce((acc, it) => acc + round0(it.med_presente_importe), 0))
-    : 0;
-  // Saldo pendiente = contrato − acumulado (anterior + presente), no solo − presente.
-  // El acumulado anterior: por ítem (autoritativo) con fallback al % pagado
-  // anteriormente del encabezado (legacy). Cuando el acumulado llega al 100%, saldo 0.
-  const totalAcumAnterior = Math.round(allItems.reduce((acc, it) => acc + round0(it.med_acum_anterior_importe), 0));
-  const pctB = parseMonto(form.porcentaje_pagado_anteriormente) || 0;
-  const anteriorPorB = pctB > 0 ? Math.round(subtotalContrato * (pctB / 100)) : 0;
-  const acumuladoAnterior = Math.max(totalAcumAnterior, anteriorPorB);
-  const acumuladoTotal = acumuladoAnterior + totalPresente;
-  const totalSaldo = hasMedicion ? Math.max(0, subtotalContrato - acumuladoTotal) : 0;
-  const anticipo_pct = parseMonto(form.anticipo_pct) ?? 0;
-  const fondo_reparo_pct = parseMonto(form.fondo_reparo_pct) ?? 0;
+  // Cálculo centralizado en acumulacionUtils → editor, vista previa y PDF
+  // producen números idénticos (una sola fuente de verdad).
+  const T = calcularTotales(form);
+  const hasMedicion = T.hasMedicion;
+  const subtotalContrato = T.subtotalContrato;
+  const totalPresente = T.totalPresente;
+  const totalAcumAnterior = T.totalAcumAnterior;
+  const acumuladoAnterior = T.acumuladoAnterior;
+  const acumuladoTotal = T.acumuladoTotal;
+  const totalSaldo = T.totalSaldo;
+  const pdfSubtotal = T.baseCalculo;
+  const baseDeduccion = T.baseCalculo;
+  const pdfAnticipo = T.anticipo;
+  const fondoReparoCalculado = T.fondoReparoMonto;
+  const pdfFondoReparo = T.fondoReparo;
+  const pdfPagadoAnteriormente = T.pagadoAnteriormente;
+  const pdfTotalNeto = T.totalNeto;
+  const anteriorPorB = T.anteriorPorB;
 
   const itemsToRender = allItems;
-
-  const pdfSubtotal = hasMedicion ? totalPresente : subtotalContrato;
-  // Base para deducciones: el monto parcial a certificar (pdfSubtotal), no el total contratado.
-  const baseDeduccion = pdfSubtotal;
-  const pdfAnticipo = Math.round(form._anticipo_monto != null
-    ? parseMonto(form._anticipo_monto)
-    : (anticipo_pct > 0 ? baseDeduccion * (anticipo_pct / 100) : 0));
-  const fondoReparoCalculado = Math.round(form._fondo_reparo_monto != null
-    ? parseMonto(form._fondo_reparo_monto)
-    : (fondo_reparo_pct > 0 ? baseDeduccion * (fondo_reparo_pct / 100) : 0));
-  const pdfFondoReparo = form.fondo_reparo_aplicar ? fondoReparoCalculado : 0;
-  const porcentaje_pagado_anteriormente = parseMonto(form.porcentaje_pagado_anteriormente) ?? 0;
-  // El % pagado anteriormente se calcula sobre el TOTAL del contrato
-  // (subtotalContrato), no sobre el monto parcial a certificar (baseDeduccion)
-  // como sí lo hacen anticipo y fondo de reparo.
-  const pdfPagadoAnteriormente = Math.round(form._pagado_anteriormente_monto != null
-    ? parseMonto(form._pagado_anteriormente_monto)
-    : (porcentaje_pagado_anteriormente > 0 ? subtotalContrato * (porcentaje_pagado_anteriormente / 100) : 0));
-  const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo - pdfPagadoAnteriormente;
+  // Locales solo para las etiquetas de deducciones (% mostrado en el PDF)
+  const anticipo_pct = parseMonto(form.anticipo_pct) || 0;
+  const fondo_reparo_pct = parseMonto(form.fondo_reparo_pct) || 0;
+  const porcentaje_pagado_anteriormente = parseMonto(form.porcentaje_pagado_anteriormente) || 0;
 
   const montoContratado = Math.round(parseMonto(form.monto_contratado));
 

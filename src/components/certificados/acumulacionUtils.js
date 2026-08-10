@@ -126,3 +126,98 @@ export function matchAnteriorDesdeCert(items, certAnterior) {
     };
   });
 }
+
+// Cálculo centralizado de los totales financieros de un certificado.
+// Editor, vista previa y PDF llaman a esta ÚNICA función → producen números
+// idénticos siempre. Una sola fuente de verdad elimina la divergencia entre
+// las tres vistas (causa raíz de los totales que no coincidían al abrir un
+// certificado guardado: el editor detectaba hasMedicion solo por _med_editado
+// mientras preview/PDF usaban una regla distinta).
+//
+// Semántica de negocio:
+//  - subtotalContrato = Σ importe_total de los ítems = valor total del contrato.
+//  - hasMedicion = true si algún ítem fue editado (_med_editado) o si su monto
+//    presente difiere del total contratado del ítem. Definición ÚNICA.
+//  - baseCalculo = monto PARCIAL a certificar (totalPresente si hay medición;
+//    sino el total del contrato). Base de anticipo y fondo de reparo.
+//  - Anticipo y fondo de reparo → sobre baseCalculo (el parcial).
+//  - % pagado anteriormente → sobre el TOTAL del contrato (subtotalContrato),
+//    no sobre el parcial: representa dinero ya cobrado en certificados previos.
+//  - Saldo pendiente = max(0, contrato − acumulado). Llega a 0 al 100%.
+export function calcularTotales(form) {
+  const items = (form && form.items) || [];
+  const totalItem = (it) =>
+    round0(it.importe_total) || Math.round(parseMonto(it.cantidad) * round0(it.importe_unitario));
+
+  const subtotalContrato = round0(items.reduce((acc, it) => acc + totalItem(it), 0));
+
+  const hasMedicion = items.some((it) => {
+    if (it._med_editado) return true;
+    if (it.med_presente_importe == null) return false;
+    return round0(it.med_presente_importe) !== totalItem(it);
+  });
+
+  const totalPresente = hasMedicion
+    ? round0(items.reduce((acc, it) => acc + round0(it.med_presente_importe), 0))
+    : 0;
+  const totalAcumAnterior = round0(
+    items.reduce((acc, it) => acc + round0(it.med_acum_anterior_importe), 0)
+  );
+
+  const pctB = parseMonto(form.porcentaje_pagado_anteriormente) || 0;
+  const anteriorPorB = pctB > 0 ? Math.round(subtotalContrato * (pctB / 100)) : 0;
+  const acumuladoAnterior = Math.max(totalAcumAnterior, anteriorPorB);
+  const acumuladoTotal = acumuladoAnterior + totalPresente;
+  const totalSaldo = hasMedicion ? Math.max(0, subtotalContrato - acumuladoTotal) : 0;
+
+  const baseCalculo = hasMedicion ? totalPresente : subtotalContrato;
+
+  const anticipo =
+    form.anticipo_monto_manual != null
+      ? round0(form.anticipo_monto_manual)
+      : parseMonto(form.anticipo_pct) > 0
+        ? Math.round(baseCalculo * (parseMonto(form.anticipo_pct) / 100))
+        : 0;
+  const fondoReparoMonto =
+    form.fondo_reparo_monto_manual != null
+      ? round0(form.fondo_reparo_monto_manual)
+      : parseMonto(form.fondo_reparo_pct) > 0
+        ? Math.round(baseCalculo * (parseMonto(form.fondo_reparo_pct) / 100))
+        : 0;
+  const fondoReparo = form.fondo_reparo_aplicar ? fondoReparoMonto : 0;
+
+  // % pagado anteriormente: sobre el TOTAL del contrato (no el parcial).
+  const pagadoAnteriormente = anteriorPorB;
+
+  const totalNeto = baseCalculo - anticipo - fondoReparo - pagadoAnteriormente;
+
+  const pctAnterior = subtotalContrato > 0 ? (acumuladoAnterior / subtotalContrato) * 100 : 0;
+  const pctActual = subtotalContrato > 0 ? (totalPresente / subtotalContrato) * 100 : 0;
+  const pctFinal = pctAnterior + pctActual;
+  const pctRestante = Math.max(0, 100 - pctFinal);
+  const overCertContrato = pctFinal > 100.01;
+  const pctCertificado = subtotalContrato > 0 ? (totalPresente / subtotalContrato) * 100 : 0;
+
+  return {
+    subtotalContrato,
+    hasMedicion,
+    totalPresente,
+    totalAcumAnterior,
+    acumuladoAnterior,
+    acumuladoTotal,
+    totalSaldo,
+    baseCalculo,
+    anticipo,
+    fondoReparoMonto,
+    fondoReparo,
+    pagadoAnteriormente,
+    totalNeto,
+    pctAnterior,
+    pctActual,
+    pctFinal,
+    pctRestante,
+    overCertContrato,
+    pctCertificado,
+    anteriorPorB,
+  };
+}

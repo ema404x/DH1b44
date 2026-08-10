@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
 import HistorialAcumulados from './HistorialAcumulados';
 import ItemAcumulacionRow from './ItemAcumulacionRow';
-import { recalcItem, aplicarCantidadPu, aplicarPresenteUnidad, aplicarPresenteImporte, aplicarAnteriorUnidad, aplicarAnteriorImporte, matchAnteriorDesdeCert } from './acumulacionUtils';
+import { recalcItem, aplicarCantidadPu, aplicarPresenteUnidad, aplicarPresenteImporte, aplicarAnteriorUnidad, aplicarAnteriorImporte, matchAnteriorDesdeCert, calcularTotales } from './acumulacionUtils';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Math.round(n || 0));
 const parseMonto = (v) => {
@@ -180,59 +180,21 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
 
   const removeItem = (i) => setForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }));
 
-  const subtotal = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
+  // Cálculo centralizado en acumulacionUtils → editor, vista previa y PDF
+  // producen números idénticos (una sola fuente de verdad para totales,
+  // deducciones y progresión). Ver calcularTotales() para la semántica.
+  const {
+    subtotalContrato: subtotal,
+    hasMedicion, totalPresente, totalAcumAnterior,
+    acumuladoAnterior, acumuladoTotal, totalSaldo, baseCalculo,
+    anticipo, fondoReparoMonto, fondoReparo, pagadoAnteriormente,
+    totalNeto, pctAnterior, pctActual, pctFinal, pctRestante, overCertContrato,
+    pctCertificado, anteriorPorB,
+  } = calcularTotales(form);
   // montoContratado: campo del encabezado si está cargado, sino suma de ítems
   const montoContratado = parseMonto(form.monto_contratado) > 0
     ? parseMonto(form.monto_contratado)
     : subtotal;
-  // hasMedicion = true SOLO si algún ítem fue explícitamente editado por el usuario
-  const hasMedicion = form.items.some(it => it._med_editado);
-  // Acumulado anterior: por ítem (fuente autoritativa) con fallback al % manual
-  // del encabezado (legacy) si los ítems no tienen acumulado anterior cargado.
-  const totalAcumAnterior = form.items.reduce((acc, it) => acc + (it.med_acum_anterior_importe || 0), 0);
-  const totalPresente = hasMedicion
-    ? form.items.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0)
-    : 0;
-  const anteriorPorB = form.porcentaje_pagado_anteriormente > 0
-    ? subtotal * (form.porcentaje_pagado_anteriormente / 100)
-    : 0;
-  const acumuladoAnterior = Math.max(totalAcumAnterior, anteriorPorB);
-  // Saldo pendiente = contrato − acumulado (anterior + presente). Base = suma de
-  // ítems (mismo base que el % de avance y que el "Total contrato" mostrado).
-  // Cuando el acumulado de certificación llega al 100%, el saldo es 0.
-  const acumuladoTotal = acumuladoAnterior + totalPresente;
-  const totalSaldo = hasMedicion ? Math.max(0, subtotal - acumuladoTotal) : 0;
-  const baseCalculo = hasMedicion ? totalPresente : subtotal;
-  // Las deducciones en % se calculan sobre el monto parcial a certificar (baseCalculo),
-  // NO sobre el total contratado. Ej: si de $40M se certifica 50% ($20M), el anticipo
-  // del 20% se aplica sobre los $20M que se certifican, no sobre los $40M del contrato.
-  const anticipo = form.anticipo_monto_manual != null
-    ? form.anticipo_monto_manual
-    : (form.anticipo_pct > 0 ? baseCalculo * (form.anticipo_pct / 100) : 0);
-  // El fondo de reparo se calcula sobre el monto a certificar (campo manual si existe)
-  const fondoReparoMonto = form.fondo_reparo_monto_manual != null
-    ? form.fondo_reparo_monto_manual
-    : (form.fondo_reparo_pct > 0 ? baseCalculo * (form.fondo_reparo_pct / 100) : 0);
-  const fondoReparo = form.fondo_reparo_aplicar ? fondoReparoMonto : 0;
-  // % ya abonado en certificados previos — se descuenta del neto, pero a
-  // diferencia del anticipo/desacopio y fondo de reparo (que se calculan sobre
-  // el monto PARCIAL a certificar), el % pagado anteriormente se calcula sobre
-  // el TOTAL del contrato: representa dinero ya cobrado en certificados previos
-  // que no debe volver a descontarse del parcial.
-  const pagadoAnteriormente = form.porcentaje_pagado_anteriormente > 0
-    ? subtotal * (form.porcentaje_pagado_anteriormente / 100)
-    : 0;
-  const totalNeto = baseCalculo - anticipo - fondoReparo - pagadoAnteriormente;
-  const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
-
-  // Progresión de certificación sobre el total del contrato (base = suma de ítems):
-  // % anterior (real, con fallback a B) + % actual (este cert) = % final.
-  // El acumulado no debe superar el 100% del contrato (sobrecertificación).
-  const pctAnterior = subtotal > 0 ? (acumuladoAnterior / subtotal) * 100 : 0;
-  const pctActual = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
-  const pctFinal = pctAnterior + pctActual;
-  const pctRestante = Math.max(0, 100 - pctFinal);
-  const overCertContrato = pctFinal > 100.01;
 
 
   const aplicarCantidadMasiva = (cant) => {
