@@ -239,65 +239,39 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
     setForm(f => ({ ...f, items: newItems }));
   };
 
+  // % Avance de Certificación = % ACUMULADO sobre el contrato (final).
+  // Calcula el presente de cada ítem como lo que falta para llegar a ese
+  // % acumulado, descontando lo ya certificado anteriormente y sin superar
+  // el saldo pendiente. Así: anterior + actual = % de avance ingresado.
   const aplicarAvance = () => {
-    const pct = (form.porcentaje_avance || 0) / 100;
-    if (!pct) {
-      alert('Ingresá un % de avance mayor a 0 antes de aplicar.');
+    const pctFinal = form.porcentaje_avance || 0;
+    if (!pctFinal || pctFinal <= 0) {
+      alert('Ingresá un % de avance de certificación mayor a 0.');
       return;
     }
-
-    // Usar subtotal real de los ítems como base del 100%
     const totalContrato = form.items.reduce((acc, it) => acc + (it.importe_total || 0), 0);
     if (!totalContrato) {
       alert('Los ítems no tienen importes calculados. Revisá cantidad y precio unitario.');
       return;
     }
-
-    const targetTotal = totalContrato * pct;
-    let acumulado = 0;
-
+    const fraccion = Math.min(1, pctFinal / 100);
     const newItems = form.items.map(item => {
-      const itemFull = item.importe_total || 0;
-
-      if (itemFull === 0) {
-        return {
-          ...item,
-          med_presente_unidad: 0,
-          med_presente_importe: 0,
-          med_acum_presente_unidad: item.med_acum_anterior_unidad || 0,
-          med_acum_presente_importe: item.med_acum_anterior_importe || 0,
-          saldo_pendiente_unidad: item.cantidad || 0,
-          saldo_pendiente_importe: 0,
-        };
-      }
-
-      if (acumulado >= targetTotal) {
-        // Ya llegamos al target, este ítem queda pendiente
-        return {
-          ...item,
-          med_presente_unidad: 0,
-          med_presente_importe: 0,
-          med_acum_presente_unidad: item.med_acum_anterior_unidad || 0,
-          med_acum_presente_importe: item.med_acum_anterior_importe || 0,
-          saldo_pendiente_unidad: item.cantidad || 0,
-          saldo_pendiente_importe: itemFull,
-        };
-      }
-
-      const resta = targetTotal - acumulado;
-      const fraccion = Math.min(1, resta / itemFull);
-      const cantPres = Math.round((item.cantidad || 0) * fraccion * 100) / 100;
-      const importePres = Math.round(itemFull * fraccion);
-      acumulado += importePres;
-
+      const importe_total = item.importe_total || 0;
+      const acumAnteriorImporte = item.med_acum_anterior_importe || 0;
+      const pu = item.importe_unitario || 0;
+      const saldoImporte = Math.max(0, importe_total - acumAnteriorImporte);
+      // Objetivo acumulado de este ítem al % ingresado; el presente es lo que
+      // falta para llegar ahí desde lo ya certificado, topeado por el saldo.
+      const objetivoAcumulado = Math.round(importe_total * fraccion);
+      const presenteImporte = Math.max(0, Math.min(saldoImporte, objetivoAcumulado - acumAnteriorImporte));
+      const presenteUnidad = pu > 0 ? Math.round((presenteImporte / pu) * 100) / 100 : 0;
       return recalcItem({
         ...item,
-        med_presente_unidad: cantPres,
-        med_presente_importe: importePres,
+        med_presente_unidad: presenteUnidad,
+        med_presente_importe: presenteImporte,
         _med_editado: true,
       });
     });
-
     setForm(f => ({ ...f, items: newItems }));
   };
 
@@ -447,12 +421,13 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
                 variant="outline"
                 className="shrink-0 gap-1.5 text-xs px-3"
                 onClick={aplicarAvance}
-                title="Distribuir el % de avance sobre los ítems"
+                title="Calcular el presente a partir del % acumulado, descontando lo ya certificado"
               >
                 <Wand2 className="h-3.5 w-3.5" />
                 Aplicar
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">% acumulado sobre el contrato; descuenta lo certificado anteriormente</p>
           </Field>
           <Field label="Fecha del Certificado"><Input type="date" value={form.fecha_certificado} onChange={e => set('fecha_certificado', e.target.value)} /></Field>
           <Field label="N° de Recepción"><Input value={form.numero_recepcion} onChange={e => set('numero_recepcion', e.target.value)} /></Field>
