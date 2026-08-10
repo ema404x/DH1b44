@@ -2,10 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Activity, List, Users, Globe, School, CheckCircle2, Download, Loader2 } from 'lucide-react';
+import { MapPin, Activity, List, Users, Globe, School, CheckCircle2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { exportarQRsUbicacionesPDF } from '@/utils/exportLocationsQR';
+import { useUbicaciones } from '@/hooks/useUbicaciones';
+import ExportarQRsDialog from '@/components/mapa/ExportarQRsDialog';
 import MapaFichajes from '@/components/mapa/MapaFichajes';
 import LocationsManager from '@/components/mapa/LocationsManager';
 import AsignacionesUbicacion from '@/components/mapa/AsignacionesUbicacion';
@@ -30,6 +31,17 @@ export default function Mapa() {
     queryFn: () => base44.entities.LocationQR.list('-created_date', 500),
     staleTime: 30000,
   });
+
+  // Datos unificados (service role) para mapear cada QR a su jefe de sitio
+  // y para exportar SIEMPRE el listado completo de QRs sin depender de RLS.
+  const { locationQRs: allQRs, locations: joinedLocations } = useUbicaciones();
+  const jefeByLocId = useMemo(() => {
+    const m = new Map();
+    for (const ld of joinedLocations) {
+      if (ld.location_qr_id) m.set(ld.location_qr_id, ld.jefe_sitio || 'Sin jefe asignado');
+    }
+    return m;
+  }, [joinedLocations]);
 
   const { data: logs = [], isLoading: logsLoading } = useQuery({
     queryKey: ['attendanceLogs'],
@@ -62,23 +74,7 @@ export default function Mapa() {
     },
   });
 
-  const [exportingQRs, setExportingQRs] = useState(false);
-
-  const handleExportQRs = async () => {
-    if (!locations.length) {
-      toast.error('No hay ubicaciones para exportar');
-      return;
-    }
-    setExportingQRs(true);
-    try {
-      await exportarQRsUbicacionesPDF(locations);
-      toast.success('PDF de QRs generado');
-    } catch (e) {
-      toast.error('Error al generar el PDF de QRs');
-    } finally {
-      setExportingQRs(false);
-    }
-  };
+  const [exportQRsOpen, setExportQRsOpen] = useState(false);
 
   const handleActivateAll = async () => {
     const inactivas = locations.filter(l => !l.is_active);
@@ -102,15 +98,20 @@ export default function Mapa() {
         <Button
           variant="outline"
           className="gap-2"
-          onClick={handleExportQRs}
-          disabled={exportingQRs || locLoading}
+          onClick={() => setExportQRsOpen(true)}
+          disabled={locLoading || !allQRs.length}
         >
-          {exportingQRs
-            ? <Loader2 className="h-4 w-4 animate-spin" />
-            : <Download className="h-4 w-4" />}
-          {exportingQRs ? 'Generando...' : 'Exportar QRs a PDF'}
+          <Download className="h-4 w-4" />
+          Exportar QRs a PDF
         </Button>
       </div>
+
+      <ExportarQRsDialog
+        open={exportQRsOpen}
+        onOpenChange={setExportQRsOpen}
+        locations={allQRs}
+        jefeByLocId={jefeByLocId}
+      />
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="h-10">
