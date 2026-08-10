@@ -296,7 +296,10 @@ export async function exportCertificadoPDF(form) {
   });
 
   // Totales
-  const TOTALS_H = hasMedicion ? 52 : 38;
+  // Reservar espacio extra si la deducción de % pagado anteriormente va a
+  // dibujarse; sin esto, con anticipo + fondo + pagado activos a la vez el
+  // bloque de totales pisa el footer o las firmas.
+  const TOTALS_H = (hasMedicion ? 52 : 38) + (pdfPagadoAnteriormente > 0 ? 7 : 0);
   if (y + TOTALS_H > SAFE_BOTTOM) {
     drawFooter(pageNum, '??');
     doc.addPage();
