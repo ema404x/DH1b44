@@ -114,7 +114,23 @@ export default function PortalOperarioApp() {
         return false;
       }
       toast.success(res.data.mensaje);
-      queryClient.invalidateQueries({ queryKey: ['workorders-operario'] });
+      // Upsert optimista de la OT actualizada (res.data.ot) al cache del operario.
+      // NO invalidamos 'workorders-operario': en móvil con conexión inestable la
+      // refetch falla y el queryFn cae al cache localStorage (lista VIEJA sin la OT
+      // que el operario acaba de iniciar por QR, porque antes no estaba asignada a
+      // él) → la OT "desaparece de la lista". Con el upsert, la OT queda en
+      // "En Progreso" de inmediato; el staleTime (5min) y el pull-to-refresh
+      // sincronizan después, con conexión estable.
+      if (res.data.ot) {
+        queryClient.setQueryData(['workorders-operario'], (old = []) => {
+          const others = (old || []).filter(o => o.id !== res.data.ot.id);
+          return [...others, res.data.ot];
+        });
+        try {
+          const cur = queryClient.getQueryData(['workorders-operario']) || [];
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ orders: cur, cachedAt: Date.now() }));
+        } catch {}
+      }
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       return true;
     } catch (err) {
