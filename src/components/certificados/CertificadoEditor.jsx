@@ -385,7 +385,7 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
               value={form.porcentaje_pagado_anteriormente || ''}
               onChange={e => set('porcentaje_pagado_anteriormente', +e.target.value)}
             />
-            <p className="text-xs text-muted-foreground mt-1">Se descuenta del importe a certificar de este período (parcial)</p>
+            <p className="text-xs text-muted-foreground mt-1">Se calcula sobre el total contratado, no sobre el parcial</p>
           </Field>
           <Field label="% Avance de Certificación">
             <div className="flex gap-2">
