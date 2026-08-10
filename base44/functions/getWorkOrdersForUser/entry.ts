@@ -52,8 +52,12 @@ export default async function(req) {
                          hasAdminView;
     const isField = isFieldRole(employeeRole);
 
-    // Query WorkOrders via service role (bypassing RLS)
-    const allOTs = await base44.asServiceRole.entities.WorkOrder.list('-created_date', 500);
+    // Query WorkOrders via service role (bypassing RLS).
+    // Orden por -updated_date (no -created_date): cuando un operario inicia una OT
+    // vieja encontrada por QR, la actualización (status→en_progreso, assigned_to=user.id)
+    // bumpa updated_date → la OT burbujea al top-500 y queda visible en "En Progreso".
+    // Con -created_date la OT vieja queda fuera del top-500 y "se sale todo" al iniciar.
+    const allOTs = await base44.asServiceRole.entities.WorkOrder.list('-updated_date', 500);
 
     // Filtro 1: sector (aislamiento entre sectores)
     let result = allOTs.filter(ot => (ot.sector_id || 'escuela') === userSector);
