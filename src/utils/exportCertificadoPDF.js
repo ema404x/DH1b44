@@ -302,7 +302,7 @@ export async function exportCertificadoPDF(form) {
   // Reservar espacio extra si la deducción de % pagado anteriormente va a
   // dibujarse; sin esto, con anticipo + fondo + pagado activos a la vez el
   // bloque de totales pisa el footer o las firmas.
-  const TOTALS_H = (hasMedicion ? 52 : 38) + (pdfPagadoAnteriormente > 0 ? 7 : 0);
+  const TOTALS_H = (hasMedicion ? 58 : 38) + (pdfPagadoAnteriormente > 0 ? 7 : 0);
   if (y + TOTALS_H > SAFE_BOTTOM) {
     drawFooter(pageNum, '??');
     doc.addPage();
@@ -315,9 +315,14 @@ export async function exportCertificadoPDF(form) {
   const pctCertificado = subtotalContrato > 0 ? (pdfSubtotal / subtotalContrato) * 100 : 0;
 
   if (hasMedicion) {
+    // % pendiente sobre el contrato = 100 − % acumulado (ya pagado + avance actual).
+    // Cuando el acumulado de certificación llega al 100%, el % pendiente es 0.
+    const pctAcumulado = subtotalContrato > 0 ? (acumuladoTotal / subtotalContrato) * 100 : 0;
+    const pctPendiente = Math.max(0, 100 - pctAcumulado);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
     doc.text(`Total contrato: ${fmt(subtotalContrato)}`, W - M, y, { align: 'right' }); y += 6;
     doc.text(`Saldo pendiente: ${fmt(totalSaldo)}`, W - M, y, { align: 'right' }); y += 6;
+    doc.text(`% Pendiente: ${pctPendiente.toFixed(1)}%`, W - M, y, { align: 'right' }); y += 6;
   }
 
   doc.setFillColor(235, 243, 255);
