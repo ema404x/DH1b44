@@ -33,19 +33,29 @@ export default function PortalOperarioApp() {
 
   const CACHE_KEY = `mis-ots-cache-${currentUser?.id || 'anon'}`;
 
-  const { data: allOTs = [], isLoading } = useQuery({
+  // initialData desde localStorage: en la primera carga (incluso sin conexión)
+  // el operario ve sus OTs guardadas. Es la base offline no-destructiva.
+  const leerCacheOTs = () => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+      if (cached?.orders) return cached.orders;
+    } catch {}
+    return [];
+  };
+
+  const { data: allOTs = [], isFetching } = useQuery({
     queryKey: ['workorders-operario'],
+    initialData: leerCacheOTs,
     queryFn: async () => {
-      try {
-        const res = await base44.functions.invoke('getWorkOrdersForUser');
-        const orders = res.data?.orders || [];
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ orders, cachedAt: Date.now() })); } catch {}
-        return orders;
-      } catch (err) {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) return JSON.parse(cached).orders;
-        throw err;
-      }
+      // Source of truth = servidor. NO capturar+devolver cache acá: al pisar el
+      // data en un error de refetch, se perdía el dato optimista de la mutación
+      // (la OT que el operario acababa de iniciar) → "se sale todo". Lanzamos y
+      // dejamos que React Query preserve el data anterior en error de refetch.
+      // El cache viejo solo se usa como initialData en la primera carga.
+      const res = await base44.functions.invoke('getWorkOrdersForUser');
+      const orders = res.data?.orders || [];
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ orders, cachedAt: Date.now() })); } catch {}
+      return orders;
     },
     staleTime: 1000 * 60 * 5,
     retry: false,
@@ -126,11 +136,16 @@ export default function PortalOperarioApp() {
           const others = (old || []).filter(o => o.id !== res.data.ot.id);
           return [...others, res.data.ot];
         });
+        // Persistir el snapshot optimista al cache offline: si el operario
+        // recarga sin conexión antes de la próxima refetch, initialData lo levanta.
         try {
           const cur = queryClient.getQueryData(['workorders-operario']) || [];
           localStorage.setItem(CACHE_KEY, JSON.stringify({ orders: cur, cachedAt: Date.now() }));
         } catch {}
       }
+      // Seguro re-invalidar: queryFn lanza en error, así React Query PRESERVA el
+      // data optimista (la OT en En Progreso) en vez de pisarlo con cache viejo.
+      queryClient.invalidateQueries({ queryKey: ['workorders-operario'] });
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       return true;
     } catch (err) {
@@ -301,7 +316,9 @@ export default function PortalOperarioApp() {
     }
   };
 
-  if (isLoading) {
+  // Spinner solo en la primera carga real (sin data previa en cache). Con
+  // initialData, las cargas siguientes muestran las OTs cacheadas de inmediato.
+  if (isFetching && allOTs.length === 0) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
