@@ -2,8 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Activity, List, Users, Globe, School, CheckCircle2 } from 'lucide-react';
+import { MapPin, Activity, List, Users, Globe, School, CheckCircle2, Download, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { exportarQRsUbicacionesPDF } from '@/utils/exportLocationsQR';
 import MapaFichajes from '@/components/mapa/MapaFichajes';
 import LocationsManager from '@/components/mapa/LocationsManager';
 import AsignacionesUbicacion from '@/components/mapa/AsignacionesUbicacion';
@@ -60,6 +62,24 @@ export default function Mapa() {
     },
   });
 
+  const [exportingQRs, setExportingQRs] = useState(false);
+
+  const handleExportQRs = async () => {
+    if (!locations.length) {
+      toast.error('No hay ubicaciones para exportar');
+      return;
+    }
+    setExportingQRs(true);
+    try {
+      await exportarQRsUbicacionesPDF(locations);
+      toast.success('PDF de QRs generado');
+    } catch (e) {
+      toast.error('Error al generar el PDF de QRs');
+    } finally {
+      setExportingQRs(false);
+    }
+  };
+
   const handleActivateAll = async () => {
     const inactivas = locations.filter(l => !l.is_active);
     await Promise.all(inactivas.map(l => base44.entities.LocationQR.update(l.id, { is_active: true })));
@@ -69,14 +89,27 @@ export default function Mapa() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <MapPin className="h-6 w-6 text-primary" />
-          Ubicaciones
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Gestión de sitios, mapa de fichajes GPS y asignación de cuadrillas
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <MapPin className="h-6 w-6 text-primary" />
+            Ubicaciones
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Gestión de sitios, mapa de fichajes GPS y asignación de cuadrillas
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={handleExportQRs}
+          disabled={exportingQRs || locLoading}
+        >
+          {exportingQRs
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <Download className="h-4 w-4" />}
+          {exportingQRs ? 'Generando...' : 'Exportar QRs a PDF'}
+        </Button>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
