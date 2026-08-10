@@ -187,11 +187,17 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
     : subtotal;
   // hasMedicion = true SOLO si algún ítem fue explícitamente editado por el usuario
   const hasMedicion = form.items.some(it => it._med_editado);
-  // totalPresente y totalSaldo calculados en tiempo real, sin depender de campos guardados
+  // Acumulado real por ítem (fuente autoritativa — no el % manual del encabezado).
+  // totalAcumAnterior = ya certificado en certs previos; totalPresente = este cert.
+  const totalAcumAnterior = form.items.reduce((acc, it) => acc + (it.med_acum_anterior_importe || 0), 0);
   const totalPresente = hasMedicion
     ? form.items.reduce((acc, it) => acc + (it.med_presente_importe || 0), 0)
     : 0;
-  const totalSaldo = hasMedicion ? Math.max(0, subtotal - totalPresente) : 0;
+  // Saldo pendiente = lo que falta para llegar al 100% del contrato, descontando
+  // el acumulado ANTERIOR + el presente (no solo el presente). Así, cuando el
+  // acumulado de certificación llega al 100%, el saldo es 0.
+  const acumuladoTotal = totalAcumAnterior + totalPresente;
+  const totalSaldo = hasMedicion ? Math.max(0, montoContratado - acumuladoTotal) : 0;
   const baseCalculo = hasMedicion ? totalPresente : subtotal;
   // Las deducciones en % se calculan sobre el monto parcial a certificar (baseCalculo),
   // NO sobre el total contratado. Ej: si de $40M se certifica 50% ($20M), el anticipo
@@ -213,9 +219,9 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
   // Progresión de certificación sobre el total del contrato:
-  // % anterior (ya pagado en certs previos) + % actual (este cert) = % final acumulado.
+  // % anterior (real, desde el acumulado por ítem) + % actual (este cert) = % final.
   // El acumulado no debe superar el 100% del contrato (sobrecertificación).
-  const pctAnterior = Math.max(0, form.porcentaje_pagado_anteriormente || 0);
+  const pctAnterior = montoContratado > 0 ? (totalAcumAnterior / montoContratado) * 100 : 0;
   const pctActual = montoContratado > 0 ? (totalPresente / montoContratado) * 100 : 0;
   const pctFinal = pctAnterior + pctActual;
   const pctRestante = Math.max(0, 100 - pctFinal);
