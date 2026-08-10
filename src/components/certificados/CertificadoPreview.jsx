@@ -40,7 +40,10 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
         ? parseMonto(form._fondo_reparo_monto)
         : (form.fondo_reparo_pct > 0 ? pdfSubtotal * ((form.fondo_reparo_pct ?? 0) / 100) : 0))
     : 0;
-  const totalNeto = pdfSubtotal - anticipo - fondoReparo;
+  const pagadoAnteriormente = form._pagado_anteriormente_monto != null
+    ? parseMonto(form._pagado_anteriormente_monto)
+    : (form.porcentaje_pagado_anteriormente > 0 ? pdfSubtotal * ((form.porcentaje_pagado_anteriormente ?? 0) / 100) : 0);
+  const totalNeto = pdfSubtotal - anticipo - fondoReparo - pagadoAnteriormente;
 
   const handleExportPDF = async () => {
     setExporting(true);
@@ -258,6 +261,12 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
                   {form._fondo_reparo_monto != null ? ' (fijo):' : ` (${form.fondo_reparo_pct ?? 0}%):`}
                 </span>
                 <span>-{fmt(fondoReparo)}</span>
+              </div>
+            )}
+            {pagadoAnteriormente > 0 && (
+              <div className="flex justify-between gap-8 text-muted-foreground">
+                <span>Ya pagado anteriormente ({form.porcentaje_pagado_anteriormente ?? 0}%):</span>
+                <span>-{fmt(pagadoAnteriormente)}</span>
               </div>
             )}
             <div className="flex justify-between gap-8 bg-primary text-primary-foreground font-bold rounded-lg px-3 py-2 text-base">

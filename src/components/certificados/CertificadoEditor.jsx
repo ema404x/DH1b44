@@ -101,7 +101,7 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
         if (!raw && raw !== 0) return '';
         return String(Math.round(raw));
       })(),
-      monto_obra_contratada: initialData?.monto_obra_contratada || 0,
+      porcentaje_pagado_anteriormente: initialData?.porcentaje_pagado_anteriormente ?? 0,
       porcentaje_avance: initialData?.porcentaje_avance || 0,
       condiciones_pago: initialData?.condiciones_pago || '',
       plazo_entrega: initialData?.plazo_entrega || '',
@@ -220,7 +220,12 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
     ? form.fondo_reparo_monto_manual
     : (form.fondo_reparo_pct > 0 ? baseCalculo * (form.fondo_reparo_pct / 100) : 0);
   const fondoReparo = form.fondo_reparo_aplicar ? fondoReparoMonto : 0;
-  const totalNeto = baseCalculo - anticipo - fondoReparo;
+  // % ya abonado en certificados previos — se descuenta del neto (igual que
+  // anticipo y fondo de reparo). Se calcula sobre el monto parcial a certificar.
+  const pagadoAnteriormente = form.porcentaje_pagado_anteriormente > 0
+    ? baseCalculo * (form.porcentaje_pagado_anteriormente / 100)
+    : 0;
+  const totalNeto = baseCalculo - anticipo - fondoReparo - pagadoAnteriormente;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
 
 
@@ -327,14 +332,14 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
           }>
             {form.tipo === 'abono_mensual' ? 'Abono Mensual' : form.tipo === 'informe' ? 'Informe' : 'Obra'}
           </Badge>
-          <Button variant="outline" className="gap-2" onClick={() => onPreview({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo })}>
+          <Button variant="outline" className="gap-2" onClick={() => onPreview({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo, _pagado_anteriormente_monto: pagadoAnteriormente })}>
             <Eye className="h-4 w-4" />Vista previa
           </Button>
-          <Button variant="outline" className="gap-2" onClick={() => onDraft({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo })} disabled={saving || emitting}>
+          <Button variant="outline" className="gap-2" onClick={() => onDraft({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo, _pagado_anteriormente_monto: pagadoAnteriormente })} disabled={saving || emitting}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? 'Guardando...' : 'Guardar borrador'}
           </Button>
-          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => onEmitir({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo })} disabled={saving || emitting}>
+          <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => onEmitir({ ...form, monto_contratado: parseMonto(form.monto_contratado), subtotal: baseCalculo, _subtotal_contrato: subtotal, _hasMedicion: hasMedicion, _anticipo_monto: anticipo, _fondo_reparo_monto: fondoReparo, _pagado_anteriormente_monto: pagadoAnteriormente })} disabled={saving || emitting}>
             {emitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             {emitting ? 'Emitiendo...' : 'Emitir certificado'}
           </Button>
@@ -400,7 +405,17 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
               <p className="text-xs text-muted-foreground mt-1">{fmt(parseMonto(form.monto_contratado))}</p>
             )}
           </Field>
-          <Field label="Monto Obra Contratada $"><Input type="number" value={form.monto_obra_contratada} onChange={e => set('monto_obra_contratada', +e.target.value)} /></Field>
+          <Field label="% Pagado Anteriormente">
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              placeholder="0"
+              value={form.porcentaje_pagado_anteriormente || ''}
+              onChange={e => set('porcentaje_pagado_anteriormente', +e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-1">Ya abonado en certificados previos</p>
+          </Field>
           <Field label="% Avance de Obra">
             <div className="flex gap-2">
               <Input type="number" min="0" max="100" value={form.porcentaje_avance} onChange={e => set('porcentaje_avance', +e.target.value)} />
@@ -622,6 +637,12 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
               >
                 {form.fondo_reparo_aplicar ? `✓ Descontando -${fmt(fondoReparoMonto)}` : 'Aplicar descuento'}
               </button>
+            </div>
+          )}
+          {pagadoAnteriormente > 0 && (
+            <div className="flex justify-between w-full text-xs text-muted-foreground">
+              <span>Ya pagado anteriormente ({form.porcentaje_pagado_anteriormente}%):</span>
+              <span className="text-destructive">-{fmt(pagadoAnteriormente)}</span>
             </div>
           )}
           <div className="w-full border-t pt-2 flex justify-between font-bold">

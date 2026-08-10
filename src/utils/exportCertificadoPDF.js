@@ -87,7 +87,11 @@ export async function exportCertificadoPDF(form) {
     ? parseMonto(form._fondo_reparo_monto)
     : (fondo_reparo_pct > 0 ? baseDeduccion * (fondo_reparo_pct / 100) : 0));
   const pdfFondoReparo = form.fondo_reparo_aplicar ? fondoReparoCalculado : 0;
-  const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
+  const porcentaje_pagado_anteriormente = parseMonto(form.porcentaje_pagado_anteriormente) ?? 0;
+  const pdfPagadoAnteriormente = Math.round(form._pagado_anteriormente_monto != null
+    ? parseMonto(form._pagado_anteriormente_monto)
+    : (porcentaje_pagado_anteriormente > 0 ? baseDeduccion * (porcentaje_pagado_anteriormente / 100) : 0));
+  const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo - pdfPagadoAnteriormente;
 
   const montoContratado = Math.round(parseMonto(form.monto_contratado));
 
@@ -336,6 +340,9 @@ export async function exportCertificadoPDF(form) {
       ? `${fondoNombre} (monto fijo):   -${fmt(pdfFondoReparo)}`
       : `${fondoNombre} (${fondo_reparo_pct}%):   -${fmt(pdfFondoReparo)}`;
     doc.text(fondoLabel, W - M, y, { align: 'right' }); y += 7;
+  }
+  if (pdfPagadoAnteriormente > 0) {
+    doc.text(`Ya pagado anteriormente (${porcentaje_pagado_anteriormente}%):   -${fmt(pdfPagadoAnteriormente)}`, W - M, y, { align: 'right' }); y += 7;
   }
 
   doc.setFillColor(15, 28, 46);

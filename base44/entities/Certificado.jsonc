@@ -68,6 +68,11 @@
       "type": "number",
       "default": 0
     },
+    "porcentaje_pagado_anteriormente": {
+      "type": "number",
+      "default": 0,
+      "description": "Porcentaje del monto a certificar que ya fue abonado en certificados previos. Se descuenta del total neto."
+    },
     "porcentaje_avance": {
       "type": "number",
       "default": 0
