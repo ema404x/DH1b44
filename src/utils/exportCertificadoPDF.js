@@ -95,9 +95,12 @@ export async function exportCertificadoPDF(form) {
     : (fondo_reparo_pct > 0 ? baseDeduccion * (fondo_reparo_pct / 100) : 0));
   const pdfFondoReparo = form.fondo_reparo_aplicar ? fondoReparoCalculado : 0;
   const porcentaje_pagado_anteriormente = parseMonto(form.porcentaje_pagado_anteriormente) ?? 0;
+  // El % pagado anteriormente se calcula sobre el TOTAL del contrato
+  // (subtotalContrato), no sobre el monto parcial a certificar (baseDeduccion)
+  // como sí lo hacen anticipo y fondo de reparo.
   const pdfPagadoAnteriormente = Math.round(form._pagado_anteriormente_monto != null
     ? parseMonto(form._pagado_anteriormente_monto)
-    : (porcentaje_pagado_anteriormente > 0 ? baseDeduccion * (porcentaje_pagado_anteriormente / 100) : 0));
+    : (porcentaje_pagado_anteriormente > 0 ? subtotalContrato * (porcentaje_pagado_anteriormente / 100) : 0));
   const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo - pdfPagadoAnteriormente;
 
   const montoContratado = Math.round(parseMonto(form.monto_contratado));

@@ -40,9 +40,12 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
         ? parseMonto(form._fondo_reparo_monto)
         : (form.fondo_reparo_pct > 0 ? pdfSubtotal * ((form.fondo_reparo_pct ?? 0) / 100) : 0))
     : 0;
+  // El % pagado anteriormente se calcula sobre el TOTAL del contrato (subtotal),
+  // no sobre el monto parcial a certificar (pdfSubtotal) como sí lo hacen
+  // anticipo y fondo de reparo.
   const pagadoAnteriormente = form._pagado_anteriormente_monto != null
     ? parseMonto(form._pagado_anteriormente_monto)
-    : (form.porcentaje_pagado_anteriormente > 0 ? pdfSubtotal * ((form.porcentaje_pagado_anteriormente ?? 0) / 100) : 0);
+    : (form.porcentaje_pagado_anteriormente > 0 ? subtotal * ((form.porcentaje_pagado_anteriormente ?? 0) / 100) : 0);
   const totalNeto = pdfSubtotal - anticipo - fondoReparo - pagadoAnteriormente;
 
   const handleExportPDF = async () => {

@@ -214,10 +214,13 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
     ? form.fondo_reparo_monto_manual
     : (form.fondo_reparo_pct > 0 ? baseCalculo * (form.fondo_reparo_pct / 100) : 0);
   const fondoReparo = form.fondo_reparo_aplicar ? fondoReparoMonto : 0;
-  // % ya abonado en certificados previos — se descuenta del neto (igual que
-  // anticipo y fondo de reparo). Se calcula sobre el monto parcial a certificar.
+  // % ya abonado en certificados previos — se descuenta del neto, pero a
+  // diferencia del anticipo/desacopio y fondo de reparo (que se calculan sobre
+  // el monto PARCIAL a certificar), el % pagado anteriormente se calcula sobre
+  // el TOTAL del contrato: representa dinero ya cobrado en certificados previos
+  // que no debe volver a descontarse del parcial.
   const pagadoAnteriormente = form.porcentaje_pagado_anteriormente > 0
-    ? baseCalculo * (form.porcentaje_pagado_anteriormente / 100)
+    ? subtotal * (form.porcentaje_pagado_anteriormente / 100)
     : 0;
   const totalNeto = baseCalculo - anticipo - fondoReparo - pagadoAnteriormente;
   const pctCertificado = subtotal > 0 ? (totalPresente / subtotal) * 100 : 0;
@@ -420,7 +423,7 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
               value={form.porcentaje_pagado_anteriormente || ''}
               onChange={e => set('porcentaje_pagado_anteriormente', +e.target.value)}
             />
-            <p className="text-xs text-muted-foreground mt-1">Ya abonado en certificados previos</p>
+            <p className="text-xs text-muted-foreground mt-1">Se aplica sobre el total del contrato, no sobre el parcial</p>
           </Field>
           <Field label="% Avance de Certificación">
             <div className="flex gap-2">
