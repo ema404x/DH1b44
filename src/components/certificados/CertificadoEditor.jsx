@@ -4,8 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2, Wand2, Layers, Send, Loader2 } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Save, Eye, AlertTriangle, CheckCircle2, Wand2, Layers, Send, Loader2, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import { base44 } from '@/api/base44Client';
 import HistorialAcumulados from './HistorialAcumulados';
+import ItemAcumulacionRow from './ItemAcumulacionRow';
+import { recalcItem, aplicarCantidadPu, aplicarPresenteUnidad, aplicarPresenteImporte, aplicarAnteriorUnidad, aplicarAnteriorImporte, matchAnteriorDesdeCert } from './acumulacionUtils';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Math.round(n || 0));
 const parseMonto = (v) => {
@@ -23,22 +27,8 @@ const parseMonto = (v) => {
 };
 const r0 = (n) => Math.round(parseMonto(n));
 
-// Recalcula todos los campos derivados de un ítem de forma determinista
-const recalcItem = (item) => {
-  const it = r0(item.importe_total) || Math.round(r0(item.cantidad) * r0(item.importe_unitario));
-  const aau = r0(item.med_acum_anterior_unidad);
-  const aa$ = r0(item.med_acum_anterior_importe);
-  const pu  = Math.round(parseMonto(item.med_presente_unidad) * 100) / 100;
-  const p$  = r0(item.med_presente_importe);
-  const apu = Math.round((aau + pu) * 100) / 100;
-  const ap$ = r0(aa$ + p$);
-  const su  = Math.max(0, Math.round((r0(item.cantidad) - apu) * 100) / 100);
-  const s$  = Math.max(0, it - ap$);
-  return { ...item, importe_total: it, med_acum_anterior_unidad: aau, med_acum_anterior_importe: aa$,
-    med_presente_unidad: pu, med_presente_importe: p$,
-    med_acum_presente_unidad: apu, med_acum_presente_importe: ap$,
-    saldo_pendiente_unidad: su, saldo_pendiente_importe: s$ };
-};
+// recalcItem y la coherencia unidad↔importe viven en ./acumulacionUtils
+// (compartidas por editor, vista previa y PDF).
 
 function Field({ label, children }) {
   return (
@@ -156,26 +146,20 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
   const setItem = (i, k, v) => {
     const items = [...form.items];
     let it = { ...items[i], [k]: v };
-
+    // Coherencia unidad↔importe en cada tramo: editar uno recalcula el otro
+    // (importe = unidad × precio unitario). Así acumulado, presente y saldo
+    // nunca se descalabran al tocar un solo campo.
     if (k === 'cantidad' || k === 'importe_unitario') {
-      it.importe_total = Math.round(r0(it.cantidad) * r0(it.importe_unitario));
-      if (!it._med_editado) {
-        it.med_presente_importe = it.importe_total;
-        it.med_presente_unidad = r0(it.cantidad);
-      }
+      it = aplicarCantidadPu(it);
+    } else if (k === 'med_presente_unidad') {
+      it = aplicarPresenteUnidad(it, v);
+    } else if (k === 'med_presente_importe') {
+      it = aplicarPresenteImporte(it, v);
+    } else if (k === 'med_acum_anterior_unidad') {
+      it = aplicarAnteriorUnidad(it, v);
+    } else if (k === 'med_acum_anterior_importe') {
+      it = aplicarAnteriorImporte(it, v);
     }
-
-    if (k === 'med_presente_importe') {
-      it._med_editado = true;
-      const pv = r0(v);
-      const cantTotal = r0(it.cantidad);
-      const cantPresente = it.importe_total > 0
-        ? Math.round((pv / it.importe_total) * cantTotal * 100) / 100
-        : 0;
-      it.med_presente_unidad = cantPresente;
-      it.med_presente_importe = pv;
-    }
-
     items[i] = recalcItem(it);
     setForm(f => ({ ...f, items }));
   };
@@ -306,6 +290,35 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
     });
 
     setForm(f => ({ ...f, items: newItems }));
+  };
+
+  // Traer el acumulado anterior del certificado previo de la misma ADA.
+  // Empareja ítems por número (fallback descripción) y respeta los que el
+  // usuario ya sobreescribió (_anterior_override). Es la base "auto" del
+  // acumulado; el override manual del usuario queda por encima.
+  const traerAnterior = async () => {
+    if (!form.ada_numero) {
+      toast.error('Cargá el N° de ADA antes de traer el acumulado anterior');
+      return;
+    }
+    try {
+      const todos = await base44.entities.Certificado.filter(
+        { ada_numero: form.ada_numero }, '-created_date', 50
+      );
+      const previos = todos
+        .filter(c => c.estado !== 'borrador' && c.id !== initialData?.id && Array.isArray(c.items) && c.items.length)
+        .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      const previo = previos[0];
+      if (!previo) {
+        toast.info('No hay certificados previos con ítems para esta ADA');
+        return;
+      }
+      const nuevos = matchAnteriorDesdeCert(form.items, previo).map(recalcItem);
+      setForm(f => ({ ...f, items: nuevos }));
+      toast.success(`Acumulado anterior traído del Cert. N° ${previo.numero}`);
+    } catch (e) {
+      toast.error('No se pudo traer el acumulado anterior');
+    }
   };
 
   const validacion = useMemo(() => {
@@ -505,51 +518,45 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
                 <Wand2 className="h-3 w-3" /> Aplicar
               </Button>
             </div>
+            <Button size="sm" variant="outline" className="gap-2" onClick={traerAnterior} title="Traer el acumulado anterior del certificado previo de la misma ADA">
+              <RefreshCw className="h-3.5 w-3.5" />Traer acum. anterior
+            </Button>
             <Button size="sm" variant="outline" className="gap-2" onClick={addItem}><Plus className="h-3.5 w-3.5" />Agregar ítem</Button>
           </div>
         </div>
-        <div className="space-y-3">
-          {form.items.map((item, i) => (
-            <div key={i} className="grid grid-cols-14 gap-2 items-start p-3 rounded-lg bg-muted/30 border" style={{gridTemplateColumns: 'repeat(14, minmax(0, 1fr))'}}>
-              <div className="col-span-1">
-                <label className="text-xs text-muted-foreground">N°</label>
-                <Input className="mt-1 h-8 text-xs" value={item.numero} onChange={e => setItem(i, 'numero', +e.target.value)} />
-              </div>
-              <div className="col-span-4">
-                <label className="text-xs text-muted-foreground">Descripción</label>
-                <Input className="mt-1 h-8 text-xs" value={item.descripcion} onChange={e => setItem(i, 'descripcion', e.target.value)} />
-              </div>
-              <div className="col-span-1">
-                <label className="text-xs text-muted-foreground">UM</label>
-                <Input className="mt-1 h-8 text-xs" value={item.um} onChange={e => setItem(i, 'um', e.target.value)} />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs text-muted-foreground">Cantidad</label>
-                <Input className="mt-1 h-8 text-xs" type="number" value={item.cantidad} onChange={e => setItem(i, 'cantidad', +e.target.value)} />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs text-muted-foreground">P. Unitario</label>
-                <Input className="mt-1 h-8 text-xs" type="number" value={item.importe_unitario} onChange={e => setItem(i, 'importe_unitario', +e.target.value)} />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs text-muted-foreground">Total contrato</label>
-                <div className="mt-1 h-8 text-xs flex items-center px-3 bg-background rounded-md border font-medium">{fmt(item.importe_total)}</div>
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs text-muted-foreground text-blue-700 font-semibold">A certificar $</label>
-                <Input
-                  className="mt-1 h-8 text-xs border-blue-300 focus:ring-blue-400"
-                  type="number"
-                  value={item.med_presente_importe || 0}
-                  onChange={e => setItem(i, 'med_presente_importe', +e.target.value)}
-                />
-              </div>
-              <div className="col-span-14 flex justify-end" style={{gridColumn: 'span 14'}}>
-                <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeItem(i)}><Trash2 className="h-3.5 w-3.5" /></Button>
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto border rounded-lg">
+          <table className="w-full text-xs border-collapse min-w-[1080px]">
+            <thead>
+              <tr className="bg-muted/60 text-muted-foreground">
+                <th className="px-1 py-2 text-left font-semibold w-10">N°</th>
+                <th className="px-1 py-2 text-left font-semibold min-w-[160px]">Descripción</th>
+                <th className="px-1 py-2 text-left font-semibold w-14">UM</th>
+                <th className="px-1 py-2 text-right font-semibold w-20">Cant.</th>
+                <th className="px-1 py-2 text-right font-semibold w-24">P. Unit.</th>
+                <th className="px-1 py-2 text-right font-semibold w-28">Total cto.</th>
+                <th className="px-1 py-2 text-right font-semibold w-20" title="Acumulado anterior — unidades">A.Ant U</th>
+                <th className="px-1 py-2 text-right font-semibold w-28" title="Acumulado anterior — importe">A.Ant $</th>
+                <th className="px-1 py-2 text-right font-semibold w-20 text-blue-700" title="Presente — unidades">Pres U</th>
+                <th className="px-1 py-2 text-right font-semibold w-28 text-blue-700" title="A certificar — importe">Pres $</th>
+                <th className="px-1 py-2 text-right font-semibold w-20" title="Acumulado presente — unidades">Ac.Pres U</th>
+                <th className="px-1 py-2 text-right font-semibold w-28" title="Acumulado presente — importe">Ac.Pres $</th>
+                <th className="px-1 py-2 text-right font-semibold w-28">Saldo $</th>
+                <th className="px-1 py-2 w-8"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {form.items.map((item, i) => (
+                <ItemAcumulacionRow key={i} item={item} index={i} onChange={setItem} onRemove={removeItem} />
+              ))}
+            </tbody>
+          </table>
         </div>
+        {form.items.some(it => it._sobrecertificado) && (
+          <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            Hay ítems que superan la cantidad contratada (sobrecertificación). Revisá el acumulado anterior o el presente.
+          </div>
+        )}
       </div>
 
       {/* Totales */}
