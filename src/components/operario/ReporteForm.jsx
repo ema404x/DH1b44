@@ -60,7 +60,9 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       setPhotos(prev => [...prev, file_url]);
     } catch (err) {
-      toast.error('Error al subir foto');
+      toast.error(!navigator.onLine
+        ? 'Sin conexión — no se pudo subir la foto. Podés guardar el reporte sin fotos y se sincronizará después.'
+        : 'Error al subir foto');
     } finally {
       setUploadingPhoto(false);
       e.target.value = '';

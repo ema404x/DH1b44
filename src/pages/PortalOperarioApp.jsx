@@ -10,6 +10,7 @@ import QRScannerModal from '@/components/operario/QRScannerModal';
 import LocationOTListModal from '@/components/operario/LocationOTListModal';
 import BodyPortal from '@/components/operario/BodyPortal';
 import MisOrdenesFiltros from '@/components/operario/MisOrdenesFiltros';
+import { useOperarioOfflineActions } from '@/hooks/useOperarioOfflineActions';
 
 export default function PortalOperarioApp() {
   const { currentUser, displayName } = useCurrentUser();
@@ -60,6 +61,13 @@ export default function PortalOperarioApp() {
     },
     staleTime: 1000 * 60 * 5,
     retry: false,
+  });
+
+  // Cola de transiciones offline (iniciar/finalizar sin conexión).
+  // Aplica el cambio al cache de inmediato (UX) y lo sincroniza al volver online.
+  const { pendingCount, syncing, pendingOtIds, queueTransition } = useOperarioOfflineActions({
+    queryClient,
+    cacheKey: CACHE_KEY,
   });
 
   const misOTs = useMemo(() => {
@@ -169,6 +177,27 @@ export default function PortalOperarioApp() {
     } else {
       extraData.gps_status = gps.gps_status;
     }
+    if (!isOnline) {
+      // Offline: encolar la transición y aplicar el cambio al cache (UX inmediata).
+      // El GPS se captura igual (offline); solo falla el envío al servidor.
+      const optimistic = {
+        ...ot,
+        status: 'en_progreso',
+        fecha_inicio_real: new Date().toISOString(),
+        assigned_to: currentUser?.id,
+        assigned_name: displayName,
+        gps_latitude: gps.gps_status === 'capturado' ? gps.gps_latitude : ot.gps_latitude,
+        gps_longitude: gps.gps_status === 'capturado' ? gps.gps_longitude : ot.gps_longitude,
+        gps_accuracy: gps.gps_status === 'capturado' ? gps.gps_accuracy : ot.gps_accuracy,
+        gps_status: gps.gps_status,
+        _pending_sync: true,
+      };
+      queueTransition(ot, 'iniciar', extraData, optimistic);
+      toast.success('OT iniciada (sin conexión). Se sincronizará al volver online.');
+      setProcessing(null);
+      setConfirmAction(null);
+      return;
+    }
     await ejecutarTransicion(ot, 'iniciar', extraData);
     // "Iniciar" solo arranca la OT. El reporte de cierre se completa después,
     // cuando el operario toque "Finalizar y Reportar" en la tarjeta de En Progreso.
@@ -179,6 +208,22 @@ export default function PortalOperarioApp() {
   };
 
   const handleReporteSaved = async (ot, reporteData) => {
+    if (!isOnline) {
+      // Offline: encolar el reporte y marcar la OT como enviada a validación.
+      const optimistic = {
+        ...ot,
+        status: 'pendiente_validacion',
+        materials_used: reporteData.materials_used,
+        materiales_faltantes: reporteData.materiales_faltantes,
+        notes: reporteData.notes,
+        photos: reporteData.photos,
+        _pending_sync: true,
+      };
+      queueTransition(ot, 'finalizar', reporteData, optimistic);
+      toast.success('Reporte guardado (sin conexión). Se enviará al jefe al volver online.');
+      setReporteOT(null);
+      return;
+    }
     // El reporte ya guardó materiales; ahora transicionar a pendiente_validacion
     const ok = await ejecutarTransicion(ot, 'finalizar', reporteData);
     if (ok) setReporteOT(null);
@@ -295,7 +340,7 @@ export default function PortalOperarioApp() {
     // el trabajador (lo resuelve transicionEstadoOT).
     if (ot.status === 'asignada') return { canAct: true };
     if (ot.status === 'en_progreso') {
-      if (!isOnline) return { canAct: false, reason: 'Sin conexión' };
+      // Offline permitido: el reporte se encola y se sincroniza después.
       if (ot.assigned_name && !isOwnerOf(ot))
         return { canAct: false, reason: `La trabaja ${ot.assigned_name}` };
       return { canAct: true };
@@ -320,10 +365,7 @@ export default function PortalOperarioApp() {
     } else if (foundOT.status === 'en_progreso') {
       // Solo el operario que está trabajando la OT puede reportarla/cerrarla.
       // Otro operario que escanea la misma ubicación la ve pero no puede actuar.
-      if (!isOnline) {
-        toast.error('Necesitás conexión para finalizar esta OT.');
-        return false;
-      }
+      // Offline permitido: el reporte se encola y se envía al volver online.
       if (foundOT.assigned_name && !isOwnerOf(foundOT)) {
         toast.info('Esta OT la está trabajando otro operario');
         return false;
@@ -352,11 +394,15 @@ export default function PortalOperarioApp() {
   return (
     <div className="min-h-screen flex flex-col gap-5">
 
-      {/* Banner offline */}
-      {!isOnline && (
+      {/* Banner offline / pendientes de sync */}
+      {(!isOnline || pendingCount > 0) && (
         <div className="flex items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-medium px-3 py-2">
-          <WifiOff className="h-4 w-4 shrink-0" />
-          Sin conexión — mostrando tus OTs guardadas.
+          {syncing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <WifiOff className="h-4 w-4 shrink-0" />}
+          {syncing
+            ? `Sincronizando ${pendingCount} acción(es) pendiente(s)...`
+            : !isOnline
+              ? `Sin conexión — trabajando con cache. ${pendingCount > 0 ? `${pendingCount} acción(es) esperando sincronizar.` : 'Tus OTs se guardan y se envían al volver online.'}`
+              : `${pendingCount} acción(es) pendiente(s) de sincronizar.`}
         </div>
       )}
 
@@ -433,7 +479,7 @@ export default function PortalOperarioApp() {
               processing={processing === ot.id}
               onIniciar={undefined}
               onFinalizar={() => setReporteOT(ot)}
-              offline={!isOnline}
+              pendingSync={pendingOtIds.has(ot.id)}
             />
           ))}
         </Seccion>
@@ -449,7 +495,7 @@ export default function PortalOperarioApp() {
               processing={processing === ot.id}
               onIniciar={() => setConfirmAction({ ot, accion: 'iniciar' })}
               onFinalizar={undefined}
-              offline={!isOnline}
+              pendingSync={pendingOtIds.has(ot.id)}
             />
           ))}
         </Seccion>
@@ -592,7 +638,7 @@ const STEPS = [
   { key: 'completada', label: 'Completada', color: '#10b981' },
 ];
 
-function OTCard({ ot, onIniciar, onFinalizar, processing, locked, offline }) {
+function OTCard({ ot, onIniciar, onFinalizar, processing, locked, pendingSync }) {
   const badge = STATUS_BADGE[ot.status] || STATUS_BADGE.pendiente;
   const rail = LANE[ot.status] || '#3b82f6';
   const prio = PRIORITY[ot.priority];
@@ -602,11 +648,18 @@ function OTCard({ ot, onIniciar, onFinalizar, processing, locked, offline }) {
       {/* Riel de color por fase */}
       <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: rail }} />
 
-      {/* Badge de estado + chip de prioridad */}
+      {/* Badge de estado + chip de prioridad + pendiente de sync */}
       <div className="flex items-start justify-between gap-2">
-        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge.cls}`}>
-          {badge.label}
-        </span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge.cls}`}>
+            {badge.label}
+          </span>
+          {pendingSync && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <WifiOff className="h-2.5 w-2.5" /> Pendiente sync
+            </span>
+          )}
+        </div>
         {prio && (
           <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${prio.cls}`}>
             {prio.label}
@@ -642,11 +695,6 @@ function OTCard({ ot, onIniciar, onFinalizar, processing, locked, offline }) {
           <div className="flex items-center justify-center gap-2 h-11 rounded-lg bg-white/5 border border-white/10 text-slate-500 text-sm font-medium">
             <Lock className="h-4 w-4" />
             Esperando validación
-          </div>
-        ) : offline ? (
-          <div className="flex items-center justify-center gap-2 h-11 rounded-lg bg-white/5 border border-white/10 text-slate-500 text-xs font-medium text-center px-2">
-            <WifiOff className="h-4 w-4 shrink-0" />
-            Necesitás conexión para {onIniciar ? 'iniciar' : 'finalizar'}.
           </div>
         ) : onIniciar ? (
           <button
@@ -690,6 +738,12 @@ function ConfirmDialog({ ot, accion, onConfirm, onCancel, processing, offline })
         <h3 className="text-base font-bold text-white mb-2">{t.titulo}</h3>
         <p className="text-sm text-slate-400 mb-1">{t.cuerpo}</p>
         <p className="text-sm font-medium text-white mb-4 truncate">"{ot.title}"</p>
+        {offline && (
+          <p className="text-xs text-amber-400 mb-3 flex items-center gap-1.5">
+            <WifiOff className="h-3.5 w-3.5" />
+            Sin conexión: la acción se guardará y se sincronizará al volver online.
+          </p>
+        )}
         <div className="flex gap-2">
           <button
             onClick={onCancel}
@@ -700,10 +754,10 @@ function ConfirmDialog({ ot, accion, onConfirm, onCancel, processing, offline })
           </button>
           <button
             onClick={onConfirm}
-            disabled={processing || offline}
+            disabled={processing}
             className="flex-1 h-11 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : offline ? 'Necesitás conexión' : t.boton}
+            {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : t.boton}
           </button>
         </div>
       </div>
