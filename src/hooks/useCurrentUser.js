@@ -2,7 +2,7 @@ import { useContext } from 'react';
 import { AuthContext } from '@/lib/AuthContext';
 import { resolveDisplayName } from '@/lib/utils';
 import { queryClientInstance } from '@/lib/query-client';
-import { isAdminLevelRole, isFieldRole } from '@/lib/roles';
+import { isAdminLevelRole, isFieldRole, canSwitchSector } from '@/lib/roles';
 
 /**
  * Hook que retorna el usuario actual y helpers de permisos.
@@ -69,5 +69,19 @@ export function useCurrentUser() {
     return resolveDisplayName(nameOrEmail, employees, fallback);
   }
 
-  return { currentUser, user: currentUser, isAdmin, isSuperAdmin, employeeRole, employeeName, employeeSector, displayName, loading, filterByUser, userPermissions, resolveUserName };
+  return {
+    currentUser,
+    user: currentUser,
+    isAdmin,
+    isSuperAdmin,
+    employeeRole,
+    employeeName,
+    employeeSector,
+    displayName,
+    loading,
+    filterByUser,
+    userPermissions,
+    resolveUserName,
+    canSwitchSector: canSwitchSector(currentUser?.role, employeeRole),
+  };
 }

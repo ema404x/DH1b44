@@ -13,8 +13,11 @@
     },
     "sector_id": {
       "type": "string",
-      "default": "escuela",
-      "description": "Sector/unidad de negocio del usuario. A\u00edsla los datos entre sectores. Se sincroniza desde el Employee al iniciar sesi\u00f3n. Valor libre definido en la entidad Sector."
+      "description": "Sector/unidad de negocio del usuario. A\u00edsla los datos entre sectores. Se sincroniza desde el Employee al iniciar sesi\u00f3n (vincularEmpleado). Sin default \u2014 los usuarios nuevos nacen sin sector_id y la funci\u00f3n lo estampa en el primer login. Para gerente_general cambia v\u00eda cambiarSectorActivo. Valor libre definido en la entidad Sector."
+    },
+    "sector_base": {
+      "type": "string",
+      "description": "Sector de origen del gerente_general. Se fija la primera vez que cambia de sector (cambiarSectorActivo). Permite identificar el sector propio en el dropdown (estrella)."
     },
     "can_delete_pendientes": {
       "type": "boolean",
@@ -22,5 +25,12 @@
       "description": "Habilita al usuario a eliminar pendientes SAP"
     }
   },
-  "required": []
+  "required": [],
+  "rls": {
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }

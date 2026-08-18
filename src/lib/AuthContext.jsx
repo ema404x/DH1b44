@@ -197,16 +197,33 @@ export const AuthProvider = ({ children }) => {
     base44.auth.redirectToLogin(window.location.href);
   };
 
-  // Cambio de sector persistente e inmediato:
-  // 1) persiste en el usuario (base44.auth.updateMe)
-  // 2) actualiza el estado en memoria
+  // Cambio de sector persistente e inmediato (Modelo B):
+  // 1) valida rol server-side y persiste via cambiarSectorActivo (service-role)
+  // 2) actualiza el estado en memoria solo si la función confirma
   // 3) invalida todas las queries para que refetch con el nuevo sector
   const switchSector = async (sectorId) => {
-    await base44.auth.updateMe({ sector_id: sectorId });
-    setUser(prev => ({ ...prev, sector_id: sectorId, data: { ...(prev?.data || {}), sector_id: sectorId } }));
-    setUserPermissions(prev => ({ ...prev, _employeeSector: sectorId }));
-    queryClientInstance.invalidateQueries();
-    queryClientInstance.removeQueries();
+    try {
+      const res = await base44.functions.invoke('cambiarSectorActivo', { sector_destino: sectorId });
+      const data = res?.data || res;
+      if (!data?.ok) throw new Error(data?.error || 'No se pudo cambiar de sector');
+      const nuevoSector = data.sector_activo || sectorId;
+      const nuevoBase = data.sector_base || null;
+      setUser(prev => ({
+        ...prev,
+        sector_id: nuevoSector,
+        data: {
+          ...(prev?.data || {}),
+          sector_id: nuevoSector,
+          ...(nuevoBase ? { sector_base: nuevoBase } : prev?.data?.sector_base ? { sector_base: prev.data.sector_base } : {}),
+        },
+      }));
+      setUserPermissions(prev => ({ ...prev, _employeeSector: nuevoSector }));
+      queryClientInstance.invalidateQueries();
+      queryClientInstance.removeQueries();
+      return nuevoSector;
+    } catch (e) {
+      throw new Error(e?.message || 'Error al cambiar de sector');
+    }
   };
 
   return (

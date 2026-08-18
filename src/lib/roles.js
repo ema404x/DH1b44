@@ -4,10 +4,11 @@
  * Mantener sincronizado con el módulo backend.
  */
 
-export const ADMIN_LEVEL_ROLES = ['admin', 'gerente', 'gerencia', 'administrativo'];
-export const GERENTE_SYNC_ROLES = ['gerente', 'gerencia', 'administrativo'];
+export const ADMIN_LEVEL_ROLES = ['admin', 'gerente', 'gerencia', 'administrativo', 'gerente_general'];
+export const GERENTE_SYNC_ROLES = ['gerente', 'gerencia', 'administrativo', 'gerente_general'];
 export const FIELD_ROLES = ['jefe_sitio', 'jefe de sitio', 'inspector', 'tecnico', 'supervisor', 'operario', 'operario_portal'];
 export const JEFE_SITIO_ROLES = ['jefe_sitio', 'jefe de sitio'];
+export const SECTOR_SWITCHER_ROLES = ['gerente_general'];
 
 export function normalizeRole(role) {
   return (role || '')
@@ -35,6 +36,16 @@ export function isJefeSitioRole(employeeRole) {
 
 export function canManageOT(employeeRole) {
   return isAdminLevelRole(employeeRole) || isJefeSitioRole(employeeRole);
+}
+
+/**
+ * True si el usuario puede cambiar de sector activo.
+ * Platform admins pueden cambiar siempre (super-user).
+ * Empleados con rol gerente_general están autorizados vía cambiarSectorActivo.
+ */
+export function canSwitchSector(platformRole, employeeRole) {
+  if (platformRole === 'admin') return true;
+  return SECTOR_SWITCHER_ROLES.includes(normalizeRole(employeeRole));
 }
 
 /**

@@ -61,17 +61,22 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Fire-and-forget: los updates de nombre/sector no bloquean la respuesta
+      // Fire-and-forget: los updates de nombre/sector no bloquean la respuesta.
+      // Usamos asServiceRole para bypassar la RLS de User.update (admin-only).
       const updateTasks = [];
       const isEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const platformNameIsEmail = isEmailPattern.test((user.full_name || '').trim());
       const platformNameDiffers = (user.full_name || '').trim() !== (emp.full_name || '').trim();
+      const userUpdate = {};
       if (emp.full_name && (platformNameIsEmail || platformNameDiffers)) {
-        updateTasks.push(base44.auth.updateMe({ full_name: emp.full_name }).catch(() => {}));
+        userUpdate.full_name = emp.full_name;
       }
       const currentUserSector = user.data?.sector_id ?? null;
       if (!currentUserSector) {
-        updateTasks.push(base44.auth.updateMe({ sector_id: empSector }).catch(() => {}));
+        userUpdate.sector_id = empSector;
+      }
+      if (Object.keys(userUpdate).length > 0) {
+        updateTasks.push(sb.entities.User.update(user.id, userUpdate).catch(() => {}));
       }
       Promise.allSettled(updateTasks).catch(() => {});
 
@@ -150,7 +155,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fire-and-forget: los updates de user_id/nombre/sector no bloquean la respuesta
+    // Fire-and-forget: los updates de user_id/nombre/sector no bloquean la respuesta.
+    // Usamos asServiceRole para bypassar la RLS de User.update (admin-only).
     const updateTasks = [];
     if (emp.user_id !== user.id) {
       updateTasks.push(sb.entities.Employee.update(emp.id, { user_id: user.id }).catch(() => {}));
@@ -158,12 +164,16 @@ Deno.serve(async (req) => {
     const isEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const platformNameIsEmail = isEmailPattern.test((user.full_name || '').trim());
     const platformNameDiffers = (user.full_name || '').trim() !== (emp.full_name || '').trim();
+    const userUpdate = {};
     if (emp.full_name && (platformNameIsEmail || platformNameDiffers)) {
-      updateTasks.push(base44.auth.updateMe({ full_name: emp.full_name }).catch(() => {}));
+      userUpdate.full_name = emp.full_name;
     }
     const currentUserSector = user.data?.sector_id ?? null;
     if (!currentUserSector) {
-      updateTasks.push(base44.auth.updateMe({ sector_id: empSector }).catch(() => {}));
+      userUpdate.sector_id = empSector;
+    }
+    if (Object.keys(userUpdate).length > 0) {
+      updateTasks.push(sb.entities.User.update(user.id, userUpdate).catch(() => {}));
     }
     Promise.allSettled(updateTasks).catch(() => {});
 

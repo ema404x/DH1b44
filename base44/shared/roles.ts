@@ -12,17 +12,22 @@
  */
 
 // Roles de empleado con visibilidad total — ven todos los registros de su sector.
-export const ADMIN_LEVEL_ROLES = ['admin', 'gerente', 'gerencia', 'administrativo'];
+export const ADMIN_LEVEL_ROLES = ['admin', 'gerente', 'gerencia', 'administrativo', 'gerente_general'];
 
 // Roles que se sincronizan a plataforma 'gerente' en vincularEmpleado.
 // 'admin' se excluye: los platform admins ya tienen acceso total.
-export const GERENTE_SYNC_ROLES = ['gerente', 'gerencia', 'administrativo'];
+// 'gerente_general' se incluye: es el rol designado para cambiar de sector activo.
+export const GERENTE_SYNC_ROLES = ['gerente', 'gerencia', 'administrativo', 'gerente_general'];
 
 // Roles de campo — ven solo sus propias OTs/registros.
 export const FIELD_ROLES = ['jefe_sitio', 'jefe de sitio', 'inspector', 'tecnico', 'supervisor', 'operario', 'operario_portal'];
 
 // Roles que pueden ejecutar acciones de cierre en OTs (jefe de sitio).
 export const JEFE_SITIO_ROLES = ['jefe_sitio', 'jefe de sitio'];
+
+// Roles de empleado (además de platform admin) que pueden cambiar de sector activo.
+// Solo gerente_general está autorizado a usar cambiarSectorActivo.
+export const SECTOR_SWITCHER_ROLES = ['gerente_general'];
 
 /** Normaliza: lowercase, sin acentos, sin espacios extra. */
 export function normalizeRole(role?: string | null): string {
@@ -56,4 +61,14 @@ export function isJefeSitioRole(employeeRole?: string | null): boolean {
 /** True si el rol puede gestionar OTs (admin-level o jefe de sitio). */
 export function canManageOT(employeeRole?: string | null): boolean {
   return isAdminLevelRole(employeeRole) || isJefeSitioRole(employeeRole);
+}
+
+/**
+ * True si el usuario puede cambiar de sector activo.
+ * Platform admins pueden cambiar siempre (super-user).
+ * Empleados con rol gerente_general están autorizados vía cambiarSectorActivo.
+ */
+export function canSwitchSector(platformRole?: string | null, employeeRole?: string | null): boolean {
+  if (platformRole === 'admin') return true;
+  return SECTOR_SWITCHER_ROLES.includes(normalizeRole(employeeRole));
 }

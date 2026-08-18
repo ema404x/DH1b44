@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useAuth } from '@/lib/AuthContext';
-import { ChevronDown, Building2, Check } from 'lucide-react';
+import { ChevronDown, Building2, Check, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
 
 export default function SectorSwitcher() {
-  const { isAdmin, currentUser, employeeSector } = useCurrentUser();
+  const { canSwitchSector, currentUser, employeeSector } = useCurrentUser();
   const { switchSector } = useAuth();
   const [sectores, setSectores] = useState([]);
   const [open, setOpen] = useState(false);
@@ -15,13 +15,14 @@ export default function SectorSwitcher() {
   const ref = useRef(null);
 
   const currentSectorId = currentUser?.sector_id || currentUser?.data?.sector_id || employeeSector || 'escuela';
+  const sectorBase = currentUser?.data?.sector_base || currentUser?.sector_base || null;
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canSwitchSector) return;
     base44.entities.Sector.list('orden', 100)
       .then(setSectores)
       .catch(() => {});
-  }, [isAdmin]);
+  }, [canSwitchSector]);
 
   useEffect(() => {
     if (!open) return;
@@ -32,9 +33,10 @@ export default function SectorSwitcher() {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  if (!isAdmin) return null;
+  if (!canSwitchSector) return null;
 
   const currentSector = sectores.find(s => s.clave === currentSectorId);
+  const currentSectorName = currentSector?.nombre || currentSectorId;
 
   const handleSwitch = async (sectorClave, sectorNombre) => {
     if (sectorClave === currentSectorId) { setOpen(false); return; }
@@ -58,7 +60,10 @@ export default function SectorSwitcher() {
       >
         <span className="text-base leading-none">{currentSector?.icono || '🏢'}</span>
         <span className="font-medium max-w-[100px] truncate hidden sm:inline">
-          {currentSector?.nombre || currentSectorId}
+          {currentSectorName}
+        </span>
+        <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase tracking-wide">
+          Viendo: {currentSectorName}
         </span>
         <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} />
       </button>
@@ -76,6 +81,7 @@ export default function SectorSwitcher() {
             ) : (
               sectores.map(s => {
                 const isCurrent = s.clave === currentSectorId;
+                const isOrigin = sectorBase && s.clave === sectorBase;
                 return (
                   <button
                     key={s.id}
@@ -87,7 +93,11 @@ export default function SectorSwitcher() {
                       !s.activo && !isCurrent && "opacity-40"
                     )}
                   >
-                    <span className="text-lg leading-none flex-shrink-0">{s.icono || '🏢'}</span>
+                    {isOrigin ? (
+                      <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 flex-shrink-0" />
+                    ) : (
+                      <span className="text-lg leading-none flex-shrink-0">{s.icono || '🏢'}</span>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{s.nombre}</p>
                       <p className="text-xs text-muted-foreground font-mono truncate">{s.clave}</p>

@@ -82,8 +82,8 @@ export default function Sectores() {
   const handleObservar = async (sectorClave, sectorNombre) => {
     setSwitching(sectorClave);
     try {
-      // Cambiar el sector del usuario actual — esto lo "mete" dentro del sector
-      await base44.auth.updateMe({ sector_id: sectorClave });
+      // Cambiar el sector del usuario actual via función server-side (Modelo B)
+      await base44.functions.invoke('cambiarSectorActivo', { sector_destino: sectorClave });
       toast.success(`Ingresaste al sector: ${sectorNombre}`, { duration: 3000 });
       // Navegar al dashboard para ver los datos del sector
       navigate('/');
