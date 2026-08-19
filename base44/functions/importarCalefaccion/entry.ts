@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
+import { createScopedClient, resolveCallerSector, sectorErrorResponse } from "../../shared/sectorGuard.ts";
 
 
 const TIPO_MAP = {
@@ -106,9 +107,9 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Aislamiento de raíz: el relevamiento cae al sector activo del operador.
-    const callerSector = user.data?.sector_id || user.sector_id;
-    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+    // Aislamiento entre sectores centralizado — ver base44/shared/sectorGuard.ts
+    const callerSector = resolveCallerSector(user);
+    const sb = createScopedClient(base44, callerSector);
 
     const { file_url, periodo, limpiar_anteriores } = await req.json();
     if (!file_url) return Response.json({ error: 'file_url requerido' }, { status: 400 });
@@ -148,8 +149,6 @@ Deno.serve(async (req) => {
       }
     }
     const allRecords = Object.values(unifyMap);
-    // Estampar sector del operador en cada registro (defensa en profundidad)
-    allRecords.forEach(r => { r.sector_id = callerSector; });
 
     // SIEMPRE limpiar todos los registros del mismo período antes de insertar
     // Esto garantiza que no haya duplicados sin importar cuántas veces se reimporte
@@ -157,12 +156,12 @@ Deno.serve(async (req) => {
       const periodoTarget = allRecords[0].periodo;
       let existing = [];
       try {
-        existing = await base44.asServiceRole.entities.EquipamientoCalefaccion.filter({ periodo: periodoTarget, sector_id: callerSector });
+        existing = await sb.entities.EquipamientoCalefaccion.filter({ periodo: periodoTarget });
       } catch (_) {}
       const DEL_BATCH = 50;
       for (let i = 0; i < existing.length; i += DEL_BATCH) {
         const batch = existing.slice(i, i + DEL_BATCH);
-        await Promise.all(batch.map(e => base44.asServiceRole.entities.EquipamientoCalefaccion.delete(e.id)));
+        await Promise.all(batch.map(e => sb.entities.EquipamientoCalefaccion.delete(e.id)));
         if (i + DEL_BATCH < existing.length) await new Promise(r => setTimeout(r, 400));
       }
     }
@@ -172,7 +171,7 @@ Deno.serve(async (req) => {
     const BATCH = 50;
     for (let i = 0; i < allRecords.length; i += BATCH) {
       const batch = allRecords.slice(i, i + BATCH);
-      await base44.asServiceRole.entities.EquipamientoCalefaccion.bulkCreate(batch);
+      await sb.entities.EquipamientoCalefaccion.bulkCreate(batch);
       created += batch.length;
       if (i + BATCH < allRecords.length) await new Promise(r => setTimeout(r, 300));
     }
@@ -192,6 +191,6 @@ Deno.serve(async (req) => {
       }
     });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return sectorErrorResponse(error);
   }
 });
