@@ -71,8 +71,12 @@ Deno.serve(async (req) => {
       if (emp.full_name && (platformNameIsEmail || platformNameDiffers)) {
         userUpdate.full_name = emp.full_name;
       }
+      // El sector de la ficha Employee es la fuente de verdad. Si el User tiene
+      // un sector distinto (stale, p.ej. quedó en 'escuela' pero la ficha es 'bapro'),
+      // reconciliar al sector de la ficha. Esto repara el estado cross-sector
+      // sin necesidad de cambiarSectorActivo manual.
       const currentUserSector = user.data?.sector_id ?? null;
-      if (!currentUserSector && empSector) {
+      if (empSector && empSector !== currentUserSector) {
         userUpdate.sector_id = empSector;
       }
       if (Object.keys(userUpdate).length > 0) {
