@@ -127,6 +127,10 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Aislamiento de raíz: las obras sincronizadas caen al sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
     const { file_url, fix = false } = await req.json();
     if (!file_url) return Response.json({ error: 'file_url requerido' }, { status: 400 });
 
@@ -212,6 +216,7 @@ Deno.serve(async (req) => {
       }
 
       // Crear faltantes en batches
+      for (const p of toCreate) { if (!p.sector_id) p.sector_id = callerSector; }
       for (let b = 0; b < toCreate.length; b += 500) {
         const batch = toCreate.slice(b, b + 500);
         try {

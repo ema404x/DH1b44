@@ -7,6 +7,10 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Aislamiento de raíz: el presupuesto cae al sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
     const { file_url, archivo_nombre } = await req.json();
     if (!file_url) return Response.json({ error: 'file_url required' }, { status: 400 });
 
@@ -158,6 +162,7 @@ REGLAS CRÍTICAS:
 
     // 6. Guardar en BD
     const nuevo = await base44.asServiceRole.entities.PresupuestoObraEnhanced.create({
+      sector_id: callerSector,
       titulo: datos.titulo,
       codigo: datos.codigo,
       licitacion: datos.licitacion || '',

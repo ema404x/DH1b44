@@ -9,6 +9,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Aislamiento de raíz: el import cae al sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
     const { fileUrl, comunaId } = await req.json();
 
     if (!fileUrl || !comunaId) {
@@ -91,6 +95,7 @@ Deno.serve(async (req) => {
       try {
         // Crear dirección
         const direccionRes = await base44.asServiceRole.entities.Direccion.create({
+          sector_id: callerSector,
           direccion: data.direccion,
           comuna: data.comuna,
           jefe_sitio: data.jefe_sitio,
@@ -107,6 +112,7 @@ Deno.serve(async (req) => {
           await base44.asServiceRole.entities.LocationData.create({
             ...escuela,
             direccion_id: direccionRes.id,
+            sector_id: callerSector,
           });
           escuelasCreadas++;
         }

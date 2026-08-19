@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
           if (existing.length > 0) {
             await base44.asServiceRole.entities.LocationData.update(existing[0].id, loc);
           } else {
-            await base44.asServiceRole.entities.LocationData.create(loc);
+            await base44.asServiceRole.entities.LocationData.create({ ...loc, sector_id: loc.sector_id || callerSector });
           }
           imported++;
         } catch (err) {

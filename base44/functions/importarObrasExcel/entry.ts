@@ -64,6 +64,10 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Aislamiento de raíz: las obras importadas caen al sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
     let body;
     try {
       body = await req.json();
@@ -255,7 +259,8 @@ Deno.serve(async (req) => {
     let errors = 0;
     const errorDetails = [];
 
-    // Creaciones
+    // Creaciones — estampar sector del operador antes de bulkCreate (defensa en profundidad)
+    for (const p of toCreate) { if (!p.sector_id) p.sector_id = callerSector; }
     for (let b = 0; b < toCreate.length; b += BATCH_SIZE) {
       const batch = toCreate.slice(b, b + BATCH_SIZE);
       try {

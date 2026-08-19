@@ -8,6 +8,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Aislamiento de raíz: las órdenes de rutina caen al sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     const mesActual = hoy.getMonth() + 1; // 1-12
@@ -75,6 +79,7 @@ Deno.serve(async (req) => {
       fechaLimite.setDate(fechaLimite.getDate() + plazo);
 
       await base44.asServiceRole.entities.OrdenRutina.create({
+        sector_id: callerSector,
         rutina_edificio_id: re.id,
         edificio_id: re.edificio_id,
         edificio_nombre: re.edificio_nombre || '',
