@@ -61,7 +61,10 @@ Deno.serve(async (req) => {
     // Escribir solo al campo plano (sector_id) NO lo ve la RLS.
     const sectorBaseActual = user.data?.sector_base ?? null;
     const sectorIdActual = user.data?.sector_id ?? user.sector_id ?? null;
-    const updatePayload = { data: { sector_id: sector_destino } };
+    // Sincronizar AMBOS campos: data.sector_id (canónico, lo lee la RLS) Y el top-level
+    // sector_id (legacy, aún leído por algunos lectores frontend). Mantenerlos
+    // consistentes evita que un sector stale top-level oculte datos del sector real.
+    const updatePayload = { sector_id: sector_destino, data: { sector_id: sector_destino } };
     if (!sectorBaseActual && sectorIdActual) {
       updatePayload.data.sector_base = sectorIdActual;
     }
