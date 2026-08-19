@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
-import { isAdminLevelRole, isFieldRole } from "../../shared/roles.ts";
+import { isFieldRole } from "../../shared/roles.ts";
 
 /**
  * Devuelve las OTs que el usuario actual puede ver.
@@ -39,7 +39,12 @@ export default async function(req) {
     const employeeRole = (employee?.role || '').toLowerCase().trim();
     const employeeName = employee?.full_name || user.full_name || '';
 
-    // Verificar permiso admin_view para WorkOrder (configurado en Control de Acceso)
+    // Verificar permiso admin_view para WorkOrder (configurado en Control de Acceso).
+    // admin_view (Ver Todo) es la ÚNICA llave — además de platformRole === 'admin' —
+    // para que gerente/gerencia/administrativo vean todas las OTs del sector. Antes
+    // se sumaban heurísticas (platformRole === 'gerente' + isAdminLevelRole) que
+    // volvían redundante al checkbox "Ver Todo": esos roles veían todo igual aunque
+    // estuviera desmarcado. Ahora el permiso explícito gobierna la visibilidad total.
     let hasAdminView = false;
     if (employee?.role) {
       const rolePerms = await base44.asServiceRole.entities.RolePermission.filter({});
@@ -48,11 +53,10 @@ export default async function(req) {
       hasAdminView = match?.permissions?.WorkOrder?.admin_view === true;
     }
 
-    // Roles con visibilidad total dentro del sector (definición centralizada en shared/roles.ts)
-    const isAdminLevel = platformRole === 'admin' ||
-                         platformRole === 'gerente' ||
-                         isAdminLevelRole(employeeRole) ||
-                         hasAdminView;
+    // Visibilidad total del sector: solo platformRole === 'admin' (cambia de
+    // sector explícitamente) o el permiso explícito admin_view (Ver Todo).
+    // Sin heurísticas de rol hardcodeadas — el Control de Acceso es la única fuente.
+    const isAdminLevel = platformRole === 'admin' || hasAdminView;
     const isField = isFieldRole(employeeRole);
 
     // Query WorkOrders via service role (bypassing RLS).
