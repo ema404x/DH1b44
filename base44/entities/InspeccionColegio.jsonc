@@ -91,6 +91,11 @@
               }
             },
             {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
               "created_by_id": "{{user.id}}"
             },
             {
