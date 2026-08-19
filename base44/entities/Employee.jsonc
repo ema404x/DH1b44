@@ -14,8 +14,7 @@
     },
     "sector_id": {
       "type": "string",
-      "default": "escuela",
-      "description": "Sector/unidad de negocio del empleado. Determina el aislamiento de datos entre sectores. Se sincroniza al usuario de plataforma al iniciar sesi\u00f3n. Valor libre definido en la entidad Sector."
+      "description": "Sector/unidad de negocio del empleado. Determina el aislamiento de datos entre sectores. Se sincroniza al usuario de plataforma al iniciar sesi\u00f3n. Se estampa desde el creador; sin default."
     },
     "specialty": {
       "type": "string",
