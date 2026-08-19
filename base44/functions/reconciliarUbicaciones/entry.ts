@@ -9,12 +9,19 @@ Deno.serve(async (req) => {
 
     const norm = (s) => (s || '').toLowerCase().trim();
 
-    // Cargar todas las fuentes
-    const [locationData, locationQRs, direcciones] = await Promise.all([
+    // Aislamiento de raíz: solo reconciliar fuentes del sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
+    // Cargar todas las fuentes y scopear al sector del caller
+    const [allLD, allQRs, allDirs] = await Promise.all([
       base44.asServiceRole.entities.LocationData.list('establecimiento', 5000),
       base44.asServiceRole.entities.LocationQR.list('name', 5000),
       base44.asServiceRole.entities.Direccion.list('direccion', 5000),
     ]);
+    const locationData = allLD.filter(x => x.sector_id === callerSector);
+    const locationQRs = allQRs.filter(x => x.sector_id === callerSector);
+    const direcciones = allDirs.filter(x => x.sector_id === callerSector);
 
     // Nombres ya existentes en LocationData
     const ldNames = new Set();

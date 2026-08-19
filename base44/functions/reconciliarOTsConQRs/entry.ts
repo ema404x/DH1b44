@@ -27,6 +27,10 @@ export default async function (req) {
     if (user.role !== 'admin')
       return Response.json({ error: 'Solo admin puede ejecutar reconciliación' }, { status: 403 });
 
+    // Aislamiento de raíz: solo reconciliar OTs y QRs del sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
     let dryRun = false;
     try {
       const body = await req.json();
@@ -35,11 +39,13 @@ export default async function (req) {
       dryRun = false;
     }
 
-    // Cargar OTs y QRs completos (service role, sin RLS)
-    const [ots, qrs] = await Promise.all([
+    // Cargar OTs y QRs completos (service role, sin RLS) — scope al sector del caller
+    const [allOts, allQrs] = await Promise.all([
       base44.asServiceRole.entities.WorkOrder.list('created_date', 5000),
       base44.asServiceRole.entities.LocationQR.list('name', 5000),
     ]);
+    const ots = allOts.filter(o => o.sector_id === callerSector);
+    const qrs = allQrs.filter(q => q.sector_id === callerSector);
 
     const qrById = new Map(qrs.map((q) => [q.id, q]));
     const qrByName = new Map();

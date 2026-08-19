@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
         await sb.entities.Employee.update(emp.id, { email: user.email }).catch(() => {});
       }
       const employeeRole = emp.role || null;
-      const empSector = emp.sector_id || 'escuela';
+      const empSector = emp.sector_id || '';
 
       // Sincronizar rol de plataforma — fire and forget
       syncPlatformRole(user.id, employeeRole, user.role).catch(() => {});
@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
         userUpdate.full_name = emp.full_name;
       }
       const currentUserSector = user.data?.sector_id ?? null;
-      if (!currentUserSector) {
+      if (!currentUserSector && empSector) {
         userUpdate.sector_id = empSector;
       }
       if (Object.keys(userUpdate).length > 0) {
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
       // ── NUNCA DESVINCULAR ──
       // Si no se encontró ficha por user_id ni por email, NO bloquear al usuario.
       // Se retorna linked:true con acceso mínimo (rol 'user', sin employee_id).
-      const fallbackSector = user.data?.sector_id || 'escuela';
+      const fallbackSector = user.data?.sector_id || '';
       return Response.json({
         linked: true,
         employee_id: null,
@@ -125,7 +125,11 @@ Deno.serve(async (req) => {
     // Elegir el empleado a vincular
     let emp;
     if (matches.length > 1) {
+      // Preferir el empleado del MISMO sector que el usuario activo — evita
+      // vincular a una ficha de otro sector y desincronizar la identidad.
+      const currentUserSector = user.data?.sector_id || user.sector_id;
       emp = matches.find(e => e.user_id === user.id)
+         || (currentUserSector ? matches.find(e => e.sector_id === currentUserSector) : null)
          || matches.find(e => e.status === 'activo')
          || matches[0];
       console.warn(`[vincularEmpleado] Múltiples fichas con email ${user.email}: vinculando a ${emp.full_name} (${emp.id})`);
@@ -134,7 +138,7 @@ Deno.serve(async (req) => {
     }
 
     const employeeRole = emp.role || null;
-    const empSector = emp.sector_id || 'escuela';
+    const empSector = emp.sector_id || '';
 
     // Sincronizar rol de plataforma — fire and forget
     syncPlatformRole(user.id, employeeRole, user.role).catch(() => {});
@@ -169,7 +173,7 @@ Deno.serve(async (req) => {
       userUpdate.full_name = emp.full_name;
     }
     const currentUserSector = user.data?.sector_id ?? null;
-    if (!currentUserSector) {
+    if (!currentUserSector && empSector) {
       userUpdate.sector_id = empSector;
     }
     if (Object.keys(userUpdate).length > 0) {

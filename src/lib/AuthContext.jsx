@@ -220,6 +220,11 @@ export const AuthProvider = ({ children }) => {
       setUserPermissions(prev => ({ ...prev, _employeeSector: nuevoSector }));
       queryClientInstance.invalidateQueries();
       queryClientInstance.removeQueries();
+      // Recarga completa para purgar state local stale y forzar sincronización de
+      // todos los módulos con el nuevo sector (RLS hard-AND exige sector exacto).
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
       return nuevoSector;
     } catch (e) {
       throw new Error(e?.message || 'Error al cambiar de sector');

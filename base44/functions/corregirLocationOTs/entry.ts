@@ -8,13 +8,21 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Solo administradores' }, { status: 403 });
     }
 
-    // Cargar todos los datos necesarios en paralelo
-    const [allOTs, locationQRs, direcciones, locationData] = await Promise.all([
+    // Aislamiento de raíz: solo corregir OTs del sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
+    // Cargar todos los datos necesarios en paralelo y scopear al sector del caller
+    const [allOTsRaw, locationQRsRaw, direccionesRaw, locationDataRaw] = await Promise.all([
       base44.asServiceRole.entities.WorkOrder.list('created_date', 5000),
       base44.asServiceRole.entities.LocationQR.list('name', 2000),
       base44.asServiceRole.entities.Direccion.list('direccion', 2000),
       base44.asServiceRole.entities.LocationData.list('establecimiento', 2000),
     ]);
+    const allOTs = allOTsRaw.filter(x => x.sector_id === callerSector);
+    const locationQRs = locationQRsRaw.filter(x => x.sector_id === callerSector);
+    const direcciones = direccionesRaw.filter(x => x.sector_id === callerSector);
+    const locationData = locationDataRaw.filter(x => x.sector_id === callerSector);
 
     // Índices para búsqueda rápida
     const qrById = {};

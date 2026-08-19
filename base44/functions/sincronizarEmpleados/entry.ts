@@ -33,8 +33,16 @@ Deno.serve(async (req) => {
         if (alreadyLinked) {
           emp = alreadyLinked;
         } else {
-          const activeEmployees = matches.filter(e => e.status === 'activo');
-          emp = activeEmployees.length > 0 ? activeEmployees[0] : matches[0];
+          // Preferir el empleado del MISMO sector que el usuario — evita
+          // vincular a una ficha de otro sector y desincronizar la identidad.
+          const userSector = user.data?.sector_id || user.sector_id;
+          const sectorMatch = userSector ? matches.find(e => e.sector_id === userSector) : null;
+          if (sectorMatch) {
+            emp = sectorMatch;
+          } else {
+            const activeEmployees = matches.filter(e => e.status === 'activo');
+            emp = activeEmployees.length > 0 ? activeEmployees[0] : matches[0];
+          }
         }
 
         // Desvinicular los otros
