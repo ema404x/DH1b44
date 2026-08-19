@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Search, Plus, Download, Upload, FileText, Pencil, Trash2, Cpu, Zap, Wind, Droplets, Car, Hammer, Building, Shield, Monitor, Sofa, CheckCircle2, Clock } from 'lucide-react';
-import { differenceInDays, isPast } from 'date-fns';
+import { differenceInDays } from 'date-fns';
 import AssetFormDialog from '@/components/assets/AssetFormDialog';
 import ImportarActivosModal from '@/components/assets/ImportarActivosModal';
 import { exportActivosToExcel, exportActivosToPDF } from '@/utils/exportActivosExcel';

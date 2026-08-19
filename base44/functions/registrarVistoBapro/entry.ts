@@ -1,8 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 // Endpoint PÚBLICO (sin auth) que el banco (BAPRO) usa para marcar un activo
-// (o todos los del lote) como visto. Valida el token + expiración + que el
-// activo pertenezca al lote antes de mutar. Solo escribe campos visto_bapro*.
+// (o todos los del lote) como visto en el mes del lote. Valida token + expiración
+// + pertenencia al lote antes de mutar. Solo escribe campos visto_bapro*.
+//
+// Modelo mes-a-mes: cada marca se registra en vistos_bapro_meses[mes] sin
+// sobrescribir meses previos. El booleano visto_bapro (backward-compat) refleja
+// el último lote visto. vistos_count es idempotente (no acumula re-marcas).
 
 Deno.serve(async (req) => {
   try {
@@ -26,67 +30,84 @@ Deno.serve(async (req) => {
     const activoIds = Array.isArray(tok.activo_ids) ? tok.activo_ids : [];
     const ahora = new Date().toISOString();
     const lote = tok.mes_periodo;
-    let vistosSet = new Set();
+    let vistosCountFinal = tok.vistos_count || 0;
 
-    if (marcar_todos) {
-      // Marcar todos los del lote.
-      let activos = [];
-      if (activoIds.length > 0) {
-        const all = await sb.entities.Asset.filter({ sector_id: tok.sector_id }, '-name', 500).catch(() => []);
-        const idSet = new Set(activoIds);
-        activos = all.filter(a => idSet.has(a.id));
-      } else {
-        const query = tok.sede_scope && tok.sede_scope !== 'TODAS'
-          ? { sector_id: tok.sector_id, location_id: tok.sede_scope }
-          : { sector_id: tok.sector_id };
-        activos = await sb.entities.Asset.filter(query, '-name', 500).catch(() => []);
-      }
-      const updates = activos.map(a => ({
+    // Construye el payload de update mergeando el histórico por mes + campos backward-compat.
+    const buildUpdate = (a) => {
+      const hist = (a.vistos_bapro_meses && typeof a.vistos_bapro_meses === 'object')
+        ? { ...a.vistos_bapro_meses } : {};
+      hist[lote] = { fecha: ahora, por: tok.token };
+      return {
         id: a.id,
+        vistos_bapro_meses: hist,
         visto_bapro: true,
         visto_bapro_fecha: ahora,
         visto_bapro_por: tok.token,
         visto_bapro_lote: lote,
-      }));
+      };
+    };
+
+    // Carga los activos del lote (por IDs explícitos o por scope de sede).
+    const cargarLote = async () => {
+      if (activoIds.length > 0) {
+        const all = await sb.entities.Asset.filter({ sector_id: tok.sector_id }, '-name', 500).catch(() => []);
+        const idSet = new Set(activoIds);
+        return all.filter(a => idSet.has(a.id));
+      }
+      const query = tok.sede_scope && tok.sede_scope !== 'TODAS'
+        ? { sector_id: tok.sector_id, location_id: tok.sede_scope }
+        : { sector_id: tok.sector_id };
+      return sb.entities.Asset.filter(query, '-name', 500).catch(() => []);
+    };
+
+    let marcadosAhora = 0;
+
+    if (marcar_todos) {
+      const activos = await cargarLote();
+      const updates = activos.map(buildUpdate);
       if (updates.length > 0) {
-        await sb.entities.Asset.bulkUpdate(updates).catch(async (err) => {
+        await sb.entities.Asset.bulkUpdate(updates).catch(async () => {
           for (const u of updates) {
             try { await sb.entities.Asset.update(u.id, u); } catch (_) {}
           }
         });
       }
-      vistosSet = new Set(activos.map(a => a.id));
+      // Exacto: todos los del lote quedan vistos para este mes.
+      vistosCountFinal = activos.length;
+      marcadosAhora = activos.length;
     } else {
-      // Marcar un activo individual. Validar que pertenece al lote.
       if (!asset_id) return Response.json({ error: 'asset_id requerido' }, { status: 400 });
+
+      // Validar pertenencia al lote y cargar el activo para merge del histórico.
+      let a = null;
       let pertenece = true;
       if (activoIds.length > 0) {
         pertenece = activoIds.includes(asset_id);
+        if (pertenece) a = await sb.entities.Asset.get(asset_id).catch(() => null);
       } else {
-        const a = await sb.entities.Asset.get(asset_id).catch(() => null);
-        pertenece = a && a.sector_id === tok.sector_id &&
+        a = await sb.entities.Asset.get(asset_id).catch(() => null);
+        pertenece = !!a && a.sector_id === tok.sector_id &&
           (!tok.sede_scope || tok.sede_scope === 'TODAS' || a.location_id === tok.sede_scope);
       }
       if (!pertenece) return Response.json({ error: 'Activo fuera del lote' }, { status: 403 });
+      if (!a) return Response.json({ error: 'Activo no encontrado' }, { status: 404 });
 
-      await sb.entities.Asset.update(asset_id, {
-        visto_bapro: true,
-        visto_bapro_fecha: ahora,
-        visto_bapro_por: tok.token,
-        visto_bapro_lote: lote,
-      }).catch(() => {});
-      vistosSet.add(asset_id);
+      // Idempotente: si ya estaba visto en este mes, no incrementa el contador.
+      const yaVisto = !!(a.vistos_bapro_meses && a.vistos_bapro_meses[lote]);
+      if (!yaVisto) {
+        await sb.entities.Asset.update(asset_id, buildUpdate(a)).catch(() => {});
+        marcadosAhora = 1;
+        vistosCountFinal = (tok.vistos_count || 0) + 1;
+      }
     }
 
-    // Actualizar contador del token.
-    const vistosCount = (tok.vistos_count || 0) + vistosSet.size;
     await sb.entities.RevisionBaproToken.update(tok.id, {
-      vistos_count: vistosCount,
+      vistos_count: vistosCountFinal,
       ultima_actividad: ahora,
       estado: 'usado',
     }).catch(() => {});
 
-    return Response.json({ ok: true, vistos: vistosSet.size, total_vistos: vistosCount });
+    return Response.json({ ok: true, vistos: marcadosAhora, total_vistos: vistosCountFinal });
   } catch (err) {
     console.error('registrarVistoBapro error:', err);
     return Response.json({ error: `Error interno: ${err.message}` }, { status: 500 });

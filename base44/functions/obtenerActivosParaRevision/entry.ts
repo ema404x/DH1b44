@@ -40,24 +40,29 @@ Deno.serve(async (req) => {
       activos = await sb.entities.Asset.filter(query, '-name', 500).catch(() => []);
     }
 
-    // Devolver solo campos seguros (sin documentos internos ni datos sensibles).
-    const safe = activos.map(a => ({
-      id: a.id,
-      name: a.name,
-      code: a.code,
-      type: a.type,
-      brand: a.brand,
-      model: a.model,
-      serial_number: a.serial_number,
-      sede: a.sede,
-      area: a.area,
-      location: a.location,
-      status: a.status,
-      criticality: a.criticality,
-      purchase_cost: a.purchase_cost,
-      visto_bapro: !!a.visto_bapro,
-      visto_bapro_fecha: a.visto_bapro_fecha || null,
-    }));
+    // Devolver solo campos seguros (sin documentos internos, costo de adquisición
+    // ni datos sensibles). El "visto" se calcula por el mes del lote (mes-a-mes).
+    const mes = tok.mes_periodo;
+    const safe = activos.map(a => {
+      const histMes = a.vistos_bapro_meses && a.vistos_bapro_meses[mes];
+      const vistoMes = !!histMes;
+      return {
+        id: a.id,
+        name: a.name,
+        code: a.code,
+        type: a.type,
+        brand: a.brand,
+        model: a.model,
+        serial_number: a.serial_number,
+        sede: a.sede,
+        area: a.area,
+        location: a.location,
+        status: a.status,
+        criticality: a.criticality,
+        visto_bapro: vistoMes,
+        visto_bapro_fecha: histMes ? histMes.fecha : null,
+      };
+    });
 
     return Response.json({
       ok: true,

@@ -9,7 +9,7 @@ const TYPE_MAP = {
   'hvac': 'instalacion_hvac', 'climatizacion': 'instalacion_hvac', 'climatización': 'instalacion_hvac', 'instalacion_hvac': 'instalacion_hvac',
   'sanitario': 'instalacion_sanitaria', 'instalacion_sanitaria': 'instalacion_sanitaria', 'plomeria': 'instalacion_sanitaria',
   'estructura': 'estructura',
-  'vehiculo': 'vehipo', 'vehículo': 'vehiculo',
+  'vehiculo': 'vehiculo', 'vehículo': 'vehiculo',
   'herramienta': 'herramienta',
   'informatico': 'sistemas_informaticos', 'informático': 'sistemas_informaticos', 'sistemas_informaticos': 'sistemas_informaticos', 'computacion': 'sistemas_informaticos',
   'mobiliario': 'mobiliario', 'mobiliario': 'mobiliario',
@@ -180,6 +180,7 @@ Deno.serve(async (req) => {
     const parseErrors = [];
     const toCreate = [];
     const toUpdate = [];
+    let duplicados = 0;
 
     for (let i = headerRowIdx + 1; i < raw.length; i++) {
       const row = raw[i];
@@ -228,15 +229,18 @@ Deno.serve(async (req) => {
         notes: colNotes >= 0 && row[colNotes] ? String(row[colNotes]).trim().slice(0, 1000) : '',
       };
 
-      // Dedup por code (si existe), sino por name+tipo.
-      let matchKey = null;
-      if (code) matchKey = normKey(code);
+      // Dedup por code contra DB existente y contra filas ya procesadas del mismo archivo.
+      const matchKey = code ? normKey(code) : null;
       const existingAsset = matchKey ? existingByCode.get(matchKey) : null;
-      if (existingAsset) {
+      if (existingAsset && existingAsset.id && existingAsset.id !== 'pending') {
+        // Existe en DB → actualizar.
         toUpdate.push({ id: existingAsset.id, ...asset });
+      } else if (existingAsset && existingAsset.id === 'pending') {
+        // Duplicado dentro del mismo Excel → ignorar (ya se creó arriba).
+        duplicados++;
       } else {
         toCreate.push(asset);
-        if (code) existingByCode.set(matchKey, { id: 'pending', ...asset });
+        if (matchKey) existingByCode.set(matchKey, { id: 'pending', ...asset });
       }
     }
 
@@ -275,6 +279,7 @@ Deno.serve(async (req) => {
       updated,
       errors,
       errorDetails: errorDetails.slice(0, 20),
+      duplicados,
       sedesResueltas: sedes.length,
     });
   } catch (err) {

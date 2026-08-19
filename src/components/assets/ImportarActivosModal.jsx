@@ -89,7 +89,7 @@ export default function ImportarActivosModal({ open, onOpenChange }) {
               <div className="flex items-center gap-2 text-sm font-medium text-emerald-600">
                 <CheckCircle2 className="h-4 w-4" /> Importación completada
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+              <div className="grid grid-cols-4 gap-2 text-center text-xs">
                 <div className="rounded bg-background/60 p-2">
                   <div className="text-lg font-bold text-emerald-600 tabular-nums">{result.created || 0}</div>
                   <div className="text-muted-foreground">Creados</div>
@@ -97,6 +97,10 @@ export default function ImportarActivosModal({ open, onOpenChange }) {
                 <div className="rounded bg-background/60 p-2">
                   <div className="text-lg font-bold text-blue-600 tabular-nums">{result.updated || 0}</div>
                   <div className="text-muted-foreground">Actualizados</div>
+                </div>
+                <div className="rounded bg-background/60 p-2">
+                  <div className="text-lg font-bold text-amber-600 tabular-nums">{result.duplicados || 0}</div>
+                  <div className="text-muted-foreground">Duplicados</div>
                 </div>
                 <div className="rounded bg-background/60 p-2">
                   <div className="text-lg font-bold text-destructive tabular-nums">{result.errors || 0}</div>

@@ -114,20 +114,36 @@
     "visto_bapro": {
       "type": "boolean",
       "default": false,
-      "description": "Marcado por el banco (BAPRO) v\u00eda link compartido. Solo escribible por el endpoint p\u00fablico validado."
+      "description": "Marcado por el banco (BAPRO) v\u00eda link compartido. Booleano global: true si fue visto en alg\u00fan mes. Para granularidad mes a mes ver vistos_bapro_meses."
     },
     "visto_bapro_fecha": {
       "type": "string",
       "format": "date-time",
-      "description": "Fecha y hora en que BAPRO tild\u00f3 el visto"
+      "description": "Fecha y hora del \u00faltimo visto BAPRO ( backward-compat)"
     },
     "visto_bapro_por": {
       "type": "string",
-      "description": "Token de la sesi\u00f3n de revisi\u00f3n BAPRO que marc\u00f3 el visto"
+      "description": "Token de la sesi\u00f3n de revisi\u00f3n BAPRO que marc\u00f3 el \u00faltimo visto"
     },
     "visto_bapro_lote": {
       "type": "string",
-      "description": "Lote/per\u00edodo de revisi\u00f3n BAPRO (mes_periodo del token)"
+      "description": "Mes del \u00faltimo lote de revisi\u00f3n BAPRO ( backward-compat)"
+    },
+    "vistos_bapro_meses": {
+      "type": "object",
+      "description": "Hist\u00f3rico de revisiones BAPRO por mes. Clave=YYYY-MM (mes_periodo del token), valor={fecha, por}. Permite revisi\u00f3n mes a mes sin perder hist\u00f3rico ni sobrescribir meses previos.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "por": {
+            "type": "string"
+          }
+        }
+      }
     },
     "sector_id": {
       "type": "string",
