@@ -16,9 +16,13 @@
     "project_name": {
       "type": "string"
     },
+    "asset_id": {
+      "type": "string",
+      "description": "FK al Asset del m\u00f3dulo Activos sobre el que se realiza el trabajo. Vincula la OT con el cat\u00e1logo de activos f\u00edsicos."
+    },
     "asset_name": {
       "type": "string",
-      "description": "Activo/equipo asociado"
+      "description": "Activo/equipo asociado (denormalizado de Asset.name)"
     },
     "location": {
       "type": "string",
@@ -224,7 +228,7 @@
     },
     "validado_por": {
       "type": "string",
-      "description": "Nombre del jefe de sitio que valid\u00f3"
+      "description": "Nombre del jefe de sitio que valid\u00f3 la OT"
     },
     "rechazo_comentario": {
       "type": "string",

@@ -5,7 +5,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useUbicaciones } from '@/hooks/useUbicaciones';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -40,7 +39,7 @@ const TYPES = [
 ];
 
 const STEPS = [
-  { id: 1, label: 'Ubicación' },
+  { id: 1, label: 'Activo' },
   { id: 2, label: 'Detalle' },
   { id: 3, label: 'Materiales' },
 ];
@@ -109,6 +108,7 @@ export default function CrearOT() {
 
   // Form fields
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [selectedAssetId, setSelectedAssetId] = useState(null);
   const [title, setTitle] = useState('');
   const [type, setType] = useState('mantenimiento_correctivo');
   const [priority, setPriority] = useState('media');
@@ -155,51 +155,32 @@ export default function CrearOT() {
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
-  // Hook unificado — trae LocationData + Direccion + LocationQR via service role (sin RLS)
-  // Garantiza que todos los usuarios vean el listado completo de direcciones.
-  const { locations: rawLocations = [], locationQRs = [], isLoading: loadingLocations } = useUbicaciones();
-  // Alias para compatibilidad con handleSelectLocation (fallback por dirección)
-  const direcciones = rawLocations;
+  // Activos del módulo Activos — la OT se vincula a un activo físico (equipo).
+  // El activo arrastra su sede, jefe de sitio y proyecto.
+  const { data: assetsRaw = [], isLoading: loadingAssets } = useQuery({
+    queryKey: ['assets-ot-select'],
+    queryFn: () => base44.entities.Asset.list('-name', 500),
+    staleTime: 120000,
+  });
 
-  // Construir lista unificada de ubicaciones para el buscador.
-  // El join LocationData ↔ Direccion ya viene hecho desde el backend.
-  const activeLocations = useMemo(() => {
-    const norm = s => (s || '').toLowerCase().trim();
-    const matchedQRNames = new Set();
-
-    // 1. LocationData con dirección y QR ya resueltos
-    const fromLD = rawLocations.map(ld => {
-      if (ld.location_qr_id) matchedQRNames.add(norm(ld.establecimiento));
-      return {
-        id: ld.location_qr_id || ld.id,
-        name: ld.establecimiento || ld.ubic_tecnica,
-        address: ld.direccion || '',
-        jefe_sitio: ld.jefe_sitio || '',
-        inspector: ld.inspector || '',
-        comuna: ld.comuna || '',
-        project_name: ld.project_name || '',
-        _locationDataId: ld.id,
-        _hasQR: ld._hasQR,
-      };
-    });
-
-    // 2. LocationQR sin LocationData — también deben aparecer en el buscador
-    const fromQR = locationQRs
-      .filter(q => q.is_active !== false && !matchedQRNames.has(norm(q.name)))
-      .map(q => ({
-        id: q.id,
-        name: q.name,
-        address: q.address || '',
-        jefe_sitio: '',
-        inspector: '',
-        comuna: '',
-        project_name: q.project_name || '',
-        _locationDataId: null,
-        _hasQR: true,
-      }));
-
-    return [...fromLD, ...fromQR];
-  }, [rawLocations, locationQRs]);
+  // Lista de activos para el buscador (excluye los dados de baja).
+  const activeAssets = useMemo(
+    () => (assetsRaw || [])
+      .filter(a => a.status !== 'baja')
+      .map(a => ({
+        id: a.id,
+        name: a.name,
+        sede: a.sede || '',
+        area: a.area || '',
+        type: a.type,
+        status: a.status,
+        criticality: a.criticality,
+        jefe_sitio: a.jefe_sitio || '',
+        project_name: a.project_name || '',
+        code: a.code || '',
+      })),
+    [assetsRaw]
+  );
 
   // Empleados activos para asignación responsable
   const { data: employees = [] } = useQuery({
@@ -245,45 +226,45 @@ export default function CrearOT() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
-  const handleSelectLocation = useCallback((loc) => {
+  // Selecciona un activo del módulo Activos y mapea sus datos a la OT.
+  // El activo arrastra sede, área, jefe de sitio y proyecto.
+  const handleSelectAsset = useCallback((asset) => {
+    const loc = {
+      id: asset.id,
+      name: asset.name,
+      address: [asset.sede, asset.area].filter(Boolean).join(' · '),
+      jefe_sitio: asset.jefe_sitio || '',
+      project_name: asset.project_name || '',
+      _asset: asset,
+    };
     setSelectedLocation(loc);
-    setLocationSearch(loc.address?.trim() || loc.name?.trim() || '');
+    setSelectedAssetId(asset.id);
+    setLocationSearch(loc.address || asset.name || '');
     setShowSuggestions(false);
-
-    // El jefe ya viene normalizado desde LocationData en activeLocations.
-    // Fallback: buscar en Direccion si no viene en el objeto.
-    let jefe = loc.jefe_sitio || '';
-    if (!jefe) {
-      const locAddr = loc.address?.toLowerCase().trim() || '';
-      const locName = loc.name?.toLowerCase().trim() || '';
-      const dirMatch = direcciones.find(d =>
-        (locAddr && d.direccion?.toLowerCase().trim() === locAddr) ||
-        (locName && d.direccion?.toLowerCase().trim() === locName)
-      );
-      jefe = dirMatch?.jefe_sitio || '';
-    }
-
-    setAutoJefeSitio(jefe);
-    if (jefe) toast.info(`Jefe de sitio asignado: ${jefe}`);
-  }, [direcciones]);
+    setAutoJefeSitio(asset.jefe_sitio || '');
+    if (asset.jefe_sitio) toast.info(`Jefe de sitio asignado: ${asset.jefe_sitio}`);
+  }, []);
 
   const handleClearLocation = useCallback(() => {
     setSelectedLocation(null);
+    setSelectedAssetId(null);
     setLocationSearch('');
     setShowSuggestions(false);
+    setAutoJefeSitio('');
     setTimeout(() => locationSearchRef.current?.focus(), 50);
   }, []);
 
   const filteredSuggestions = useMemo(() => {
     const q = locationSearch.toLowerCase();
-    return activeLocations.filter(l =>
+    return activeAssets.filter(a =>
       !q ||
-      l.name?.toLowerCase().includes(q) ||
-      l.address?.toLowerCase().includes(q) ||
-      l.inspector?.toLowerCase().includes(q) ||
-      l.jefe_sitio?.toLowerCase().includes(q)
+      a.name?.toLowerCase().includes(q) ||
+      a.sede?.toLowerCase().includes(q) ||
+      a.area?.toLowerCase().includes(q) ||
+      a.code?.toLowerCase().includes(q) ||
+      a.jefe_sitio?.toLowerCase().includes(q)
     ).slice(0, 10);
-  }, [activeLocations, locationSearch]);
+  }, [activeAssets, locationSearch]);
 
   // Close suggestions on outside click
   useEffect(() => {
@@ -404,7 +385,8 @@ export default function CrearOT() {
         tipo: 'obra',
         estado: 'pendiente',
         prioridad: priority,
-        establecimiento: selectedLocation?.name || '',
+        establecimiento: selectedLocation?._asset?.sede || selectedLocation?.name || '',
+        activo_nombre: selectedLocation?.name || '',
         sitio: locationLabel,
         jefe_sitio: autoJefeSitio || '',
         materiales_necesarios: materials.filter(m => m.material_name.trim()).map(m => m.material_name).join(', '),
@@ -423,8 +405,8 @@ export default function CrearOT() {
         materials_used: materials.filter(m => m.material_name.trim()),
         require_photos: requirePhotos,
         photos,
-        location_qr_id: selectedLocation?.id || '',
-        location_qr_name: selectedLocation?.name || '',
+        asset_id: selectedAssetId || undefined,
+        asset_name: selectedLocation?.name || '',
         location: locationLabel,
         project_name: selectedLocation?.project_name || '',
         assigned_name: responsable || undefined,
@@ -439,6 +421,7 @@ export default function CrearOT() {
     setCreatedOT(null);
     setShowQR(false);
     setSelectedLocation(null);
+    setSelectedAssetId(null);
     setLocationSearch('');       // ← fix: limpiar el input de búsqueda
     setShowSuggestions(false);
     setTitle('');
@@ -575,11 +558,11 @@ export default function CrearOT() {
         {/* ── PASO 1: Ubicación ──────────────────────────────────────────────── */}
         {step === 1 && (
           <div className="space-y-5">
-            <SectionTitle icon={MapPin} label="¿En qué establecimiento?" sub="Seleccioná la ubicación donde se realizará el trabajo" />
+            <SectionTitle icon={Wrench} label="¿Qué activo intervenir?" sub="Seleccioná el equipo/activo del módulo Activos sobre el que se trabajará" />
 
-            {loadingLocations ? (
+            {loadingAssets ? (
               <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
-                <Loader2 className="h-4 w-4 animate-spin" /> Cargando establecimientos...
+                <Loader2 className="h-4 w-4 animate-spin" /> Cargando activos...
               </div>
             ) : (
               <div className="space-y-2">
@@ -593,12 +576,13 @@ export default function CrearOT() {
                       setLocationSearch(e.target.value);
                       if (selectedLocation) {
                         setSelectedLocation(null);
+                        setSelectedAssetId(null);
                         setAutoJefeSitio('');
                       }
                       setShowSuggestions(true);
                     }}
                     onFocus={() => setShowSuggestions(true)}
-                    placeholder="Escribí para buscar establecimiento..."
+                    placeholder="Escribí para buscar activo (nombre, sede, código)..."
                     className="bg-card border-border text-foreground h-12 pl-9 pr-9"
                   />
                   {locationSearch && (
@@ -612,18 +596,21 @@ export default function CrearOT() {
 
                   {/* Dropdown de sugerencias */}
                   {showSuggestions && filteredSuggestions.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden">
-                      {filteredSuggestions.map(loc => (
+                    <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden max-h-80 overflow-y-auto">
+                      {filteredSuggestions.map(a => (
                         <button
-                          key={loc.id}
-                          onMouseDown={() => handleSelectLocation(loc)}
+                          key={a.id}
+                          onMouseDown={() => handleSelectAsset(a)}
                           className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-accent transition-colors border-b border-border/50 last:border-0"
                         >
-                          <MapPin className="h-4 w-4 text-primary shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{loc.name}</p>
-                            {loc.address && <p className="text-xs text-muted-foreground truncate">{loc.address}</p>}
+                          <Wrench className="h-4 w-4 text-primary shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground truncate">{a.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {[a.sede, a.area].filter(Boolean).join(' · ') || 'Sin sede asignada'}
+                            </p>
                           </div>
+                          {a.code && <span className="text-[10px] font-mono text-muted-foreground shrink-0">{a.code}</span>}
                         </button>
                       ))}
                     </div>
@@ -650,14 +637,14 @@ export default function CrearOT() {
                       </p>
                     )}
                     {selectedLocation && !autoJefeSitio && (
-                      <p className="text-amber-400/80 text-xs mt-1">Sin jefe de sitio vinculado a esta ubicación</p>
+                      <p className="text-amber-400/80 text-xs mt-1">El activo no tiene jefe de sitio asignado</p>
                     )}
                   </div>
                 )}
 
                 {!selectedLocation && !locationSearch && (
                   <p className="text-xs text-muted-foreground text-center py-2">
-                    La ubicación es opcional — podés continuar sin seleccionarla
+                    El activo es opcional — podés continuar sin seleccionarlo
                   </p>
                 )}
               </div>
@@ -931,7 +918,7 @@ export default function CrearOT() {
               <SummaryRow label="Título" value={title} />
               <SummaryRow label="Tipo" value={TYPES.find(t => t.value === type)?.label} />
               <SummaryRow label="Prioridad" value={priority.charAt(0).toUpperCase() + priority.slice(1)} />
-              {selectedLocation && <SummaryRow label="Establecimiento" value={selectedLocation.name} />}
+              {selectedLocation && <SummaryRow label="Activo" value={selectedLocation.name} />}
               {assignedName && <SummaryRow label="Persona a cargo" value={assignedName} />}
               {autoJefeSitio && !assignedName && <SummaryRow label="Jefe de sitio (auto)" value={autoJefeSitio} />}
               {scheduledDate && <SummaryRow label="Fecha programada" value={scheduledDate} />}
