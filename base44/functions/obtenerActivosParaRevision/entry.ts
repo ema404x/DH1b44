@@ -40,6 +40,30 @@ Deno.serve(async (req) => {
       activos = await sb.entities.Asset.filter(query, '-name', 500).catch(() => []);
     }
 
+    // Cargar OTs vinculadas a los activos del lote (misma sector) para mostrar
+    // el historial de mantenimiento al banco. Solo campos operativos, no sensibles.
+    const assetIds = activos.map(a => a.id);
+    const otsByAsset = {};
+    if (assetIds.length > 0) {
+      const allOts = await sb.entities.WorkOrder.filter({ sector_id: tok.sector_id }, '-created_date', 200).catch(() => []);
+      const idSet = new Set(assetIds);
+      for (const o of allOts) {
+        if (o.asset_id && idSet.has(o.asset_id)) {
+          if (!otsByAsset[o.asset_id]) otsByAsset[o.asset_id] = [];
+          otsByAsset[o.asset_id].push({
+            title: o.title,
+            code: o.code,
+            type: o.type,
+            status: o.status,
+            priority: o.priority,
+            scheduled_date: o.scheduled_date,
+            completed_date: o.completed_date,
+            assigned_name: o.assigned_name,
+          });
+        }
+      }
+    }
+
     // Devolver solo campos seguros (sin documentos internos, costo de adquisición
     // ni datos sensibles). El "visto" se calcula por el mes del lote (mes-a-mes).
     const mes = tok.mes_periodo;
@@ -61,6 +85,7 @@ Deno.serve(async (req) => {
         criticality: a.criticality,
         visto_bapro: vistoMes,
         visto_bapro_fecha: histMes ? histMes.fecha : null,
+        ots: otsByAsset[a.id] || [],
       };
     });
 

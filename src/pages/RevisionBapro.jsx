@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, CheckCircle2, ShieldCheck, Building2, Clock, AlertTriangle, FileWarning } from 'lucide-react';
+import { Loader2, CheckCircle2, ShieldCheck, Building2, Clock, AlertTriangle, FileWarning, Wrench } from 'lucide-react';
 
 const typeLabels = {
   equipo_electrico: 'Equipo eléctrico', equipo_mecanico: 'Equipo mecánico', instalacion_hvac: 'Climatización (HVAC)',
@@ -11,6 +11,16 @@ const typeLabels = {
 };
 const statusLabels = {
   operativo: 'Operativo', en_mantenimiento: 'En mantenimiento', fuera_de_servicio: 'Fuera de servicio', baja: 'Baja',
+};
+const otStatusLabels = {
+  pendiente: 'Pendiente', asignada: 'Asignada', en_progreso: 'En progreso', obra: 'En obra',
+  pendiente_validacion: 'P. validación', completada: 'Completada', cancelada: 'Cancelada',
+};
+const otStatusStyles = {
+  pendiente: 'bg-slate-100 text-slate-600', asignada: 'bg-blue-100 text-blue-700',
+  en_progreso: 'bg-amber-100 text-amber-700', obra: 'bg-amber-100 text-amber-700',
+  pendiente_validacion: 'bg-violet-100 text-violet-700', completada: 'bg-emerald-100 text-emerald-700',
+  cancelada: 'bg-red-100 text-red-700',
 };
 
 export default function RevisionBapro() {
@@ -193,6 +203,22 @@ export default function RevisionBapro() {
                     <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1">
                       <CheckCircle2 className="h-3 w-3" /> Visto el {new Date(a.visto_bapro_fecha).toLocaleString('es-AR')}
                     </p>
+                  )}
+                  {Array.isArray(a.ots) && a.ots.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-slate-100">
+                      <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1 mb-1">
+                        <Wrench className="h-3 w-3" /> Órdenes de trabajo ({a.ots.length})
+                      </p>
+                      <div className="space-y-1">
+                        {a.ots.map((o, i) => (
+                          <div key={i} className="text-[11px] text-slate-600 flex items-center gap-2 flex-wrap">
+                            <span className={`px-1.5 py-0.5 rounded font-medium ${otStatusStyles[o.status] || 'bg-slate-100 text-slate-600'}`}>{otStatusLabels[o.status] || o.status}</span>
+                            <span className="font-medium text-slate-700">{o.title}</span>
+                            {o.scheduled_date && <span className="text-slate-400">· {new Date(o.scheduled_date).toLocaleDateString('es-AR')}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
                 <div className="flex-shrink-0">
