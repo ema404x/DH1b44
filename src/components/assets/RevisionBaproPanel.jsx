@@ -42,9 +42,10 @@ export default function RevisionBaproPanel({ sedes }) {
         dias_expiracion: parseInt(dias, 10) || 30,
         notas,
       });
-      setGeneratedLink(res.link);
+      const body = res?.data ?? res;
+      setGeneratedLink(body.link);
       qc.invalidateQueries({ queryKey: ['bapro_tokens'] });
-      toast.success(`Link generado para ${res.total_activos} activos`);
+      toast.success(`Link generado para ${body.total_activos} activos`);
     } catch (err) {
       toast.error(err.message || 'Error al generar link');
     } finally {

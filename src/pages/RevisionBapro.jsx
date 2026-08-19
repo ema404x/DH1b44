@@ -36,8 +36,9 @@ export default function RevisionBapro() {
     setError(null);
     try {
       const res = await base44.functions.invoke('obtenerActivosParaRevision', { token });
-      if (res?.error) { setError(res.error); return; }
-      setData(res);
+      const body = res?.data ?? res;
+      if (body?.error) { setError(body.error); return; }
+      setData(body);
     } catch (err) {
       setError(err.message || 'Error al cargar');
     } finally {
