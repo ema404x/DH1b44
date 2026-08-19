@@ -23,6 +23,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { usePermission } from '@/hooks/usePermission';
 import { useToast } from '@/components/ui/use-toast';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { getActiveSectorId, withActiveSector } from '@/lib/sectorContext';
 
 const roleLabels = {
   operario: 'Operario', tecnico: 'Técnico', capataz: 'Capataz', supervisor: 'Supervisor',
@@ -71,7 +72,8 @@ export default function Employees() {
   const { allowed: canCreate } = usePermission('Employee', 'create');
   const { allowed: canDelete } = usePermission('Employee', 'delete');
   const { currentUser } = useCurrentUser();
-  const activeSectorId = currentUser?.sector_id || currentUser?.data?.sector_id || 'escuela';
+  // Sector activo resuelto de forma central (fail-closed, sin default 'escuela').
+  const activeSectorId = getActiveSectorId(currentUser);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [onlyIssues, setOnlyIssues] = useState(false);
@@ -82,7 +84,15 @@ export default function Employees() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: employees = [], isLoading } = useQuery({ queryKey: ['employees'], queryFn: () => base44.entities.Employee.list('-created_date') });
+  const { data: employees = [], isLoading } = useQuery({
+    queryKey: ['employees', activeSectorId],
+    // Scope explícito por sector además de la RLS. La RLS tiene una rama self
+    // (data.user_id) que no valida sector y deja ver la propia ficha de otro
+    // sector al switchearte. Este filtro cierra esa fuga en la grilla.
+    queryFn: () => activeSectorId
+      ? base44.entities.Employee.filter({ sector_id: activeSectorId }, '-created_date')
+      : base44.entities.Employee.list('-created_date'),
+  });
   const { data: locations = [] } = useQuery({ queryKey: ['locations'], queryFn: () => base44.entities.LocationData.list('-created_date', 500) });
   const { data: rolePermissions = [] } = useQuery({ queryKey: ['rolePermissions'], queryFn: () => base44.entities.RolePermission.list() });
   const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => base44.entities.User.list('-created_date', 500) });
@@ -187,9 +197,9 @@ export default function Employees() {
   const saveMutation = useMutation({
     mutationFn: (data) => {
       if (editing) return base44.entities.Employee.update(editing.id, data);
-      // Al crear, estampar el sector activo del usuario (si no, el default del schema
-      // siempre manda a "escuela" y el empleado queda en el sector equivocado).
-      return base44.entities.Employee.create({ ...data, sector_id: data.sector_id || activeSectorId });
+      // Estampa el sector activo de forma central (fail-closed). Si no se resuelve,
+      // no se inventa 'escuela' — el backend stampSectorOnCreate lo marca SIN_SECTOR.
+      return base44.entities.Employee.create(withActiveSector(data, currentUser));
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['employees'] }); setDialogOpen(false); setEditing(null); },
     onError: (err) => {
