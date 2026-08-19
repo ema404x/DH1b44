@@ -30,7 +30,7 @@ import { es } from 'date-fns/locale';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
-const panel = "rounded-2xl border border-border bg-card shadow-sm p-4";
+const panel = "rounded-2xl border border-border bg-card shadow-sm p-6";
 
 const STATUS_COLORS = {
   pendiente:   { dot: 'bg-yellow-400', text: 'text-yellow-400' },
@@ -48,19 +48,20 @@ const PRIORITY_COLORS = {
 };
 
 const KPI_COLORS = {
-  blue:    { icon: 'bg-blue-500/15 text-blue-300' },
-  amber:   { icon: 'bg-amber-500/15 text-amber-300' },
-  green:   { icon: 'bg-emerald-500/15 text-emerald-300' },
-  purple:  { icon: 'bg-purple-500/15 text-purple-300' },
-  red:     { icon: 'bg-red-500/15 text-red-300' },
-  primary: { icon: 'bg-primary/15 text-primary' },
+  blue:    { icon: 'bg-blue-500/15 text-blue-300',      top: 'border-t-blue-400' },
+  amber:   { icon: 'bg-amber-500/15 text-amber-300',    top: 'border-t-amber-400' },
+  green:   { icon: 'bg-emerald-500/15 text-emerald-300', top: 'border-t-emerald-400' },
+  purple:  { icon: 'bg-purple-500/15 text-purple-300',  top: 'border-t-purple-400' },
+  red:     { icon: 'bg-red-500/15 text-red-300',        top: 'border-t-red-400' },
+  gold:    { icon: 'bg-amber-500/15 text-amber-300',    top: 'border-t-amber-400' },
+  primary: { icon: 'bg-primary/15 text-primary',         top: 'border-t-primary' },
 };
 
 function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, href, alert }) {
   const cfg = KPI_COLORS[color] || KPI_COLORS.blue;
   const inner = (
     <div className="h-full group">
-      <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm p-5 h-full transition-all hover:shadow-md hover:-translate-y-0.5 duration-200">
+      <div className={cn("relative overflow-hidden rounded-2xl border border-border bg-card p-6 h-full transition-all hover:shadow-md hover:-translate-y-0.5 duration-200 border-t-[3px]", cfg.top)}>
         <div className="flex items-start justify-between mb-4">
           <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", cfg.icon)}>
             <Icon className="h-5 w-5" />
@@ -91,7 +92,7 @@ function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, hr
 
 function KpiCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm p-5 h-full">
+    <div className="rounded-2xl border border-border bg-card shadow-sm p-6 h-full">
       <div className="flex items-start justify-between mb-4">
         <div className="h-10 w-10 rounded-xl skeleton" />
       </div>
@@ -309,8 +310,6 @@ export default function Dashboard() {
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-background space-y-6 pb-10 page-enter">
-      <AuroraEffect />
-
       {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1">
         <div>
@@ -319,7 +318,7 @@ export default function Dashboard() {
             {format(new Date(), "EEEE d 'de' MMMM, yyyy", { locale: es })}
           </p>
           <h1 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-            {greeting}{firstName ? `, ${firstName}` : ''} <span className="text-2xl">👋</span>
+            {greeting}{firstName ? `, ${firstName}` : ''}
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             {canRead('WorkOrder') && <>{kpiVal(kpis?.pendingOrders, metrics.pendingOrders)} OTs pendientes · {kpiVal(kpis?.inProgressOrders, metrics.inProgressOrders)} en progreso</>}
@@ -329,7 +328,7 @@ export default function Dashboard() {
         {canRead('WorkOrder') && (
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link to="/crear-ot">
-              <Button size="sm" className="gap-1.5">
+              <Button size="sm" className="gap-1.5 bg-amber-500 hover:bg-amber-400 text-amber-950 border-0 shadow-sm">
                 <Zap className="h-3.5 w-3.5" /> Crear OT
               </Button>
             </Link>
@@ -407,16 +406,16 @@ export default function Dashboard() {
         <>
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="OTs Pendientes"   value={kpiVal(kpis?.pendingOrders, metrics.pendingOrders)}          subtitle={`${kpiVal(kpis?.completedThisMonth, metrics.completedThisMonth)} completadas este mes`}  icon={ClipboardList} color="amber"  alert={kpiVal(kpis?.overdueOrders, metrics.overdueOrders) > 0 ? kpiVal(kpis?.overdueOrders, metrics.overdueOrders) : undefined} />}
-          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="En Progreso"      value={kpiVal(kpis?.inProgressOrders, metrics.inProgressOrders)}        subtitle={`${kpiVal(kpis?.efficiency, metrics.efficiency)}% de eficiencia total`}          icon={Activity}      color="purple" />}
+          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="En Progreso"      value={kpiVal(kpis?.inProgressOrders, metrics.inProgressOrders)}        subtitle={`${kpiVal(kpis?.efficiency, metrics.efficiency)}% de eficiencia total`}          icon={Activity}      color="blue" />}
           {canRead('Project')    && <KpiCard href="/proyectos"   title="Proyectos"        value={kpiVal(kpis?.activeProjects, metrics.activeProjects)}         subtitle={`${kpiVal(kpis?.totalProjects, projects.length)} en total`}                          icon={FolderKanban}  color="blue"   />}
-          {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos del Mes" value={fmt(kpiVal(kpis?.revenueThisMonth, metrics.revenueThisMonth))} subtitle={`${fmt(kpiVal(kpis?.pendingInvoices, metrics.pendingInvoices))} por cobrar`}         icon={DollarSign}    color="green"  trend={kpiVal(kpis?.revenueTrend, metrics.revenueTrend)} />}
+          {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos del Mes" value={fmt(kpiVal(kpis?.revenueThisMonth, metrics.revenueThisMonth))} subtitle={`${fmt(kpiVal(kpis?.pendingInvoices, metrics.pendingInvoices))} por cobrar`}         icon={DollarSign}    color="gold"  trend={kpiVal(kpis?.revenueTrend, metrics.revenueTrend)} />}
         </div>
         <div className="h-4" />
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={kpiVal(kpis?.activeClients, metrics.activeClients)}            subtitle={`${kpiVal(kpis?.totalClients, clients.length)} en total`}                        icon={Users}         color="primary" />}
+          {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={kpiVal(kpis?.activeClients, metrics.activeClients)}            subtitle={`${kpiVal(kpis?.totalClients, clients.length)} en total`}                        icon={Users}         color="blue" />}
           {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={kpiVal(kpis?.urgentOrders, metrics.urgentOrders.length)}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={kpiVal(kpis?.urgentOrders, metrics.urgentOrders.length) > 0 ? 'red' : 'green'} />}
           {canRead('Pendientes') && <KpiCard href="/activos"    title="Pendientes SAP"  value={kpiVal(kpis?.pendientesActivos, pendientesKpis.activos)} subtitle={`${kpiVal(kpis?.pendientesResueltos, pendientesKpis.resueltos)} resueltos`} icon={Wrench} color="amber" alert={kpiVal(kpis?.pendientesUrgentes, pendientesKpis.urgentes) > 0 ? kpiVal(kpis?.pendientesUrgentes, pendientesKpis.urgentes) : undefined} />}
-          {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={kpiVal(kpis?.totalMaterials, materials.length)}                  subtitle={`${kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length)} bajo mínimo`}      icon={Package}       color={kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length) > 0 ? 'red' : 'green'} />}
+          {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={kpiVal(kpis?.totalMaterials, materials.length)}                  subtitle={`${kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length)} bajo mínimo`}      icon={Package}       color={kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length) > 0 ? 'red' : 'gold'} />}
         </div>
         </>
         )}
