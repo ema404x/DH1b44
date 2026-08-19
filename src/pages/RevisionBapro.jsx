@@ -245,14 +245,14 @@ export default function RevisionBapro() {
         )}
 
         <footer className="mt-8 pt-4 border-t border-slate-200 text-center text-[11px] text-slate-400 space-y-2">
-          <div className="flex justify-center">
+          <div className="flex justify-center items-center gap-2">
             <img
               src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/36319e6f8_mejoresh.jpg"
-              alt="Mejores"
-              className="h-7 w-auto opacity-60 grayscale-[20%]"
+              alt="Mejores — en mantenimiento, obras y servicios"
+              className="h-11 w-auto opacity-80"
             />
           </div>
-          <p>Portal de revisión seguro · Solo lectura · {activos.length} activos</p>
+          <p className="pt-1">Portal de revisión seguro · Solo lectura · {activos.length} activos</p>
         </footer>
       </main>
     </div>
