@@ -97,37 +97,58 @@
       ]
     },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "user_condition": {
-            "role": "gerente"
-          }
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
         }
       ]
     },
     "update": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "user_condition": {
-            "role": "gerente"
-          }
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
         }
       ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     }
   }
 }
