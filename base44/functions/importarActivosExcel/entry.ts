@@ -207,6 +207,7 @@ Deno.serve(async (req) => {
       const criticidad = colCrit >= 0 && row[colCrit] ? mapEnum(row[colCrit], CRIT_MAP, 'media') : 'media';
 
       const asset = {
+        sector_id: callerSector,
         name: name.slice(0, 255),
         code: code ? code.slice(0, 100) : '',
         type: tipo,
