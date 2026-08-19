@@ -59,7 +59,8 @@ Deno.serve(async (req) => {
       if (!sol) {
         return Response.json({ error: 'Solicitud no encontrada' }, { status: 404 });
       }
-      if (sol.sector_id && sol.sector_id !== callerSector) {
+      // Fail-closed: si la solicitud no tiene sector o no coincide, bloquear.
+      if (sol.sector_id !== callerSector) {
         return Response.json({ error: 'Forbidden: solicitud de otro sector' }, { status: 403 });
       }
       if (!isAdmin && sol.created_by_id !== user.id && sol.jefe_sitio_email !== user.email) {
@@ -91,7 +92,8 @@ Deno.serve(async (req) => {
       if (!sol) {
         return Response.json({ error: 'Solicitud no encontrada' }, { status: 404 });
       }
-      if (sol.sector_id && sol.sector_id !== callerSector) {
+      // Fail-closed: si la solicitud no tiene sector o no coincide, bloquear.
+      if (sol.sector_id !== callerSector) {
         return Response.json({ error: 'Forbidden: solicitud de otro sector' }, { status: 403 });
       }
       if (!isAdmin && sol.created_by_id !== user.id) {

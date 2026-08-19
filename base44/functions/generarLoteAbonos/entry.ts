@@ -206,10 +206,13 @@ Deno.serve(async (req) => {
       }
 
       // ── Verificar duplicado para este mes ───────────────────────────────
+      // Idempotencia scopeada al sector del abono: evita colisión cross-sector si
+      // dos sectores comparten ada_numero/contratista.
       const existingForMonth = await base44.asServiceRole.entities.Certificado.filter({
         ada_numero: abono.ada_numero || '',
         tipo: 'abono_mensual',
         mes_periodo: mes_target,
+        sector_id: abono.sector_id || callerSector,
       });
 
       if (existingForMonth.length > 0 && !regenerar) {

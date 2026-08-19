@@ -347,10 +347,12 @@ Deno.serve(async (req) => {
 
     // Pre-cargar todos los certificados de abono del mes para evitar N+1 queries
     const certDate = new Date(`${certYear}-${String(certMonth).padStart(2, '0')}-01T00:00:00`);
+    // Idempotencia scopeada al sector del admin: evita colisión cross-sector.
     const certsMesActual = await base44.asServiceRole.entities.Certificado.filter({
       mes_periodo: mesFormato,
       tipo: 'abono_mensual',
       generado_automaticamente: true,
+      sector_id: callerSector,
     });
     const certsMesSet = new Set(certsMesActual.map(c => `${c.oc_numero || ''}__${c.contratista}`));
 

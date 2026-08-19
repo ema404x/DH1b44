@@ -60,7 +60,10 @@ export default async function(req) {
     // vieja encontrada por QR, la actualización (status→en_progreso, assigned_to=user.id)
     // bumpa updated_date → la OT burbujea al top-500 y queda visible en "En Progreso".
     // Con -created_date la OT vieja queda fuera del top-500 y "se sale todo" al iniciar.
-    const allOTs = await base44.asServiceRole.entities.WorkOrder.list('-updated_date', 500);
+    // Filtrar por sector server-side: el cap de 500 aplica SOLO al sector del caller,
+    // no al pool global. Antes, si otro sector tenía >500 OTs más recientes, las del
+    // caller quedaban fuera del top-500 y se subreportaban ("se sale todo").
+    const allOTs = await base44.asServiceRole.entities.WorkOrder.filter({ sector_id: userSector }, '-updated_date', 500);
 
     // Filtro 1: sector (aislamiento entre sectores)
     let result = allOTs.filter(ot => (ot.sector_id || 'escuela') === userSector);
