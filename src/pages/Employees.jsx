@@ -22,6 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { usePermission } from '@/hooks/usePermission';
 import { useToast } from '@/components/ui/use-toast';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 const roleLabels = {
   operario: 'Operario', tecnico: 'Técnico', capataz: 'Capataz', supervisor: 'Supervisor',
@@ -69,6 +70,8 @@ export default function Employees() {
   const { allowed: canEdit } = usePermission('Employee', 'update');
   const { allowed: canCreate } = usePermission('Employee', 'create');
   const { allowed: canDelete } = usePermission('Employee', 'delete');
+  const { currentUser } = useCurrentUser();
+  const activeSectorId = currentUser?.sector_id || currentUser?.data?.sector_id || 'escuela';
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [onlyIssues, setOnlyIssues] = useState(false);
@@ -182,8 +185,16 @@ export default function Employees() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data) => editing ? base44.entities.Employee.update(editing.id, data) : base44.entities.Employee.create(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['employees'] }); setDialogOpen(false); setEditing(null); }
+    mutationFn: (data) => {
+      if (editing) return base44.entities.Employee.update(editing.id, data);
+      // Al crear, estampar el sector activo del usuario (si no, el default del schema
+      // siempre manda a "escuela" y el empleado queda en el sector equivocado).
+      return base44.entities.Employee.create({ ...data, sector_id: data.sector_id || activeSectorId });
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['employees'] }); setDialogOpen(false); setEditing(null); },
+    onError: (err) => {
+      toast({ title: 'Error al guardar', description: err?.message || 'No se pudo guardar el empleado.', variant: 'destructive' });
+    }
   });
 
   const deleteMutation = useMutation({

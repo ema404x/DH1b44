@@ -57,11 +57,13 @@ Deno.serve(async (req) => {
     }
 
     // ── Fijar sector_base solo la primera vez (preserva el sector de origen) ──
+    // Escribe a data.sector_id / data.sector_base — la RLS lee {{user.data.sector_id}}.
+    // Escribir solo al campo plano (sector_id) NO lo ve la RLS.
     const sectorBaseActual = user.data?.sector_base ?? null;
     const sectorIdActual = user.data?.sector_id ?? user.sector_id ?? null;
-    const updatePayload = { sector_id: sector_destino };
+    const updatePayload = { data: { sector_id: sector_destino } };
     if (!sectorBaseActual && sectorIdActual) {
-      updatePayload.sector_base = sectorIdActual;
+      updatePayload.data.sector_base = sectorIdActual;
     }
 
     await sb.entities.User.update(user.id, updatePayload);
