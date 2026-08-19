@@ -27,17 +27,20 @@ Deno.serve(async (req) => {
     // Cargar activos del lote.
     const activoIds = Array.isArray(tok.activo_ids) ? tok.activo_ids : [];
     let activos = [];
+    const scopeQuery = tok.sede_scope && tok.sede_scope !== 'TODAS'
+      ? { sector_id: tok.sector_id, location_id: tok.sede_scope }
+      : { sector_id: tok.sector_id };
+
     if (activoIds.length > 0) {
-      // Filtrar por sector del token + IDs explícitos.
+      // Snapshot del lote: filtrar por sector del token + IDs explícitos.
       const all = await sb.entities.Asset.filter({ sector_id: tok.sector_id }, '-name', 500).catch(() => []);
       const idSet = new Set(activoIds);
       activos = all.filter(a => idSet.has(a.id));
-    } else {
-      // Scope por sede.
-      const query = tok.sede_scope && tok.sede_scope !== 'TODAS'
-        ? { sector_id: tok.sector_id, location_id: tok.sede_scope }
-        : { sector_id: tok.sector_id };
-      activos = await sb.entities.Asset.filter(query, '-name', 500).catch(() => []);
+    }
+    // Fallback: si el snapshot no devuelve activos (movidos de sector, dados de
+    // baja, o lote vacío), mostrar los activos actuales del sector/sede del mes.
+    if (activos.length === 0) {
+      activos = await sb.entities.Asset.filter(scopeQuery, '-name', 500).catch(() => []);
     }
 
     // Cargar OTs vinculadas a los activos del lote (misma sector) para mostrar
