@@ -22,18 +22,25 @@ Deno.serve(async (req) => {
 
     const updates = {};
 
+    // ── Resolver el sector del registro (data.sector_id o el del creador) ──
+    // Se usa tanto para estampar sector_id si falta como para scopear la
+    // resolución de jefe_sitio_email al MISMO sector. Esto previene la fuga
+    // cross-sector: un "Juan Pérez" del sector B no debe matchear una OT del
+    // sector A (RLS daría visibilidad al jefe del otro sector via email).
+    let recordSector = data.sector_id || null;
+    if (!recordSector && data.created_by_id) {
+      try {
+        const creator = await sb.entities.User.get(data.created_by_id);
+        recordSector = creator?.sector_id || creator?.data?.sector_id || null;
+      } catch (_) { /* queda null */ }
+    }
+
     // ── Stamping de sector_id si falta ──
     // Fallback 'SIN_SECTOR' (NO 'escuela'): un registro cuyo creador no resuelve
     // sector no debe colarse en el sector escuela. El centinela SIN_SECTOR es
     // consistente con el backfill y detectable con un solo filtro.
     if (!data.sector_id) {
-      let sector = 'SIN_SECTOR';
-      if (data.created_by_id) {
-        try {
-          const creator = await sb.entities.User.get(data.created_by_id);
-          sector = creator?.sector_id || creator?.data?.sector_id || 'SIN_SECTOR';
-        } catch (_) { /* queda SIN_SECTOR */ }
-      }
+      const sector = recordSector || 'SIN_SECTOR';
       updates.sector_id = sector;
       if (sector === 'SIN_SECTOR') {
         console.warn(`[stampSectorOnCreate] SIN_SECTOR — entidad=${entityName} id=${entityId} created_by_id=${data.created_by_id || 'ninguno'}`);
@@ -41,10 +48,14 @@ Deno.serve(async (req) => {
     }
 
     // ── Stamping de jefe_sitio y jefe_sitio_email para WorkOrder y Pendiente ──
+    // Scopeado al sector del registro (recordSector). Si no se resolvió sector,
+    // fallback a todos (legacy) — pero ese caso ya queda marcado SIN_SECTOR arriba.
     if ((entityName === 'WorkOrder' || entityName === 'Pendiente') && !data.jefe_sitio_email) {
       try {
         const normalize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-        const allEmployees = await sb.entities.Employee.list('-updated_date', 500);
+        const allEmployees = recordSector
+          ? await sb.entities.Employee.filter({ sector_id: recordSector })
+          : await sb.entities.Employee.list('-updated_date', 500);
 
         // Si jefe_sitio (nombre) está seteado, resolver email por fuzzy matching
         if (data.jefe_sitio) {

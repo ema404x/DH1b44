@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     return Response.json({
       ok: true,
       sector_activo: sector_destino,
-      sector_base: updatePayload.sector_base || sectorBaseActual,
+      sector_base: updatePayload.data.sector_base || sectorBaseActual,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

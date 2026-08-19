@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
               config_id: cfg.id, tipo: 'garantia_activo', nivel, titulo,
               mensaje: `El activo "${asset.name}" tiene su garantía ${diasRestantes < 0 ? 'vencida' : 'por vencer'}.`,
               entidad_tipo: 'Asset', entidad_id: asset.id, entidad_nombre: asset.name,
-              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString()
+              email_enviado: false, leida: false, sector_id: cfgSector, fecha_alerta: ahora.toISOString()
             };
             nuevasAlertas.push(alerta);
             
@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
               config_id: cfg.id, tipo: 'stock_material', nivel, titulo,
               mensaje: `El material "${mat.name}" tiene stock ${mat.stock} (mínimo: ${mat.min_stock}).`,
               entidad_tipo: 'Material', entidad_id: mat.id, entidad_nombre: mat.name,
-              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString()
+              email_enviado: false, leida: false, sector_id: cfgSector, fecha_alerta: ahora.toISOString()
             };
             nuevasAlertas.push(alerta);
             
@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
               mensaje: `El pendiente "${(p.descripcion || p.establecimiento || '')?.substring(0, 60)}" lleva ${diasVencidos} días vencido.`,
               entidad_tipo: 'Pendiente', entidad_id: p.id,
               entidad_nombre: p.establecimiento || p.descripcion?.substring(0, 40) || p.id,
-              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString()
+              email_enviado: false, leida: false, sector_id: cfgSector, fecha_alerta: ahora.toISOString()
             };
             nuevasAlertas.push(alerta);
             
@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
               titulo: `OT vencida hace ${diasVencidos} día${diasVencidos !== 1 ? 's' : ''}`,
               mensaje: `La OT "${ot.title}" (${ot.code || ot.id}) lleva ${diasVencidos} días sin completar.`,
               entidad_tipo: 'WorkOrder', entidad_id: ot.id, entidad_nombre: ot.title,
-              email_enviado: false, leida: false, fecha_alerta: ahora.toISOString()
+              email_enviado: false, leida: false, sector_id: cfgSector, fecha_alerta: ahora.toISOString()
             };
             nuevasAlertas.push(alerta);
             

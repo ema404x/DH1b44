@@ -12,6 +12,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -215,6 +216,7 @@ function ConfigCard({ config, onSave, onDelete, onTest }) {
 
 export default function ConfigAlertas() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [creating, setCreating] = useState(false);
 
   const { data: configs = [], isLoading } = useQuery({
@@ -228,7 +230,7 @@ export default function ConfigAlertas() {
   });
 
   const createConfig = useMutation({
-    mutationFn: (tipo) => base44.entities.AlertaConfig.create(DEFAULT_CONFIGS[tipo]),
+    mutationFn: (tipo) => base44.entities.AlertaConfig.create({ ...DEFAULT_CONFIGS[tipo], sector_id: user?.data?.sector_id }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['alerta-configs'] }); toast.success('Configuración creada'); },
   });
 
