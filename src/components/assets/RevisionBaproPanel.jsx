@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Link2, Copy, Check, Clock, Ban, Send } from 'lucide-react';
+import { Loader2, Link2, Copy, Check, Clock, Ban, Send, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
 function currentMonth() {
@@ -60,6 +60,7 @@ export default function RevisionBaproPanel({ sedes }) {
   };
 
   const revoke = async (id) => {
+    if (!window.confirm('¿Revocar este link? El banco ya no podrá abrirlo.')) return;
     try {
       await base44.entities.RevisionBaproToken.update(id, { estado: 'revocado' });
       qc.invalidateQueries({ queryKey: ['bapro_tokens'] });
@@ -121,6 +122,9 @@ export default function RevisionBaproPanel({ sedes }) {
           {generatedLink && (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5">
               <Input readOnly value={generatedLink} className="text-xs font-mono bg-transparent border-0 flex-1" />
+              <Button size="sm" variant="default" className="h-8 gap-1.5" onClick={() => window.open(generatedLink, '_blank')}>
+                <ExternalLink className="h-3.5 w-3.5" /> Abrir
+              </Button>
               <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => copyLink(generatedLink)}>
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? 'Copiado' : 'Copiar'}
@@ -159,12 +163,15 @@ export default function RevisionBaproPanel({ sedes }) {
                         </div>
                       </div>
                       <div className="flex gap-1.5 flex-shrink-0">
+                        <Button size="sm" variant="default" className="h-8 gap-1.5" onClick={() => window.open(`${window.location.origin}/revision-bapro/${t.token}`, '_blank')}>
+                          <ExternalLink className="h-3.5 w-3.5" /> Abrir
+                        </Button>
                         <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => copyLink(`${window.location.origin}/revision-bapro/${t.token}`)}>
                           <Copy className="h-3.5 w-3.5" /> Copiar
                         </Button>
                         {(t.estado === 'activo' || t.estado === 'usado') && (
-                          <Button size="sm" variant="ghost" className="h-8 text-destructive" onClick={() => revoke(t.id)}>
-                            <Ban className="h-3.5 w-3.5" />
+                          <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-destructive" onClick={() => revoke(t.id)}>
+                            <Ban className="h-3.5 w-3.5" /> Revocar
                           </Button>
                         )}
                       </div>
