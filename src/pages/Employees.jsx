@@ -206,7 +206,17 @@ export default function Employees() {
       if (editing) return base44.entities.Employee.update(editing.id, data);
       // El sector viene del selector explícito del formulario (siempre presente).
       // withActiveSector es backstop fail-closed: si faltara, usa la cadena central.
-      return base44.entities.Employee.create(withActiveSector(data, currentUser, employeeSector));
+      const payload = withActiveSector(data, currentUser, employeeSector);
+      // Guard robusto: impedir altas sin sector (quedarían invisibles en el filtro)
+      // o en un sector distinto al activo (contaminación cross-sector). La política
+      // de aislamiento exige operar solo en el sector activo de la sesión.
+      if (!payload.sector_id) {
+        return Promise.reject(new Error('Seleccioná un sector antes de guardar.'));
+      }
+      if (activeSectorId && payload.sector_id !== activeSectorId) {
+        return Promise.reject(new Error('Solo podés crear empleados en tu sector activo. Cambiá de sector primero.'));
+      }
+      return base44.entities.Employee.create(payload);
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['employees'] }); setDialogOpen(false); setEditing(null); },
     onError: (err) => {

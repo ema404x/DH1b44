@@ -21,7 +21,10 @@ export function useCurrentUser() {
   // Nombre del empleado configurado en el módulo de Empleados (tiene prioridad sobre full_name de plataforma)
   const employeeName = userPermissions?._employeeName || null;
   // Sector/unidad de negocio del empleado (aislamiento de datos entre sectores)
-  const employeeSector = userPermissions?._employeeSector || 'escuela';
+  // Fail-closed: NUNCA defaultear a 'escuela'. Si el sector no está resuelto,
+  // devolver null para que getActiveSectorId/withActiveSector no estampen un
+  // sector equivocado en silencio (bug histórico: empleados BAPRO creados en escuela).
+  const employeeSector = userPermissions?._employeeSector || null;
   // Nombre a mostrar: nombre en ficha de empleado > nombre de plataforma
   const displayName = employeeName || currentUser?.full_name || currentUser?.email || 'Usuario';
 

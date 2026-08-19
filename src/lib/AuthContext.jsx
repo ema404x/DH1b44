@@ -99,7 +99,7 @@ export const AuthProvider = ({ children }) => {
     if (!loaded) {
       setUserPermissions({
         Dashboard: { read: true },
-        _employeeSector: currentUser?.data?.sector_id || currentUser?.sector_id || 'escuela',
+        _employeeSector: currentUser?.data?.sector_id || currentUser?.sector_id || null,
         _minimalAccess: true,
       });
       // vinculationFailed=true solo si hubo error de red → la UI ofrece reintentar.
@@ -156,7 +156,7 @@ export const AuthProvider = ({ children }) => {
       ...perms,
       _employeeRole: emp.role || null,
       _employeeName: emp.full_name || null,
-      _employeeSector: emp.sector_id || 'escuela',
+      _employeeSector: emp.sector_id || null,
     });
     return true;
   };
@@ -175,7 +175,7 @@ export const AuthProvider = ({ children }) => {
       ...(data.employee_permissions || {}),
       _employeeRole: data.employee_role || null,
       _employeeName: data.employee_name || null,
-      _employeeSector: data.employee_sector || 'escuela',
+      _employeeSector: data.employee_sector || null,
     });
     return true;
   };
