@@ -269,68 +269,54 @@
       ]
     },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "created_by_id": "{{user.id}}"
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "data.jefe_sitio_email": "{{user.email}}"
-        },
-        {
-          "$and": [
+          "$or": [
             {
               "user_condition": {
                 "role": "admin"
               }
             },
             {
-              "data.sector_id": "{{user.data.sector_id}}"
-            }
-          ]
-        },
-        {
-          "$and": [
-            {
               "user_condition": {
                 "role": "gerente"
               }
             },
             {
-              "data.sector_id": "{{user.data.sector_id}}"
+              "created_by_id": "{{user.id}}"
+            },
+            {
+              "data.jefe_sitio_email": "{{user.email}}"
             }
           ]
         }
       ]
     },
     "update": {
-      "$or": [
+      "$and": [
         {
-          "created_by_id": "{{user.id}}"
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "data.jefe_sitio_email": "{{user.email}}"
-        },
-        {
-          "$and": [
+          "$or": [
             {
               "user_condition": {
                 "role": "admin"
               }
             },
             {
-              "data.sector_id": "{{user.data.sector_id}}"
-            }
-          ]
-        },
-        {
-          "$and": [
-            {
               "user_condition": {
                 "role": "gerente"
               }
             },
             {
-              "data.sector_id": "{{user.data.sector_id}}"
+              "created_by_id": "{{user.id}}"
+            },
+            {
+              "data.jefe_sitio_email": "{{user.email}}"
             }
           ]
         }
