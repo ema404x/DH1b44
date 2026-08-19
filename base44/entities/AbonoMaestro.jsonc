@@ -133,8 +133,7 @@
     },
     "sector_id": {
       "type": "string",
-      "default": "escuela",
-      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Valor libre definido en la entidad Sector."
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Se estampa desde el creador; sin default."
     },
     "notas": {
       "type": "string",
@@ -168,48 +167,69 @@
       ]
     },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "user_condition": {
-            "role": "gerente"
-          }
-        },
-        {
-          "user_condition": {
-            "role": "jefe_sitio"
-          }
-        },
-        {
-          "created_by_id": "{{user.id}}"
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "jefe_sitio"
+              }
+            },
+            {
+              "created_by_id": "{{user.id}}"
+            }
+          ]
         }
       ]
     },
     "update": {
-      "$or": [
+      "$and": [
         {
-          "created_by_id": "{{user.id}}"
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "created_by_id": "{{user.id}}"
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
           "user_condition": {
             "role": "admin"
           }
-        },
-        {
-          "user_condition": {
-            "role": "gerente"
-          }
         }
       ]
-    },
-    "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
     }
   }
 }
