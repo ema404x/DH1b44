@@ -108,8 +108,7 @@
     },
     "sector_id": {
       "type": "string",
-      "default": "escuela",
-      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Valor libre definido en la entidad Sector."
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Se estampa desde el creador; sin default."
     },
     "notes": {
       "type": "string"
