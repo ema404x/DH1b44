@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Link2, Copy, Check, Clock, Ban, Send, ExternalLink } from 'lucide-react';
+import { Loader2, Link2, Copy, Check, Clock, Ban, Send, ExternalLink, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 function currentMonth() {
@@ -68,6 +68,17 @@ export default function RevisionBaproPanel({ sedes }) {
       toast.success('Link revocado');
     } catch (err) {
       toast.error('Error al revocar');
+    }
+  };
+
+  const eliminar = async (id) => {
+    if (!window.confirm('¿Eliminar este link definitivamente? Esta acción no se puede deshacer.')) return;
+    try {
+      await base44.entities.RevisionBaproToken.delete(id);
+      qc.invalidateQueries({ queryKey: ['bapro_tokens'] });
+      toast.success('Link eliminado');
+    } catch (err) {
+      toast.error('Error al eliminar');
     }
   };
 
@@ -175,6 +186,9 @@ export default function RevisionBaproPanel({ sedes }) {
                             <Ban className="h-3.5 w-3.5" /> Revocar
                           </Button>
                         )}
+                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-destructive" onClick={() => eliminar(t.id)}>
+                          <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
