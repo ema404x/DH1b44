@@ -11,7 +11,8 @@
       "enum": [
         "garantia_activo",
         "stock_material",
-        "pendiente_vencido"
+        "pendiente_vencido",
+        "ot_vencida"
       ]
     },
     "nivel": {
@@ -31,7 +32,7 @@
     },
     "entidad_tipo": {
       "type": "string",
-      "description": "Tipo de entidad afectada (Asset, Material, Pendiente)"
+      "description": "Tipo de entidad afectada (Asset, Material, Pendiente, WorkOrder)"
     },
     "entidad_id": {
       "type": "string"
@@ -50,6 +51,10 @@
     "fecha_alerta": {
       "type": "string",
       "format": "date-time"
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector/unidad de negocio. A\u00edsla los logs entre sectores. Se estampa al generar la alerta desde el sector de la config origen; sin default."
     }
   },
   "required": [
@@ -73,37 +78,58 @@
       ]
     },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "user_condition": {
-            "role": "gerente"
-          }
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
         }
       ]
     },
     "update": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "user_condition": {
-            "role": "gerente"
-          }
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
         }
       ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     }
   }
 }
