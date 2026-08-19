@@ -8,7 +8,7 @@
     },
     "code": {
       "type": "string",
-      "description": "C\u00f3digo interno"
+      "description": "C\u00f3digo interno (clave de unicidad para import/dedup)"
     },
     "type": {
       "type": "string",
@@ -36,13 +36,17 @@
     "serial_number": {
       "type": "string"
     },
+    "location_id": {
+      "type": "string",
+      "description": "FK a Edificio/LocationData del mapa. Sede donde se encuentra el activo."
+    },
     "location": {
       "type": "string",
-      "description": "Ubicaci\u00f3n f\u00edsica del activo"
+      "description": "Ubicaci\u00f3n f\u00edsica detallada del activo (texto auxiliar)"
     },
     "sede": {
       "type": "string",
-      "description": "Sede/edificio donde se encuentra (agrupaci\u00f3n principal para BAPRO)"
+      "description": "Nombre de la sede/edificio (denormalizado de location_id para b\u00fasqueda y BAPRO)"
     },
     "area": {
       "type": "string",
@@ -106,6 +110,24 @@
       "items": {
         "type": "string"
       }
+    },
+    "visto_bapro": {
+      "type": "boolean",
+      "default": false,
+      "description": "Marcado por el banco (BAPRO) v\u00eda link compartido. Solo escribible por el endpoint p\u00fablico validado."
+    },
+    "visto_bapro_fecha": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que BAPRO tild\u00f3 el visto"
+    },
+    "visto_bapro_por": {
+      "type": "string",
+      "description": "Token de la sesi\u00f3n de revisi\u00f3n BAPRO que marc\u00f3 el visto"
+    },
+    "visto_bapro_lote": {
+      "type": "string",
+      "description": "Lote/per\u00edodo de revisi\u00f3n BAPRO (mes_periodo del token)"
     },
     "sector_id": {
       "type": "string",

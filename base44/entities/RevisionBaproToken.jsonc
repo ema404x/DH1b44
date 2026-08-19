@@ -1,0 +1,123 @@
+{
+  "name": "RevisionBaproToken",
+  "type": "object",
+  "properties": {
+    "token": {
+      "type": "string",
+      "description": "Token \u00fanico del link compartido (>=32 chars)"
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector que posee los activos revisados. Se estampa desde el creador; sin default."
+    },
+    "sede_scope": {
+      "type": "string",
+      "description": "Sede/edificio del scope: 'TODAS' o un location_id de Edificio"
+    },
+    "sede_nombre": {
+      "type": "string",
+      "description": "Nombre de la sede para mostrar (denormalizado)"
+    },
+    "mes_periodo": {
+      "type": "string",
+      "description": "Mes del lote de revisi\u00f3n (formato YYYY-MM)"
+    },
+    "activo_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs expl\u00edcitos de activos del lote. Vac\u00edo = todos los del sector/sede."
+    },
+    "expiracion": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de expiraci\u00f3n del link"
+    },
+    "creado_por": {
+      "type": "string",
+      "description": "Nombre del admin que gener\u00f3 el link"
+    },
+    "creado_por_email": {
+      "type": "string",
+      "description": "Email del admin que gener\u00f3 el link"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "activo",
+        "usado",
+        "expirado",
+        "revocado"
+      ],
+      "default": "activo",
+      "description": "Estado del link"
+    },
+    "total_activos": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de activos en scope al momento de la generaci\u00f3n"
+    },
+    "vistos_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad de activos marcados como vistos con este token"
+    },
+    "ultima_actividad": {
+      "type": "string",
+      "format": "date-time",
+      "description": "\u00daltima vez que el banco marc\u00f3 un visto con este link"
+    },
+    "notas": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "token",
+    "sector_id",
+    "mes_periodo"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

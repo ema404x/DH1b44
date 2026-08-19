@@ -31,7 +31,7 @@ const navGroups = [
     items: [
       { label: 'Proyectos', icon: FolderKanban, path: '/proyectos' },
       { label: 'Órdenes de Trabajo', icon: ClipboardList, path: '/ordenes' },
-      { label: 'Pendientes', icon: ClipboardCheck, path: '/activos' },
+      { label: 'Activos', icon: ClipboardCheck, path: '/activos' },
       { label: 'Informes', icon: ClipboardCheck, path: '/informes' },
       { label: 'Plan de Infraestructura', icon: Wrench, path: '/calefaccion' },
       { label: 'Rutinas de Mantenimiento', icon: RefreshCw, path: '/rutinas' },
