@@ -67,11 +67,11 @@ Deno.serve(async (req) => {
     // (deuda pendiente de migración de registros viejos sin sector).
     const callerSector = user?.data?.sector_id || user?.sector_id;
     const callerEsAdmin = ['admin', 'gerente'].includes(user.role || '');
-    // Fail-closed: si la OT no tiene sector o no coincide con el del caller, bloquear.
-    // Antes, si ot.sector_id era null el chequeo se salteaba (fail-open) → OT sin sector
-    // mutable por cualquier operario logueado.
-    if (!callerEsAdmin && ot.sector_id !== callerSector) {
-      return Response.json({ error: 'Esta OT pertenece a otro sector' }, { status: 403 });
+    // Aislamiento de raíz: TODOS (incluido admin/gerente) deben operar solo OTs de su
+    // sector activo. Para ver/tocar otro sector hay que cambiar de sector activo.
+    // No existe bypass por rol — el bypass sería exactamente lo que rompe el aislamiento.
+    if (ot.sector_id !== callerSector) {
+      return Response.json({ error: 'Esta OT pertenece a otro sector. Cambiá de sector activo para operarla.' }, { status: 403 });
     }
 
     // Validar estado actual

@@ -91,8 +91,9 @@ Deno.serve(async (req) => {
       const obra = existing[0];
       if (!obra) return Response.json({ error: 'Obra no encontrada' }, { status: 404 });
 
-      if (obra.sector_id && obra.sector_id !== callerSector) {
-        return Response.json({ error: 'Obra de otro sector' }, { status: 403 });
+      // Fail-closed: sector debe coincidir exactamente. Sin bypass por rol.
+      if (obra.sector_id !== callerSector) {
+        return Response.json({ error: 'Obra de otro sector. Cambiá de sector activo.' }, { status: 403 });
       }
       if (obra.ciclo_archivado && !isSuperAdmin) {
         return Response.json({ error: 'Obra archivada: solo administradores pueden modificarla' }, { status: 403 });
@@ -124,8 +125,9 @@ Deno.serve(async (req) => {
       const existing = await sb.entities.ObraCertificacion.filter({ id }).catch(() => []);
       const obra = existing[0];
       if (!obra) return Response.json({ error: 'Obra no encontrada' }, { status: 404 });
-      if (obra.sector_id && obra.sector_id !== callerSector) {
-        return Response.json({ error: 'Obra de otro sector' }, { status: 403 });
+      // Fail-closed: sector debe coincidir exactamente. Sin bypass por rol.
+      if (obra.sector_id !== callerSector) {
+        return Response.json({ error: 'Obra de otro sector. Cambiá de sector activo.' }, { status: 403 });
       }
       await sb.entities.ObraCertificacion.delete(id);
       return Response.json({ success: true });

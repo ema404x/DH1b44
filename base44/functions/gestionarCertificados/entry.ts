@@ -31,8 +31,12 @@ Deno.serve(async (req) => {
     // Gerencia puede ver cualquier certificado; otros usuarios solo los que crearon
     if (action === 'get' && certificado_id) {
       const cert = await sb.entities.Certificado.get(certificado_id);
-      if (cert?.sector_id && cert.sector_id !== callerSector) {
-        return Response.json({ error: 'Forbidden — certificado de otro sector' }, { status: 403 });
+      if (!cert) {
+        return Response.json({ error: 'Certificado no encontrado' }, { status: 404 });
+      }
+      // Fail-closed: sector debe coincidir exactamente. Sin bypass por rol.
+      if (cert.sector_id !== callerSector) {
+        return Response.json({ error: 'Forbidden — certificado de otro sector. Cambiá de sector activo.' }, { status: 403 });
       }
       const isCreator = cert?.created_by_id === user.id;
       if (!isGerencia && !isCreator) {
