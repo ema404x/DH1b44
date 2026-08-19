@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
+import { createScopedClient } from "../../shared/sectorGuard.ts";
 
 const SKIP_SHEETS = ['PARA FORMATO CONDICIONAL', 'ESC'];
 const BATCH_SIZE = 50;
@@ -188,16 +189,13 @@ Deno.serve(async (req) => {
   let totalSkipped = 0;
 
   // Pre-cargar LocationData y Direccion para resolución automática
-  const sb = base44.asServiceRole;
-  const [allLocationsRaw, allDireccionesRaw, existingPendientes] = await Promise.all([
+  const sb = createScopedClient(base44, callerSector);
+  const [allLocations, allDirecciones, existingPendientes] = await Promise.all([
     sb.entities.LocationData.list('-created_date', 2000).catch(() => []),
     sb.entities.Direccion.list().catch(() => []),
     // Pre-cargar pendientes existentes de esta comuna para evitar duplicados por numero_sap
     base44.entities.Pendiente.filter({ comuna }, '-created_date', 2000).catch(() => []),
   ]);
-  // Scope al sector del operador — evita asignar jefe_sitio de otro sector
-  const allLocations = allLocationsRaw.filter(x => !x.sector_id || x.sector_id === callerSector);
-  const allDirecciones = allDireccionesRaw.filter(x => !x.sector_id || x.sector_id === callerSector);
 
   // Set de números SAP ya existentes — previene duplicados
   const existingSapNumbers = new Set(

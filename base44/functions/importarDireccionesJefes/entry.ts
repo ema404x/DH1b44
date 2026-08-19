@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
+import { createScopedClient, resolveCallerSector, sectorErrorResponse } from "../../shared/sectorGuard.ts";
 
 Deno.serve(async (req) => {
   try {
@@ -10,9 +11,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Aislamiento de raíz: el import cae al sector activo del operador.
-    const callerSector = user.data?.sector_id || user.sector_id;
-    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+    // Aislamiento entre sectores centralizado — ver base44/shared/sectorGuard.ts
+    const callerSector = resolveCallerSector(user);
+    const sb = createScopedClient(base44, callerSector);
 
     const { file_url } = await req.json();
 
@@ -84,11 +85,10 @@ Deno.serve(async (req) => {
       comuna: dirData.comuna,
       jefe_sitio: dirData.jefe,
       estado: 'activo',
-      sector_id: callerSector,
     }));
 
     try {
-      const dirsCreated = await base44.asServiceRole.entities.Direccion.bulkCreate(direccionesList);
+      const dirsCreated = await sb.entities.Direccion.bulkCreate(direccionesList);
       direccionesCreadas = dirsCreated.length;
 
       // Mapear direcciones creadas
@@ -114,13 +114,12 @@ Deno.serve(async (req) => {
             inspector: dirData.jefe,
             m2: 0,
             estado: 'activo',
-            sector_id: callerSector,
           });
         }
       });
 
       if (escuelasList.length > 0) {
-        const escsCreated = await base44.asServiceRole.entities.LocationData.bulkCreate(escuelasList);
+        const escsCreated = await sb.entities.LocationData.bulkCreate(escuelasList);
         escuelasCreadas = escsCreated.length;
       }
     } catch (err) {
@@ -135,6 +134,6 @@ Deno.serve(async (req) => {
       message: `Importación completada: ${direccionesCreadas} direcciones y ${escuelasCreadas} escuelas`,
     });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return sectorErrorResponse(error);
   }
 });

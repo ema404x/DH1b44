@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createScopedClient } from "../../shared/sectorGuard.ts";
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -78,17 +79,16 @@ Deno.serve(async (req) => {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
   if (user.role !== 'admin') return Response.json({ error: 'Solo admin puede geocodificar' }, { status: 403 });
 
-  // Aislamiento de raíz: solo geocodificar LocationData del sector activo del operador.
+  // Aislamiento entre sectores centralizado — ver base44/shared/sectorGuard.ts
   const callerSector = user.data?.sector_id || user.sector_id;
   if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+  const sb = createScopedClient(base44, callerSector);
 
-  // Obtener LocationData sin coords — scope al sector del caller
-  const [allLocations, allDirecciones] = await Promise.all([
-    base44.asServiceRole.entities.LocationData.list('-created_date', 500),
-    base44.asServiceRole.entities.Direccion.list('-created_date', 500),
+  // Obtener LocationData sin coords — scope al sector del caller (automático vía sb)
+  const [locations, direcciones] = await Promise.all([
+    sb.entities.LocationData.list('-created_date', 500),
+    sb.entities.Direccion.list('-created_date', 500),
   ]);
-  const locations = allLocations.filter(l => !l.sector_id || l.sector_id === callerSector);
-  const direcciones = allDirecciones.filter(d => !d.sector_id || d.sector_id === callerSector);
 
   const dirMap = {};
   direcciones.forEach(d => { dirMap[d.id] = d; });
@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
     }
 
     if (coords) {
-      await base44.asServiceRole.entities.LocationData.update(loc.id, {
+      await sb.entities.LocationData.update(loc.id, {
         gps_latitude: coords.lat,
         gps_longitude: coords.lon,
       });

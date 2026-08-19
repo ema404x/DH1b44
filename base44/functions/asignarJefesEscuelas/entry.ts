@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
+import { createScopedClient, resolveCallerSector, sectorErrorResponse } from "../../shared/sectorGuard.ts";
 
 Deno.serve(async (req) => {
   try {
@@ -13,9 +14,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: se requieren permisos de administrador' }, { status: 403 });
     }
 
-    // Aislamiento de raíz: solo actualizar LocationData del sector activo del operador.
-    const callerSector = user.data?.sector_id || user.sector_id;
-    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+    // Aislamiento entre sectores centralizado — ver base44/shared/sectorGuard.ts
+    const callerSector = resolveCallerSector(user);
+    const sb = createScopedClient(base44, callerSector);
 
     const formData = await req.formData();
     const file = formData.get('file');
@@ -26,8 +27,7 @@ Deno.serve(async (req) => {
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { header: true });
 
-    const allLocations = await base44.asServiceRole.entities.LocationData.list('-created_date', 500);
-    const locations = allLocations.filter(l => !l.sector_id || l.sector_id === callerSector);
+    const locations = await sb.entities.LocationData.list('-created_date', 500);
     let updated = 0;
     const errors = [];
 
@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
               updateData.sup = row['SUP'];
             }
 
-            await base44.asServiceRole.entities.LocationData.update(matching.id, updateData);
+            await sb.entities.LocationData.update(matching.id, updateData);
             updated++;
           } else {
             errors.push(`No encontrado: ${establecimiento}`);
@@ -104,6 +104,6 @@ Deno.serve(async (req) => {
       totalErrors: errors.length,
     });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return sectorErrorResponse(error);
   }
 });

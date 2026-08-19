@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createScopedClient } from "../../shared/sectorGuard.ts";
 
 const ENTITY_DEFAULTS = {
    InformePlaneacion: { estado_contacto: 'PENDIENTE' },
@@ -60,12 +61,10 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Aislamiento de raíz: todo lo importado cae al sector activo del operador.
+  // Aislamiento entre sectores centralizado — ver base44/shared/sectorGuard.ts
   const callerSector = user.data?.sector_id || user.sector_id;
   if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
-
-  // Entidades globales (sin sector_id) — no se estampa sector
-  const GLOBAL_ENTITIES = new Set(['PrecarioMinisterio']);
+  const sb = createScopedClient(base44, callerSector);
 
   const { mapping, raw_data } = await req.json();
   const sheets = (mapping.sheets || []).filter(s => s.target_entity && s.target_entity !== 'skip');
@@ -139,7 +138,6 @@ Deno.serve(async (req) => {
       if (row.every(cell => cell === null || cell === undefined || cell === '')) continue;
 
       const record = { ...defaults };
-      if (!GLOBAL_ENTITIES.has(entityKey)) record.sector_id = callerSector;
       let hasData = false;
 
       for (const [colName, fieldName] of activeMappings) {
@@ -164,7 +162,7 @@ Deno.serve(async (req) => {
        const batch = records.slice(i, i + BATCH_SIZE);
        try {
          console.log(`[IMPORT] Attempting bulkCreate for ${batch.length} records`);
-         await base44.asServiceRole.entities[entityKey].bulkCreate(batch);
+         await sb.entities[entityKey].bulkCreate(batch);
          imported += batch.length;
          console.log(`[IMPORT] Successfully imported ${batch.length} records`);
        } catch (batchErr) {
@@ -172,7 +170,7 @@ Deno.serve(async (req) => {
          // If bulk fails, try one by one to get individual errors
          for (const record of batch) {
            try {
-             await base44.asServiceRole.entities[entityKey].create(record);
+             await sb.entities[entityKey].create(record);
              imported++;
            } catch (err) {
              const recordSummary = [

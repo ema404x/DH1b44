@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
+import { createScopedClient, resolveCallerSector, SectorError } from "../../shared/sectorGuard.ts";
 
 function parseDate(val) {
   if (!val) return null;
@@ -64,9 +65,9 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Aislamiento de raíz: las obras importadas caen al sector activo del operador.
-    const callerSector = user.data?.sector_id || user.sector_id;
-    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+    // Aislamiento entre sectores centralizado — ver base44/shared/sectorGuard.ts
+    const callerSector = resolveCallerSector(user);
+    const sb = createScopedClient(base44, callerSector);
 
     let body;
     try {
@@ -224,14 +225,7 @@ Deno.serve(async (req) => {
     // Paginar lectura de existentes con máximo 5000 por request
     let existing = [];
     try {
-      let skip = 0;
-      const PAGE = 5000;
-      while (true) {
-        const chunk = await base44.asServiceRole.entities.Project.list('id', PAGE, skip);
-        existing.push(...chunk);
-        if (chunk.length < PAGE) break;
-        skip += PAGE;
-      }
+      existing = await sb.entities.Project.filter({}, 'id', 5000);
     } catch (err) {
       parseErrors.push(`Lectura de projects existentes falló: ${err.message}`);
       existing = [];
@@ -259,18 +253,17 @@ Deno.serve(async (req) => {
     let errors = 0;
     const errorDetails = [];
 
-    // Creaciones — estampar sector del operador antes de bulkCreate (defensa en profundidad)
-    for (const p of toCreate) { if (!p.sector_id) p.sector_id = callerSector; }
+    // Creaciones — sb.entities.Project.bulkCreate estampa sector_id automáticamente
     for (let b = 0; b < toCreate.length; b += BATCH_SIZE) {
       const batch = toCreate.slice(b, b + BATCH_SIZE);
       try {
-        await base44.asServiceRole.entities.Project.bulkCreate(batch);
+        await sb.entities.Project.bulkCreate(batch);
         created += batch.length;
       } catch (err) {
         // Fallback: crear uno por uno
         for (let j = 0; j < batch.length; j++) {
           try {
-            await base44.asServiceRole.entities.Project.create(batch[j]);
+            await sb.entities.Project.create(batch[j]);
             created++;
           } catch (e2) {
             errors++;
@@ -284,13 +277,13 @@ Deno.serve(async (req) => {
     for (let b = 0; b < toUpdate.length; b += BATCH_SIZE) {
       const batch = toUpdate.slice(b, b + BATCH_SIZE);
       try {
-        await base44.asServiceRole.entities.Project.bulkUpdate(batch);
+        await sb.entities.Project.bulkUpdate(batch);
         updated += batch.length;
       } catch (err) {
         // Fallback: actualizar uno por uno
         for (let j = 0; j < batch.length; j++) {
           try {
-            await base44.asServiceRole.entities.Project.update(batch[j].id, batch[j]);
+            await sb.entities.Project.update(batch[j].id, batch[j]);
             updated++;
           } catch (e2) {
             errors++;
@@ -311,7 +304,10 @@ Deno.serve(async (req) => {
     });
 
   } catch (err) {
-    // ⚠️ BUG FIX: Capturar errores no previstos
+    // SectorError → 403; el resto → 500 estructurado
+    if (err instanceof SectorError) {
+      return Response.json({ error: err.message }, { status: err.status });
+    }
     console.error('importarObrasExcel error:', err);
     return Response.json({
       error: `Error interno: ${err.message}`,
