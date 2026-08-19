@@ -115,11 +115,11 @@ export default function RevisionBapro() {
     <div className="min-h-screen bg-slate-50">
       {/* Logo superior — Mejores */}
       <div className="bg-white border-b border-slate-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex justify-center">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex justify-end">
           <img
             src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/bcab542cd_mejores_logo.jpg"
             alt="Mejores — en mantenimiento, obras y servicios"
-            className="h-14 w-auto rounded-lg"
+            className="h-16 w-16 object-cover rounded-xl shadow-sm ring-1 ring-slate-200"
           />
         </div>
       </div>
