@@ -19,7 +19,10 @@ export default async function(req) {
 
     const userEmail = (user.email || '').toLowerCase().trim();
     const userId = user.id;
-    const userSector = user.data?.sector_id || user.sector_id || 'escuela';
+    const userSector = user.data?.sector_id || user.sector_id;
+    if (!userSector) {
+      return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+    }
     const platformRole = user.role;
 
     // Resolver empleado vinculado para obtener rol y nombre canónico

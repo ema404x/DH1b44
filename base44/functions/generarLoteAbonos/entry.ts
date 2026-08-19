@@ -86,6 +86,7 @@ async function generateOneCertificate(base44, abono, mesInfo, currentNum) {
     anticipo_pct: abono.anticipo_pct || 0,
     fondo_reparo_pct: abono.fondo_reparo_pct || 0,
     items: certItems,
+    sector_id: abono.sector_id || '',
   };
 
   const created = await base44.asServiceRole.entities.Certificado.create(newCert);
@@ -113,6 +114,12 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (user?.role !== 'admin') {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
+
+    // Fail closed en sector: el admin solo certifica abonos de su sector activo.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) {
+      return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -149,12 +156,15 @@ Deno.serve(async (req) => {
       const a = await base44.asServiceRole.entities.AbonoMaestro.get(abono_id);
       abonos = a ? [a] : [];
     } else {
-      abonos = await base44.asServiceRole.entities.AbonoMaestro.filter({ estado: 'activo' });
+      abonos = await base44.asServiceRole.entities.AbonoMaestro.filter({ sector_id: callerSector, estado: 'activo' });
       if (regenerar) {
-        const completados = await base44.asServiceRole.entities.AbonoMaestro.filter({ estado: 'completado' });
+        const completados = await base44.asServiceRole.entities.AbonoMaestro.filter({ sector_id: callerSector, estado: 'completado' });
         abonos = [...abonos, ...completados];
       }
     }
+
+    // Aislar por sector incluso cuando se pide por abono_id (evita certificar un abono de otro sector).
+    abonos = abonos.filter(a => (a.sector_id || callerSector) === callerSector);
 
     if (comunas.length > 0) {
       abonos = abonos.filter(a => comunas.includes(a.comuna));
@@ -238,7 +248,7 @@ Deno.serve(async (req) => {
         totalGenerated++;
 
         // ── Crear solicitud de aprobación vinculada ───────────────────────
-        const sectorId = abono.sector_id || user.data?.sector_id || 'escuela';
+        const sectorId = abono.sector_id || callerSector;
         const numeroSol = `CERT-${res.id.slice(-6).toUpperCase()}`;
         try {
           await base44.asServiceRole.entities.SolicitudCertificado.create({

@@ -302,6 +302,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
+    // Fail closed en sector: el admin solo certifica abonos de su sector activo.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) {
+      return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const forceRun = body.forceRun === true;
 
@@ -333,8 +339,8 @@ Deno.serve(async (req) => {
     const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     const mesPeriodoLabel = `${MESES_ES[certMonth - 1]} ${certYear}`;
 
-    // Obtener todos los AbonoMaestro activos
-    const abonos = await base44.asServiceRole.entities.AbonoMaestro.filter({ estado: 'activo' });
+    // Obtener todos los AbonoMaestro activos del sector del admin (aislamiento entre sectores)
+    const abonos = await base44.asServiceRole.entities.AbonoMaestro.filter({ sector_id: callerSector, estado: 'activo' });
 
     const generatedCerts = [];
     const skipped = [];
@@ -440,6 +446,7 @@ Deno.serve(async (req) => {
         items: certItems,
         numero_en_contrato: numeroEnContrato,
         duracion_meses_total: abono.duracion_meses,
+        sector_id: abono.sector_id || callerSector,
       };
 
       // Generar y subir PDF profesional
