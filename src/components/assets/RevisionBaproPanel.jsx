@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Link2, Copy, Check, Clock, Ban, Send, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Loader2, Link2, Copy, Check, Clock, Ban, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 function currentMonth() {
@@ -23,7 +23,6 @@ export default function RevisionBaproPanel({ sedes }) {
   const [generating, setGenerating] = useState(false);
   const [generatedLink, setGeneratedLink] = useState(null);
   const [copied, setCopied] = useState(false);
-  const [reclaiming, setReclaiming] = useState(false);
   const qc = useQueryClient();
 
   const { data: tokens = [], isLoading } = useQuery({
@@ -67,23 +66,6 @@ export default function RevisionBaproPanel({ sedes }) {
       toast.success('Link revocado');
     } catch (err) {
       toast.error('Error al revocar');
-    }
-  };
-
-  const reclamar = async () => {
-    setReclaiming(true);
-    try {
-      const res = await base44.functions.invoke('reclamarActivosSinSector', {});
-      if (res.reclamados > 0) {
-        toast.success(`${res.reclamados} activos reclamados a tu sector`);
-        qc.invalidateQueries({ queryKey: ['bapro_tokens'] });
-      } else {
-        toast.info('No hay activos sin sector para reclamar');
-      }
-    } catch (err) {
-      toast.error(err.message || 'Error al reclamar activos');
-    } finally {
-      setReclaiming(false);
     }
   };
 
@@ -145,23 +127,6 @@ export default function RevisionBaproPanel({ sedes }) {
               </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <Card className="border-l-4 border-l-amber-500">
-        <CardContent className="pt-4 pb-4 flex items-center justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" /> Activos sin sector
-            </h3>
-            <p className="text-xs text-muted-foreground -mt-1">
-              Si los activos no aparecen en el link, pueden estar sin sector asignado (imports anteriores no estampaban sector). Reclamá los huérfanos a tu sector activo.
-            </p>
-          </div>
-          <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={reclamar} disabled={reclaiming}>
-            {reclaiming ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-            Reclamar a mi sector
-          </Button>
         </CardContent>
       </Card>
 
