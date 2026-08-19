@@ -49,17 +49,18 @@ Deno.serve(async (req) => {
       const idSet = new Set(assetIds);
       for (const o of allOts) {
         if (o.asset_id && idSet.has(o.asset_id)) {
+          // Tope de 10 OTs por activo (ya ordenado por -created_date) y solo
+          // campos mostrados en la vista pública — sin nombres de empleados
+          // ni datos internos, porque el link se comparte con el banco sin login.
           if (!otsByAsset[o.asset_id]) otsByAsset[o.asset_id] = [];
-          otsByAsset[o.asset_id].push({
-            title: o.title,
-            code: o.code,
-            type: o.type,
-            status: o.status,
-            priority: o.priority,
-            scheduled_date: o.scheduled_date,
-            completed_date: o.completed_date,
-            assigned_name: o.assigned_name,
-          });
+          if (otsByAsset[o.asset_id].length < 10) {
+            otsByAsset[o.asset_id].push({
+              title: o.title,
+              status: o.status,
+              scheduled_date: o.scheduled_date,
+              completed_date: o.completed_date,
+            });
+          }
         }
       }
     }
