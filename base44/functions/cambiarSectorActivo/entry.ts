@@ -71,6 +71,28 @@ Deno.serve(async (req) => {
 
     await sb.entities.User.update(user.id, updatePayload);
 
+    // ── Sincronizar la ficha Employee al nuevo sector (fix rebote de limbo) ──
+    // Sin esto la ficha queda en el sector viejo y vincularEmpleado (que trata a
+    // la ficha como fuente de verdad) revierte el User al sector viejo en el
+    // próximo login → el empleado queda en limbo (no visto en ningún sector).
+    // Best-effort: si no hay ficha (platform admin puro) no rompe el flujo.
+    // Los registros históricos (OTs/Activos/Pendientes) NO se migran: quedan en
+    // su sector original, preservando el aislamiento y evitando contaminación.
+    try {
+      let empRow = emp;
+      if (!empRow) {
+        const byUid = user.id ? (await sb.entities.Employee.filter({ user_id: user.id }).catch(() => [])) : [];
+        empRow = byUid[0];
+        if (!empRow && user.email) {
+          const byEmail = await sb.entities.Employee.filter({ email: user.email }).catch(() => []);
+          empRow = byEmail.find(e => e.email?.toLowerCase().trim() === user.email.toLowerCase().trim());
+        }
+      }
+      if (empRow && empRow.sector_id !== sector_destino) {
+        await sb.entities.Employee.update(empRow.id, { sector_id: sector_destino }).catch(() => {});
+      }
+    } catch (_) {}
+
     return Response.json({
       ok: true,
       sector_activo: sector_destino,
