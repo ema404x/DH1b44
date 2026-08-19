@@ -9,6 +9,12 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Fail closed en sector: sin sector → 403. NUNCA defaultear a 'escuela'.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) {
+      return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const { operation = 'list' } = body;
 
@@ -25,9 +31,8 @@ Deno.serve(async (req) => {
 
     // ── LIST: obtener solicitudes ────────────────────────────────────────
     if (operation === 'list') {
-      // Filtrar por sector del usuario — aisla datos entre sectores
-      const userSector = user.data?.sector_id || user.sector_id || 'escuela';
-      const all = await base44.asServiceRole.entities.SolicitudCertificado.filter({ sector_id: userSector });
+      // Filtrar por sector del usuario — aisla datos entre sectores (fail closed)
+      const all = await base44.asServiceRole.entities.SolicitudCertificado.filter({ sector_id: callerSector });
 
       if (isAdmin) {
         return Response.json({ solicitudes: all, isAdmin: true });
@@ -49,13 +54,16 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'id y data son requeridos' }, { status: 400 });
       }
 
-      // Verificar acceso: admin puede actualizar cualquier solicitud
-      // Non-admin solo puede actualizar las suyas
-      if (!isAdmin) {
-        const sol = await base44.asServiceRole.entities.SolicitudCertificado.get(id);
-        if (!sol || (sol.created_by_id !== user.id && sol.jefe_sitio_email !== user.email)) {
-          return Response.json({ error: 'Forbidden: sin permisos para modificar esta solicitud' }, { status: 403 });
-        }
+      // Verificar acceso + aislamiento por sector (incluso admins quedan scopeados a su sector)
+      const sol = await base44.asServiceRole.entities.SolicitudCertificado.get(id);
+      if (!sol) {
+        return Response.json({ error: 'Solicitud no encontrada' }, { status: 404 });
+      }
+      if (sol.sector_id && sol.sector_id !== callerSector) {
+        return Response.json({ error: 'Forbidden: solicitud de otro sector' }, { status: 403 });
+      }
+      if (!isAdmin && sol.created_by_id !== user.id && sol.jefe_sitio_email !== user.email) {
+        return Response.json({ error: 'Forbidden: sin permisos para modificar esta solicitud' }, { status: 403 });
       }
 
       const updated = await base44.asServiceRole.entities.SolicitudCertificado.update(id, data);
@@ -79,11 +87,15 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'id es requerido' }, { status: 400 });
       }
 
-      if (!isAdmin) {
-        const sol = await base44.asServiceRole.entities.SolicitudCertificado.get(id);
-        if (!sol || sol.created_by_id !== user.id) {
-          return Response.json({ error: 'Forbidden: sin permisos para eliminar esta solicitud' }, { status: 403 });
-        }
+      const sol = await base44.asServiceRole.entities.SolicitudCertificado.get(id);
+      if (!sol) {
+        return Response.json({ error: 'Solicitud no encontrada' }, { status: 404 });
+      }
+      if (sol.sector_id && sol.sector_id !== callerSector) {
+        return Response.json({ error: 'Forbidden: solicitud de otro sector' }, { status: 403 });
+      }
+      if (!isAdmin && sol.created_by_id !== user.id) {
+        return Response.json({ error: 'Forbidden: sin permisos para eliminar esta solicitud' }, { status: 403 });
       }
 
       await base44.asServiceRole.entities.SolicitudCertificado.delete(id);

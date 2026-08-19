@@ -15,6 +15,13 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const sb = base44.asServiceRole;
+
+    // Fail closed en sector: sin sector → 403. NUNCA defaultear a 'escuela'.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) {
+      return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+    }
+
     const body = await req.json();
     const { action } = body;
 
@@ -69,9 +76,8 @@ Deno.serve(async (req) => {
 
     // ── LIST ──
     if (action === 'list') {
-      // Filtrar por sector del usuario — aisla datos entre sectores
-      const userSector = user.data?.sector_id || user.sector_id || 'escuela';
-      const all = await sb.entities.ObraCertificacion.filter({ sector_id: userSector });
+      // Filtrar por sector del usuario — aisla datos entre sectores (fail closed)
+      const all = await sb.entities.ObraCertificacion.filter({ sector_id: callerSector });
       const obras = isSuperAdmin ? all : all.filter(canAccess);
       return Response.json({ obras });
     }
@@ -85,6 +91,9 @@ Deno.serve(async (req) => {
       const obra = existing[0];
       if (!obra) return Response.json({ error: 'Obra no encontrada' }, { status: 404 });
 
+      if (obra.sector_id && obra.sector_id !== callerSector) {
+        return Response.json({ error: 'Obra de otro sector' }, { status: 403 });
+      }
       if (obra.ciclo_archivado && !isSuperAdmin) {
         return Response.json({ error: 'Obra archivada: solo administradores pueden modificarla' }, { status: 403 });
       }
@@ -112,6 +121,12 @@ Deno.serve(async (req) => {
       }
       const { id } = body;
       if (!id) return Response.json({ error: 'id requerido' }, { status: 400 });
+      const existing = await sb.entities.ObraCertificacion.filter({ id }).catch(() => []);
+      const obra = existing[0];
+      if (!obra) return Response.json({ error: 'Obra no encontrada' }, { status: 404 });
+      if (obra.sector_id && obra.sector_id !== callerSector) {
+        return Response.json({ error: 'Obra de otro sector' }, { status: 403 });
+      }
       await sb.entities.ObraCertificacion.delete(id);
       return Response.json({ success: true });
     }
