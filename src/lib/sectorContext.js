@@ -19,9 +19,15 @@
  * @param {object|null} user — usuario actual (de useCurrentUser / auth.me)
  * @returns {string|null}
  */
-export function getActiveSectorId(user) {
-  if (!user) return null;
-  return user.data?.sector_id || user.sector_id || null;
+export function getActiveSectorId(user, employeeSector = null) {
+  if (!user) return employeeSector || null;
+  // Cadena de resolución completa (espejo de filterByUser en useCurrentUser):
+  //   1. data.sector_id — canónico, escrito por cambiarSectorActivo (lo lee la RLS)
+  //   2. sector_id — legacy / top-level
+  //   3. employeeSector — sector de la ficha Employee, reconciliado por vincularEmpleado
+  //      Es la señal más confiable para platform admins (linkEmployee los saltea, así
+  //      que data.sector_id puede estar vacío y employeeSector resuelve desde la ficha).
+  return user.data?.sector_id || user.sector_id || employeeSector || null;
 }
 
 /**
@@ -35,9 +41,9 @@ export function getActiveSectorId(user) {
  * @param {object|null} user — usuario actual
  * @returns {object} payload con sector_id estampado si corresponde
  */
-export function withActiveSector(payload, user) {
+export function withActiveSector(payload, user, employeeSector = null) {
   if (!payload || payload.sector_id) return payload;
-  const sectorId = getActiveSectorId(user);
+  const sectorId = getActiveSectorId(user, employeeSector);
   if (!sectorId) return payload;
   return { ...payload, sector_id: sectorId };
 }

@@ -48,6 +48,7 @@ const comunaColors = {
 };
 
 const employeeFields = [
+  { key: 'sector_id', label: 'Sector', type: 'select', required: true },
   { key: 'full_name', label: 'Nombre Completo', required: true },
   { key: 'dni', label: 'DNI' },
   { key: 'role', label: 'Cargo', type: 'select', required: true, options: [] }, // se sobreescribe dinámicamente abajo
@@ -71,9 +72,10 @@ export default function Employees() {
   const { allowed: canEdit } = usePermission('Employee', 'update');
   const { allowed: canCreate } = usePermission('Employee', 'create');
   const { allowed: canDelete } = usePermission('Employee', 'delete');
-  const { currentUser } = useCurrentUser();
-  // Sector activo resuelto de forma central (fail-closed, sin default 'escuela').
-  const activeSectorId = getActiveSectorId(currentUser);
+  const { currentUser, employeeSector } = useCurrentUser();
+  // Sector activo resuelto de forma central con la cadena completa
+  // (data.sector_id → sector_id → employeeSector). Fail-closed, sin default 'escuela'.
+  const activeSectorId = getActiveSectorId(currentUser, employeeSector);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [onlyIssues, setOnlyIssues] = useState(false);
@@ -96,6 +98,7 @@ export default function Employees() {
   const { data: locations = [] } = useQuery({ queryKey: ['locations'], queryFn: () => base44.entities.LocationData.list('-created_date', 500) });
   const { data: rolePermissions = [] } = useQuery({ queryKey: ['rolePermissions'], queryFn: () => base44.entities.RolePermission.list() });
   const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => base44.entities.User.list('-created_date', 500) });
+  const { data: sectors = [] } = useQuery({ queryKey: ['sectores'], queryFn: () => base44.entities.Sector.list('orden', 100) });
 
   const jefesSitio = useMemo(() =>
     employees.filter(e => e.role === 'jefe_sitio').map(e => ({ value: e.full_name, label: e.full_name })),
@@ -106,12 +109,16 @@ export default function Employees() {
     const roleOptions = rolePermissions.length > 0
       ? rolePermissions.map(r => ({ value: r.role_name, label: r.role_name }))
       : Object.entries(roleLabels).map(([value, label]) => ({ value, label }));
+    const sectorOptions = sectors
+      .filter(s => s.activo !== false)
+      .map(s => ({ value: s.clave, label: s.nombre || s.clave }));
     return employeeFields.map(f => {
+      if (f.key === 'sector_id') return { ...f, options: sectorOptions };
       if (f.key === 'role') return { ...f, options: roleOptions };
       if (f.key === 'assigned_jefe_sitio') return { ...f, type: 'select', options: jefesSitio };
       return f;
     });
-  }, [rolePermissions, jefesSitio]);
+  }, [rolePermissions, jefesSitio, sectors]);
 
   // Resuelve el label legible del rol
   const getRoleLabel = (roleKey) => {
@@ -197,9 +204,9 @@ export default function Employees() {
   const saveMutation = useMutation({
     mutationFn: (data) => {
       if (editing) return base44.entities.Employee.update(editing.id, data);
-      // Estampa el sector activo de forma central (fail-closed). Si no se resuelve,
-      // no se inventa 'escuela' — el backend stampSectorOnCreate lo marca SIN_SECTOR.
-      return base44.entities.Employee.create(withActiveSector(data, currentUser));
+      // El sector viene del selector explícito del formulario (siempre presente).
+      // withActiveSector es backstop fail-closed: si faltara, usa la cadena central.
+      return base44.entities.Employee.create(withActiveSector(data, currentUser, employeeSector));
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['employees'] }); setDialogOpen(false); setEditing(null); },
     onError: (err) => {
@@ -386,7 +393,7 @@ export default function Employees() {
         onOpenChange={setDialogOpen}
         title={editing ? 'Editar Empleado' : 'Nuevo Empleado'}
         fields={computedEmployeeFields}
-        initialData={editing || { role: computedEmployeeFields.find(f => f.key === 'role')?.options?.[0]?.value || '', status: 'activo' }}
+        initialData={editing || { sector_id: activeSectorId || '', role: computedEmployeeFields.find(f => f.key === 'role')?.options?.[0]?.value || '', status: 'activo' }}
         onSave={(data) => saveMutation.mutate(data)}
         saving={saveMutation.isPending}
       />
