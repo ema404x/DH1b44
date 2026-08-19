@@ -39,6 +39,10 @@
     },
     "entity_id": {
       "type": "string"
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Se estampa desde el creador; sin default."
     }
   },
   "required": [
@@ -66,21 +70,47 @@
       ]
     },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "created_by_id": "{{user.id}}"
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "$or": [
+            {
+              "created_by_id": "{{user.id}}"
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
         }
       ]
     },
     "update": {
-      "$or": [
+      "$and": [
         {
-          "created_by_id": "{{user.id}}"
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "created_by_id": "{{user.id}}"
+            },
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
           "user_condition": {
@@ -88,11 +118,6 @@
           }
         }
       ]
-    },
-    "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
     }
   }
 }
