@@ -14,7 +14,10 @@ export default function SectorSwitcher() {
   const [switching, setSwitching] = useState(null);
   const ref = useRef(null);
 
-  const currentSectorId = currentUser?.sector_id || currentUser?.data?.sector_id || employeeSector || 'escuela';
+  // data.sector_id es canónico (lo lee la RLS). El top-level sector_id es legacy y
+  // puede desincronizarse — priorizar data.sector_id para que el switcher refleje el
+  // sector REAL y no uno stale.
+  const currentSectorId = currentUser?.data?.sector_id || currentUser?.sector_id || employeeSector || 'escuela';
   const sectorBase = currentUser?.data?.sector_base || currentUser?.sector_base || null;
 
   useEffect(() => {

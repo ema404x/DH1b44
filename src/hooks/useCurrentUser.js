@@ -48,7 +48,9 @@ export function useCurrentUser() {
     if (!currentUser) return list;
 
     // Aislar por sector_id — un admin en sector BAPRO no debe ver registros del sector escuela.
-    const userSector = currentUser?.sector_id || currentUser?.data?.sector_id || employeeSector || 'escuela';
+    // data.sector_id es el campo CANÓNICO que lee la RLS ({{user.data.sector_id}}).
+    // El top-level sector_id es legacy y puede quedar desincronizado — nunca priorizarlo.
+    const userSector = currentUser?.data?.sector_id || currentUser?.sector_id || employeeSector || 'escuela';
     return list.filter(item => {
       const itemSector = item.sector_id || 'escuela';
       return itemSector === userSector;
