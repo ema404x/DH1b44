@@ -82,6 +82,10 @@
       "type": "number",
       "default": 24,
       "description": "Horas m\u00ednimas entre env\u00edos de email del mismo tipo"
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector/unidad de negocio. A\u00edsla la configuraci\u00f3n y sus alertas entre sectores. Vac\u00edo = config global (legacy)."
     }
   },
   "required": [

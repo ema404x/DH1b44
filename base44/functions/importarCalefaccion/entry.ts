@@ -106,6 +106,10 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Aislamiento de raíz: el relevamiento cae al sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
     const { file_url, periodo, limpiar_anteriores } = await req.json();
     if (!file_url) return Response.json({ error: 'file_url requerido' }, { status: 400 });
 
@@ -144,6 +148,8 @@ Deno.serve(async (req) => {
       }
     }
     const allRecords = Object.values(unifyMap);
+    // Estampar sector del operador en cada registro (defensa en profundidad)
+    allRecords.forEach(r => { r.sector_id = callerSector; });
 
     // SIEMPRE limpiar todos los registros del mismo período antes de insertar
     // Esto garantiza que no haya duplicados sin importar cuántas veces se reimporte
@@ -151,7 +157,7 @@ Deno.serve(async (req) => {
       const periodoTarget = allRecords[0].periodo;
       let existing = [];
       try {
-        existing = await base44.asServiceRole.entities.EquipamientoCalefaccion.filter({ periodo: periodoTarget });
+        existing = await base44.asServiceRole.entities.EquipamientoCalefaccion.filter({ periodo: periodoTarget, sector_id: callerSector });
       } catch (_) {}
       const DEL_BATCH = 50;
       for (let i = 0; i < existing.length; i += DEL_BATCH) {

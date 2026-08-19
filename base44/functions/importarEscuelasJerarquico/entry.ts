@@ -15,6 +15,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Aislamiento de raíz: el import cae al sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
     const { sheetData } = await req.json();
 
     if (!sheetData || !Array.isArray(sheetData)) {
@@ -72,6 +76,7 @@ Deno.serve(async (req) => {
             comuna,
             sup: sup ? parseFloat(String(sup).replace(/,/g, '.')) : null,
             estado: 'activo',
+            sector_id: callerSector,
           };
 
           await base44.entities.LocationData.create(locationData);

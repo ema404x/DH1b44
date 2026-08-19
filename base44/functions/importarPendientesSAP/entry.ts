@@ -168,6 +168,10 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Aislamiento de raíz: los pendientes caen al sector activo del operador.
+  const callerSector = user.data?.sector_id || user.sector_id;
+  if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
   const { file_url, comuna, jefes_por_inspector } = await req.json();
   if (!file_url) return Response.json({ error: 'file_url requerido' }, { status: 400 });
 
@@ -185,12 +189,15 @@ Deno.serve(async (req) => {
 
   // Pre-cargar LocationData y Direccion para resolución automática
   const sb = base44.asServiceRole;
-  const [allLocations, allDirecciones, existingPendientes] = await Promise.all([
+  const [allLocationsRaw, allDireccionesRaw, existingPendientes] = await Promise.all([
     sb.entities.LocationData.list('-created_date', 2000).catch(() => []),
     sb.entities.Direccion.list().catch(() => []),
     // Pre-cargar pendientes existentes de esta comuna para evitar duplicados por numero_sap
     base44.entities.Pendiente.filter({ comuna }, '-created_date', 2000).catch(() => []),
   ]);
+  // Scope al sector del operador — evita asignar jefe_sitio de otro sector
+  const allLocations = allLocationsRaw.filter(x => !x.sector_id || x.sector_id === callerSector);
+  const allDirecciones = allDireccionesRaw.filter(x => !x.sector_id || x.sector_id === callerSector);
 
   // Set de números SAP ya existentes — previene duplicados
   const existingSapNumbers = new Set(
@@ -292,6 +299,7 @@ Deno.serve(async (req) => {
         jefe_sitio_email,
         fecha_emision_sap: parseDate(r.fechaInicio),
         fecha_limite: parseDate(r.fechaLimite),
+        sector_id: callerSector,
       };
 
       recordsToCreate.push(record);

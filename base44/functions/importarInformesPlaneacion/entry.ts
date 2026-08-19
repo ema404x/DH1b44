@@ -6,6 +6,10 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Aislamiento de raíz: los informes caen al sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
     const { file_url } = await req.json();
     if (!file_url) return Response.json({ error: 'file_url requerida' }, { status: 400 });
 
@@ -43,6 +47,7 @@ Deno.serve(async (req) => {
         proveedor_contratado_2026: row[6] ? String(row[6]).trim() : '',
         fecha_envio_contratar: row[7] ? String(row[7]).trim() : '',
         estado_actual: row[8] ? String(row[8]).trim() : '',
+        sector_id: callerSector,
       };
 
       informes.push(informe);

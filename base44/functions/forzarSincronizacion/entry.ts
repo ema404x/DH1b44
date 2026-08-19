@@ -59,8 +59,15 @@ Deno.serve(async (req) => {
         const empEmail = (emp.email || '').toLowerCase().trim();
         const matchByEmail = empEmail ? usersByEmail[empEmail] : null;
         if (matchByEmail) {
-          await sb.entities.Employee.update(emp.id, { user_id: matchByEmail.id });
-          fixes.vinculados_nuevos.push({ employee: emp.full_name, email: emp.email, user_id: matchByEmail.id });
+          // Solo re-vincular si coinciden sectores — evita desync cross-sector
+          const userSector = matchByEmail.data?.sector_id || matchByEmail.sector_id;
+          if (emp.sector_id && userSector && emp.sector_id !== userSector) {
+            await sb.entities.Employee.update(emp.id, { $unset: { user_id: "" } });
+            fixes.user_ids_limpiados.push({ employee: emp.full_name, old_user_id: emp.user_id });
+          } else {
+            await sb.entities.Employee.update(emp.id, { user_id: matchByEmail.id });
+            fixes.vinculados_nuevos.push({ employee: emp.full_name, email: emp.email, user_id: matchByEmail.id });
+          }
         } else {
           await sb.entities.Employee.update(emp.id, { $unset: { user_id: "" } });
           fixes.user_ids_limpiados.push({ employee: emp.full_name, old_user_id: emp.user_id });
@@ -88,6 +95,9 @@ Deno.serve(async (req) => {
       if (!empEmail) continue;
       const match = usersByEmail[empEmail];
       if (match) {
+        // Solo vincular si coinciden sectores (o el empleado no tiene sector) — evita desync cross-sector
+        const userSector = match.data?.sector_id || match.sector_id;
+        if (emp.sector_id && userSector && emp.sector_id !== userSector) continue;
         await sb.entities.Employee.update(emp.id, { user_id: match.id });
         fixes.vinculados_nuevos.push({ employee: emp.full_name, email: emp.email, user_id: match.id });
       }

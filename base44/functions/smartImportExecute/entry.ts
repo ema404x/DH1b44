@@ -60,6 +60,13 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Aislamiento de raíz: todo lo importado cae al sector activo del operador.
+  const callerSector = user.data?.sector_id || user.sector_id;
+  if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
+  // Entidades globales (sin sector_id) — no se estampa sector
+  const GLOBAL_ENTITIES = new Set(['PrecarioMinisterio']);
+
   const { mapping, raw_data } = await req.json();
   const sheets = (mapping.sheets || []).filter(s => s.target_entity && s.target_entity !== 'skip');
 
@@ -132,6 +139,7 @@ Deno.serve(async (req) => {
       if (row.every(cell => cell === null || cell === undefined || cell === '')) continue;
 
       const record = { ...defaults };
+      if (!GLOBAL_ENTITIES.has(entityKey)) record.sector_id = callerSector;
       let hasData = false;
 
       for (const [colName, fieldName] of activeMappings) {

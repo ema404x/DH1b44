@@ -10,6 +10,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Aislamiento de raíz: el import cae al sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
     const { file_url } = await req.json();
 
     if (!file_url) {
@@ -80,6 +84,7 @@ Deno.serve(async (req) => {
       comuna: dirData.comuna,
       jefe_sitio: dirData.jefe,
       estado: 'activo',
+      sector_id: callerSector,
     }));
 
     try {
@@ -109,6 +114,7 @@ Deno.serve(async (req) => {
             inspector: dirData.jefe,
             m2: 0,
             estado: 'activo',
+            sector_id: callerSector,
           });
         }
       });

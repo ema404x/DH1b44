@@ -5,9 +5,11 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
 
     const isScheduled = req.headers.get('x-automation-trigger') === 'scheduled';
+    let callerSector = null;
     if (!isScheduled) {
       const user = await base44.auth.me();
       if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      callerSector = user.data?.sector_id || user.sector_id;
     }
 
     const sb = base44.asServiceRole;
@@ -93,6 +95,12 @@ Deno.serve(async (req) => {
 
     // ── Procesar configs ──
     for (const cfg of configs) {
+      // Sector de la config: explícito, o el del caller (manual), o global (scheduled legacy).
+      const cfgSector = cfg.sector_id || callerSector;
+      const scopedAssets    = cfgSector ? assets.filter(a => !a.sector_id || a.sector_id === cfgSector) : assets;
+      const scopedMaterials  = cfgSector ? materials.filter(m => !m.sector_id || m.sector_id === cfgSector) : materials;
+      const scopedPendientes = cfgSector ? pendientesVencidos.filter(p => !p.sector_id || p.sector_id === cfgSector) : pendientesVencidos;
+      const scopedWOs        = cfgSector ? workOrders.filter(w => !w.sector_id || w.sector_id === cfgSector) : workOrders;
       const alertasGeneradas = [];
       const alertasParaNotificar = [];
 
@@ -100,7 +108,7 @@ Deno.serve(async (req) => {
       if (cfg.tipo === 'garantia_activo') {
         const diasAnticipacion = cfg.dias_anticipacion || 30;
         const nuevasAlertas = [];
-        for (const asset of assets) {
+        for (const asset of scopedAssets) {
           if (!asset.warranty_expiry) continue;
           if (keyExistente('garantia_activo', asset.id)) continue;
           const diasRestantes = Math.ceil((new Date(asset.warranty_expiry) - ahora) / 86400000);
@@ -135,7 +143,7 @@ Deno.serve(async (req) => {
       if (cfg.tipo === 'stock_material') {
         const pctExtra = cfg.umbral_stock_pct || 0;
         const nuevasAlertas = [];
-        for (const mat of materials) {
+        for (const mat of scopedMaterials) {
           if (!mat.min_stock || mat.min_stock === 0) continue;
           if (keyExistente('stock_material', mat.id)) continue;
           const umbral = mat.min_stock * (1 + pctExtra / 100);
@@ -169,7 +177,7 @@ Deno.serve(async (req) => {
       if (cfg.tipo === 'pendiente_vencido') {
         const diasLimite = cfg.dias_vencimiento_pendiente || 7;
         const nuevasAlertas = [];
-        for (const p of pendientesVencidos) {
+        for (const p of scopedPendientes) {
           if (!p.fecha_limite) continue;
           if (keyExistente('pendiente_vencido', p.id)) continue;
           const diasVencidos = Math.ceil((ahora - new Date(p.fecha_limite)) / 86400000);
@@ -202,7 +210,7 @@ Deno.serve(async (req) => {
       if (cfg.tipo === 'ot_vencida') {
         const diasLimite = cfg.dias_vencimiento_ot || 1;
         const nuevasAlertas = [];
-        for (const ot of workOrders) {
+        for (const ot of scopedWOs) {
           if (!ot.scheduled_date) continue;
           if (['completada', 'cancelada'].includes(ot.status)) continue;
           if (keyExistente('ot_vencida', ot.id)) continue;

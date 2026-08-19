@@ -5,6 +5,10 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Aislamiento de raíz: los pendientes caen al sector activo del operador.
+  const callerSector = user.data?.sector_id || user.sector_id;
+  if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
   const { processed_data, inspector_name, inspector_email } = await req.json();
 
   if (!processed_data || !Array.isArray(processed_data)) {
@@ -43,6 +47,7 @@ Deno.serve(async (req) => {
             prioridad: 'media',
             jefe_sitio: inspector_name || null,
             jefe_sitio_email: inspector_email || null,
+            sector_id: callerSector,
           });
           totalImported++;
         } catch (e) {

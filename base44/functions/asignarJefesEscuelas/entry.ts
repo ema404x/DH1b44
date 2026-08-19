@@ -13,6 +13,10 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: se requieren permisos de administrador' }, { status: 403 });
     }
 
+    // Aislamiento de raíz: solo actualizar LocationData del sector activo del operador.
+    const callerSector = user.data?.sector_id || user.sector_id;
+    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+
     const formData = await req.formData();
     const file = formData.get('file');
     if (!file) {
@@ -22,7 +26,8 @@ Deno.serve(async (req) => {
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { header: true });
 
-    const locations = await base44.asServiceRole.entities.LocationData.list('-created_date', 500);
+    const allLocations = await base44.asServiceRole.entities.LocationData.list('-created_date', 500);
+    const locations = allLocations.filter(l => !l.sector_id || l.sector_id === callerSector);
     let updated = 0;
     const errors = [];
 
