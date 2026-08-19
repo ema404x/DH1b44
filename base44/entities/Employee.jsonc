@@ -101,7 +101,14 @@
     "read": {
       "$or": [
         {
-          "data.user_id": "{{user.id}}"
+          "$and": [
+            {
+              "data.user_id": "{{user.id}}"
+            },
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            }
+          ]
         },
         {
           "$and": [
