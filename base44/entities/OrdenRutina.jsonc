@@ -141,6 +141,11 @@
               }
             },
             {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
               "data.responsable_id": "{{user.id}}"
             }
           ]
