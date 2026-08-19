@@ -9,9 +9,18 @@ import { Loader2 } from 'lucide-react';
 
 export default function EntityFormDialog({ open, onOpenChange, title, fields, initialData, onSave, saving }) {
   const [form, setForm] = useState(initialData || {});
+  const prevOpen = React.useRef(open);
 
+  // Resetear el form SOLO cuando el dialog se abre (false → true).
+  // Si dependemos de `initialData` (objeto nuevo en cada render del padre),
+  // el efecto se dispara en cada keystroke y pisaría lo que el usuario escribe,
+  // impidiendo cargar datos en el alta. El edit funciona porque `editing` es
+  // una referencia estable; el alta pasa un literal nuevo → reset continuo.
   React.useEffect(() => {
-    if (open) setForm(initialData || {});
+    if (open && !prevOpen.current) {
+      setForm(initialData || {});
+    }
+    prevOpen.current = open;
   }, [open, initialData]);
 
   const handleChange = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
