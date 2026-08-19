@@ -132,23 +132,7 @@
   "rls": {
     "create": {},
     "read": {
-      "$and": [
-        {
-          "data.sector_id": "{{user.data.sector_id}}"
-        },
-        {
-          "$or": [
-            {
-              "user_condition": {
-                "role": "admin"
-              }
-            },
-            {
-              "created_by_id": "{{user.id}}"
-            }
-          ]
-        }
-      ]
+      "data.sector_id": "{{user.data.sector_id}}"
     },
     "update": {
       "$and": [
