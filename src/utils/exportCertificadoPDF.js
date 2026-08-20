@@ -187,21 +187,47 @@ export async function exportCertificadoPDF(form) {
     ['FIN', fmtDate(form.fecha_finalizacion)],
     ['MONTO CONTRATADO', fmt(montoContratado)],
   ];
+  // Anchos disponibles para los valores de cada columna. El izquierdo arranca
+  // en M+40 y debe caber hasta antes de la columna derecha; el derecho arranca
+  // en W/2+48 y debe caber hasta W-M. Sin este wrapping, textos largos
+  // (emprendimiento, obra/servicio, contratista) se amontonan o se interponen
+  // con la columna opuesta.
+  const L_KEY_X = M, L_VAL_X = M + 40;
+  const L_VAL_MAXW = (W / 2 - 4) - L_VAL_X - 1;
+  const R_KEY_X = W / 2 + 5, R_VAL_X = W / 2 + 48;
+  const R_VAL_MAXW = (W - M) - R_VAL_X - 1;
   const INFO_LINE = 5.5;
-  doc.setFontSize(8); doc.setTextColor(40, 40, 40);
-  leftInfo.forEach(([k, v], i) => {
-    const ry = y + i * INFO_LINE;
-    doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80); doc.text(k + ':', M, ry);
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
-    doc.text(String(v || '—'), M + 40, ry);
-  });
-  rightInfo.forEach(([k, v], i) => {
-    const ry = y + i * INFO_LINE;
-    doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80); doc.text(k + ':', W / 2 + 5, ry);
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
-    doc.text(String(v || '—'), W / 2 + 48, ry);
-  });
-  y += Math.max(leftInfo.length, rightInfo.length) * INFO_LINE + 4;
+
+  doc.setFontSize(8);
+  const rows = Math.max(leftInfo.length, rightInfo.length);
+  for (let i = 0; i < rows; i++) {
+    let leftLines = [], rightLines = [];
+    if (leftInfo[i]) {
+      doc.setFont('helvetica', 'normal');
+      leftLines = doc.splitTextToSize(String(leftInfo[i][1] || '—'), L_VAL_MAXW);
+    }
+    if (rightInfo[i]) {
+      doc.setFont('helvetica', 'normal');
+      rightLines = doc.splitTextToSize(String(rightInfo[i][1] || '—'), R_VAL_MAXW);
+    }
+    const lineCount = Math.max(leftLines.length, rightLines.length, 1);
+    const ry = y;
+
+    if (leftInfo[i]) {
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80);
+      doc.text(leftInfo[i][0] + ':', L_KEY_X, ry);
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
+      leftLines.forEach((ln, li) => doc.text(ln, L_VAL_X, ry + li * INFO_LINE));
+    }
+    if (rightInfo[i]) {
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 80, 80);
+      doc.text(rightInfo[i][0] + ':', R_KEY_X, ry);
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
+      rightLines.forEach((ln, li) => doc.text(ln, R_VAL_X, ry + li * INFO_LINE));
+    }
+    y += lineCount * INFO_LINE;
+  }
+  y += 4;
 
   doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.3);
   doc.line(M, y, W - M, y);
