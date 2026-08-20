@@ -101,7 +101,7 @@ export { normalizeName };
 export function assertAllowedFileUrl(file_url) {
   const urlObj = new URL(file_url);
   if (urlObj.protocol !== 'https:') throw new Error('Solo HTTPS permitido');
-  const ALLOWED_HOSTS = ['media.base44.com', 'storage.googleapis.com'];
+  const ALLOWED_HOSTS = ['base44.app', 'media.base44.com', 'storage.googleapis.com'];
   if (!ALLOWED_HOSTS.some(h => urlObj.hostname === h || urlObj.hostname.endsWith('.' + h))) {
     throw new Error('Dominio no permitido');
   }
