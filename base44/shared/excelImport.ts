@@ -34,6 +34,14 @@ export const CRIT_MAP = {
 };
 export const COMUNA_VALID = new Set(['8A', '8B', '10A']);
 
+// Headers que identifican la sede/ubicación del activo. Amplio para que un Excel
+// sin columna "sede" explícita igual se resuelva (la sede es la ubicación a crear).
+export const SEDE_HEADERS = [
+  'sede', 'edificio', 'establecimiento', 'escuela', 'colegio', 'cole',
+  'ubicacion', 'ubicación', 'ubicacion_fisica', 'lugar', 'sitio', 'local',
+  'direccion', 'dirección', 'deposito', 'depósito', 'galpon', 'planta',
+];
+
 // Parsea fechas del Excel (Date JS, número serial Excel, ISO, DD/MM/YYYY).
 export function parseDate(val) {
   if (!val || val === null) return null;

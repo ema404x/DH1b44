@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
 import { createScopedClient, resolveCallerSector, SectorError } from "../../shared/sectorGuard.ts";
-import { normalizeName, parseDate, mapEnum, findHeaderIndex, findHeaderRow, assertAllowedFileUrl, TYPE_MAP, STATUS_MAP, CRIT_MAP } from "../../shared/excelImport.ts";
+import { normalizeName, parseDate, mapEnum, findHeaderIndex, findHeaderRow, assertAllowedFileUrl, TYPE_MAP, STATUS_MAP, CRIT_MAP, SEDE_HEADERS } from "../../shared/excelImport.ts";
 
 Deno.serve(async (req) => {
   try {
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     const headerRowIdx = findHeaderRow(raw);
     const headers = raw[headerRowIdx] || [];
 
-    const colSede = findHeaderIndex(headers, ['sede', 'edificio', 'establecimiento']);
+    const colSede = findHeaderIndex(headers, SEDE_HEADERS);
     const colCode = findHeaderIndex(headers, ['codigo', 'cod', 'code']);
     const colName = findHeaderIndex(headers, ['nombre', 'name', 'activo', 'descripcion', 'descripción']);
     const colType = findHeaderIndex(headers, ['tipo', 'type']);

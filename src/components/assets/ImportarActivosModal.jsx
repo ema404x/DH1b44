@@ -73,7 +73,7 @@ export default function ImportarActivosModal({ open, onOpenChange }) {
             <Upload className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
             <div className="flex-1 text-xs">
               <p className="font-medium mb-1">2. Subir archivo completado</p>
-              <p className="text-muted-foreground mb-2">.xlsx o .csv. La columna "Sede" debe coincidir con un edificio del mapa.</p>
+              <p className="text-muted-foreground mb-2">.xlsx o .csv. La columna de ubicación (Sede, Edificio, Establecimiento, Ubicacion, Lugar, Dirección, etc.) identifica dónde está el activo. {isBapro ? 'Las sedes faltantes se crean automáticamente.' : 'La sede debe coincidir con un edificio del mapa.'}</p>
               <input
                 ref={inputRef}
                 type="file"

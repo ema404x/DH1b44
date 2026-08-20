@@ -2,7 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
 import { createScopedClient, resolveCallerSector, SectorError } from '../../shared/sectorGuard.ts';
 import { locationDataToEdificioPayload } from '../../shared/locationSync.ts';
-import { normalizeName, parseDate, mapEnum, findHeaderIndex, findHeaderRow, assertAllowedFileUrl, TYPE_MAP, STATUS_MAP, CRIT_MAP, COMUNA_VALID } from '../../shared/excelImport.ts';
+import { normalizeName, parseDate, mapEnum, findHeaderIndex, findHeaderRow, assertAllowedFileUrl, TYPE_MAP, STATUS_MAP, CRIT_MAP, COMUNA_VALID, SEDE_HEADERS } from '../../shared/excelImport.ts';
 
 // Importer masivo de Activos BAPRO con auto-creación de ubicaciones.
 //
@@ -68,7 +68,7 @@ export default async function(req) {
     const headerRowIdx = findHeaderRow(raw);
     const headers = raw[headerRowIdx] || [];
 
-    const colSede = findHeaderIndex(headers, ['sede', 'edificio', 'establecimiento']);
+    const colSede = findHeaderIndex(headers, SEDE_HEADERS);
     const colCode = findHeaderIndex(headers, ['codigo', 'cod', 'code']);
     const colName = findHeaderIndex(headers, ['nombre', 'name', 'activo', 'descripcion', 'descripción']);
     const colType = findHeaderIndex(headers, ['tipo', 'type']);
