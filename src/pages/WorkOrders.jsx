@@ -240,9 +240,23 @@ export default function WorkOrders() {
     },
   });
 
+  // Delete ruteado por función backend (eliminarOT): el SDK directo fallaba con
+  // 403 cuando user.data.sector_id quedaba desfasado. La función valida sector con
+  // la ficha de Empleado como fuente canónica y usa asServiceRole.
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.WorkOrder.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['workorders'] }); setSelectedOrder(null); }
+    mutationFn: async (id) => {
+      const res = await base44.functions.invoke('eliminarOT', { ot_id: id });
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      setSelectedOrder(null);
+      toast.success('OT eliminada correctamente');
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Error al eliminar la OT');
+    },
   });
 
   const handleStatusChange = async (id, newStatus) => {

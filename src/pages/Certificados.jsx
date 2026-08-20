@@ -62,52 +62,32 @@ export default function Certificados() {
     },
   });
 
-  // Emitir: siempre crea un nuevo certificado emitido (invalida borradores anteriores)
+  // Emitir vía función backend (emitirCertificado): garantiza sector_id, crea la
+  // solicitud de aprobación, y limpia el borrador previo de forma atómica. Devuelve
+  // el cert y su tipo para que la lista swithee a la pestaña correcta.
   const emitirMutation = useMutation({
     mutationFn: async (data) => {
-      // Crear primero el certificado emitido — si falla, no tocamos nada
-      const { id: _id, ...rest } = data;
-      const payload = { ...rest, estado: 'emitido' };
-      const cert = await base44.entities.Certificado.create(payload);
-
-      // Ahora que el nuevo cert existe, limpiar el anterior si correspondía
-      if (editing?.id && (editing.estado === 'borrador' || editing.estado === 'aprobado')) {
-        try {
-          await base44.entities.Certificado.delete(editing.id);
-          if (editing.estado === 'aprobado') {
-            const solicitudes = await base44.entities.SolicitudCertificado.filter({ certificado_id: editing.id });
-            for (const sol of solicitudes) await base44.entities.SolicitudCertificado.delete(sol.id);
-          }
-        } catch (_) { /* no bloquear el flujo si falla la limpieza */ }
-      }
-
-      // Crear solicitud de aprobación
-      const numero = `CERT-${cert.id.slice(-6).toUpperCase()}`;
-      await base44.entities.SolicitudCertificado.create({
-        numero,
-        titulo: `Certificado N°${cert.numero} — ${cert.contratista || cert.emprendimiento || ''}`,
-        establecimiento: cert.emprendimiento || cert.obra_servicio || '',
-        jefe_sitio: displayName,
-        jefe_sitio_email: user?.email || '',
-        descripcion_trabajo: cert.obra_servicio || '',
-        monto_solicitado: cert.subtotal || cert.monto_contratado || 0,
-        porcentaje_avance: cert.porcentaje_avance || 0,
-        periodo: cert.mes_periodo || '',
-        estado: 'enviada',
-        certificado_id: cert.id,
-        historial: [{
-          fecha: new Date().toISOString(),
-          estado: 'enviada',
-          usuario: displayName,
-          comentario: 'Certificado emitido — enviado automáticamente para aprobación',
-        }]
+      const res = await base44.functions.invoke('emitirCertificado', {
+        data,
+        editing_id: editing?.id,
+        editing_estado: editing?.estado,
+        display_name: displayName,
+        user_email: user?.email,
       });
-      return cert;
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['certificados'] });
       queryClient.invalidateQueries({ queryKey: ['solicitudes-cert'] });
-      toast.success('Certificado emitido y enviado a aprobación gerencial');
+      // Auto-switch a la pestaña del tipo emitido — antes la lista quedaba en
+      // 'abono_mensual' (default) y los certs de obra no se veían.
+      if (res?.tipo) setTab(res.tipo);
+      if (res?.solicitud_creada === false) {
+        toast.warning(res.mensaje || 'Certificado emitido, pero la solicitud de aprobación falló');
+      } else {
+        toast.success(res.mensaje || 'Certificado emitido y enviado a aprobación gerencial');
+      }
       setView('list');
       setExtracted(null);
       setEditing(null);

@@ -134,12 +134,67 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     queryFn: () => base44.entities.Employee.list('full_name', 200),
     staleTime: 600_000,
   });
+  // Operarios con cuenta de plataforma (rol 'user') del mismo sector que la OT.
+  // Muchos operarios tienen cuenta pero no ficha de Employee — sin este lookup
+  // el jefe tipea su nombre y assigned_to queda vacío (visibilidad rota).
+  const { data: operariosUsers = [] } = useQuery({
+    queryKey: ['operarios-users', data.sector_id],
+    queryFn: async () => {
+      const users = await base44.entities.User.list('-created_date', 100);
+      return users.filter(u => u.role === 'user' && (u.data?.sector_id || u.sector_id) === data.sector_id);
+    },
+    staleTime: 600_000,
+    retry: false,
+  });
   // Los jefes de sitio no pueden asignar OTs a otros jefes de sitio — solo a operarios.
   // Los gerentes/admins sí pueden asignar a cualquier empleado, incluyendo jefes.
   const isJefeRole = (role) => role && role.toLowerCase().replace(/[\s_]+/g, '').includes('jefe');
   const activeEmployees = employees
     .filter(e => (e.status === 'activo' || !e.status))
     .filter(e => isSuperAdmin || !isJefeRole(e.role));
+
+  // Resuelve nombre tipeado → { user_id, email, isJefe, full_name } buscando en
+  // Employees del sector y, si no, en platform Users (operarios sin ficha).
+  // El jefe suele asignar la OT tipeando el nombre, lo que dejaba assigned_to
+  // vacío y rompía la visibilidad del operario. Al resolver acá estampamos
+  // assigned_to = user_id → visibilidad por FK, no por string.
+  const normalizeName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ');
+  const resolveEmployeeByName = (name) => {
+    const target = normalizeName(name);
+    if (!target) return null;
+    const emp = activeEmployees.find(e => normalizeName(e.full_name) === target);
+    if (emp) return { user_id: emp.user_id, email: emp.email, isJefe: isJefeRole(emp.role), full_name: emp.full_name };
+    const op = operariosUsers.find(u => normalizeName(u.full_name) === target);
+    if (op) return { user_id: op.id, email: op.email, isJefe: false, full_name: op.full_name };
+    return null;
+  };
+
+  const handleAssignedNameChange = (e) => {
+    const name = e.target.value;
+    const match = resolveEmployeeByName(name);
+    const fields = { assigned_name: name };
+    if (match && match.user_id) {
+      fields.assigned_to = match.user_id;
+      // Si el asignado es jefe de sitio, estampar jefe_sitio_email para visibilidad RLS
+      if (match.isJefe && match.email) {
+        fields.jefe_sitio_email = match.email.toLowerCase().trim();
+      }
+    } else {
+      fields.assigned_to = '';
+    }
+    saveFields(fields);
+  };
+
+  const handleAssignedNameBlur = () => {
+    const name = (data.assigned_name || '').trim();
+    if (!name) return;
+    const match = resolveEmployeeByName(name);
+    if (!match) {
+      toast.warning(`No se encontró a "${name}" en el equipo. El operario no verá esta OT hasta tener usuario vinculado.`);
+    } else if (!match.user_id) {
+      toast.warning(`${match.full_name} no tiene usuario vinculado. No verá esta OT en Mis Órdenes hasta tenerlo.`);
+    }
+  };
 
   const closeAfterSaveRef = useRef(false);
   const saveMutation = useMutation({
@@ -490,7 +545,8 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             <div>
               <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Responsable</p>
               <Input value={data.assigned_name || ''} placeholder="Nombre del responsable…"
-                onChange={e => saveFields({ assigned_name: e.target.value, assigned_to: '' })}
+                onChange={handleAssignedNameChange}
+                onBlur={handleAssignedNameBlur}
                 className="h-8 text-[11px] bg-slate-800/80 border-white/10 text-white rounded-lg px-2" />
             </div>
             <div>
