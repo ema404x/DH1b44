@@ -119,43 +119,99 @@ export default async function(req) {
     const sedesCreadas = [];
     let duplicados = 0;
 
+    // Sede por defecto para todo el lote cuando el Excel no trae columna de
+    // ubicación. Se crea una sola vez (lazy) y se reutiliza en todas las filas,
+    // así la importación nunca aborta por "sin sede".
+    let defaultSede = null;
+    async function getDefaultSede() {
+      if (defaultSede !== null) return defaultSede;
+      const norm = normalizeName('Sede Principal');
+      // Reutilizar si ya existe una con ese nombre en el sector.
+      defaultSede = edByNorm.get(norm) || null;
+      if (!defaultSede && auto_create_locations) {
+        try {
+          let ld = ldByNorm.get(norm);
+          if (!ld) {
+            ld = await sb.entities.LocationData.create({
+              ubic_tecnica: 'sede-principal',
+              establecimiento: 'Sede Principal',
+              comuna: '10A',
+              jefe_sitio: '',
+              estado: 'activo',
+            });
+            ldByNorm.set(norm, ld);
+          }
+          const ed = await sb.entities.Edificio.create({
+            nombre: 'Sede Principal',
+            comuna: 'Otra',
+            jefe_sitio: '',
+            activo: true,
+            location_id: ld.id,
+          });
+          edByNorm.set(norm, ed);
+          edByLink.set(ld.id, ed);
+          defaultSede = ed;
+          sedesCreadas.push({ nombre: 'Sede Principal', locationdata_id: ld.id });
+        } catch (e) {
+          parseErrors.push(`Sede por defecto: no se pudo crear (${e.message})`);
+          defaultSede = false; // marca fallo para no reintentar
+        }
+      }
+      return defaultSede;
+    }
+
     // Resolver/crear la sede de una fila → devuelve { location_id, sedeNombre }.
+    // Resistente: si la creación falla para una sede, se registra el error y se
+    // continúa (el activo se crea sin vínculo o con sede por defecto) en lugar de
+    // abortar toda la importación.
     async function resolveSede(sedeRaw, comunaRaw, jefeRaw) {
-      if (!sedeRaw) return { location_id: null, sedeNombre: '', created: false };
+      if (!sedeRaw) {
+        const def = await getDefaultSede();
+        return def ? { location_id: def.id, sedeNombre: def.nombre, created: false } : { location_id: null, sedeNombre: '', created: false };
+      }
       const norm = normalizeName(sedeRaw);
       if (!norm) return { location_id: null, sedeNombre: '', created: false };
 
-      // Edificio existente por nombre o por link a LocationData.
       let ed = edByNorm.get(norm) || null;
       let ld = ldByNorm.get(norm) || null;
 
       if (!ld && auto_create_locations) {
-        // Crear LocationData (requiere ubic_tecnica + comuna).
         const comuna = COMUNA_VALID.has(String(comunaRaw || '').toUpperCase()) ? String(comunaRaw).toUpperCase() : '10A';
-        const ubic = norm.slice(0, 50);
-        ld = await sb.entities.LocationData.create({
-          ubic_tecnica: ubic,
-          establecimiento: sedeRaw.slice(0, 200),
-          comuna,
-          jefe_sitio: jefeRaw || '',
-          estado: 'activo',
-        });
-        ldByNorm.set(norm, ld);
-        sedesCreadas.push({ nombre: sedeRaw, locationdata_id: ld.id });
+        const ubic = (norm.slice(0, 45) || 'sede').padEnd(3, 'x');
+        try {
+          ld = await sb.entities.LocationData.create({
+            ubic_tecnica: ubic,
+            establecimiento: sedeRaw.slice(0, 200),
+            comuna,
+            jefe_sitio: jefeRaw || '',
+            estado: 'activo',
+          });
+          ldByNorm.set(norm, ld);
+          sedesCreadas.push({ nombre: sedeRaw, locationdata_id: ld.id });
+        } catch (e) {
+          parseErrors.push(`Sede "${sedeRaw}": no se creó ubicación (${e.message})`);
+          ldByNorm.set(norm, false); // cachea fallo: no reintentar en filas siguientes
+          ld = null;
+        }
       }
 
       if (!ed && ld && auto_create_locations) {
-        // Crear Edificio espejo vinculado.
         const payload = locationDataToEdificioPayload(ld);
-        ed = await sb.entities.Edificio.create({
-          nombre: payload.nombre,
-          comuna: payload.comuna || 'Otra',
-          jefe_sitio: payload.jefe_sitio,
-          activo: payload.activo,
-          location_id: ld.id,
-        });
-        edByNorm.set(norm, ed);
-        edByLink.set(ld.id, ed);
+        try {
+          ed = await sb.entities.Edificio.create({
+            nombre: payload.nombre,
+            comuna: payload.comuna || 'Otra',
+            jefe_sitio: payload.jefe_sitio,
+            activo: payload.activo,
+            location_id: ld.id,
+          });
+          edByNorm.set(norm, ed);
+          edByLink.set(ld.id, ed);
+        } catch (e) {
+          parseErrors.push(`Sede "${sedeRaw}": no se creó edificio (${e.message})`);
+          edByNorm.set(norm, false);
+          ed = null;
+        }
       }
 
       return {
@@ -171,8 +227,8 @@ export default async function(req) {
       const name = colName >= 0 && row[colName] ? String(row[colName]).trim() : null;
       if (!name) { parseErrors.push(`Fila ${i + 1}: sin nombre de activo`); continue; }
 
+      // sede opcional: si falta, resolveSede usa una sede por defecto para el lote.
       const sedeRaw = colSede >= 0 && row[colSede] ? String(row[colSede]).trim() : '';
-      if (!sedeRaw) { parseErrors.push(`Fila ${i + 1}: sin sede (requerida)`); continue; }
 
       const code = colCode >= 0 && row[colCode] ? String(row[colCode]).trim() : '';
       const comunaRaw = colComuna >= 0 && row[colComuna] ? String(row[colComuna]).trim() : '';
