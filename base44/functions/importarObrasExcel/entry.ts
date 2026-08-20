@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
 import { createScopedClient, resolveCallerSector, SectorError } from "../../shared/sectorGuard.ts";
+import { assertAllowedFileUrl } from '../../shared/excelImport.ts';
 
 function parseDate(val) {
   if (!val) return null;
@@ -81,19 +82,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'file_url requerido y válido' }, { status: 400 });
     }
 
-    // ⚠️ SECURITY: Validar que la URL sea segura (prevenir SSRF)
-    try {
-      const urlObj = new URL(file_url);
-      if (urlObj.protocol !== 'https:') {
-        return Response.json({ error: 'Solo HTTPS permitido' }, { status: 403 });
-      }
-      const ALLOWED_HOSTS = ['media.base44.com', 'storage.googleapis.com'];
-      if (!ALLOWED_HOSTS.some(h => urlObj.hostname === h || urlObj.hostname.endsWith('.' + h))) {
-        return Response.json({ error: 'Dominio no permitido' }, { status: 403 });
-      }
-    } catch {
-      return Response.json({ error: 'URL inválida' }, { status: 400 });
-    }
+    // ⚠️ SECURITY: validación centralizada en shared/excelImport.ts (prevenir SSRF)
+    try { assertAllowedFileUrl(file_url); }
+    catch { return Response.json({ error: 'URL inválida o dominio no permitido' }, { status: 400 }); }
 
     const res = await fetch(file_url, { signal: AbortSignal.timeout(30000) });
     if (!res.ok) return Response.json({ error: `Descarga fallida: ${res.status}` }, { status: 400 });

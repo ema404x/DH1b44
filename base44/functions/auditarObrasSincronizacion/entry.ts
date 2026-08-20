@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
+import { assertAllowedFileUrl } from '../../shared/excelImport.ts';
 
 function parseDate(val) {
   if (!val) return null;
@@ -134,17 +135,9 @@ Deno.serve(async (req) => {
     const { file_url, fix = false } = await req.json();
     if (!file_url) return Response.json({ error: 'file_url requerido' }, { status: 400 });
 
-    // SSRF protection: solo permitir dominios de almacenamiento confiables
-    try {
-      const parsed = new URL(file_url);
-      if (parsed.protocol !== 'https:') return Response.json({ error: 'Solo HTTPS permitido' }, { status: 403 });
-      const ALLOWED_HOSTS = ['media.base44.com', 'storage.googleapis.com'];
-      if (!ALLOWED_HOSTS.some(h => parsed.hostname === h || parsed.hostname.endsWith('.' + h))) {
-        return Response.json({ error: 'Dominio no permitido' }, { status: 403 });
-      }
-    } catch {
-      return Response.json({ error: 'URL inválida' }, { status: 400 });
-    }
+    // SSRF protection: validación centralizada en shared/excelImport.ts
+    try { assertAllowedFileUrl(file_url); }
+    catch { return Response.json({ error: 'URL inválida o dominio no permitido' }, { status: 400 }); }
 
     const res = await fetch(file_url, { signal: AbortSignal.timeout(30000) });
     if (!res.ok) return Response.json({ error: `Descarga fallida: ${res.status}` }, { status: 400 });
