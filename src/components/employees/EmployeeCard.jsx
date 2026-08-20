@@ -60,8 +60,13 @@ export function getLinkStatus(emp, users = [], rolePermissions = []) {
   return { level: 'ok', label: 'Vinculado', detail: 'Puede ingresar al sistema correctamente' };
 }
 
+const sectorBadgeColors = {
+  bapro:   'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+  escuela: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+};
+
 export default function EmployeeCard({
-  emp, canEdit, canDelete, roleLabel, roleBadgeClass, item, users, rolePermissions, onEdit, onDelete, onQR, onRelink, isRelinking
+  emp, canEdit, canDelete, roleLabel, roleBadgeClass, sectorLabel, item, users, rolePermissions, onEdit, onDelete, onQR, onRelink, isRelinking
 }) {
   const linkStatus = getLinkStatus(emp, users, rolePermissions);
   const hasIssue = linkStatus.level === 'error';
@@ -82,6 +87,12 @@ export default function EmployeeCard({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-semibold text-white">{emp.full_name}</p>
+                  {sectorLabel && (
+                    <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium mt-1 ${sectorBadgeColors[emp.sector_id] || 'bg-slate-500/20 text-slate-300 border border-slate-500/30'}`}>
+                      <Building2 className="h-2.5 w-2.5" />
+                      {sectorLabel}
+                    </span>
+                  )}
                   <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                     <span className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full font-medium ${roleBadgeClass}`}>
                       {roleLabel}

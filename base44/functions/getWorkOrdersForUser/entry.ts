@@ -19,13 +19,13 @@ export default async function(req) {
 
     const userEmail = (user.email || '').toLowerCase().trim();
     const userId = user.id;
-    const userSector = user.data?.sector_id || user.sector_id;
-    if (!userSector) {
-      return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
-    }
     const platformRole = user.role;
 
-    // Resolver empleado vinculado para obtener rol y nombre canónico
+    // Resolver empleado vinculado ANTES de calcular el sector: la ficha de
+    // Empleado es la fuente canónica de sector (decisión del proyecto). Si el
+    // usuario de plataforma quedó con un data.sector_id stale (ej. asignado
+    // antes de existir cambiarSectorActivo), usar el sector de la ficha evita
+    // que la función devuelva OTs de otro sector.
     let employee = null;
     if (userEmail) {
       const empResults = await base44.asServiceRole.entities.Employee.filter({ email: userEmail });
@@ -35,6 +35,28 @@ export default async function(req) {
       const empByUserId = await base44.asServiceRole.entities.Employee.filter({ user_id: userId });
       employee = empByUserId[0] || null;
     }
+
+    const userSector = employee?.sector_id || user.data?.sector_id || user.sector_id;
+    if (!userSector) {
+      return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+    }
+
+    // Reconciliación best-effort: si la ficha tiene sector y difiere del
+    // usuario de plataforma, alinear data.sector_id (canónico para RLS) y el
+    // top-level sector_id (legacy) al sector de la ficha. Idempotente y no
+    // interrumpe el flujo si la escritura falla. Así Dashboard/Reportes/RLS
+    // también quedan en el sector correcto sin pedirle al usuario que re-logee.
+    try {
+      if (employee?.sector_id) {
+        const platformSector = user.data?.sector_id || user.sector_id;
+        if (platformSector && platformSector !== employee.sector_id) {
+          await base44.asServiceRole.entities.User.update(userId, {
+            sector_id: employee.sector_id,
+            data: { ...user.data, sector_id: employee.sector_id },
+          });
+        }
+      }
+    } catch (_) {}
 
     const employeeRole = (employee?.role || '').toLowerCase().trim();
     const employeeName = employee?.full_name || user.full_name || '';

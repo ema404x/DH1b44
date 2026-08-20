@@ -131,6 +131,14 @@ export default function Employees() {
   const getRoleBadgeClass = (roleKey) =>
     roleBadgeColors[roleKey] || 'bg-slate-500/20 text-slate-300 border border-slate-500/30';
 
+  // Resuelve la etiqueta legible del sector (BAPRO / Escuela) desde el mapa
+  // de sectores ya cargado en la página, para mostrarla en la placa del empleado.
+  const getSectorLabel = (sectorId) => {
+    if (!sectorId) return '';
+    const s = sectors.find(x => x.clave === sectorId);
+    return s?.nombre || s?.clave || sectorId;
+  };
+
   const stats = useMemo(() => ({
     total: employees.length,
     activos: employees.filter(e => e.status === 'activo').length,
@@ -375,6 +383,7 @@ export default function Employees() {
               canDelete={canDelete}
               roleLabel={getRoleLabel(emp.role)}
               roleBadgeClass={getRoleBadgeClass(emp.role)}
+              sectorLabel={getSectorLabel(emp.sector_id)}
               item={item}
               onEdit={(emp) => { setEditing(emp); setDialogOpen(true); }}
               onDelete={(id) => deleteMutation.mutate(id)}
