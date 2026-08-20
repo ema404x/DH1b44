@@ -1,10 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Loader2, Download, Upload, CheckCircle2, AlertTriangle, FileSpreadsheet } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Loader2, Download, Upload, CheckCircle2, AlertTriangle, FileSpreadsheet, Building2 } from 'lucide-react';
 import { downloadPlantillaActivos } from '@/utils/exportActivosExcel';
 
 export default function ImportarActivosModal({ open, onOpenChange }) {
@@ -12,8 +14,15 @@ export default function ImportarActivosModal({ open, onOpenChange }) {
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [autoCreateLocations, setAutoCreateLocations] = useState(true);
+  const { user } = useCurrentUser();
   const qc = useQueryClient();
   const inputRef = useRef(null);
+
+  // auto-creación de ubicaciones: default ON para BAPRO (sector sin sedes precargadas),
+  // OFF para escuela (las sedes ya existen y no queremos crear duplicados por error de tipeo).
+  const sector = user?.data?.sector_id || user?.sector_id;
+  const isBapro = sector === 'bapro';
 
   const reset = () => { setFile(null); setResult(null); setError(null); };
 
@@ -24,9 +33,13 @@ export default function ImportarActivosModal({ open, onOpenChange }) {
     setResult(null);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      const res = await base44.functions.invoke('importarActivosExcel', { file_url });
-      setResult(res);
+      // BAPRO usa el importer con auto-creación; escuela usa el importer clásico.
+      const fnName = isBapro ? 'importarActivosBapro' : 'importarActivosExcel';
+      const payload = isBapro ? { file_url, auto_create_locations: autoCreateLocations } : { file_url };
+      const res = await base44.functions.invoke(fnName, payload);
+      setResult(res.data || res);
       qc.invalidateQueries({ queryKey: ['assets'] });
+      qc.invalidateQueries({ queryKey: ['edificios'] });
     } catch (err) {
       setError(err.message || 'Error al importar');
     } finally {
@@ -77,6 +90,21 @@ export default function ImportarActivosModal({ open, onOpenChange }) {
             </div>
           </div>
 
+          {isBapro && (
+            <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <Building2 className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 text-xs">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium mb-0.5">Crear ubicaciones faltantes automáticamente</p>
+                    <p className="text-muted-foreground">Las sedes del Excel que no existan se crean como LocationData + Edificio y se vinculan al activo.</p>
+                  </div>
+                  <Switch checked={autoCreateLocations} onCheckedChange={setAutoCreateLocations} />
+                </div>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 p-2.5 rounded-md">
               <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
@@ -107,6 +135,17 @@ export default function ImportarActivosModal({ open, onOpenChange }) {
                   <div className="text-muted-foreground">Errores</div>
                 </div>
               </div>
+              {result.sedes_creadas > 0 && (
+                <div className="text-[11px] text-emerald-600 mt-1">
+                  <Building2 className="h-3 w-3 inline mr-1" />
+                  {result.sedes_creadas} sede(s) nueva(s) creada(s) y vinculada(s) automáticamente.
+                </div>
+              )}
+              {result.parseErrors?.length > 0 && (
+                <div className="text-[11px] text-amber-600 max-h-20 overflow-y-auto mt-1 space-y-0.5">
+                  {result.parseErrors.slice(0, 10).map((e, i) => <div key={i}>• {e}</div>)}
+                </div>
+              )}
               {result.errorDetails?.length > 0 && (
                 <div className="text-[11px] text-muted-foreground max-h-24 overflow-y-auto mt-2 space-y-0.5">
                   {result.errorDetails.map((e, i) => <div key={i}>• {e}</div>)}

@@ -129,11 +129,25 @@ function makeScopedEntity(entity, sector, isGlobal) {
 
 // Devuelve { entities } con todas las entidades asServiceRole envueltas
 // con aislamiento por sector. Drop-in reemplazo de base44.asServiceRole.
+//
+// NOTA: asServiceRole.entities es un Proxy del SDK cuyas entidades NO son
+// own-enumerable (Object.keys devuelve []). Por eso envolvemos on-demand con
+// un Proxy que crea el scoped entity la primera vez que se accede a cada
+// nombre. Las funciones que ya usan createScopedClient acceden por nombre
+// (sb.entities.Asset), así que la API se preserva.
 export function createScopedClient(base44, sector) {
   const raw = base44.asServiceRole.entities;
-  const scoped = {};
-  for (const name of Object.keys(raw)) {
-    scoped[name] = makeScopedEntity(raw[name], sector, GLOBAL_ENTITIES.has(name));
-  }
-  return { entities: scoped };
+  const cache = new Map();
+  const entities = new Proxy({}, {
+    get(_target, prop) {
+      if (typeof prop !== 'string') return undefined;
+      if (cache.has(prop)) return cache.get(prop);
+      const entity = raw[prop];
+      if (!entity) return undefined;
+      const scoped = makeScopedEntity(entity, sector, GLOBAL_ENTITIES.has(prop));
+      cache.set(prop, scoped);
+      return scoped;
+    },
+  });
+  return { entities };
 }

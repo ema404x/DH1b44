@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Boxes, ClipboardList, Link2 } from 'lucide-react';
+import { Boxes, ClipboardList, Link2, RefreshCw } from 'lucide-react';
 import ActivosTab from '@/components/assets/ActivosTab';
 import PendientesTab from '@/components/assets/PendientesTab';
 import RevisionBaproPanel from '@/components/assets/RevisionBaproPanel';
+import SincronizacionPanel from '@/components/assets/SincronizacionPanel';
 
 export default function Assets() {
   const [tab, setTab] = useState('activos');
@@ -28,10 +29,12 @@ export default function Assets() {
           <TabsTrigger value="activos" className="gap-1.5"><Boxes className="h-3.5 w-3.5" />Catálogo</TabsTrigger>
           <TabsTrigger value="pendientes" className="gap-1.5"><ClipboardList className="h-3.5 w-3.5" />Pendientes SAP</TabsTrigger>
           <TabsTrigger value="bapro" className="gap-1.5"><Link2 className="h-3.5 w-3.5" />Revisión BAPRO</TabsTrigger>
+          <TabsTrigger value="sync" className="gap-1.5"><RefreshCw className="h-3.5 w-3.5" />Sincronización</TabsTrigger>
         </TabsList>
         <TabsContent value="activos" className="mt-5"><ActivosTab /></TabsContent>
         <TabsContent value="pendientes" className="mt-5"><PendientesTab /></TabsContent>
         <TabsContent value="bapro" className="mt-5"><RevisionBaproPanel sedes={sedes} /></TabsContent>
+        <TabsContent value="sync" className="mt-5"><SincronizacionPanel /></TabsContent>
       </Tabs>
     </div>
   );
