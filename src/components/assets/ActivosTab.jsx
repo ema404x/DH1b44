@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Search, Plus, Download, Upload, FileText, Pencil, Trash2, Cpu, Zap, Wind, Droplets, Car, Hammer, Building, Shield, Monitor, Sofa, CheckCircle2, Clock } from 'lucide-react';
+import { Search, Plus, Download, Upload, FileText, Pencil, Trash2, QrCode, Cpu, Zap, Wind, Droplets, Car, Hammer, Building, Shield, Monitor, Sofa, CheckCircle2, Clock } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AssetFormDialog from '@/components/assets/AssetFormDialog';
 import ImportarActivosModal from '@/components/assets/ImportarActivosModal';
+import AssetQRModal from '@/components/assets/AssetQRModal';
 import { exportActivosToExcel, exportActivosToPDF } from '@/utils/exportActivosExcel';
 import { fmtCurrency } from '@/lib/format';
 
@@ -44,6 +45,7 @@ export default function ActivosTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [qrAsset, setQrAsset] = useState(null);
   const [exportMenu, setExportMenu] = useState(false);
   const qc = useQueryClient();
 
@@ -223,7 +225,8 @@ export default function ActivosTab() {
                       <td className="px-3 py-2.5 hidden lg:table-cell text-right text-xs tabular-nums">{asset.purchase_cost ? fmtCurrency(asset.purchase_cost) : '—'}</td>
                       <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                         <div className="flex gap-0.5">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(asset)}><Pencil className="h-3.5 w-3.5" /></Button>
+                           <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => setQrAsset(asset)} title="Ver QR del activo"><QrCode className="h-3.5 w-3.5" /></Button>
+                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(asset)}><Pencil className="h-3.5 w-3.5" /></Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -261,6 +264,7 @@ export default function ActivosTab() {
 
       <AssetFormDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editing} sedes={sedes} />
       <ImportarActivosModal open={importOpen} onOpenChange={setImportOpen} />
+      <AssetQRModal open={!!qrAsset} onOpenChange={(o) => !o && setQrAsset(null)} asset={qrAsset} />
     </div>
   );
 }

@@ -272,6 +272,23 @@ export default function PortalOperarioApp() {
       return;
     }
 
+    // Tipo 'asset' — buscar OTs del activo via backend (service role, sin RLS).
+    // Reusa el mismo modal de lista que las ubicaciones (LocationOTListModal).
+    if (result.type === 'asset') {
+      setLocOTs({ orders: [], name: 'Cargando…', loading: true, locId: null, assetId: result.value, error: false });
+      try {
+        const res = await base44.functions.invoke('publicFichar', {
+          action: 'getWorkOrdersForAsset',
+          assetId: result.value,
+        });
+        const data = res.data || {};
+        setLocOTs({ orders: data.workOrders || [], name: data.assetName || 'Activo', loading: false, assetId: result.value, error: false });
+      } catch {
+        setLocOTs({ orders: [], name: 'Activo', loading: false, assetId: result.value, error: true });
+      }
+      return;
+    }
+
     // Tipo 'ot' o 'raw' (ID crudo) — buscar la OT via backend (service role) para evitar RLS
     const otId = result.value;
     if (!otId) {
@@ -312,6 +329,18 @@ export default function PortalOperarioApp() {
   };
 
   const handleRetryLoc = async () => {
+    if (locOTs?.assetId) {
+      const assetId = locOTs.assetId;
+      setLocOTs({ orders: [], name: 'Cargando…', loading: true, assetId, error: false });
+      try {
+        const res = await base44.functions.invoke('publicFichar', { action: 'getWorkOrdersForAsset', assetId });
+        const data = res.data || {};
+        setLocOTs({ orders: data.workOrders || [], name: data.assetName || 'Activo', loading: false, assetId, error: false });
+      } catch {
+        setLocOTs({ orders: [], name: 'Activo', loading: false, assetId, error: true });
+      }
+      return;
+    }
     if (!locOTs?.locId) return;
     const locId = locOTs.locId;
     setLocOTs({ orders: [], name: 'Cargando…', loading: true, locId, error: false });

@@ -130,6 +130,49 @@ Deno.serve(async (req) => {
       });
     }
 
+    // GET active work orders for an ASSET (mirror of getWorkOrderForLocation).
+    // Resuelve OTs por FK asset_id (link explícito Activo ↔ OT, ya existente en
+    // el schema de WorkOrder). Sector-isolated: las OTs deben pertenecer al
+    // mismo sector que el activo (fail-closed contra fugas cross-sector).
+    if (action === 'getWorkOrdersForAsset') {
+      const { assetId } = body;
+      if (!assetId) return Response.json({ error: 'assetId requerido' }, { status: 400 });
+
+      const [assetResults, ordersByAsset] = await Promise.all([
+        sb.entities.Asset.filter({ id: assetId }).catch(() => []),
+        sb.entities.WorkOrder.filter({ asset_id: assetId }).catch(() => []),
+      ]);
+
+      const asset = assetResults[0] || null;
+      if (!asset) return Response.json({ workOrders: [], workOrder: null, asset: null, assetName: '', assetSede: '', assetType: '' });
+
+      const assetSector = asset.sector_id;
+      const sameSector = (o) => !assetSector || !o.sector_id || o.sector_id === assetSector;
+
+      // 1) OTs activas vinculadas por FK asset_id
+      let activeOrders = ordersByAsset.filter(o =>
+        !['completada', 'cancelada'].includes(o.status) && sameSector(o));
+
+      // 2) Fallback por asset_name (denormalizado) si no hay OTs con FK
+      if (activeOrders.length === 0 && asset.name) {
+        const byName = await sb.entities.WorkOrder.filter({ asset_name: asset.name }).catch(() => []);
+        activeOrders = byName.filter(o =>
+          !['completada', 'cancelada'].includes(o.status) && sameSector(o));
+      }
+
+      const priorityOrder = { urgente: 0, alta: 1, media: 2, baja: 3 };
+      activeOrders.sort((a, b) => (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2));
+
+      return Response.json({
+        workOrders: activeOrders,
+        workOrder: activeOrders[0] || null,
+        asset,
+        assetName: asset.name,
+        assetSede: asset.sede || '',
+        assetType: asset.type || '',
+      });
+    }
+
     // UPLOAD file — validar tipo y tamaño
     if (action === 'uploadFile') {
       const { fileBase64, fileName, mimeType } = body;

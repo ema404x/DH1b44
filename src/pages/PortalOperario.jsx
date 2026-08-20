@@ -185,14 +185,27 @@ function ListaOTs({ orders, locationName, locationAddress, onSelect }) {
 export default function PortalOperario() {
   const params = new URLSearchParams(window.location.search);
   const locationId = params.get('loc');
+  const assetId = params.get('asset');
 
   const [phase, setPhase] = useState('loading'); // loading | pin | list | execute | done | error
   const [locationData, setLocationData] = useState(null);
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  // Cargar datos del establecimiento
+  // Cargar datos del establecimiento (ubicación) o del activo según el parámetro.
+  // ?loc=<id>   → OTs de una ubicación (escuelas).
+  // ?asset=<id> → OTs de un activo (mismo flujo: clave → lista → ejecutar).
   useEffect(() => {
+    if (assetId) {
+      callFn({ action: 'getWorkOrdersForAsset', assetId })
+        .then(res => {
+          setLocationData({ name: res.assetName || 'Activo', address: res.assetSede || '' });
+          setOrders(res.workOrders || []);
+          setPhase('pin');
+        })
+        .catch(() => setPhase('error'));
+      return;
+    }
     if (!locationId) { setPhase('error'); return; }
     callFn({ action: 'getWorkOrderForLocation', locationId })
       .then(res => {
@@ -201,7 +214,7 @@ export default function PortalOperario() {
         setPhase('pin');
       })
       .catch(() => setPhase('error'));
-  }, [locationId]);
+  }, [locationId, assetId]);
 
   const handleAuthSuccess = () => setPhase('list');
 
@@ -217,6 +230,11 @@ export default function PortalOperario() {
   };
 
   const reloadOrders = async () => {
+    if (assetId) {
+      const res = await callFn({ action: 'getWorkOrdersForAsset', assetId });
+      setOrders(res.workOrders || []);
+      return;
+    }
     const res = await callFn({ action: 'getWorkOrderForLocation', locationId });
     setOrders(res.workOrders || []);
   };

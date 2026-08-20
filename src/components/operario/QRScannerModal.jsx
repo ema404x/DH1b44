@@ -206,8 +206,10 @@ function parseQRContent(decodedText) {
     try {
       const url = base ? new URL(urlStr, base) : new URL(urlStr);
       const loc = url.searchParams.get('loc') || url.searchParams.get('ubicacion');
+      const asset = url.searchParams.get('asset');
       const ot  = url.searchParams.get('ot');
       if (loc) return { type: 'loc', value: loc, raw: text };
+      if (asset) return { type: 'asset', value: asset, raw: text };
       if (ot)  return { type: 'ot',  value: ot,  raw: text };
       // Tiene params pero no son loc/ot/ubicacion → QR no reconocido (ej. ?id=)
       if ([...url.searchParams.keys()].length > 0) return { type: 'unknown', raw: text };
@@ -220,6 +222,9 @@ function parseQRContent(decodedText) {
   // Regex fallback: ?loc= / ?ubicacion= / ?ot=
   const locMatch = text.match(/[?&](?:loc|ubicacion)=([^&\s]+)/);
   if (locMatch) return { type: 'loc', value: locMatch[1], raw: text };
+
+  const assetMatch = text.match(/[?&]asset=([^&\s]+)/);
+  if (assetMatch) return { type: 'asset', value: assetMatch[1], raw: text };
 
   const otMatch = text.match(/[?&]ot=([^&\s]+)/);
   if (otMatch) return { type: 'ot', value: otMatch[1], raw: text };
