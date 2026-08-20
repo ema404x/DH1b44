@@ -187,6 +187,18 @@
             },
             {
               "created_by_id": "{{user.id}}"
+            },
+            {
+              "$and": [
+                {
+                  "data.sector_id": "escuela"
+                },
+                {
+                  "user_condition": {
+                    "role": "user"
+                  }
+                }
+              ]
             }
           ]
         }
