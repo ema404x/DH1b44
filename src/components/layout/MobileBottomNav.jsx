@@ -50,11 +50,11 @@ export default function MobileBottomNav({ onMore }) {
               key={item.path}
               to={item.path}
               aria-current={active ? 'page' : undefined}
-              className="relative flex flex-1 flex-col items-center justify-center gap-1 py-1.5 min-h-[56px] select-none active:bg-muted/40 transition-colors"
+              className="relative flex flex-1 flex-col items-center justify-center gap-1 py-2 min-h-[56px] select-none active:bg-muted/40 transition-colors"
             >
               <span
                 className={cn(
-                  'relative flex h-8 w-16 items-center justify-center rounded-full transition-colors',
+                  'relative flex h-9 w-16 items-center justify-center rounded-full transition-colors',
                   active ? 'bg-primary/15' : 'bg-transparent'
                 )}
               >
@@ -76,9 +76,9 @@ export default function MobileBottomNav({ onMore }) {
         <button
           onClick={onMore}
           aria-label="Más módulos"
-          className="relative flex flex-1 flex-col items-center justify-center gap-1 py-1.5 min-h-[56px] select-none active:bg-muted/40 transition-colors"
+          className="relative flex flex-1 flex-col items-center justify-center gap-1 py-2 min-h-[56px] select-none active:bg-muted/40 transition-colors"
         >
-          <span className="relative flex h-8 w-16 items-center justify-center rounded-full">
+          <span className="relative flex h-9 w-16 items-center justify-center rounded-full">
             <LayoutGrid className="h-5 w-5 text-muted-foreground" />
           </span>
           <span className="text-[10px] leading-none text-muted-foreground">Más</span>

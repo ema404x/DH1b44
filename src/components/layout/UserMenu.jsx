@@ -25,7 +25,7 @@ export default function UserMenu() {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 h-9 px-2 rounded-lg hover:bg-white/10 transition-colors"
+        className="flex items-center justify-center gap-2 h-11 w-11 lg:h-9 lg:w-auto lg:px-2 rounded-lg hover:bg-white/10 transition-colors"
       >
         <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
           {initials}

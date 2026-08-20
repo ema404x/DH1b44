@@ -81,7 +81,7 @@ export default function MobileHeader() {
       className="lg:hidden relative flex items-center px-2 border-b border-border bg-card/95 backdrop-blur-xl flex-shrink-0 z-30"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
-        height: 'calc(2.75rem + env(safe-area-inset-top))',
+        height: 'calc(3rem + env(safe-area-inset-top))',
       }}
     >
       {isRoot ? (
@@ -100,12 +100,12 @@ export default function MobileHeader() {
       )}
 
       {!isRoot && (
-        <span className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-foreground truncate max-w-[42%] pointer-events-none">
+        <span className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-foreground truncate max-w-[36%] pointer-events-none">
           {title}
         </span>
       )}
 
-      <div className="flex items-center gap-0.5 ml-auto">
+      <div className="flex items-center gap-1 ml-auto pr-1">
         <SectorSwitcher />
         <GlobalSearch variant="icon" />
         <NotificationBell />

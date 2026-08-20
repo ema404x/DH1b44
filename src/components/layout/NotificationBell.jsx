@@ -106,7 +106,7 @@ export default function NotificationBell() {
       <button
         onClick={handleOpen}
         className={cn(
-          'relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-200',
+          'relative h-11 w-11 lg:h-9 lg:w-9 rounded-lg flex items-center justify-center transition-all duration-200',
           open ? 'bg-primary/15 text-primary' : 'text-slate-400 hover:bg-white/8 hover:text-slate-200'
         )}
       >
