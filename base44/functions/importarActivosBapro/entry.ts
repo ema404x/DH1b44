@@ -8,16 +8,64 @@ import { normalizeName, parseDate, mapEnum, findHeaderIndex, findHeaderRow, asse
 //
 // Diferencia con importarActivosExcel: si una sede del Excel no existe como
 // LocationData/Edificio, la CREA (LocationData + Edificio espejo) con el
-// sector_id del caller estampado, y vincula el activo. Esto deja el catálogo
-// de BAPRO listo para go-live sin pre-carga manual de ubicaciones.
+// sector_id del caller estampado, y vincula el activo.
 //
-// Flow por fila:
-//   sede normalizada → buscar LocationData por nombre → si no, crear LocationData
-//   → buscar Edificio por location_id → si no, crear Edificio espejo
-//   → crear/actualizar Asset con location_id = Edificio.id, sede, sector_id.
-//
-// Validación: nombre requerido, sede requerida (se crea si falta), code opcional
-// (dedup), tipo/comuna dentro del enum. Filas inválidas se saltan y reportan.
+// OPTIMIZACIONES PARA VOLUMEN GRANDE:
+//   1. Pre-fetch paginado de existentes (LocationData, Edificio, Asset) sin
+//      tope de 5000 — pagina por cursor de updated_date hasta traer todo.
+//   2. Pre-creación de sedes en PARALELO (chunks de 10) ANTES del loop de
+//      filas: convierte O(2N) llamadas secuenciales en O(N/10) round-trips.
+//   3. Comuna saneada (trim) y validada contra enum antes de crear → evita 400.
+//   4. ubic_tecnica con sufijo anti-colisión (contador) para sedes con el
+//      mismo prefijo normalizado.
+//   5. bulkCreate de activos en batches de 50 con fallback binario (split
+//      a la mitad) para aislar registros malos sin caer a 1-a-1 secuencial.
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const LOCATION_PARALLEL = 10;   // sedes creadas en paralelo
+const ASSET_BATCH = 50;          // bulkCreate size
+const FETCH_PAGE = 5000;         // página del pre-fetch
+const FETCH_MAX_PAGES = 20;     // tope de páginas (100k registros) anti-loop
+
+// Pagina un entity por cursor de updated_date hasta traer todo (o hasta
+// FETCH_MAX_PAGES). Evita el tope de 5000 del list() simple.
+async function fetchAll(sb, entityName) {
+  const out = [];
+  let cursor: string | null = null;
+  for (let p = 0; p < FETCH_MAX_PAGES; p++) {
+    let page;
+    if (cursor) {
+      page = await sb.entities[entityName].filter(
+        { updated_date: { $lt: cursor } },
+        '-updated_date',
+        FETCH_PAGE,
+      );
+    } else {
+      page = await sb.entities[entityName].list('-updated_date', FETCH_PAGE);
+    }
+    if (!page || page.length === 0) break;
+    out.push(...page);
+    if (page.length < FETCH_PAGE) break;
+    // cursor = updated_date del último (más viejo) de la página ordenada desc
+    const last = page[page.length - 1];
+    cursor = last.updated_date || last.created_date || null;
+    if (!cursor) break;
+  }
+  return out;
+}
+
+// Sanea y valida la comuna contra el enum de LocationData (8A/8B/10A).
+// Cualquier valor inválido cae a '10A' — nunca se envía un enum inválido (400).
+function safeComuna(raw) {
+  const c = String(raw || '').trim().toUpperCase();
+  return COMUNA_VALID.has(c) ? c : '10A';
+}
+
+// Genera un ubic_tecnica único dentro del lote (anti-colisión por prefijo).
+function makeUbicTecnica(norm, counter) {
+  const base = (norm || 'sede').slice(0, 40).replace(/[^a-z0-9-]/g, '').padEnd(3, 'x');
+  return `${base}-${counter}`;
+}
 
 export default async function(req) {
   try {
@@ -40,14 +88,14 @@ export default async function(req) {
     try { assertAllowedFileUrl(file_url); }
     catch (e) { return Response.json({ error: e.message }, { status: 400 }); }
 
+    // ── Descarga + parse del Excel ──────────────────────────────────────
     const res = await fetch(file_url, { signal: AbortSignal.timeout(30000) });
     if (!res.ok) return Response.json({ error: `Descarga fallida: ${res.status}` }, { status: 400 });
-    const MAX_SIZE = 50 * 1024 * 1024;
     const contentLength = parseInt(res.headers.get('content-length') || '0', 10);
-    if (contentLength > MAX_SIZE) return Response.json({ error: 'Archivo demasiado grande (máx 50MB)' }, { status: 413 });
+    if (contentLength > MAX_FILE_SIZE) return Response.json({ error: 'Archivo demasiado grande (máx 50MB)' }, { status: 413 });
     const buffer = await res.arrayBuffer();
     if (buffer.byteLength === 0) return Response.json({ error: 'Archivo vacío' }, { status: 400 });
-    if (buffer.byteLength > MAX_SIZE) return Response.json({ error: 'Archivo demasiado grande (máx 50MB)' }, { status: 413 });
+    if (buffer.byteLength > MAX_FILE_SIZE) return Response.json({ error: 'Archivo demasiado grande (máx 50MB)' }, { status: 413 });
 
     let workbook;
     try {
@@ -89,11 +137,13 @@ export default async function(req) {
     const colFreq = findHeaderIndex(headers, ['frecuencia', 'frecuencia (dias)']);
     const colNotes = findHeaderIndex(headers, ['notas', 'observaciones', 'obs']);
 
-    // Caches de sedes (LocationData + Edificio) por nombre normalizado.
-    let allLD = [];
-    let allEd = [];
-    try { allLD = await sb.entities.LocationData.list('-updated_date', 5000); } catch { allLD = []; }
-    try { allEd = await sb.entities.Edificio.list('-updated_date', 5000); } catch { allEd = []; }
+    // ── Pre-fetch paginado de existentes ─────────────────────────────────
+    const [allLD, allEd, existing] = await Promise.all([
+      fetchAll(sb, 'LocationData').catch(() => []),
+      fetchAll(sb, 'Edificio').catch(() => []),
+      fetchAll(sb, 'Asset').catch(() => []),
+    ]);
+
     const ldByNorm = new Map();
     for (const ld of allLD) {
       const n = normalizeName(ld.establecimiento || ld.ubic_tecnica);
@@ -106,120 +156,128 @@ export default async function(req) {
       if (n) edByNorm.set(n, ed);
       if (ed.location_id) edByLink.set(ed.location_id, ed);
     }
-
-    // Activos existentes para dedup por code.
-    let existing = [];
-    try { existing = await sb.entities.Asset.list('-updated_date', 5000); } catch { existing = []; }
     const existingByCode = new Map();
     for (const a of existing) if (a.code) existingByCode.set(normalizeName(a.code), a);
 
     const parseErrors = [];
+    const sedesCreadas = [];
+
+    // ── PASADA 1: recolectar sedes únicas del Excel ──────────────────────
+    // Sede por defecto si no hay columna sede.
+    const uniqueSedes = new Map(); // norm → { raw, comuna, jefe }
+    const hasSedeCol = colSede >= 0;
+    let defaultSedeNorm = normalizeName('Sede Principal');
+
+    for (let i = headerRowIdx + 1; i < raw.length; i++) {
+      const row = raw[i];
+      if (!row || row.length === 0) continue;
+      const name = colName >= 0 && row[colName] ? String(row[colName]).trim() : null;
+      if (!name) continue; // sin nombre → se salta y se reporta en pasada 2
+
+      const sedeRaw = hasSedeCol && row[colSede] ? String(row[colSede]).trim() : '';
+      const comunaRaw = colComuna >= 0 && row[colComuna] ? String(row[colComuna]).trim() : '';
+      const jefeRaw = colJefe >= 0 && row[colJefe] ? String(row[colJefe]).trim() : '';
+
+      const sedeNorm = sedeRaw ? normalizeName(sedeRaw) : defaultSedeNorm;
+      if (!uniqueSedes.has(sedeNorm)) {
+        uniqueSedes.set(sedeNorm, {
+          raw: sedeRaw || 'Sede Principal',
+          comuna: comunaRaw,
+          jefe: jefeRaw,
+        });
+      }
+    }
+
+    // ── PASADA 2: crear sedes faltantes en paralelo (chunks) ─────────────
+    const sedesToCreateLD = []; // norms que necesitan LocationData
+    for (const [norm, info] of uniqueSedes) {
+      if (!ldByNorm.has(norm) && !edByNorm.has(norm)) {
+        sedesToCreateLD.push(norm);
+      }
+    }
+
+    let ubicCounter = 0;
+    const createdLDs = []; // { norm, ld }
+    for (let i = 0; i < sedesToCreateLD.length; i += LOCATION_PARALLEL) {
+      const chunk = sedesToCreateLD.slice(i, i + LOCATION_PARALLEL);
+      const payloads = chunk.map(norm => {
+        const info = uniqueSedes.get(norm);
+        ubicCounter++;
+        return {
+          norm,
+          payload: {
+            ubic_tecnica: makeUbicTecnica(norm, ubicCounter),
+            establecimiento: info.raw.slice(0, 200),
+            comuna: safeComuna(info.comuna),
+            jefe_sitio: info.jefe.slice(0, 100),
+            estado: 'activo',
+          },
+        };
+      });
+      const results = await Promise.allSettled(
+        payloads.map(p => sb.entities.LocationData.create(p.payload)),
+      );
+      results.forEach((r, idx) => {
+        const norm = payloads[idx].norm;
+        if (r.status === 'fulfilled') {
+          const ld = r.value;
+          ldByNorm.set(norm, ld);
+          createdLDs.push({ norm, ld });
+          sedesCreadas.push({ nombre: uniqueSedes.get(norm).raw, locationdata_id: ld.id });
+        } else {
+          parseErrors.push(`Sede "${uniqueSedes.get(norm).raw}": no se creó ubicación (${r.reason?.message || r.reason})`);
+          ldByNorm.set(norm, false); // cachea fallo
+        }
+      });
+    }
+
+    // Crear Edificios espejo para los LocationData recién creados (paralelo).
+    const edificiosToCreate = createdLDs.filter(({ ld }) => ld && !edByLink.has(ld.id));
+    for (let i = 0; i < edificiosToCreate.length; i += LOCATION_PARALLEL) {
+      const chunk = edificiosToCreate.slice(i, i + LOCATION_PARALLEL);
+      const payloads = chunk.map(({ norm, ld }) => {
+        const info = locationDataToEdificioPayload(ld);
+        return {
+          norm, ld,
+          payload: {
+            nombre: info.nombre || uniqueSedes.get(norm).raw,
+            comuna: info.comuna || 'Otra',
+            jefe_sitio: info.jefe_sitio || '',
+            activo: info.activo !== false,
+            location_id: ld.id,
+          },
+        };
+      });
+      const results = await Promise.allSettled(
+        payloads.map(p => sb.entities.Edificio.create(p.payload)),
+      );
+      results.forEach((r, idx) => {
+        const { norm, ld } = payloads[idx];
+        if (r.status === 'fulfilled') {
+          const ed = r.value;
+          edByNorm.set(norm, ed);
+          edByLink.set(ld.id, ed);
+        } else {
+          parseErrors.push(`Sede "${uniqueSedes.get(norm).raw}": no se creó edificio (${r.reason?.message || r.reason})`);
+          edByNorm.set(norm, false);
+        }
+      });
+    }
+
+    // Resolver location_id por norm → reusa cache; si la creación falló, null.
+    function resolveSedeId(sedeRaw) {
+      const norm = sedeRaw ? normalizeName(sedeRaw) : defaultSedeNorm;
+      const ed = edByNorm.get(norm);
+      if (ed) return { location_id: ed.id, sedeNombre: ed.nombre };
+      const ld = ldByNorm.get(norm);
+      if (ld) return { location_id: ld.id, sedeNombre: ld.establecimiento };
+      return { location_id: null, sedeNombre: sedeRaw || '' };
+    }
+
+    // ── PASADA 3: construir assets (sin awaits) ─────────────────────────
     const toCreate = [];
     const toUpdate = [];
-    const sedesCreadas = [];
     let duplicados = 0;
-
-    // Sede por defecto para todo el lote cuando el Excel no trae columna de
-    // ubicación. Se crea una sola vez (lazy) y se reutiliza en todas las filas,
-    // así la importación nunca aborta por "sin sede".
-    let defaultSede = null;
-    async function getDefaultSede() {
-      if (defaultSede !== null) return defaultSede;
-      const norm = normalizeName('Sede Principal');
-      // Reutilizar si ya existe una con ese nombre en el sector.
-      defaultSede = edByNorm.get(norm) || null;
-      if (!defaultSede && auto_create_locations) {
-        try {
-          let ld = ldByNorm.get(norm);
-          if (!ld) {
-            ld = await sb.entities.LocationData.create({
-              ubic_tecnica: 'sede-principal',
-              establecimiento: 'Sede Principal',
-              comuna: '10A',
-              jefe_sitio: '',
-              estado: 'activo',
-            });
-            ldByNorm.set(norm, ld);
-          }
-          const ed = await sb.entities.Edificio.create({
-            nombre: 'Sede Principal',
-            comuna: 'Otra',
-            jefe_sitio: '',
-            activo: true,
-            location_id: ld.id,
-          });
-          edByNorm.set(norm, ed);
-          edByLink.set(ld.id, ed);
-          defaultSede = ed;
-          sedesCreadas.push({ nombre: 'Sede Principal', locationdata_id: ld.id });
-        } catch (e) {
-          parseErrors.push(`Sede por defecto: no se pudo crear (${e.message})`);
-          defaultSede = false; // marca fallo para no reintentar
-        }
-      }
-      return defaultSede;
-    }
-
-    // Resolver/crear la sede de una fila → devuelve { location_id, sedeNombre }.
-    // Resistente: si la creación falla para una sede, se registra el error y se
-    // continúa (el activo se crea sin vínculo o con sede por defecto) en lugar de
-    // abortar toda la importación.
-    async function resolveSede(sedeRaw, comunaRaw, jefeRaw) {
-      if (!sedeRaw) {
-        const def = await getDefaultSede();
-        return def ? { location_id: def.id, sedeNombre: def.nombre, created: false } : { location_id: null, sedeNombre: '', created: false };
-      }
-      const norm = normalizeName(sedeRaw);
-      if (!norm) return { location_id: null, sedeNombre: '', created: false };
-
-      let ed = edByNorm.get(norm) || null;
-      let ld = ldByNorm.get(norm) || null;
-
-      if (!ld && auto_create_locations) {
-        const comuna = COMUNA_VALID.has(String(comunaRaw || '').toUpperCase()) ? String(comunaRaw).toUpperCase() : '10A';
-        const ubic = (norm.slice(0, 45) || 'sede').padEnd(3, 'x');
-        try {
-          ld = await sb.entities.LocationData.create({
-            ubic_tecnica: ubic,
-            establecimiento: sedeRaw.slice(0, 200),
-            comuna,
-            jefe_sitio: jefeRaw || '',
-            estado: 'activo',
-          });
-          ldByNorm.set(norm, ld);
-          sedesCreadas.push({ nombre: sedeRaw, locationdata_id: ld.id });
-        } catch (e) {
-          parseErrors.push(`Sede "${sedeRaw}": no se creó ubicación (${e.message})`);
-          ldByNorm.set(norm, false); // cachea fallo: no reintentar en filas siguientes
-          ld = null;
-        }
-      }
-
-      if (!ed && ld && auto_create_locations) {
-        const payload = locationDataToEdificioPayload(ld);
-        try {
-          ed = await sb.entities.Edificio.create({
-            nombre: payload.nombre,
-            comuna: payload.comuna || 'Otra',
-            jefe_sitio: payload.jefe_sitio,
-            activo: payload.activo,
-            location_id: ld.id,
-          });
-          edByNorm.set(norm, ed);
-          edByLink.set(ld.id, ed);
-        } catch (e) {
-          parseErrors.push(`Sede "${sedeRaw}": no se creó edificio (${e.message})`);
-          edByNorm.set(norm, false);
-          ed = null;
-        }
-      }
-
-      return {
-        location_id: ed?.id || ld?.id || null,
-        sedeNombre: ed?.nombre || ld?.establecimiento || sedeRaw,
-        created: !!ld,
-      };
-    }
 
     for (let i = headerRowIdx + 1; i < raw.length; i++) {
       const row = raw[i];
@@ -227,15 +285,12 @@ export default async function(req) {
       const name = colName >= 0 && row[colName] ? String(row[colName]).trim() : null;
       if (!name) { parseErrors.push(`Fila ${i + 1}: sin nombre de activo`); continue; }
 
-      // sede opcional: si falta, resolveSede usa una sede por defecto para el lote.
-      const sedeRaw = colSede >= 0 && row[colSede] ? String(row[colSede]).trim() : '';
-
+      const sedeRaw = hasSedeCol && row[colSede] ? String(row[colSede]).trim() : '';
       const code = colCode >= 0 && row[colCode] ? String(row[colCode]).trim() : '';
-      const comunaRaw = colComuna >= 0 && row[colComuna] ? String(row[colComuna]).trim() : '';
+
+      const { location_id, sedeNombre } = resolveSedeId(sedeRaw);
+
       const jefeRaw = colJefe >= 0 && row[colJefe] ? String(row[colJefe]).trim() : '';
-
-      const { location_id, sedeNombre } = await resolveSede(sedeRaw, comunaRaw, jefeRaw);
-
       const tipo = colType >= 0 && row[colType] ? mapEnum(row[colType], TYPE_MAP, 'otro') : 'otro';
       const estado = colStatus >= 0 && row[colStatus] ? mapEnum(row[colStatus], STATUS_MAP, 'operativo') : 'operativo';
       const criticidad = colCrit >= 0 && row[colCrit] ? mapEnum(row[colCrit], CRIT_MAP, 'media') : 'media';
@@ -275,34 +330,54 @@ export default async function(req) {
       }
     }
 
-    const BATCH = 25;
+    // ── bulkCreate / bulkUpdate con fallback binario ────────────────────
     let created = 0, updated = 0, errors = 0;
     const errorDetails = [];
 
-    for (let b = 0; b < toCreate.length; b += BATCH) {
-      const batch = toCreate.slice(b, b + BATCH);
+    async function bulkCreateWithFallback(batch) {
       try {
         await sb.entities.Asset.bulkCreate(batch);
         created += batch.length;
       } catch (err) {
-        for (const item of batch) {
-          try { await sb.entities.Asset.create(item); created++; }
-          catch (e2) { errors++; errorDetails.push(`Crear [${item.code || '?'}] ${item.name.slice(0,40)}: ${e2.message}`); }
+        if (batch.length <= 1) {
+          errors++;
+          errorDetails.push(`Crear [${batch[0].code || '?'}] ${batch[0].name.slice(0, 40)}: ${err.message}`);
+          return;
         }
+        const mid = Math.floor(batch.length / 2);
+        await bulkCreateWithFallback(batch.slice(0, mid));
+        await bulkCreateWithFallback(batch.slice(mid));
       }
     }
-    for (let b = 0; b < toUpdate.length; b += BATCH) {
-      const batch = toUpdate.slice(b, b + BATCH);
+
+    async function bulkUpdateWithFallback(batch) {
       try {
         await sb.entities.Asset.bulkUpdate(batch);
         updated += batch.length;
       } catch (err) {
-        for (const item of batch) {
-          try { await sb.entities.Asset.update(item.id, item); updated++; }
-          catch (e2) { errors++; errorDetails.push(`Actualizar [${item.code}] id=${item.id}: ${e2.message}`); }
+        if (batch.length <= 1) {
+          errors++;
+          errorDetails.push(`Actualizar [${batch[0].code}] id=${batch[0].id}: ${err.message}`);
+          return;
         }
+        const mid = Math.floor(batch.length / 2);
+        await bulkUpdateWithFallback(batch.slice(0, mid));
+        await bulkUpdateWithFallback(batch.slice(mid));
       }
     }
+
+    // Procesar en paralelo (chunks independientes) para reducir tiempo total.
+    const createBatches = [];
+    for (let b = 0; b < toCreate.length; b += ASSET_BATCH) {
+      createBatches.push(toCreate.slice(b, b + ASSET_BATCH));
+    }
+    await Promise.allSettled(createBatches.map(bulkCreateWithFallback));
+
+    const updateBatches = [];
+    for (let b = 0; b < toUpdate.length; b += ASSET_BATCH) {
+      updateBatches.push(toUpdate.slice(b, b + ASSET_BATCH));
+    }
+    await Promise.allSettled(updateBatches.map(bulkUpdateWithFallback));
 
     return Response.json({
       ok: true,
@@ -317,6 +392,8 @@ export default async function(req) {
       parseErrors: parseErrors.slice(0, 20),
       sedes_creadas: sedesCreadas.length,
       sedes_creadas_detalle: sedesCreadas.slice(0, 50),
+      sedes_totales_unicas: uniqueSedes.size,
+      sedes_preexistentes: uniqueSedes.size - sedesToCreateLD.length,
       auto_create_locations,
     });
   } catch (err) {
