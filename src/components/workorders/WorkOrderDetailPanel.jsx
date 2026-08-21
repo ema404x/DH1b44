@@ -133,14 +133,16 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     queryFn: () => base44.entities.Employee.list('full_name', 200),
     staleTime: 600_000,
   });
-  // Operarios con cuenta de plataforma (rol 'user') del mismo sector que la OT.
-  // Muchos operarios tienen cuenta pero no ficha de Employee — sin este lookup
-  // el jefe tipea su nombre y assigned_to queda vacío (visibilidad rota).
-  const { data: operariosUsers = [] } = useQuery({
-    queryKey: ['operarios-users', data.sector_id],
+  // Operarios del sector vía backend (getOperariosSector): service-role, sector-scoped,
+  // read-only. Reemplaza los lookups client-side (Employee.list / User.list) que la RLS
+  // dejaba vacíos para un jefe_sitio → nunca podía resolver el user_id de otro operario
+  // → assigned_to quedaba vacío. Ahora el jefe resuelve operarios con cuenta y estampa
+  // assigned_to (visibilidad por FK, no solo por match de nombre en getWorkOrdersForUser).
+  const { data: operariosSector = [] } = useQuery({
+    queryKey: ['operarios-sector', data.sector_id],
     queryFn: async () => {
-      const users = await base44.entities.User.list('-created_date', 100);
-      return users.filter(u => u.role === 'user' && (u.data?.sector_id || u.sector_id) === data.sector_id);
+      const res = await base44.functions.invoke('getOperariosSector');
+      return res.data?.operarios || [];
     },
     staleTime: 600_000,
     retry: false,
@@ -151,20 +153,22 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const activeEmployees = employees
     .filter(e => (e.status === 'activo' || !e.status))
     .filter(e => isSuperAdmin || !isJefeRole(e.role));
+  const assignableOperarios = operariosSector
+    .filter(o => (o.status === 'activo' || !o.status))
+    .filter(o => isSuperAdmin || !o.is_jefe);
 
-  // Resuelve nombre tipeado → { user_id, email, isJefe, full_name } buscando en
-  // Employees del sector y, si no, en platform Users (operarios sin ficha).
-  // El jefe suele asignar la OT tipeando el nombre, lo que dejaba assigned_to
-  // vacío y rompía la visibilidad del operario. Al resolver acá estampamos
-  // assigned_to = user_id → visibilidad por FK, no por string.
+  // Resuelve nombre tipeado → { user_id, email, isJefe, full_name }. operariosSector es
+  // la lista completa del sector (fichas con/sin cuenta + users sin ficha), así un
+  // jefe_sitio ahora resuelve cualquier operario. activeEmployees queda como fallback
+  // por si operariosSector aún no cargó (cache de employees ya poblado para admins).
   const normalizeName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ');
   const resolveEmployeeByName = (name) => {
     const target = normalizeName(name);
     if (!target) return null;
+    const match = assignableOperarios.find(o => normalizeName(o.full_name) === target);
+    if (match) return { user_id: match.user_id, email: match.email, isJefe: !!match.is_jefe, full_name: match.full_name };
     const emp = activeEmployees.find(e => normalizeName(e.full_name) === target);
     if (emp) return { user_id: emp.user_id, email: emp.email, isJefe: isJefeRole(emp.role), full_name: emp.full_name };
-    const op = operariosUsers.find(u => normalizeName(u.full_name) === target);
-    if (op) return { user_id: op.id, email: op.email, isJefe: false, full_name: op.full_name };
     return null;
   };
 
