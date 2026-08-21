@@ -186,6 +186,27 @@ export default function CrearOT() {
     staleTime: 120000,
   });
 
+  // Direcciones del jefe de sitio (escuela) — para acotar el picker de activos a
+  // sus direcciones vinculadas. Solo se carga si el creador es jefe de sitio del
+  // sector escuela. La RLS de Direccion ya aísla por sector, así que acá solo
+  // filtramos por jefe_sitio (nombre) contra el del creador. Debe declararse
+  // ANTES que activeAssets (que consume misDirSet) para evitar temporal dead zone.
+  const { data: misDirecciones = [] } = useQuery({
+    queryKey: ['mis-direcciones', displayName, isEscuela, isJefeSitioCreator],
+    queryFn: () => base44.entities.Direccion.list('-created_date', 500),
+    enabled: isEscuela && isJefeSitioCreator,
+    staleTime: 300000,
+  });
+  const misDirSet = useMemo(
+    () => new Set(
+      misDirecciones
+        .filter(d => normName(d.jefe_sitio) === normName(displayName))
+        .map(d => normName(d.direccion))
+        .filter(Boolean)
+    ),
+    [misDirecciones, displayName]
+  );
+
   // Lista de activos para el buscador (excluye los dados de baja).
   const activeAssets = useMemo(
     () => (assetsRaw || [])
@@ -220,26 +241,6 @@ export default function CrearOT() {
     queryFn: () => base44.entities.Employee.list('full_name', 500),
     staleTime: 300000,
   });
-
-  // Direcciones del jefe de sitio (escuela) — para acotar el picker de activos a
-  // sus direcciones vinculadas. Solo se carga si el creador es jefe de sitio del
-  // sector escuela. La RLS de Direccion ya aísla por sector, así que acá solo
-  // filtramos por jefe_sitio (nombre) contra el del creador.
-  const { data: misDirecciones = [] } = useQuery({
-    queryKey: ['mis-direcciones', displayName, isEscuela, isJefeSitioCreator],
-    queryFn: () => base44.entities.Direccion.list('-created_date', 500),
-    enabled: isEscuela && isJefeSitioCreator,
-    staleTime: 300000,
-  });
-  const misDirSet = useMemo(
-    () => new Set(
-      misDirecciones
-        .filter(d => normName(d.jefe_sitio) === normName(displayName))
-        .map(d => normName(d.direccion))
-        .filter(Boolean)
-    ),
-    [misDirecciones, displayName]
-  );
   // Los jefes de sitio no pueden asignar OTs a otros jefes de sitio — solo a operarios.
   // Los gerentes/admins sí pueden asignar a cualquier empleado, incluyendo jefes.
   const isJefeRole = (role) => role && role.toLowerCase().replace(/[\s_]+/g, '').includes('jefe');
