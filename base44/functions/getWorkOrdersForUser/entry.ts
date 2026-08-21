@@ -115,11 +115,56 @@ export default async function(req) {
     if (isField) {
       const normName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
       const myName = normName(employeeName);
+
+      // Resolver el jefe de sitio del operario. El operario de campo ejecuta el
+      // trabajo que le solicita su jefe de sitio: debe ver TODAS las OTs que ese
+      // jefe crea (incluso las que aún no se le asignaron nominalmente). El linkage
+      // canónico es la entidad Tablet (nombre de la tablet → jefe_sitio), que es
+      // como se vincula la tablet del jefe con su cuadrilla. Fallback:
+      // Employee.assigned_jefe_sitio. El jefe se resuelve dentro del MISMO sector
+      // (aislamiento entre sectores) — si no hay tablet/jefe configurado, no se
+      // suma nada (comportamiento previo intacto, ej. sector BAPRO sin tablets).
+      let jefeUserId: string | null = null;
+      let jefeEmail = '';
+      let jefeName = '';
+      try {
+        let jefeNameStr = '';
+        if (employeeName) {
+          const tablets = await base44.asServiceRole.entities.Tablet.filter({
+            sector_id: userSector,
+            nombre: employeeName,
+          });
+          const tablet = tablets.find(t => normName(t.nombre) === normName(employeeName));
+          if (tablet?.jefe_sitio) jefeNameStr = tablet.jefe_sitio;
+        }
+        if (!jefeNameStr && employee?.assigned_jefe_sitio) {
+          jefeNameStr = employee.assigned_jefe_sitio;
+        }
+        if (jefeNameStr) {
+          const jefeEmps = await base44.asServiceRole.entities.Employee.filter({
+            sector_id: userSector,
+            full_name: jefeNameStr,
+          });
+          const jefe = jefeEmps.find(e => normName(e.full_name) === normName(jefeNameStr)) || null;
+          if (jefe) {
+            jefeUserId = jefe.user_id || null;
+            jefeEmail = (jefe.email || '').toLowerCase().trim();
+            jefeName = jefe.full_name || jefeNameStr;
+          } else {
+            jefeName = jefeNameStr;
+          }
+        }
+      } catch (_) {}
+
       result = result.filter(ot =>
         (ot.assigned_to && ot.assigned_to === userId) ||
         (ot.created_by_id && ot.created_by_id === userId) ||
         (ot.jefe_sitio_email && ot.jefe_sitio_email.toLowerCase().trim() === userEmail) ||
-        (myName && normName(ot.assigned_name) === myName)
+        (myName && normName(ot.assigned_name) === myName) ||
+        // OTs creadas por el jefe de sitio del operario
+        (jefeUserId && ot.created_by_id && ot.created_by_id === jefeUserId) ||
+        (jefeEmail && ot.jefe_sitio_email && ot.jefe_sitio_email.toLowerCase().trim() === jefeEmail) ||
+        (jefeName && normName(ot.jefe_sitio) === normName(jefeName))
       );
       return Response.json({ orders: result, total: result.length, role: employeeRole });
     }
