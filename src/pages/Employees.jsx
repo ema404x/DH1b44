@@ -18,6 +18,7 @@ import AsignacionAutomatica from '@/components/employees/AsignacionAutomatica';
 import InviteUserDialog from '@/components/employees/InviteUserDialog';
 import SyncEmployeesButton from '@/components/employees/SyncEmployeesButton';
 import EmployeeCard from '@/components/employees/EmployeeCard';
+import EmployeeSignatureDialog from '@/components/employees/EmployeeSignatureDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { usePermission } from '@/hooks/usePermission';
@@ -82,6 +83,7 @@ export default function Employees() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [qrEmployee, setQrEmployee] = useState(null);
+  const [signEmp, setSignEmp] = useState(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -388,6 +390,7 @@ export default function Employees() {
               onEdit={(emp) => { setEditing(emp); setDialogOpen(true); }}
               onDelete={(id) => deleteMutation.mutate(id)}
               onQR={setQrEmployee}
+              onSign={setSignEmp}
               onRelink={(emp) => relinkMutation.mutate(emp)}
               isRelinking={relinkMutation.isPending}
               users={users}
@@ -406,6 +409,13 @@ export default function Employees() {
       />
 
       <InviteUserDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+
+      <EmployeeSignatureDialog
+        emp={signEmp}
+        open={!!signEmp}
+        onOpenChange={(o) => { if (!o) setSignEmp(null); }}
+        onSaved={() => queryClient.invalidateQueries({ queryKey: ['employees'] })}
+      />
 
       <EntityFormDialog
         open={dialogOpen}

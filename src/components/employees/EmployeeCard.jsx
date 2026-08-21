@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   Pencil, Trash2, Phone, Mail, QrCode, MapPin, Building2,
-  CheckCircle2, XCircle, RefreshCw
+  CheckCircle2, XCircle, RefreshCw, Signature
 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -66,7 +66,7 @@ const sectorBadgeColors = {
 };
 
 export default function EmployeeCard({
-  emp, canEdit, canDelete, roleLabel, roleBadgeClass, sectorLabel, item, users, rolePermissions, onEdit, onDelete, onQR, onRelink, isRelinking
+  emp, canEdit, canDelete, roleLabel, roleBadgeClass, sectorLabel, item, users, rolePermissions, onEdit, onDelete, onQR, onRelink, isRelinking, onSign
 }) {
   const linkStatus = getLinkStatus(emp, users, rolePermissions);
   const hasIssue = linkStatus.level === 'error';
@@ -106,9 +106,14 @@ export default function EmployeeCard({
                   </div>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-cyan-400 hover:text-cyan-300" onClick={() => onQR(emp)}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-cyan-400 hover:text-cyan-300" onClick={() => onQR(emp)} title="QR de fichaje">
                     <QrCode className="h-3.5 w-3.5" />
                   </Button>
+                  {canEdit && (
+                    <Button variant="ghost" size="icon" className={`h-7 w-7 ${emp.firma_url ? 'text-emerald-400 hover:text-emerald-300' : 'text-slate-400 hover:text-emerald-300'}`} onClick={() => onSign(emp)} title="Cargar firma">
+                      <Signature className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   {canEdit && (
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400" onClick={() => onEdit(emp)}>
                       <Pencil className="h-3.5 w-3.5" />
