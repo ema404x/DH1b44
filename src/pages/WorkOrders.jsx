@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import KanbanBoard from '@/components/workorders/KanbanBoard';
+import WorkOrderCard from '@/components/workorders/WorkOrderCard';
 import WorkOrderQRButton from '@/components/workorders/WorkOrderQRButton';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { exportOTsPDF } from '@/utils/exportPDF';
@@ -45,67 +46,6 @@ const STATUS_LABELS = {
   cancelada: 'Cancelada',
 };
 
-function WorkOrderCard({ order, onOpen, onShowQR, onComplete, onStart, canComplete }) {
-  const { resolveOTOwner } = useResolveCreator();
-  const isOverdue = (() => { try { return order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
-  const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
-  const isTerminal = ['completada', 'cancelada'].includes(order.status);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`group relative bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border rounded-lg p-4 cursor-pointer transition-all hover:-translate-y-1 ${isOverdue ? 'border-red-500/30 bg-red-500/5' : 'border-slate-700/50'}`}
-      onClick={() => onOpen(order)}
-    >
-      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-        <WorkOrderQRButton order={order} onShowQR={onShowQR} />
-      </div>
-
-      <div className="flex items-start gap-3">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-          <Wrench className="h-4 w-4 text-white" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-white">{order.title}</h3>
-          <div className="flex items-center gap-2 mt-2 flex-wrap text-xs text-slate-400">
-            {order.asset_name && <span className="flex items-center gap-1"><Zap className="h-3 w-3" />{order.asset_name}</span>}
-            {order.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{order.location}</span>}
-            {order.assigned_name && <span className="flex items-center gap-1"><User className="h-3 w-3" />{order.assigned_name}</span>}
-          </div>
-          <p className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
-            <User className="h-2.5 w-2.5" /> {creadorLabel} {creadorPor}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/50">
-        <Badge className="text-xs bg-slate-700 text-slate-200">{STATUS_LABELS[order.status] || order.status}</Badge>
-        <Badge variant="secondary" className="text-xs">{order.priority}</Badge>
-        {isOverdue && <Badge className="bg-red-500/20 text-red-300 text-xs">VENCIDA</Badge>}
-        {canComplete && !isTerminal && ['pendiente', 'asignada'].includes(order.status) && (
-          <Button
-            size="sm"
-            onClick={(e) => { e.stopPropagation(); onStart(order.id); }}
-            className="ml-auto h-7 px-3 text-xs gap-1 bg-blue-600 hover:bg-blue-500 text-white"
-          >
-            <Zap className="h-3.5 w-3.5" /> Iniciar
-          </Button>
-        )}
-        {canComplete && !isTerminal && !['pendiente', 'asignada'].includes(order.status) && (
-          <Button
-            size="sm"
-            onClick={(e) => { e.stopPropagation(); onComplete(order.id); }}
-            className="ml-auto h-7 px-3 text-xs gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" /> Completar
-          </Button>
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
 export default function WorkOrders() {
   const [search, setSearch] = useState('');
   const [statusTab, setStatusTab] = useState('all');
@@ -127,7 +67,10 @@ export default function WorkOrders() {
   const isJefeSitio = isJefeSitioRole(employeeRole);
   const canCompleteOT = isGerente || isJefeSitio;
 
-  const handleComplete = async (id) => {
+  // Estabilizadas con useCallback para que las cards memoizadas (React.memo)
+  // no se re-rendericen cuando cambia una referencia de callback. queryClient
+  // es estable → estas funciones son estables de por vida del componente.
+  const handleComplete = useCallback(async (id) => {
     try {
       const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: 'completar' });
       toast.success(res.data.mensaje || 'OT completada');
@@ -136,9 +79,9 @@ export default function WorkOrders() {
       const msg = err.response?.data?.error || err.message || 'Error al completar la OT';
       toast.error(msg);
     }
-  };
+  }, [queryClient]);
 
-  const handleStart = async (id) => {
+  const handleStart = useCallback(async (id) => {
     try {
       const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: 'iniciar' });
       toast.success(res.data.mensaje || 'OT iniciada');
@@ -147,7 +90,7 @@ export default function WorkOrders() {
       const msg = err.response?.data?.error || err.message || 'Error al iniciar la OT';
       toast.error(msg);
     }
-  };
+  }, [queryClient]);
   const { allowed: canCreate } = usePermission('WorkOrder', 'create');
   const { allowed: canDelete } = usePermission('WorkOrder', 'delete');
   const { resolveCreator } = useResolveCreator();

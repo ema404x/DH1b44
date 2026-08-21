@@ -20,6 +20,7 @@ import { useEmergencyNotifications } from '@/hooks/useEmergencyNotifications';
 import EmergencyAlert from '@/components/emergencias/EmergencyAlert';
 import { useSmartCache } from '@/hooks/useSmartCache';
 import { useAppUsageTracker } from '@/hooks/useAppUsageTracker';
+import PageErrorBoundary from '@/components/shared/PageErrorBoundary';
 
 // Estable entre renders — no se recrea nunca
 const onSyncCallback = (count) =>
@@ -118,7 +119,9 @@ export default function AppLayout() {
                 exit="exit"
                 transition={{ duration: 0.2, ease: [0.4, 0.0, 0.2, 1] }}
               >
-                <Outlet />
+                <PageErrorBoundary>
+                  <Outlet />
+                </PageErrorBoundary>
               </motion.div>
             </AnimatePresence>
           </PullToRefresh>

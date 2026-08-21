@@ -9,7 +9,6 @@ const DB_VERSION = 2;
 const STORE = 'queries';
 const MAX_CACHE_AGE_MS = 1000 * 60 * 60 * 4;  // 4 horas máximo
 const MAX_ENTRIES = 40;                         // tope de entradas en storage
-const MAX_ARRAY_ITEMS = 150;                    // tope de ítems por lista guardada
 
 // ── IndexedDB setup ──────────────────────────────────────────────────────────
 let _db = null;
@@ -34,17 +33,16 @@ function openCacheDB() {
 export async function saveCacheEntry(queryKey, data) {
   if (!data || (Array.isArray(data) && data.length === 0)) return;
   try {
-    // Acotar listas grandes antes de persistir para no llenar el storage
-    const trimmed = Array.isArray(data) && data.length > MAX_ARRAY_ITEMS
-      ? data.slice(0, MAX_ARRAY_ITEMS)
-      : data;
+    // Persistir la lista completa (mismo tope que la query, p.ej. 500) para que la
+    // hidratación muestre la lista entera sin recortes a 150 que provocaban un
+    // "flash" de lista parcial que luego saltaba al llegar el dato fresco.
     const db = await openCacheDB();
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).put({
       queryKey,
-      data: trimmed,
+      data,
       savedAt: Date.now(),
-      count: Array.isArray(trimmed) ? trimmed.length : 1,
+      count: Array.isArray(data) ? data.length : 1,
     });
   } catch (_) { /* fallo silencioso — no afecta operación */ }
 }
