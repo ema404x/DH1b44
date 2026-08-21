@@ -200,8 +200,15 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   };
 
   const closeAfterSaveRef = useRef(false);
+  // OTs del sector escuela → rutea por el backend actualizarOT (service-role +
+  // guard de sector explícito) para bybassear el gap de RLS que bloquea a un jefe
+  // de actualizar OTs asignadas a él por nombre (sin jefe_sitio_email/created_by
+  // que lo respalde). OTs de otros sectores → SDK directo (RLS), sin cambios.
+  const isEscuelaOT = order.sector_id === 'escuela';
   const saveMutation = useMutation({
-    mutationFn: (d) => base44.entities.WorkOrder.update(order.id, d),
+    mutationFn: (d) => isEscuelaOT
+      ? base44.functions.invoke('actualizarOT', { ot_id: order.id, patch: d }).then(r => r.data?.ot)
+      : base44.entities.WorkOrder.update(order.id, d),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
@@ -211,11 +218,13 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
         onClose();
       }
     },
-    onError: () => {
-      if (closeAfterSaveRef.current) {
-        closeAfterSaveRef.current = false;
-        toast.error('Error al guardar');
-      }
+    onError: (err) => {
+      // Siempre visible (también en auto-save) — cierra el cabo suelto del
+      // guardado silencioso: antes un 403 en auto-save no daba feedback, el edit
+      // quedaba en pantalla sin persistir y se revertía al reabrir.
+      const msg = err?.response?.data?.error || err?.message || 'Error al guardar';
+      toast.error(msg);
+      if (closeAfterSaveRef.current) closeAfterSaveRef.current = false;
     },
   });
 
