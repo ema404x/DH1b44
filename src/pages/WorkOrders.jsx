@@ -228,20 +228,27 @@ export default function WorkOrders() {
   // (única fuente de verdad — no se re-filtra en el frontend)
   const visibleOrders = orders;
 
-  const filtered = useMemo(() => visibleOrders.filter(o => {
-    // Normaliza: lowercase + sin acentos — para que "gaston" matchee "Gastón Massá"
+  // Pre-normaliza los campos buscables UNA vez por cambio de visibleOrders (no por
+  // cada tecla). NFD + strip de acentos sobre los campos de texto era el costo hot
+  // del filtro en cada keystroke de búsqueda.
+  const searchableOrders = useMemo(() => {
+    const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return visibleOrders.map(o => ({
+      o,
+      fields: [
+        norm(o.title), norm(o.location), norm(o.location_qr_name), norm(o.project_name),
+        norm(o.asset_name), norm(o.assigned_name), norm(o.code), norm(o.jefe_sitio),
+      ],
+    }));
+  }, [visibleOrders]);
+
+  const filtered = useMemo(() => {
     const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const q = norm(search);
-    const creador = norm(resolveCreator(o.created_by_id, ''));
+    return searchableOrders.filter(({ o, fields }) => {
+      const creador = norm(resolveCreator(o.created_by_id, ''));
     const matchSearch = !q || 
-      norm(o.title).includes(q) ||
-      norm(o.location).includes(q) ||
-      norm(o.location_qr_name).includes(q) ||
-      norm(o.project_name).includes(q) ||
-      norm(o.asset_name).includes(q) ||
-      norm(o.assigned_name).includes(q) ||
-      norm(o.code).includes(q) ||
-      norm(o.jefe_sitio).includes(q) ||
+      fields.some(f => f.includes(q)) ||
       creador.includes(q);
     const matchStatus = statusTab === 'all' || o.status === statusTab;
 
@@ -285,7 +292,8 @@ export default function WorkOrders() {
     })();
 
     return matchSearch && matchStatus && matchPriority && matchType && matchOperario && matchJefe && matchDateFrom && matchDateTo && matchOverdue;
-  }), [visibleOrders, search, statusTab, advFilters, resolveJefe, resolveCreator]);
+    }).map(({ o }) => o);
+  }, [searchableOrders, search, statusTab, advFilters, resolveJefe, resolveCreator]);
 
   const stats = useMemo(() => ({
     total: filtered.length,
