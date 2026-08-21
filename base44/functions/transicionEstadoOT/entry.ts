@@ -61,12 +61,44 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Orden de trabajo no encontrada' }, { status: 404 });
     }
 
-    // Aislamiento por sector: la OT debe ser del mismo sector del que la opera
-    // (salvo admin/gerente de plataforma). Evita que el bypass de RLS abra una fuga
-    // cross-sector. Si la OT o el usuario no tienen sector cargado, no se bloquea
-    // (deuda pendiente de migración de registros viejos sin sector).
-    const callerSector = user?.data?.sector_id || user?.sector_id;
+    // ── Resolución canónica del sector del caller ──
+    // ALINEADA con getWorkOrdersForUser: la ficha de Empleado es la fuente canónica
+    // de sector (decisión del proyecto). Resolvemos primero por email y luego por
+    // user_id; si la ficha tiene sector, es la verdad. Sin esto, un jefe con
+    // data.sector_id stale en la plataforma ve sus OTs (getWorkOrdersForUser corrige
+    // vía la ficha) pero al transicionar recibe 403 "pertenece a otro sector" porque
+    // acá se leía solo user.data.sector_id. cambiarSectorActivo sincroniza ficha Y
+    // plataforma a la vez, así que esto nunca regresa un cambio de sector legítimo.
+    const userEmail = (user.email || '').toLowerCase().trim();
+    let employee = null;
+    if (userEmail) {
+      const byEmail = await base44.asServiceRole.entities.Employee
+        .filter({ email: userEmail }).catch(() => []);
+      employee = byEmail && byEmail.length > 0 ? byEmail[0] : null;
+    }
+    if (!employee && user.id) {
+      const byUid = await base44.asServiceRole.entities.Employee
+        .filter({ user_id: user.id }).catch(() => []);
+      employee = byUid && byUid.length > 0 ? byUid[0] : null;
+    }
+    const callerSector = employee?.sector_id || user?.data?.sector_id || user?.sector_id;
     const callerEsAdmin = ['admin', 'gerente'].includes(user.role || '');
+
+    // Reconciliación best-effort (igual que getWorkOrdersForUser): si la ficha tiene
+    // sector y difiere del usuario de plataforma, alinear data.sector_id al de la
+    // ficha. Idempotente y no interrumpe si la escritura falla. Así RLS y otros
+    // lectores también quedan en el sector correcto sin pedir re-login.
+    try {
+      if (employee?.sector_id) {
+        const platformSector = user.data?.sector_id || user.sector_id;
+        if (platformSector && platformSector !== employee.sector_id) {
+          await base44.asServiceRole.entities.User.update(user.id, {
+            sector_id: employee.sector_id,
+            data: { ...user.data, sector_id: employee.sector_id },
+          });
+        }
+      }
+    } catch (_) {}
     // Aislamiento de raíz: TODOS (incluido admin/gerente) deben operar solo OTs de su
     // sector activo. Para ver/tocar otro sector hay que cambiar de sector activo.
     // No existe bypass por rol — el bypass sería exactamente lo que rompe el aislamiento.
@@ -101,17 +133,11 @@ Deno.serve(async (req) => {
     // así que hay que buscar la ficha del empleado por user_id.
     const userRole = user.role || '';
     const esAdminPlataforma = ['admin', 'gerente'].includes(userRole);
+    // Reutiliza el employee resuelto arriba (sector canónico) — evita un fetch
+    // duplicado y garantiza consistencia entre el chequeo de sector y el de rol.
     let esJefe = esAdminPlataforma;
     if (!esJefe) {
-      try {
-        const empleados = await base44.asServiceRole.entities.Employee
-          .filter({ user_id: user.id }).catch(() => []);
-        const emp = empleados && empleados.length > 0 ? empleados[0] : null;
-        // Robusto: verifica admin-level y jefe de sitio vía helper centralizado
-        esJefe = canManageOT(emp?.role);
-      } catch {
-        esJefe = false;
-      }
+      esJefe = canManageOT(employee?.role);
     }
     if ((accion === 'aprobar' || accion === 'rechazar' || accion === 'completar') && !esJefe) {
       return Response.json({ error: 'Solo el Jefe de Sitio, Admin o Gerente puede completar o rechazar OTs' }, { status: 403 });
