@@ -114,9 +114,15 @@ export default function CrearOT() {
   // role 'user' de escuela → la lista llega vacía y no ven sus ubicaciones al crear OT.
   // Bapro y otros sectores mantienen Asset.list exacto — NINGÚN cambio aplica a ambos sectores.
   const isEscuela = employeeSector === 'escuela';
+  const isBapro = employeeSector === 'bapro';
+  // BAPRO: las OT son generales (no se rigen por ubicación/activo). El primer
+  // paso (selección de activo) se omite para ese sector — arrancan directo en
+  // Detalle. Escuela y demás sectores mantienen el flujo de 3 pasos intacto.
+  const firstStep = isBapro ? 2 : 1;
+  const steps = isBapro ? STEPS.filter(s => s.id !== 1) : STEPS;
 
   // Wizard state
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(firstStep);
   const [createdOT, setCreatedOT] = useState(null);
   const [showQR, setShowQR] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
@@ -470,7 +476,7 @@ export default function CrearOT() {
 
   // Reset
   const resetForm = () => {
-    setStep(1);
+    setStep(firstStep);
     setCreatedOT(null);
     setShowQR(false);
     setSelectedLocation(null);
@@ -578,7 +584,7 @@ export default function CrearOT() {
               </div>
               <div>
                 <h1 className="text-base font-bold text-foreground">Crear Orden de Trabajo</h1>
-                <p className="text-xs text-muted-foreground">Paso {step} de 3</p>
+                <p className="text-xs text-muted-foreground">Paso {steps.findIndex(s => s.id === step) + 1} de {steps.length}</p>
               </div>
             </div>
             <Button
@@ -593,7 +599,7 @@ export default function CrearOT() {
 
           {/* Progress bar */}
           <div className="flex gap-1">
-            {STEPS.map(s => (
+            {steps.map(s => (
               <div key={s.id} className="flex-1">
                 <div className={`h-1 rounded-full transition-colors ${step >= s.id ? 'bg-primary' : 'bg-border'}`} />
                 <p className={`text-[10px] mt-1 text-center font-medium transition-colors ${step === s.id ? 'text-primary' : step > s.id ? 'text-muted-foreground' : 'text-border'}`}>
@@ -986,7 +992,7 @@ export default function CrearOT() {
 
         {/* ── Navegación de pasos ────────────────────────────────────────────── */}
         <div className="flex gap-3 pt-2 pb-8">
-          {step > 1 && (
+          {step > firstStep && (
             <Button variant="outline" className="flex-1 h-12 gap-2 border-border" onClick={() => setStep(s => s - 1)}>
               <ChevronLeft className="h-4 w-4" /> Atrás
             </Button>
