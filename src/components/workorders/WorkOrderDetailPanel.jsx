@@ -108,7 +108,6 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [qrOpen, setQrOpen] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [convertingToObra, setConvertingToObra] = useState(false);
-  const [assignMode, setAssignMode] = useState('list');
   const [rechazoOpen, setRechazoOpen] = useState(false);
   const queryClient = useQueryClient();
   const { resolveOTOwner } = useResolveCreator();
