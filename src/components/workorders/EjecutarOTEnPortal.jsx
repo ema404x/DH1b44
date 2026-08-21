@@ -97,13 +97,12 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
           password: clave,
           workOrderId: order.id,
           updates: {
-            status: 'completada',
-            completed_date: new Date().toISOString().split('T')[0],
+            status: 'pendiente_validacion',
             ...(photos.length > 0 && { photos: [...(order.photos || []), ...photos] }),
             ...gpsData,
           },
         });
-        onCompleted({ ...order, status: 'completada', ...res.workOrder });
+        onCompleted({ ...order, status: 'pendiente_validacion', ...res.workOrder });
       } catch (err) {
         setGpsStatus('no_disponible');
       } finally {
@@ -204,7 +203,7 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
           >
             {saving
               ? <><Loader2 className="h-6 w-6 animate-spin" /> {gpsStatus === 'capturando' ? 'Localizando...' : 'Guardando...'}</>
-              : <><CheckCircle2 className="h-7 w-7" /> Marcar como Completada</>
+              : <><CheckCircle2 className="h-7 w-7" /> Finalizar y Enviar al Jefe</>
             }
           </button>
         </div>

@@ -250,7 +250,7 @@ export default function EjecutarOrdenPublica() {
   const { promptOpen: clavePromptOpen, requireClave, onPromptSuccess, onPromptClose } = useOperarioClave();
 
   const loadOrder = (ot, locName) => {
-    if (['completada', 'cancelada'].includes(ot.status)) {
+    if (['completada', 'cancelada', 'pendiente_validacion'].includes(ot.status)) {
       setOrder(ot);
       setLocationName(ot.location || locName);
       setPhase('done');
@@ -363,8 +363,7 @@ export default function EjecutarOrdenPublica() {
             photos: allPhotos,
             signature_url: firma.signatureUrl,
             signature_name: firma.signatureName,
-            status: allDone ? 'completada' : 'en_progreso',
-            completed_date: allDone ? new Date().toISOString().split('T')[0] : undefined,
+            status: allDone ? 'pendiente_validacion' : 'en_progreso',
             // Datos GPS
             gps_latitude: gps.lat ?? null,
             gps_longitude: gps.lng ?? null,
@@ -503,9 +502,9 @@ export default function EjecutarOrdenPublica() {
         <div className="h-24 w-24 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
           <CheckCircle2 className="h-12 w-12 text-emerald-600" />
         </div>
-        <h2 className="font-bold text-2xl mb-2">¡Orden completada!</h2>
+        <h2 className="font-bold text-2xl mb-2">¡Orden enviada al Jefe de Sitio!</h2>
         {order && <p className="font-semibold text-slate-800 mb-2">{order.title}</p>}
-        <p className="text-slate-500 text-sm">La orden fue guardada correctamente.</p>
+        <p className="text-slate-500 text-sm">La orden quedó pendiente de validación por el Jefe de Sitio.</p>
         {firma?.signatureName && (
           <p className="text-slate-400 text-sm mt-3">Firmado por: <strong>{firma.signatureName}</strong></p>
         )}

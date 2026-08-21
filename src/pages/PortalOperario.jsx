@@ -101,7 +101,8 @@ function PantallaClave({ locationName, onSuccess, onError }) {
 
 // ── Lista de OTs ────────────────────────────────────────────────────────────
 function ListaOTs({ orders, locationName, locationAddress, onSelect }) {
-  const activas = orders.filter(o => !['completada', 'cancelada'].includes(o.status));
+  const activas = orders.filter(o => !['completada', 'cancelada', 'pendiente_validacion'].includes(o.status));
+  const enValidacion = orders.filter(o => o.status === 'pendiente_validacion');
   const completadas = orders.filter(o => o.status === 'completada');
 
   return (
@@ -159,6 +160,20 @@ function ListaOTs({ orders, locationName, locationAddress, onSelect }) {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {enValidacion.length > 0 && (
+          <div>
+            <p className="text-xs font-bold text-amber-500 uppercase tracking-wider mb-3">En validación ({enValidacion.length})</p>
+            <div className="space-y-2">
+              {enValidacion.map(order => (
+                <div key={order.id} className="bg-amber-50 rounded-2xl p-4 border border-amber-200 flex items-center gap-3">
+                  <ClipboardList className="h-6 w-6 text-amber-500 shrink-0" />
+                  <p className="text-amber-700 text-sm font-medium">{order.title}</p>
+                </div>
+              ))}
             </div>
           </div>
         )}
