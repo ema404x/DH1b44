@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
 import { Loader2, ClipboardList, MapPin, Play, Flag, Lock, Clock, CheckCircle2, ArrowRight, ScanLine, History, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
+import CountUp from '@/components/dashboard/CountUp';
 import ReporteForm from '@/components/operario/ReporteForm';
 import QRScannerModal from '@/components/operario/QRScannerModal';
 import LocationOTListModal from '@/components/operario/LocationOTListModal';
@@ -410,18 +412,32 @@ export default function PortalOperarioApp() {
     }
   };
 
-  // Spinner solo en la primera carga real (sin data previa en cache). Con
-  // initialData, las cargas siguientes muestran las OTs cacheadas de inmediato.
+  // Skeleton shimmer solo en la primera carga real (sin data previa en cache).
+  // Con initialData, las cargas siguientes muestran las OTs cacheadas de inmediato.
   if (isFetching && allOTs.length === 0) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen flex flex-col gap-5 page-enter">
+        <div className="flex items-center gap-3">
+          <div className="h-11 w-11 rounded-xl skeleton" />
+          <div className="flex-1 space-y-2">
+            <div className="h-5 w-56 rounded skeleton" />
+            <div className="h-3 w-40 rounded skeleton" />
+          </div>
+          <div className="h-11 w-11 rounded-xl skeleton" />
+        </div>
+        <div className="h-11 rounded-xl skeleton" />
+        <div className="h-14 rounded-xl skeleton" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-40 rounded-xl skeleton" style={{ animationDelay: `${i * 80}ms` }} />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col gap-5">
+    <div className="min-h-screen flex flex-col gap-5 page-enter">
 
       {/* Banner offline / pendientes de sync */}
       {(!isOnline || pendingCount > 0) && (
@@ -442,7 +458,7 @@ export default function PortalOperarioApp() {
         </div>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold text-white">Mis Órdenes de Trabajo</h1>
-          <p className="text-xs text-slate-400">{displayName} · {misOTs.length} activa{misOTs.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-slate-400 tabular-nums">{displayName} · <CountUp value={misOTs.length} /> activa{misOTs.length !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => setScannerOpen(true)}
@@ -479,9 +495,18 @@ export default function PortalOperarioApp() {
       {vista === 'historial' ? (
         <div>
           {historialFiltrado.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {historialFiltrado.map(ot => <HistorialCard key={ot.id} ot={ot} />)}
-            </div>
+            <motion.div
+              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+              initial="hidden"
+              animate="show"
+              variants={{ show: { transition: { staggerChildren: 0.04 } } }}
+            >
+              {historialFiltrado.map(ot => (
+                <motion.div key={ot.id} variants={cardVariants}>
+                  <HistorialCard ot={ot} />
+                </motion.div>
+              ))}
+            </motion.div>
           ) : (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-500">
               <History className="h-12 w-12 text-slate-700" />
@@ -606,6 +631,11 @@ export default function PortalOperarioApp() {
   );
 }
 
+const cardVariants = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } },
+};
+
 function Seccion({ titulo, subtitulo, icon: Icon, color, children }) {
   const colorHex = { blue: '#3b82f6', sky: '#0ea5e9', amber: '#f59e0b' }[color] || '#3b82f6';
   const count = React.Children.count(children);
@@ -615,12 +645,19 @@ function Seccion({ titulo, subtitulo, icon: Icon, color, children }) {
         <span className="h-7 w-1 rounded-full" style={{ backgroundColor: colorHex }} />
         <Icon className="h-4 w-4" style={{ color: colorHex }} />
         <h2 className="text-sm font-bold text-white">{titulo}</h2>
-        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-white/5 text-slate-400 tabular-nums">{count}</span>
+        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-white/5 text-slate-400 tabular-nums"><CountUp value={count} /></span>
         <span className="text-xs text-slate-500 truncate">· {subtitulo}</span>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {children}
-      </div>
+      <motion.div
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+        initial="hidden"
+        animate="show"
+        variants={{ show: { transition: { staggerChildren: 0.05 } } }}
+      >
+        {React.Children.map(children, (child) => (
+          <motion.div variants={cardVariants}>{child}</motion.div>
+        ))}
+      </motion.div>
     </div>
   );
 }
