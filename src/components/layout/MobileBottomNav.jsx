@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, ClipboardList, RefreshCw, FolderKanban, LayoutGrid, HardHat } from 'lucide-react';
+import { motion, MotionConfig } from 'framer-motion';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 import { hasModulePermission } from '@/lib/roles';
@@ -37,6 +38,7 @@ export default function MobileBottomNav({ onMore }) {
   const items = PRIMARY.filter(allowed).slice(0, 4);
 
   return (
+    <MotionConfig reducedMotion="user">
     <nav
       className="lg:hidden fixed inset-x-0 bottom-0 z-40"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
@@ -52,13 +54,15 @@ export default function MobileBottomNav({ onMore }) {
               aria-current={active ? 'page' : undefined}
               className="relative flex flex-1 flex-col items-center justify-center gap-1 py-2 min-h-[56px] select-none active:bg-muted/40 transition-colors"
             >
-              <span
-                className={cn(
-                  'relative flex h-9 w-16 items-center justify-center rounded-full transition-colors',
-                  active ? 'bg-primary/15' : 'bg-transparent'
+              <span className="relative flex h-9 w-16 items-center justify-center rounded-full">
+                {active && (
+                  <motion.span
+                    layoutId="bottom-nav-pill"
+                    className="absolute inset-0 rounded-full bg-primary/15"
+                    transition={{ type: 'spring', stiffness: 480, damping: 32 }}
+                  />
                 )}
-              >
-                <item.icon className={cn('h-5 w-5 transition-colors', active ? 'text-primary' : 'text-muted-foreground')} />
+                <item.icon className={cn('relative h-5 w-5 transition-all duration-200', active ? 'text-primary scale-105' : 'text-muted-foreground')} />
               </span>
               <span
                 className={cn(
@@ -85,5 +89,6 @@ export default function MobileBottomNav({ onMore }) {
         </button>
       </div>
     </nav>
+    </MotionConfig>
   );
 }
