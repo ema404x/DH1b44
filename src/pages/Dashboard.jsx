@@ -23,6 +23,7 @@ import KpisJefeSitio from '@/components/dashboard/KpisJefeSitio';
 import AuroraEffect from '@/components/dashboard/AuroraEffect';
 import DashboardFilters from '@/components/dashboard/DashboardFilters';
 import SectionHeader from '@/components/dashboard/SectionHeader';
+import CountUp from '@/components/dashboard/CountUp';
 import { format, isPast, parseISO, startOfMonth, subMonths, formatDistanceToNow, subDays } from 'date-fns';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import PullToRefresh from '@/components/shared/PullToRefresh';
@@ -80,7 +81,7 @@ function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, hr
           )}
         </div>
         <div>
-          <p className="text-3xl font-bold text-foreground tabular-nums tracking-tight leading-none">{value}</p>
+          <p className="text-3xl font-bold text-foreground tabular-nums tracking-tight leading-none"><CountUp value={value} /></p>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-2">{title}</p>
           {subtitle && <p className="text-xs text-muted-foreground/70 mt-1">{subtitle}</p>}
         </div>
