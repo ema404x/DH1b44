@@ -6,6 +6,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { isJefeSitioRole } from '@/lib/roles';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +44,10 @@ const STEPS = [
   { id: 2, label: 'Detalle' },
   { id: 3, label: 'Materiales' },
 ];
+
+// Normaliza strings para comparar nombres/direcciones (minúsculas, sin acentos,
+// espacios colapsados). Tolerante a "JUAN ASCHETTINO" vs "Juan Aschettino".
+const normName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ');
 
 // ── Componente auxiliar: item de checklist ─────────────────────────────────────
 
@@ -98,7 +103,12 @@ function MaterialItem({ item, onUpdate, onRemove }) {
 export default function CrearOT() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { isSuperAdmin, employeeSector } = useCurrentUser();
+  const { isSuperAdmin, employeeSector, employeeRole, displayName } = useCurrentUser();
+  // Un jefe de sitio que crea una OT solo debe ver sus direcciones vinculadas (no
+  // las de todos los jefes). Aplica solo en escuela, donde existe el vínculo
+  // Direccion.jefe_sitio → asset.name/location. Admins/gerentes y otros sectores
+  // ven todos los activos (sin cambios).
+  const isJefeSitioCreator = !isSuperAdmin && isJefeSitioRole(employeeRole);
   // Solo sector escuela: cargar activos vía resolver backend (getActivosSector) en
   // lugar de Asset.list (RLS). La cláusula RLS anidada de Asset no se honra para
   // role 'user' de escuela → la lista llega vacía y no ven sus ubicaciones al crear OT.
@@ -180,6 +190,15 @@ export default function CrearOT() {
   const activeAssets = useMemo(
     () => (assetsRaw || [])
       .filter(a => a.status !== 'baja')
+      // Jefes de sitio (escuela): solo activos cuyas direcciones figuran en sus
+      // Direccion vinculadas. El activo de escuela es la dirección misma (name =
+      // calle, ej: "ZUVIRIA 6640"), así que el match es name/location contra el
+      // set de direcciones del jefe. Si no hay direcciones cargadas todavía o el
+      // creador no es jefe, se ven todos (fallback no destructivo).
+      .filter(a => {
+        if (!(isEscuela && isJefeSitioCreator && misDirSet.size > 0)) return true;
+        return misDirSet.has(normName(a.name)) || misDirSet.has(normName(a.location));
+      })
       .map(a => ({
         id: a.id,
         name: a.name,
@@ -192,7 +211,7 @@ export default function CrearOT() {
         project_name: a.project_name || '',
         code: a.code || '',
       })),
-    [assetsRaw]
+    [assetsRaw, isEscuela, isJefeSitioCreator, misDirSet]
   );
 
   // Empleados activos para asignación responsable
@@ -201,6 +220,26 @@ export default function CrearOT() {
     queryFn: () => base44.entities.Employee.list('full_name', 500),
     staleTime: 300000,
   });
+
+  // Direcciones del jefe de sitio (escuela) — para acotar el picker de activos a
+  // sus direcciones vinculadas. Solo se carga si el creador es jefe de sitio del
+  // sector escuela. La RLS de Direccion ya aísla por sector, así que acá solo
+  // filtramos por jefe_sitio (nombre) contra el del creador.
+  const { data: misDirecciones = [] } = useQuery({
+    queryKey: ['mis-direcciones', displayName, isEscuela, isJefeSitioCreator],
+    queryFn: () => base44.entities.Direccion.list('-created_date', 500),
+    enabled: isEscuela && isJefeSitioCreator,
+    staleTime: 300000,
+  });
+  const misDirSet = useMemo(
+    () => new Set(
+      misDirecciones
+        .filter(d => normName(d.jefe_sitio) === normName(displayName))
+        .map(d => normName(d.direccion))
+        .filter(Boolean)
+    ),
+    [misDirecciones, displayName]
+  );
   // Los jefes de sitio no pueden asignar OTs a otros jefes de sitio — solo a operarios.
   // Los gerentes/admins sí pueden asignar a cualquier empleado, incluyendo jefes.
   const isJefeRole = (role) => role && role.toLowerCase().replace(/[\s_]+/g, '').includes('jefe');
