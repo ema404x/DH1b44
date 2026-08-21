@@ -98,7 +98,12 @@ function MaterialItem({ item, onUpdate, onRemove }) {
 export default function CrearOT() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { isSuperAdmin } = useCurrentUser();
+  const { isSuperAdmin, employeeSector } = useCurrentUser();
+  // Solo sector escuela: cargar activos vía resolver backend (getActivosSector) en
+  // lugar de Asset.list (RLS). La cláusula RLS anidada de Asset no se honra para
+  // role 'user' de escuela → la lista llega vacía y no ven sus ubicaciones al crear OT.
+  // Bapro y otros sectores mantienen Asset.list exacto — NINGÚN cambio aplica a ambos sectores.
+  const isEscuela = employeeSector === 'escuela';
 
   // Wizard state
   const [step, setStep] = useState(1);
@@ -157,9 +162,17 @@ export default function CrearOT() {
 
   // Activos del módulo Activos — la OT se vincula a un activo físico (equipo).
   // El activo arrastra su sede, jefe de sitio y proyecto.
+  // Sector escuela → resolver backend (service-role, sector-scoped). Otros sectores
+  // → Asset.list con RLS (comportamiento original, sin tocar). El queryKey cambia con
+  // isEscuela para que React Query refetchee al resolver el sector y no sirva data stale.
   const { data: assetsRaw = [], isLoading: loadingAssets } = useQuery({
-    queryKey: ['assets-ot-select'],
-    queryFn: () => base44.entities.Asset.list('-name', 500),
+    queryKey: ['assets-ot-select', isEscuela ? 'escuela-resolver' : 'rls'],
+    queryFn: isEscuela
+      ? async () => {
+          const res = await base44.functions.invoke('getActivosSector');
+          return res.data?.assets || [];
+        }
+      : () => base44.entities.Asset.list('-name', 500),
     staleTime: 120000,
   });
 
