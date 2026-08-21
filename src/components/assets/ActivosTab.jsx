@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Search, Plus, Download, Upload, FileText, Pencil, Trash2, QrCode, Cpu, Zap, Wind, Droplets, Car, Hammer, Building, Shield, Monitor, Sofa, CheckCircle2, Clock } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import AssetFormDialog from '@/components/assets/AssetFormDialog';
+import AssetRow from '@/components/assets/AssetRow';
 import ImportarActivosModal from '@/components/assets/ImportarActivosModal';
 import AssetQRModal from '@/components/assets/AssetQRModal';
 import { exportActivosToExcel, exportActivosToPDF } from '@/utils/exportActivosExcel';
@@ -21,22 +22,6 @@ const typeLabels = {
   herramienta: 'Herramienta', sistemas_informaticos: 'Informático', mobiliario: 'Mobiliario',
   seguridad: 'Seguridad', otro: 'Otro',
 };
-const typeIcons = {
-  equipo_electrico: Zap, equipo_mecanico: Hammer, instalacion_hvac: Wind, instalacion_sanitaria: Droplets,
-  estructura: Building, vehiculo: Car, herramienta: Hammer, sistemas_informaticos: Monitor,
-  mobiliario: Sofa, seguridad: Shield, otro: Cpu,
-};
-const statusColors = {
-  operativo: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  en_mantenimiento: 'bg-amber-100 text-amber-700 border-amber-200',
-  fuera_de_servicio: 'bg-red-100 text-red-700 border-red-200',
-  baja: 'bg-gray-100 text-gray-500 border-gray-200',
-};
-const critColors = {
-  baja: 'bg-slate-100 text-slate-600', media: 'bg-blue-100 text-blue-700',
-  alta: 'bg-orange-100 text-orange-700', critica: 'bg-red-100 text-red-700',
-};
-
 export default function ActivosTab() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -59,16 +44,10 @@ export default function ActivosTab() {
 
   const sedeName = (id) => sedes.find(s => s.id === id)?.nombre || '';
 
-  const openEdit = (a) => { setEditing(a); setDialogOpen(true); };
+  // Estabilizada con useCallback para que las filas memoizadas (AssetRow/React.memo)
+  // no se re-rendericen al cambiar la referencia del callback.
+  const openEdit = useCallback((a) => { setEditing(a); setDialogOpen(true); }, []);
   const openNew = () => { setEditing(null); setDialogOpen(true); };
-
-  const getMaintenanceStatus = (asset) => {
-    if (!asset.next_maintenance) return null;
-    const days = differenceInDays(new Date(asset.next_maintenance), new Date());
-    if (days < 0) return { label: `Vencido ${Math.abs(days)}d`, color: 'text-red-600' };
-    if (days <= 14) return { label: `En ${days}d`, color: 'text-amber-600' };
-    return { label: `En ${days}d`, color: 'text-emerald-600' };
-  };
 
   const filtered = useMemo(() => assets.filter(a => {
     const matchSearch = !search ||
@@ -184,66 +163,16 @@ export default function ActivosTab() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(asset => {
-                  const Icon = typeIcons[asset.type] || Cpu;
-                  const maint = getMaintenanceStatus(asset);
-                  return (
-                    <tr key={asset.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => openEdit(asset)}>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <Icon className="h-3.5 w-3.5 text-primary" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-medium text-sm leading-tight truncate max-w-[200px]">{asset.name}</div>
-                            <div className="text-[11px] text-muted-foreground font-mono">{asset.code || '—'}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 hidden md:table-cell text-xs text-muted-foreground truncate max-w-[160px]">{sedeName(asset.location_id) || asset.sede || '—'}</td>
-                      <td className="px-3 py-2.5 hidden lg:table-cell text-xs">{typeLabels[asset.type] || 'Otro'}</td>
-                      <td className="px-3 py-2.5">
-                        <Badge variant="outline" className={`text-[10px] ${statusColors[asset.status]}`}>{(asset.status || '').replace('_', ' ')}</Badge>
-                      </td>
-                      <td className="px-3 py-2.5 hidden lg:table-cell">
-                        <Badge className={`text-[10px] ${critColors[asset.criticality]}`}>{asset.criticality}</Badge>
-                      </td>
-                      <td className="px-3 py-2.5 hidden xl:table-cell text-[11px]">
-                        {maint ? (
-                          <span className={`flex items-center gap-1 ${maint.color}`}><Clock className="h-3 w-3" />{maint.label}</span>
-                        ) : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {asset.visto_bapro ? (
-                          <span className="flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Visto
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-muted-foreground">Pendiente</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 hidden lg:table-cell text-right text-xs tabular-nums">{asset.purchase_cost ? fmtCurrency(asset.purchase_cost) : '—'}</td>
-                      <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
-                        <div className="flex gap-0.5">
-                           <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => setQrAsset(asset)} title="Ver QR del activo"><QrCode className="h-3.5 w-3.5" /></Button>
-                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(asset)}><Pencil className="h-3.5 w-3.5" /></Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>¿Eliminar activo?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteMutation.mutate(asset.id)}>Eliminar</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {filtered.map(asset => (
+                  <AssetRow
+                    key={asset.id}
+                    asset={asset}
+                    sedes={sedes}
+                    onEdit={openEdit}
+                    onQr={setQrAsset}
+                    onDelete={deleteMutation.mutate}
+                  />
+                ))}
               </tbody>
               {filtered.length === 0 && !isLoading && (
                 <tfoot><tr><td colSpan={9} className="text-center py-12 text-muted-foreground">
