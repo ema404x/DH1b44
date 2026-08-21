@@ -64,14 +64,25 @@ const PageLoader = () => (
   </div>
 );
 
+const CHUNK_RELOAD_KEY = 'base44_chunk_reload';
+
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidMount() {
+    // La app cargó sana tras un reload → limpiamos el flag anti-loop.
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+  }
   componentDidCatch(error) {
     // Auto-recargar en errores de "chunk stale" — pasan cuando se redeploya la app
     // y el navegador tiene referencias cacheadas a módulos que ya no existen.
-    if (error?.message?.includes('Failed to fetch dynamically imported module') ||
-        error?.message?.includes('Importing a module script failed')) {
+    const isChunkError =
+      error?.message?.includes('Failed to fetch dynamically imported module') ||
+      error?.message?.includes('Importing a module script failed');
+    // Anti-loop: un solo auto-reload por sesión. Si no alcanza, queda el botón
+    // manual "Recargar página" para que el usuario fuerce la recarga.
+    if (isChunkError && !sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
+      sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
       window.location.reload();
     }
   }
