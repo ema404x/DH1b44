@@ -265,6 +265,7 @@ Deno.serve(async (req) => {
         const mats = Array.isArray(actualizada.materials_used) ? actualizada.materials_used : [];
         const costoMateriales = mats.reduce((s, m) => s + ((m?.quantity || 0) * (m?.unit_cost || 0)), 0);
         const assetName = ot.asset_name || actualizada.asset_name || null;
+        const fechaCierre = actualizada.completed_date || new Date().toISOString().split('T')[0];
         await base44.asServiceRole.entities.AssetHistory.create({
           asset_id: ot.asset_id,
           asset_name: assetName,
@@ -276,6 +277,23 @@ Deno.serve(async (req) => {
           costo: costoMateriales || 0,
           sector_id: ot.sector_id,
         });
+        // Auto-actualizar last_maintenance/next_maintenance del activo cuando la
+        // OT es de mantenimiento (preventivo/correctivo/reparacion). UpKeep-style:
+        // el ciclo de mantenimiento se alimenta de las OTs reales, no solo manual.
+        // Defense-in-depth: re-chequea sector del asset antes de escribir.
+        const esMantenimiento = ['mantenimiento_preventivo', 'mantenimiento_correctivo', 'reparacion'].includes(ot.type);
+        if (esMantenimiento) {
+          const asset = await base44.asServiceRole.entities.Asset.get(ot.asset_id).catch(() => null);
+          if (asset && asset.sector_id === ot.sector_id) {
+            const freq = asset.maintenance_frequency_days || 90;
+            const proxima = new Date(fechaCierre);
+            proxima.setDate(proxima.getDate() + freq);
+            await base44.asServiceRole.entities.Asset.update(ot.asset_id, {
+              last_maintenance: fechaCierre,
+              next_maintenance: proxima.toISOString().split('T')[0],
+            });
+          }
+        }
       } catch (e) {
         console.warn('[transicionEstadoOT] AssetHistory error:', e?.message);
       }

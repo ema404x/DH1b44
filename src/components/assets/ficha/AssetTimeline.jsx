@@ -53,9 +53,17 @@ export default function AssetTimeline({ assetId, assetName }) {
                   </div>
                   <div className="ml-2">
                     <div className="text-sm font-medium capitalize">{(h.tipo_evento || '').replace('_', ' ')}</div>
-                    <div className="text-xs text-muted-foreground">{h.descripcion || '—'}</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs text-muted-foreground flex-1">{h.descripcion || '—'}</div>
+                      {h.costo > 0 && (
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-1.5 py-0.5 tabular-nums shrink-0">
+                          {fmtCurrency(h.costo)}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[10px] text-muted-foreground mt-0.5">
                       {new Date(h.created_date).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
+                      {h.ot_id && <span className="text-blue-600"> · OT</span>}
                       {h.usuario ? ` · ${h.usuario}` : ''}
                     </div>
                   </div>
