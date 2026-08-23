@@ -1,27 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Loader2, CheckCircle2, ShieldCheck, Building2, Clock, AlertTriangle, FileWarning, Wrench } from 'lucide-react';
-
-const typeLabels = {
-  equipo_electrico: 'Equipo eléctrico', equipo_mecanico: 'Equipo mecánico', instalacion_hvac: 'Climatización (HVAC)',
-  instalacion_sanitaria: 'Instalación sanitaria', estructura: 'Estructura', vehiculo: 'Vehículo',
-  herramienta: 'Herramienta', sistemas_informaticos: 'Sistemas informáticos', mobiliario: 'Mobiliario',
-  seguridad: 'Seguridad', otro: 'Otro',
-};
-const statusLabels = {
-  operativo: 'Operativo', en_mantenimiento: 'En mantenimiento', fuera_de_servicio: 'Fuera de servicio', baja: 'Baja',
-};
-const otStatusLabels = {
-  pendiente: 'Pendiente', asignada: 'Asignada', en_progreso: 'En progreso', obra: 'En obra',
-  pendiente_validacion: 'P. validación', completada: 'Completada', cancelada: 'Cancelada',
-};
-const otStatusStyles = {
-  pendiente: 'bg-slate-100 text-slate-600', asignada: 'bg-blue-100 text-blue-700',
-  en_progreso: 'bg-amber-100 text-amber-700', obra: 'bg-amber-100 text-amber-700',
-  pendiente_validacion: 'bg-violet-100 text-violet-700', completada: 'bg-emerald-100 text-emerald-700',
-  cancelada: 'bg-red-100 text-red-700',
-};
+import { Loader2, CheckCircle2, ShieldCheck, Building2, Clock, AlertTriangle, FileWarning, Wrench, Boxes } from 'lucide-react';
+import AssetCardRevision from '@/components/bapro/AssetCardRevision';
+import OTsMesList from '@/components/bapro/OTsMesList';
 
 export default function RevisionBapro() {
   const { token } = useParams();
@@ -30,6 +12,7 @@ export default function RevisionBapro() {
   const [data, setData] = useState(null);
   const [markingId, setMarkingId] = useState(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const [tab, setTab] = useState('activos');
 
   const cargar = async () => {
     setLoading(true);
@@ -85,7 +68,7 @@ export default function RevisionBapro() {
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
           <Loader2 className="h-8 w-8 mx-auto mb-3 text-blue-600 animate-spin" />
-          <p className="text-sm text-slate-500">Cargando inventario…</p>
+          <p className="text-sm text-slate-500">Cargando revisión…</p>
         </div>
       </div>
     );
@@ -110,6 +93,7 @@ export default function RevisionBapro() {
   const vistos = activos.filter(a => a.visto_bapro).length;
   const pct = data?.total > 0 ? Math.round((vistos / data.total) * 100) : 0;
   const todosVistos = vistos === data?.total && data?.total > 0;
+  const totalOtsMes = data?.total_ots_mes ?? (data?.ots_mes?.length || 0);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -166,97 +150,64 @@ export default function RevisionBapro() {
           </div>
         )}
 
-        {/* Acción marcar todos */}
-        {activos.length > 0 && !todosVistos && (
-          <div className="mb-4 flex items-center justify-between gap-3 bg-white rounded-xl border border-slate-200 p-3.5">
-            <div>
-              <p className="text-sm font-medium text-slate-700">Marcar todos como vistos</p>
-              <p className="text-xs text-slate-500">Registra la revisión completa del lote en un solo paso.</p>
-            </div>
-            <button
-              onClick={marcarTodos}
-              disabled={markingAll}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
-            >
-              {markingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              Marcar todos
-            </button>
-          </div>
-        )}
+        {/* Tabs */}
+        <div className="flex items-center gap-2 mb-4 bg-white rounded-xl border border-slate-200 p-1.5">
+          <button onClick={() => setTab('activos')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'activos' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}>
+            <Boxes className="h-4 w-4" /> Activos y modificaciones
+            <span className={`text-[11px] px-1.5 py-0.5 rounded-md tabular-nums ${tab === 'activos' ? 'bg-white/20' : 'bg-slate-100'}`}>{activos.length}</span>
+          </button>
+          <button onClick={() => setTab('ots')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'ots' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}>
+            <Wrench className="h-4 w-4" /> OTs del mes
+            <span className={`text-[11px] px-1.5 py-0.5 rounded-md tabular-nums ${tab === 'ots' ? 'bg-white/20' : 'bg-slate-100'}`}>{totalOtsMes}</span>
+          </button>
+        </div>
 
-        {todosVistos && (
-          <div className="mb-4 flex items-center gap-2 bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-            <p className="text-sm text-emerald-700 font-medium">Revisión completa. Todos los activos fueron vistos.</p>
-          </div>
-        )}
-
-        {/* Lista de activos */}
-        {activos.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl border border-slate-200">
-            <p className="text-sm text-slate-500">No hay activos en este lote de revisión.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {activos.map(a => (
-              <div key={a.id} className={`bg-white rounded-xl border p-4 flex items-center justify-between gap-3 transition-colors ${a.visto_bapro ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200'}`}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-slate-800">{a.name}</span>
-                    {a.code && <span className="text-[11px] text-slate-400 font-mono">{a.code}</span>}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap text-[11px] text-slate-500">
-                    {a.sede && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{a.sede}</span>}
-                    {a.area && <span>· {a.area}</span>}
-                    <span>· {typeLabels[a.type] || a.type}</span>
-                    <span>· {statusLabels[a.status] || a.status}</span>
-                    {a.brand && <span>· {a.brand} {a.model}</span>}
-                  </div>
-                  {a.visto_bapro && a.visto_bapro_fecha && (
-                    <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> Visto el {new Date(a.visto_bapro_fecha).toLocaleString('es-AR')}
-                    </p>
-                  )}
-                  {Array.isArray(a.ots) && a.ots.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-slate-100">
-                      <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1 mb-1">
-                        <Wrench className="h-3 w-3" /> Órdenes de trabajo ({a.ots.length})
-                      </p>
-                      <div className="space-y-1">
-                        {a.ots.map((o, i) => (
-                          <div key={i} className="text-[11px] text-slate-600 flex items-center gap-2 flex-wrap">
-                            <span className={`px-1.5 py-0.5 rounded font-medium ${otStatusStyles[o.status] || 'bg-slate-100 text-slate-600'}`}>{otStatusLabels[o.status] || o.status}</span>
-                            <span className="font-medium text-slate-700">{o.title}</span>
-                            {o.scheduled_date && <span className="text-slate-400">· {new Date(o.scheduled_date).toLocaleDateString('es-AR')}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+        {tab === 'activos' && (
+          <>
+            {/* Acción marcar todos */}
+            {activos.length > 0 && !todosVistos && (
+              <div className="mb-4 flex items-center justify-between gap-3 bg-white rounded-xl border border-slate-200 p-3.5">
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Marcar todos como vistos</p>
+                  <p className="text-xs text-slate-500">Registra la revisión completa del lote en un solo paso.</p>
                 </div>
-                <div className="flex-shrink-0">
-                  {a.visto_bapro ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-medium">
-                      <CheckCircle2 className="h-4 w-4" /> Visto
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => marcarUno(a.id)}
-                      disabled={markingId === a.id}
-                      className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-xs font-medium hover:bg-slate-50 disabled:opacity-50 flex items-center gap-1.5 transition-colors"
-                    >
-                      {markingId === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                      Marcar visto
-                    </button>
-                  )}
-                </div>
+                <button onClick={marcarTodos} disabled={markingAll}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors">
+                  {markingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Marcar todos
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+
+            {todosVistos && (
+              <div className="mb-4 flex items-center gap-2 bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                <p className="text-sm text-emerald-700 font-medium">Revisión completa. Todos los activos fueron vistos.</p>
+              </div>
+            )}
+
+            {activos.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-xl border border-slate-200">
+                <p className="text-sm text-slate-500">No hay activos en este lote de revisión.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {activos.map(a => (
+                  <AssetCardRevision key={a.id} asset={a} onMarcar={marcarUno} marking={markingId === a.id} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === 'ots' && (
+          <OTsMesList ots={data?.ots_mes || []} />
         )}
 
         <footer className="mt-8 pt-4 border-t border-slate-200 text-center text-[11px] text-slate-400 space-y-2">
-          <p>Portal de revisión seguro · Solo lectura · {activos.length} activos</p>
+          <p>Portal de revisión seguro · Solo lectura · {activos.length} activos · {totalOtsMes} OTs del mes</p>
         </footer>
       </main>
     </div>
