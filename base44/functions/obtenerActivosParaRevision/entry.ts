@@ -91,6 +91,7 @@ Deno.serve(async (req) => {
     const otsMes = [];
     for (const o of allOts) {
       if (!inMes(o.created_date)) continue;
+      if (o.status !== 'completada') continue;
       if (otsMes.length >= 200) break;
       otsMes.push({
         id: o.id,
