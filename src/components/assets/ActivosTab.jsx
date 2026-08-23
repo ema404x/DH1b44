@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Search, Plus, Download, Upload, FileText, Pencil, Trash2, QrCode, Cpu, Zap, Wind, Droplets, Car, Hammer, Building, Shield, Monitor, Sofa, CheckCircle2, Clock } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import AssetFormDialog from '@/components/assets/AssetFormDialog';
 import AssetRow from '@/components/assets/AssetRow';
 import ImportarActivosModal from '@/components/assets/ImportarActivosModal';
@@ -35,8 +36,10 @@ export default function ActivosTab() {
   const [qrAsset, setQrAsset] = useState(null);
   const [exportMenu, setExportMenu] = useState(false);
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { user } = useCurrentUser();
   const isBapro = (user?.data?.sector_id || user?.sector_id) === 'bapro';
+  const openFicha = useCallback((a) => navigate(`/activos/${a.id}`), [navigate]);
 
   const { data: assets = [], isLoading } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list('-updated_date', 500) });
   const { data: sedes = [] } = useQuery({ queryKey: ['edificios'], queryFn: () => base44.entities.Edificio.list('-updated_date', 500) });
@@ -173,6 +176,7 @@ export default function ActivosTab() {
                     asset={asset}
                     sedes={sedes}
                     onEdit={openEdit}
+                    onOpen={openFicha}
                     onQr={setQrAsset}
                     onDelete={deleteMutation.mutate}
                   />
@@ -195,7 +199,7 @@ export default function ActivosTab() {
         </div>
       )}
 
-      <AssetFormDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editing} sedes={sedes} />
+      <AssetFormDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editing} sedes={sedes} assets={assets} />
       {isBapro
         ? <ImportarActivosWizard open={importOpen} onOpenChange={setImportOpen} />
         : <ImportarActivosModal open={importOpen} onOpenChange={setImportOpen} />}

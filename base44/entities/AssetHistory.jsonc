@@ -1,0 +1,129 @@
+{
+  "name": "AssetHistory",
+  "type": "object",
+  "properties": {
+    "asset_id": {
+      "type": "string",
+      "description": "FK al Asset del evento"
+    },
+    "asset_name": {
+      "type": "string",
+      "description": "Nombre del asset (denormalizado para mostrar en timeline)"
+    },
+    "tipo_evento": {
+      "type": "string",
+      "enum": [
+        "creado",
+        "mantenimiento",
+        "cambio_estado",
+        "movimiento",
+        "costo",
+        "baja"
+      ],
+      "description": "Tipo de evento del lifecycle del activo"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Detalle del evento"
+    },
+    "usuario": {
+      "type": "string",
+      "description": "Nombre del usuario que gener\u00f3 el evento"
+    },
+    "usuario_id": {
+      "type": "string",
+      "description": "ID del usuario (trazabilidad)"
+    },
+    "ot_id": {
+      "type": "string",
+      "description": "FK a WorkOrder si el evento viene de una OT"
+    },
+    "costo": {
+      "type": "number",
+      "description": "Costo asociado al evento (para lifecycle cost acumulado)"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Datos extra flexibles del evento",
+      "additionalProperties": true
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Se estampa desde el creador; sin default."
+    }
+  },
+  "required": [
+    "asset_id",
+    "tipo_evento",
+    "sector_id"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "gerente"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "jefe_sitio"
+              }
+            },
+            {
+              "created_by_id": "{{user.id}}"
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

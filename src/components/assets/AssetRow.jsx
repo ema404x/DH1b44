@@ -44,13 +44,13 @@ function getMaintenanceStatus(asset) {
   return { label: `En ${days}d`, color: 'text-emerald-600' };
 }
 
-function AssetRow({ asset, sedes, onEdit, onQr, onDelete }) {
+function AssetRow({ asset, sedes, onEdit, onOpen, onQr, onDelete }) {
   const Icon = typeIcons[asset.type] || Cpu;
   const maint = getMaintenanceStatus(asset);
   const sedeName = (id) => sedes.find(s => s.id === id)?.nombre || '';
 
   return (
-    <tr className="border-b last:border-0 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => onEdit(asset)}>
+    <tr className="border-b last:border-0 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => onOpen ? onOpen(asset) : onEdit(asset)}>
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-2.5">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">

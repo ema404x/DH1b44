@@ -30,6 +30,7 @@ const Invoices = lazy(() => import('@/pages/Invoices'));
 const Presupuestos = lazy(() => import('@/pages/Presupuestos'));
 const Informes = lazy(() => import('@/pages/Informes'));
 const Assets = lazy(() => import('@/pages/Assets'));
+const ActivoFicha = lazy(() => import('@/pages/ActivoFicha'));
 const Calendario = lazy(() => import('@/pages/Calendario'));
 const Reportes = lazy(() => import('@/pages/Reportes'));
 const Automatizaciones = lazy(() => import('@/pages/Automatizaciones'));
@@ -140,6 +141,7 @@ const AuthenticatedApp = () => {
         <Route path="/finanzas" element={<ProtectedPage moduleKey="Invoice"><Invoices /></ProtectedPage>} />
         <Route path="/informes" element={<ProtectedPage moduleKey="Informes"><Informes /></ProtectedPage>} />
         <Route path="/activos" element={<ProtectedPage moduleKey="Asset"><Assets /></ProtectedPage>} />
+        <Route path="/activos/:id" element={<ProtectedPage moduleKey="Asset"><ActivoFicha /></ProtectedPage>} />
         <Route path="/calendario" element={<ProtectedPage moduleKey="Calendario"><Calendario /></ProtectedPage>} />
         <Route path="/reportes" element={<ProtectedPage moduleKey="Reportes"><Reportes /></ProtectedPage>} />
         <Route path="/automatizaciones" element={<ProtectedPage moduleKey="Automatizaciones"><Automatizaciones /></ProtectedPage>} />

@@ -36,6 +36,10 @@
     "serial_number": {
       "type": "string"
     },
+    "parent_asset_id": {
+      "type": "string",
+      "description": "FK al Asset padre. Un sub-activo hereda el sector del padre (no puede cruzar sectores). La jerarqu\u00eda se valida en guardarAsset (anti-ciclo + mismo sector)."
+    },
     "location_id": {
       "type": "string",
       "description": "FK a Edificio/LocationData del mapa. Sede donde se encuentra el activo."

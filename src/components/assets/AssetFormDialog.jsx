@@ -23,9 +23,10 @@ const emptyAsset = {
   location_id: '', sede: '', area: '', jefe_sitio: '', status: 'operativo', criticality: 'media',
   location: '', purchase_cost: 0, purchase_date: '', warranty_expiry: '',
   last_maintenance: '', next_maintenance: '', maintenance_frequency_days: 90, notes: '',
+  parent_asset_id: '',
 };
 
-export default function AssetFormDialog({ open, onOpenChange, editing, sedes }) {
+export default function AssetFormDialog({ open, onOpenChange, editing, sedes, assets }) {
   const [form, setForm] = useState(emptyAsset);
   const qc = useQueryClient();
 
@@ -34,12 +35,11 @@ export default function AssetFormDialog({ open, onOpenChange, editing, sedes }) 
   }, [open, editing]);
 
   const saveMutation = useMutation({
-    mutationFn: (data) => {
+    mutationFn: async (data) => {
       const payload = { ...data };
       if (!payload.code) delete payload.code;
-      return editing
-        ? base44.entities.Asset.update(editing.id, payload)
-        : base44.entities.Asset.create(payload);
+      const res = await base44.functions.invoke('guardarAsset', { id: editing?.id || null, data: payload });
+      return res.data;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['assets'] }); onOpenChange(false); },
   });
@@ -86,6 +86,18 @@ export default function AssetFormDialog({ open, onOpenChange, editing, sedes }) 
                   <SelectContent>
                     <SelectItem value="__none">— Sin sede —</SelectItem>
                     {sedes.map(s => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Activo padre (jerarquía)</Label>
+                <Select value={form.parent_asset_id || '__none'} onValueChange={v => set('parent_asset_id', v === '__none' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Activo raíz (sin padre)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none">— Raíz (sin padre) —</SelectItem>
+                    {(assets || []).filter(a => a.id !== editing?.id).map(a => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}{a.code ? ` · ${a.code}` : ''}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
