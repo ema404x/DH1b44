@@ -256,6 +256,31 @@ Deno.serve(async (req) => {
     // autenticado lo bloquea la RLS para el operario. El sector ya se validó arriba.
     const actualizada = await base44.asServiceRole.entities.WorkOrder.update(ot_id, updateData);
 
+    // ── Registro de historial del activo (lifecycle UpKeep) ──
+    // Solo cuando la OT llega a 'completada' y tiene asset_id. Best-effort: si
+    // falla, la transición ya quedó hecha y no se interrumpe. Estampa el sector de
+    // la OT (== callerSector, validado arriba) → AssetHistory queda aislado.
+    if (nuevoEstado === 'completada' && ot.asset_id) {
+      try {
+        const mats = Array.isArray(actualizada.materials_used) ? actualizada.materials_used : [];
+        const costoMateriales = mats.reduce((s, m) => s + ((m?.quantity || 0) * (m?.unit_cost || 0)), 0);
+        const assetName = ot.asset_name || actualizada.asset_name || null;
+        await base44.asServiceRole.entities.AssetHistory.create({
+          asset_id: ot.asset_id,
+          asset_name: assetName,
+          tipo_evento: 'mantenimiento',
+          descripcion: `OT completada: ${ot.title || ot.code || ot.id}`,
+          usuario: user.full_name || user.email || '',
+          usuario_id: user.id,
+          ot_id: ot.id,
+          costo: costoMateriales || 0,
+          sector_id: ot.sector_id,
+        });
+      } catch (e) {
+        console.warn('[transicionEstadoOT] AssetHistory error:', e?.message);
+      }
+    }
+
     return Response.json({
       success: true,
       ot: actualizada,
