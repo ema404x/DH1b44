@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import {
   DollarSign, BarChart3, FileCheck, TrendingUp,
   Wallet, Clock, CheckCircle2, AlertCircle,
-  ArrowUpRight, ArrowDownRight, Activity, Layers, PieChart
+  ArrowUpRight, ArrowDownRight, Activity, Layers, PieChart, Calendar
 } from 'lucide-react';
+import { parseISO, subDays, subYears, startOfYear } from 'date-fns';
 import CertificacionObrasPanel from '@/components/invoices/CertificacionObrasPanel';
 import DashboardFinanciero from '@/components/finanzas/DashboardFinanciero';
 import ReportesFacturacion from '@/components/invoices/ReportesFacturacion';
@@ -14,14 +15,45 @@ import RentabilidadProyectos from '@/components/finanzas/RentabilidadProyectos';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
-function HeroKpi({ label, value, sub, icon: Icon, color, border, bg, trend, trendUp }) {
+const PERIODOS = [
+  { key: '30',  label: '30 días' },
+  { key: '90',  label: '90 días' },
+  { key: 'ytd', label: 'Año actual' },
+  { key: 'all', label: 'Histórico' },
+];
+
+function filtrarPorPeriodo(invoices, periodo) {
+  if (periodo === 'all') return { curr: invoices, prev: [] };
+  const now = new Date();
+  let desde, hasta, prevDesde, prevHasta;
+  if (periodo === '30') { desde = subDays(now, 30); hasta = now; prevHasta = desde; prevDesde = subDays(now, 60); }
+  else if (periodo === '90') { desde = subDays(now, 90); hasta = now; prevHasta = desde; prevDesde = subDays(now, 180); }
+  else if (periodo === 'ytd') { desde = startOfYear(now); hasta = now; prevHasta = desde; prevDesde = subYears(startOfYear(now), 1); }
+  const inRange = (inv, d, h) => {
+    if (!inv.issue_date) return false;
+    let dt; try { dt = parseISO(inv.issue_date); } catch { return false; }
+    if (h && dt >= h) return false;
+    return !d || dt >= d;
+  };
+  return {
+    curr: invoices.filter(i => inRange(i, desde, hasta)),
+    prev: invoices.filter(i => inRange(i, prevDesde, prevHasta)),
+  };
+}
+
+function HeroKpi({ label, value, sub, icon: Icon, color, border, bg, trend, trendUp, delta }) {
   return (
     <div className={`relative overflow-hidden rounded-2xl border ${border} p-4 flex flex-col gap-3`} style={{ background: bg }}>
       <div className="flex items-start justify-between">
         <div className={`h-9 w-9 rounded-xl flex items-center justify-center border ${border}`} style={{ background: bg }}>
           <Icon className={`h-4 w-4 ${color}`} />
         </div>
-        {trend != null && (
+        {delta != null ? (
+          <div className={`flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${delta > 0 ? 'bg-emerald-500/12 text-emerald-400' : delta < 0 ? 'bg-red-500/12 text-red-400' : 'bg-muted/40 text-muted-foreground'}`}>
+            {delta > 0 ? <ArrowUpRight className="h-3 w-3" /> : delta < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
+            {delta > 0 ? '+' : ''}{delta}%
+          </div>
+        ) : trend != null && (
           <div className={`flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${trendUp ? 'bg-emerald-500/12 text-emerald-400' : 'bg-red-500/12 text-red-400'}`}>
             {trendUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
             {trend}
@@ -46,29 +78,39 @@ const TABS = [
 
 export default function Invoices() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [periodo, setPeriodo] = useState('all');
   const STALE = 2 * 60 * 1000;
 
   const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],  queryFn: () => base44.entities.Invoice.list('-created_date'),    staleTime: STALE });
   const { data: projects  = [] } = useQuery({ queryKey: ['projects'],  queryFn: () => base44.entities.Project.list('-updated_date', 300), staleTime: STALE });
   const { data: obras     = [] } = useQuery({ queryKey: ['obras-certificacion'], queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 1000), staleTime: STALE });
 
+  const { curr: fInvoices, prev: prevInvoices } = useMemo(() => filtrarPorPeriodo(invoices, periodo), [invoices, periodo]);
+
+  const deltaPct = (c, p) => (!p || p === 0 ? null : Math.round(((c - p) / p) * 100));
+
   const kpis = useMemo(() => {
-    const total   = invoices.reduce((s, i) => s + (i.total || 0), 0);
-    const cobrado = invoices.filter(i => i.status === 'pagada').reduce((s, i) => s + (i.total || 0), 0);
-    const pending = invoices.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0);
-    const overdue = invoices.filter(i => i.status === 'vencida').reduce((s, i) => s + (i.total || 0), 0);
+    const total   = fInvoices.reduce((s, i) => s + (i.total || 0), 0);
+    const cobrado = fInvoices.filter(i => i.status === 'pagada').reduce((s, i) => s + (i.total || 0), 0);
+    const pending = fInvoices.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0);
+    const overdue = fInvoices.filter(i => i.status === 'vencida').reduce((s, i) => s + (i.total || 0), 0);
     const cobPct  = total > 0 ? Math.round((cobrado / total) * 100) : 0;
     const montoACobrar = obras.filter(o => !o.ciclo_archivado).reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
+    const prevTotal = prevInvoices.reduce((s, i) => s + (i.total || 0), 0);
+    const prevCobrado = prevInvoices.filter(i => i.status === 'pagada').reduce((s, i) => s + (i.total || 0), 0);
     return {
       total, cobrado, pending, overdue, cobPct,
-      nPending: invoices.filter(i => i.status === 'pendiente').length,
-      nPaid:    invoices.filter(i => i.status === 'pagada').length,
-      nOverdue: invoices.filter(i => i.status === 'vencida').length,
-      count:    invoices.length,
+      nPending: fInvoices.filter(i => i.status === 'pendiente').length,
+      nPaid:    fInvoices.filter(i => i.status === 'pagada').length,
+      nOverdue: fInvoices.filter(i => i.status === 'vencida').length,
+      count:    fInvoices.length,
       montoACobrar,
       nObras:   obras.filter(o => !o.ciclo_archivado).length,
+      dTotal: deltaPct(total, prevTotal),
+      dCobrado: deltaPct(cobrado, prevCobrado),
+      dPending: deltaPct(pending, prevInvoices.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0)),
     };
-  }, [invoices, obras]);
+  }, [fInvoices, prevInvoices, obras]);
 
   return (
     <div className="pb-12 space-y-0">
@@ -95,10 +137,26 @@ export default function Invoices() {
                 <p className="text-xs text-muted-foreground mt-0.5">Rentabilidad · Reportes · Certificación de Obras</p>
               </div>
             </div>
-            {/* Quick stat badge */}
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/8 text-xs text-emerald-400 font-semibold">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              {kpis.cobPct}% cobrado
+            {/* Periodo selector + Quick stat badge */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 p-1 rounded-xl border border-border/40 bg-card/40 backdrop-blur-sm">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground ml-1.5" />
+                {PERIODOS.map(p => (
+                  <button
+                    key={p.key}
+                    onClick={() => setPeriodo(p.key)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                      periodo === p.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/8 text-xs text-emerald-400 font-semibold">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {kpis.cobPct}% cobrado
+              </div>
             </div>
           </div>
 
@@ -107,15 +165,17 @@ export default function Invoices() {
             <HeroKpi
               label="Total Facturado" value={fmt(kpis.total)} sub={`${kpis.count} facturas en total`}
               icon={Wallet} color="text-primary" border="border-primary/20" bg="rgba(59,130,246,0.06)"
+              delta={kpis.dTotal}
             />
             <HeroKpi
               label="Cobrado" value={fmt(kpis.cobrado)} sub={`${kpis.nPaid} facturas pagadas`}
               icon={CheckCircle2} color="text-emerald-400" border="border-emerald-500/20" bg="rgba(16,185,129,0.06)"
-              trend={`${kpis.cobPct}%`} trendUp={true}
+              delta={kpis.dCobrado}
             />
             <HeroKpi
               label="Pendiente" value={fmt(kpis.pending)} sub={`${kpis.nPending} facturas`}
               icon={Clock} color="text-amber-400" border="border-amber-500/20" bg="rgba(245,158,11,0.06)"
+              delta={kpis.dPending}
             />
             <HeroKpi
               label="Obras — A Cobrar" value={fmt(kpis.montoACobrar)} sub={`${kpis.nObras} obras activas`}
@@ -148,7 +208,7 @@ export default function Invoices() {
 
       {/* ── Content ──────────────────────────────────────────────────── */}
       <div className="page-enter" key={activeTab}>
-        {activeTab === 'dashboard'    && <DashboardFinanciero />}
+        {activeTab === 'dashboard'    && <DashboardFinanciero periodo={periodo} />}
         {activeTab === 'rentabilidad' && <RentabilidadProyectos projects={projects} invoices={invoices} />}
         {activeTab === 'reportes'     && <ReportesFacturacion />}
         {activeTab === 'certificacion'&& <CertificacionObrasPanel />}

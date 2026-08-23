@@ -8,10 +8,11 @@ import {
 } from 'recharts';
 import {
   TrendingUp, DollarSign, AlertCircle,
-  Clock, CheckCircle2, Building2, FileCheck, ArrowUpRight,
+  Clock, CheckCircle2, Building2, FileCheck, ArrowUpRight, ArrowDownRight,
 } from 'lucide-react';
-import { format, parseISO, startOfMonth } from 'date-fns';
+import { format, parseISO, startOfMonth, subDays, subYears, startOfYear } from 'date-fns';
 import { es } from 'date-fns/locale';
+import SaludFinancieraPanel from '@/components/finanzas/SaludFinancieraPanel';
 
 const fmt  = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 const fmtM = (n) => { if (!n) return '$0'; if (Math.abs(n) >= 1_000_000) return `$${(n/1_000_000).toFixed(1)}M`; if (Math.abs(n) >= 1_000) return `$${(n/1_000).toFixed(0)}K`; return `$${n}`; };
@@ -63,7 +64,7 @@ function SectionHeader({ title, sub }) {
   );
 }
 
-function StatCard({ title, value, sub, icon: Icon, color, glow }) {
+function StatCard({ title, value, sub, icon: Icon, color, glow, delta }) {
   return (
     <div className={`relative overflow-hidden rounded-2xl border bg-card p-4 flex flex-col gap-2 ${glow ? 'border-primary/30' : 'border-border/40'}`}>
       {glow && <div className="absolute inset-0 opacity-[0.04]" style={{ background: `radial-gradient(ellipse at top right, ${glow}, transparent 70%)` }} />}
@@ -72,14 +73,23 @@ function StatCard({ title, value, sub, icon: Icon, color, glow }) {
         <Icon className={`h-3.5 w-3.5 ${color} opacity-70`} />
       </div>
       <div className="relative">
-        <p className="text-xl font-bold text-foreground tabular-nums leading-tight">{value}</p>
+        <div className="flex items-end gap-2">
+          <p className="text-xl font-bold text-foreground tabular-nums leading-tight">{value}</p>
+          {delta != null && (
+            <span className={`flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full mb-0.5
+              ${delta > 0 ? 'bg-emerald-500/12 text-emerald-400' : delta < 0 ? 'bg-red-500/12 text-red-400' : 'bg-muted/40 text-muted-foreground'}`}>
+              {delta > 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : delta < 0 ? <ArrowDownRight className="h-2.5 w-2.5" /> : null}
+              {delta != null ? `${delta > 0 ? '+' : ''}${delta}%` : ''}
+            </span>
+          )}
+        </div>
         {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
       </div>
     </div>
   );
 }
 
-export default function DashboardFinanciero() {
+export default function DashboardFinanciero({ periodo = 'all' }) {
   const STALE = 2 * 60 * 1000;
 
   const { data: invoices    = [] } = useQuery({ queryKey: ['invoices'],           queryFn: () => base44.entities.Invoice.list(),                          staleTime: STALE });
@@ -87,11 +97,40 @@ export default function DashboardFinanciero() {
   const { data: obras        = [] } = useQuery({ queryKey: ['obras-certificacion'],queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 1000), staleTime: STALE });
   const { data: projects     = [] } = useQuery({ queryKey: ['projects'],          queryFn: () => base44.entities.Project.list('-updated_date', 300),      staleTime: STALE });
 
+  // ── Filtrado por período (solo facturas) + ventana anterior para deltas ──
+  const { filtered, prevFiltered } = useMemo(() => {
+    const now = new Date();
+    const inRange = (inv, desde, hasta) => {
+      if (!inv.issue_date) return false;
+      let d;
+      try { d = parseISO(inv.issue_date); } catch { return false; }
+      if (hasta && d >= hasta) return false;
+      return !desde || d >= desde;
+    };
+    let desde = null, hasta = null, prevDesde = null, prevHasta = null;
+    if (periodo === '30') { desde = subDays(now, 30); hasta = now; prevHasta = desde; prevDesde = subDays(now, 60); }
+    else if (periodo === '90') { desde = subDays(now, 90); hasta = now; prevHasta = desde; prevDesde = subDays(now, 180); }
+    else if (periodo === 'ytd') { desde = startOfYear(now); hasta = now; prevHasta = desde; prevDesde = subYears(startOfYear(now), 1); }
+    // 'all' → sin filtro
+    if (!desde) {
+      return { filtered: invoices, prevFiltered: [] };
+    }
+    return {
+      filtered: invoices.filter(i => inRange(i, desde, hasta)),
+      prevFiltered: invoices.filter(i => inRange(i, prevDesde, prevHasta)),
+    };
+  }, [invoices, periodo]);
+
+  const deltaPct = (curr, prev) => {
+    if (!prev || prev === 0) return null;
+    return Math.round(((curr - prev) / prev) * 100);
+  };
+
   const kpis = useMemo(() => {
-    const totalFacturado = invoices.reduce((s, i) => s + (i.total || 0), 0);
-    const cobrado        = invoices.filter(i => i.status === 'pagada').reduce((s, i) => s + (i.total || 0), 0);
-    const pendiente      = invoices.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0);
-    const vencido        = invoices.filter(i => i.status === 'vencida').reduce((s, i) => s + (i.total || 0), 0);
+    const totalFacturado = filtered.reduce((s, i) => s + (i.total || 0), 0);
+    const cobrado        = filtered.filter(i => i.status === 'pagada').reduce((s, i) => s + (i.total || 0), 0);
+    const pendiente      = filtered.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0);
+    const vencido        = filtered.filter(i => i.status === 'vencida').reduce((s, i) => s + (i.total || 0), 0);
     const obrasActivas   = obras.filter(o => !o.ciclo_archivado);
     const montoACobrar   = obrasActivas.reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
     const montoListo     = obrasActivas.filter(o => o.estado_cobro === 'listo_certificar').reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
@@ -100,13 +139,21 @@ export default function DashboardFinanciero() {
     const totalPresup    = projects.reduce((s, p) => s + (p.estimated_budget || 0), 0);
     const ejecucionProm  = projects.length > 0 ? Math.round(projects.reduce((s, p) => s + (p.progress || 0), 0) / projects.length) : 0;
     const cobPct         = totalFacturado > 0 ? Math.round((cobrado / totalFacturado) * 100) : 0;
-    return { totalFacturado, cobrado, pendiente, vencido, montoACobrar, montoListo, montoCerts, cntCerts: certsAprobados.length, totalPresup, ejecucionProm, cobPct, nActivas: obrasActivas.length };
-  }, [invoices, obras, certificates, projects]);
+    // Deltas vs período anterior
+    const prevTotal = prevFiltered.reduce((s, i) => s + (i.total || 0), 0);
+    const prevCobrado = prevFiltered.filter(i => i.status === 'pagada').reduce((s, i) => s + (i.total || 0), 0);
+    return {
+      totalFacturado, cobrado, pendiente, vencido, montoACobrar, montoListo, montoCerts,
+      cntCerts: certsAprobados.length, totalPresup, ejecucionProm, cobPct, nActivas: obrasActivas.length,
+      dTotal: deltaPct(totalFacturado, prevTotal),
+      dCobrado: deltaPct(cobrado, prevCobrado),
+    };
+  }, [filtered, prevFiltered, obras, certificates, projects]);
 
   // Evolución mensual
   const monthlyData = useMemo(() => {
     const map = {};
-    invoices.forEach(inv => {
+    filtered.forEach(inv => {
       if (!inv.issue_date) return;
       try {
         const key = format(startOfMonth(parseISO(inv.issue_date)), 'MMM yy', { locale: es });
@@ -116,19 +163,19 @@ export default function DashboardFinanciero() {
       } catch {}
     });
     return Object.values(map).slice(-10);
-  }, [invoices]);
+  }, [filtered]);
 
   // Distribución por estado
   const pieData = useMemo(() => {
     const byStatus = {};
-    invoices.forEach(i => { byStatus[i.status] = (byStatus[i.status] || 0) + (i.total || 0); });
+    filtered.forEach(i => { byStatus[i.status] = (byStatus[i.status] || 0) + (i.total || 0); });
     return Object.entries(byStatus).filter(([, v]) => v > 0).map(([k, v]) => ({ name: STATUS_LABELS[k] || k, value: v, color: STATUS_COLORS[k] || '#94A3B8' }));
-  }, [invoices]);
+  }, [filtered]);
 
   // Top clientes
   const topClientes = useMemo(() => {
     const map = {};
-    invoices.forEach(i => {
+    filtered.forEach(i => {
       const k = i.client_name || 'Sin cliente';
       if (!map[k]) map[k] = { name: k, total: 0, cobrado: 0, cnt: 0 };
       map[k].total   += (i.total || 0);
@@ -136,7 +183,7 @@ export default function DashboardFinanciero() {
       map[k].cnt     += 1;
     });
     return Object.values(map).sort((a, b) => b.total - a.total).slice(0, 6);
-  }, [invoices]);
+  }, [filtered]);
 
   // Obras por estado
   const obrasEstado = useMemo(() => {
@@ -161,10 +208,10 @@ export default function DashboardFinanciero() {
       <div>
         <SectionHeader title="Facturas" sub="Estado actual de la cartera" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard title="Total Facturado"    value={fmt(kpis.totalFacturado)} sub={`${invoices.length} facturas`}            icon={DollarSign}   color="text-primary"      glow="hsl(213,90%,55%)" />
-          <StatCard title="Cobrado"            value={fmt(kpis.cobrado)}        sub={`${kpis.cobPct}% del total`}              icon={CheckCircle2} color="text-emerald-400"  glow={false} />
-          <StatCard title="Pendiente de Cobro" value={fmt(kpis.pendiente)}      sub={`${invoices.filter(i=>i.status==='pendiente').length} fac.`} icon={Clock} color="text-amber-400" glow={false} />
-          <StatCard title="Vencido Sin Cobrar" value={fmt(kpis.vencido)}        sub={`${invoices.filter(i=>i.status==='vencida').length} vencidas`} icon={AlertCircle} color="text-red-400" glow={false} />
+          <StatCard title="Total Facturado"    value={fmt(kpis.totalFacturado)} sub={`${filtered.length} facturas`}            icon={DollarSign}   color="text-primary"      glow="hsl(213,90%,55%)" delta={kpis.dTotal} />
+          <StatCard title="Cobrado"            value={fmt(kpis.cobrado)}        sub={`${kpis.cobPct}% del total`}              icon={CheckCircle2} color="text-emerald-400"  glow={false} delta={kpis.dCobrado} />
+          <StatCard title="Pendiente de Cobro" value={fmt(kpis.pendiente)}      sub={`${filtered.filter(i=>i.status==='pendiente').length} fac.`} icon={Clock} color="text-amber-400" glow={false} />
+          <StatCard title="Vencido Sin Cobrar" value={fmt(kpis.vencido)}        sub={`${filtered.filter(i=>i.status==='vencida').length} vencidas`} icon={AlertCircle} color="text-red-400" glow={false} />
         </div>
       </div>
 
@@ -251,7 +298,10 @@ export default function DashboardFinanciero() {
         </div>
       </div>
 
-      {/* ── Fila 4: Top clientes + Obras por estado ─────────────────────── */}
+      {/* ── Salud financiera + Aging de cuentas a cobrar ───────────────── */}
+      <SaludFinancieraPanel invoices={filtered} totalFacturado={kpis.totalFacturado} cobrado={kpis.cobrado} />
+
+      {/* ── Top clientes + Obras por estado ────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Top clientes */}
         <div className="rounded-2xl border border-border/40 bg-card p-5">
