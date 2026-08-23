@@ -1,0 +1,99 @@
+{
+  "name": "MaterialUsageAlert",
+  "type": "object",
+  "properties": {
+    "material_name": {
+      "type": "string",
+      "description": "Nombre del material monitoreado. Join key contra WorkOrder.materials_used[].material_name (comparaci\u00f3n normalizada: trim + min\u00fasculas)."
+    },
+    "threshold": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad acumulada de uso en OTs que dispara la alerta (ej: 200 cerraduras)."
+    },
+    "activo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si la alerta est\u00e1 habilitada."
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector/unidad de negocio. A\u00edsla la configuraci\u00f3n entre sectores. Se estampa desde el creador; sin default."
+    }
+  },
+  "required": [
+    "material_name",
+    "threshold",
+    "sector_id"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "gerente"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

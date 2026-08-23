@@ -20,6 +20,7 @@ import InventoryImporter from '@/components/inventory/InventoryImporter';
 import MovimientoDialog from '@/components/inventory/MovimientoDialog';
 import MovimientosLog from '@/components/inventory/MovimientosLog';
 import RequerimientosList from '@/components/inventory/RequerimientosList';
+import UtilizacionMaterialesTab from '@/components/inventory/UtilizacionMaterialesTab';
 import { useEffect } from 'react';
 import { usePermission } from '@/hooks/usePermission';
 
@@ -159,10 +160,11 @@ export default function Inventory() {
       {/* Tabs */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
         <Tabs defaultValue="stock" className="w-full">
-          <TabsList className="grid w-full sm:w-auto grid-cols-3 bg-slate-800/50 border border-slate-700/50">
+          <TabsList className="grid w-full sm:w-auto grid-cols-4 bg-slate-800/50 border border-slate-700/50">
             <TabsTrigger value="stock" className="gap-1.5"><Package className="h-4 w-4" /> Stock</TabsTrigger>
             <TabsTrigger value="movimientos" className="gap-1.5"><History className="h-4 w-4" /> Movimientos</TabsTrigger>
             <TabsTrigger value="requerimientos" className="gap-1.5"><ShoppingCart className="h-4 w-4" /> Requerimientos</TabsTrigger>
+            <TabsTrigger value="utilizacion" className="gap-1.5"><TrendingUp className="h-4 w-4" /> Utilización</TabsTrigger>
           </TabsList>
 
           {/* Stock Tab */}
@@ -349,6 +351,11 @@ export default function Inventory() {
           {/* Requerimientos Tab */}
           <TabsContent value="requerimientos" className="mt-4">
             <RequerimientosList user={currentUser} />
+          </TabsContent>
+
+          {/* Utilización de Materiales en OTs */}
+          <TabsContent value="utilizacion" className="mt-4">
+            <UtilizacionMaterialesTab />
           </TabsContent>
         </Tabs>
       </motion.div>
