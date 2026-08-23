@@ -46,29 +46,30 @@ Deno.serve(async (req) => {
     // Cargar OTs del sector (historial por activo + listado del mes).
     const allOts = await sb.entities.WorkOrder.filter({ sector_id: tok.sector_id }, '-created_date', 500).catch(() => []);
 
-    // OTs por activo (top 10, campos seguros) — historial de mantenimiento.
+    // Rango del mes del lote (YYYY-MM).
+    const [yy, mm] = (tok.mes_periodo || '').split('-').map(Number);
+    const mesStart = new Date(yy || 2000, (mm || 1) - 1, 1).getTime();
+    const mesEnd = new Date(yy || 2000, mm || 12, 1).getTime();
+    const inMes = (d) => { if (!d) return false; const t = new Date(d).getTime(); return t >= mesStart && t < mesEnd; };
+
+    // OTs por activo del mes (top 10, campos seguros) — historial del mes.
     const assetIds = activos.map(a => a.id);
     const idSet = new Set(assetIds);
     const otsByAsset = {};
     for (const o of allOts) {
-      if (o.asset_id && idSet.has(o.asset_id)) {
+      if (o.asset_id && idSet.has(o.asset_id) && inMes(o.created_date)) {
         if (!otsByAsset[o.asset_id]) otsByAsset[o.asset_id] = [];
         if (otsByAsset[o.asset_id].length < 10) {
           otsByAsset[o.asset_id].push({
             title: o.title,
             status: o.status,
+            type: o.type,
             scheduled_date: o.scheduled_date,
             completed_date: o.completed_date,
           });
         }
       }
     }
-
-    // Rango del mes del lote (YYYY-MM).
-    const [yy, mm] = (tok.mes_periodo || '').split('-').map(Number);
-    const mesStart = new Date(yy || 2000, (mm || 1) - 1, 1).getTime();
-    const mesEnd = new Date(yy || 2000, mm || 12, 1).getTime();
-    const inMes = (d) => { if (!d) return false; const t = new Date(d).getTime(); return t >= mesStart && t < mesEnd; };
 
     // Modificaciones del mes (AssetHistory) por activo — lifecycle del mes.
     const allHist = await sb.entities.AssetHistory.filter({ sector_id: tok.sector_id }, '-created_date', 500).catch(() => []);

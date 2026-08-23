@@ -10,6 +10,16 @@ const typeLabels = {
 const statusLabels = {
   operativo: 'Operativo', en_mantenimiento: 'En mantenimiento', fuera_de_servicio: 'Fuera de servicio', baja: 'Baja',
 };
+const otStatusLabels = {
+  pendiente: 'Pendiente', asignada: 'Asignada', en_progreso: 'En progreso', obra: 'En obra',
+  pendiente_validacion: 'P. validación', completada: 'Completada', cancelada: 'Cancelada',
+};
+const otStatusStyles = {
+  pendiente: 'bg-slate-100 text-slate-600', asignada: 'bg-blue-100 text-blue-700',
+  en_progreso: 'bg-amber-100 text-amber-700', obra: 'bg-amber-100 text-amber-700',
+  pendiente_validacion: 'bg-violet-100 text-violet-700', completada: 'bg-emerald-100 text-emerald-700',
+  cancelada: 'bg-red-100 text-red-700',
+};
 const eventIcons = { creado: PlusCircle, mantenimiento: Wrench, cambio_estado: ArrowRightLeft, baja: PowerOff, movimiento: ArrowRightLeft, costo: DollarSign };
 const eventColors = {
   creado: 'text-emerald-600 bg-emerald-50', mantenimiento: 'text-blue-600 bg-blue-50',
@@ -83,6 +93,22 @@ export default function AssetCardRevision({ asset, onMarcar, marking }) {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* OTs del mes vinculadas al activo */}
+        {Array.isArray(asset.ots) && asset.ots.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <p className="text-[11px] text-slate-400 font-medium mb-2 flex items-center gap-1"><Wrench className="h-3 w-3" /> Órdenes de trabajo del mes ({asset.ots.length})</p>
+            <div className="space-y-1">
+              {asset.ots.map((o, i) => (
+                <div key={i} className="text-[11px] text-slate-600 flex items-center gap-2 flex-wrap">
+                  <span className={`px-1.5 py-0.5 rounded font-medium ${otStatusStyles[o.status] || 'bg-slate-100 text-slate-600'}`}>{otStatusLabels[o.status] || o.status}</span>
+                  <span className="font-medium text-slate-700">{o.title}</span>
+                  {o.completed_date && <span className="text-slate-400">· {new Date(o.completed_date).toLocaleDateString('es-AR')}</span>}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
