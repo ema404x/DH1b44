@@ -199,18 +199,6 @@ export default function RevisionBapro() {
                 ))}
               </div>
             )}
-
-            {/* OTs del mes — listado plano visible también en la solapa de activos */}
-            {(data?.ots_mes || []).length > 0 && (
-              <div className="mt-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Wrench className="h-4 w-4 text-blue-600" />
-                  <h3 className="text-sm font-semibold text-slate-800">Órdenes de trabajo del mes</h3>
-                  <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 tabular-nums">{(data?.ots_mes || []).length}</span>
-                </div>
-                <OTsMesList ots={data?.ots_mes || []} />
-              </div>
-            )}
           </>
         )}
 
