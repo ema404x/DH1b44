@@ -12,7 +12,9 @@ import { differenceInDays } from 'date-fns';
 import AssetFormDialog from '@/components/assets/AssetFormDialog';
 import AssetRow from '@/components/assets/AssetRow';
 import ImportarActivosModal from '@/components/assets/ImportarActivosModal';
+import ImportarActivosWizard from '@/components/assets/importar-wizard/ImportarActivosWizard';
 import AssetQRModal from '@/components/assets/AssetQRModal';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { exportActivosToExcel, exportActivosToPDF } from '@/utils/exportActivosExcel';
 import { fmtCurrency } from '@/lib/format';
 
@@ -33,6 +35,8 @@ export default function ActivosTab() {
   const [qrAsset, setQrAsset] = useState(null);
   const [exportMenu, setExportMenu] = useState(false);
   const qc = useQueryClient();
+  const { user } = useCurrentUser();
+  const isBapro = (user?.data?.sector_id || user?.sector_id) === 'bapro';
 
   const { data: assets = [], isLoading } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list('-updated_date', 500) });
   const { data: sedes = [] } = useQuery({ queryKey: ['edificios'], queryFn: () => base44.entities.Edificio.list('-updated_date', 500) });
@@ -192,7 +196,9 @@ export default function ActivosTab() {
       )}
 
       <AssetFormDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editing} sedes={sedes} />
-      <ImportarActivosModal open={importOpen} onOpenChange={setImportOpen} />
+      {isBapro
+        ? <ImportarActivosWizard open={importOpen} onOpenChange={setImportOpen} />
+        : <ImportarActivosModal open={importOpen} onOpenChange={setImportOpen} />}
       <AssetQRModal open={!!qrAsset} onOpenChange={(o) => !o && setQrAsset(null)} asset={qrAsset} />
     </div>
   );

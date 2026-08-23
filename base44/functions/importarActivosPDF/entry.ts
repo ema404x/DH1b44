@@ -4,23 +4,10 @@ import { assertAllowedFileUrl } from '../../shared/excelImport.ts';
 import { bulkImportAssets } from '../../shared/assetBulkImport.ts';
 
 // Importer masivo de Activos desde uno o varios PDFs.
-//
-// Flujo:
-//   1. El frontend sube cada PDF con UploadFile → array de file_urls.
-//   2. Esta función recorre cada PDF y extrae datos estructurados con
-//      ExtractDataFromUploadedFile (soporta PDF nativamente), usando un
-//      schema que mapea a los campos del Asset.
-//   3. Los items extraídos se mapean a inputs crudos y se pasan al helper
-//      compartido bulkImportAssets (mismo que importarActivosBapro), que
-//      resuelve/crea sedes, dedupea por código y bulk-crea/actualiza.
-//
-// Limitado a admin/gerente. Sector-aislado vía sectorGuard + bulkImportAssets.
+//   dry_run=true  → extrae + valida SIN escribir; devuelve preview.
+//   dry_run=false → ejecuta el import real y persiste ImportacionActivos.
 
 const MAX_FILES = 20;
-
-// Schema de extracción. ExtractDataFromUploadedFile devuelve list|dict;
-// pedimos un array de objetos de activo y toleramos también un wrapper
-// { activos: [...] } por si el extractor envuelve la lista.
 const ASSET_SCHEMA = {
   type: 'object',
   properties: {
@@ -35,9 +22,9 @@ const ASSET_SCHEMA = {
           marca: { type: 'string' },
           modelo: { type: 'string' },
           serie: { type: 'string', description: 'Número de serie' },
-          sede: { type: 'string', description: 'Sede, edificio, establecimiento o ubicación donde se encuentra el activo' },
+          sede: { type: 'string', description: 'Sede, edificio, establecimiento o ubicación' },
           area: { type: 'string', description: 'Área, zona o departamento dentro de la sede' },
-          jefe_sitio: { type: 'string', description: 'Responsable / jefe de sitio del activo' },
+          jefe_sitio: { type: 'string', description: 'Responsable / jefe de sitio' },
           comuna: { type: 'string', description: 'Comuna: 8A, 8B o 10A' },
           estado: { type: 'string', description: 'Estado: operativo, en mantenimiento, fuera de servicio o baja' },
           criticidad: { type: 'string', description: 'Criticidad: baja, media, alta o crítica' },
@@ -54,8 +41,6 @@ const ASSET_SCHEMA = {
   required: ['activos'],
 };
 
-// Mapea un item extraído (keys en español, con fallbacks a inglés) al input
-// crudo que consume bulkImportAssets.
 function mapExtractedItem(item) {
   if (!item || typeof item !== 'object') return null;
   const name = item.nombre || item.name;
@@ -81,6 +66,30 @@ function mapExtractedItem(item) {
   };
 }
 
+// Extrae items de todos los PDFs (común a dry-run y real).
+async function extractInputs(base44, file_urls) {
+  const allInputs = [];
+  const fileErrors = [];
+  const fileStats = [];
+  for (let i = 0; i < file_urls.length; i++) {
+    const file_url = file_urls[i];
+    const fileName = file_url.split('/').pop() || `archivo-${i + 1}`;
+    try {
+      const extractRes = await base44.integrations.Core.ExtractDataFromUploadedFile({ file_url, json_schema: ASSET_SCHEMA });
+      const output = extractRes?.output;
+      let items: any[] = [];
+      if (Array.isArray(output)) items = output;
+      else if (output && typeof output === 'object') items = output.activos || output.assets || output.items || [];
+      const mapped = items.map(mapExtractedItem).filter(Boolean);
+      fileStats.push({ fileName, extraidos: mapped.length });
+      allInputs.push(...mapped);
+    } catch (err) {
+      fileErrors.push({ fileName, error: err.message || String(err) });
+    }
+  }
+  return { allInputs, fileErrors, fileStats };
+}
+
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -89,88 +98,65 @@ export default async function(req) {
     if (user.role !== 'admin' && user.role !== 'gerente') {
       return Response.json({ error: 'Forbidden: solo admin/gerente' }, { status: 403 });
     }
-
     const callerSector = resolveCallerSector(user);
     const sb = createScopedClient(base44, callerSector);
 
     const body = await req.json().catch(() => ({}));
-    const { file_urls, auto_create_locations = true } = body;
+    const { file_urls, auto_create_locations = true, dry_run = false } = body;
     if (!file_urls || !Array.isArray(file_urls) || file_urls.length === 0) {
       return Response.json({ error: 'file_urls (array) requerido' }, { status: 400 });
     }
-    if (file_urls.length > MAX_FILES) {
-      return Response.json({ error: `Máximo ${MAX_FILES} archivos por lote` }, { status: 400 });
-    }
+    if (file_urls.length > MAX_FILES) return Response.json({ error: `Máximo ${MAX_FILES} archivos por lote` }, { status: 400 });
     for (const url of file_urls) {
-      if (typeof url !== 'string') {
-        return Response.json({ error: 'file_url inválido' }, { status: 400 });
-      }
+      if (typeof url !== 'string') return Response.json({ error: 'file_url inválido' }, { status: 400 });
       try { assertAllowedFileUrl(url); }
       catch (e) { return Response.json({ error: e.message }, { status: 400 }); }
     }
 
-    // ── Extracción por PDF ──────────────────────────────────────────────
-    const allInputs = [];
-    const fileErrors = [];
-    const fileStats = [];
-
-    for (let i = 0; i < file_urls.length; i++) {
-      const file_url = file_urls[i];
-      const fileName = file_url.split('/').pop() || `archivo-${i + 1}`;
-      try {
-        const extractRes = await base44.integrations.Core.ExtractDataFromUploadedFile({
-          file_url,
-          json_schema: ASSET_SCHEMA,
-        });
-        // ExtractDataFromUploadedFile → { status, details, output }
-        // output puede ser list[dict] o dict con { activos: [...] }
-        const output = extractRes?.output;
-        let items: any[] = [];
-        if (Array.isArray(output)) {
-          items = output;
-        } else if (output && typeof output === 'object') {
-          items = output.activos || output.assets || output.items || [];
-        }
-        const mapped = items.map(mapExtractedItem).filter(Boolean);
-        fileStats.push({ fileName, extraidos: mapped.length });
-        allInputs.push(...mapped);
-      } catch (err) {
-        fileErrors.push({ fileName, error: err.message || String(err) });
-      }
-    }
-
+    const { allInputs, fileErrors, fileStats } = await extractInputs(base44, file_urls);
     if (allInputs.length === 0) {
-      return Response.json({
-        error: 'No se pudieron extraer activos de los PDFs',
-        fileErrors,
-        fileStats,
-        extracted: 0,
-      }, { status: 400 });
+      return Response.json({ error: 'No se pudieron extraer activos de los PDFs', fileErrors, fileStats, extracted: 0 }, { status: 400 });
     }
 
-    // ── Bulk import con el helper compartido ───────────────────────────
-    const result = await bulkImportAssets(sb, allInputs, { autoCreateLocations: auto_create_locations });
+    const result = await bulkImportAssets(sb, allInputs, { autoCreateLocations: auto_create_locations, dryRun: dry_run });
+
+    if (dry_run) {
+      return Response.json({
+        ok: true, sector: callerSector, tipo: 'pdf',
+        files: file_urls.length, fileErrors, fileStats, extracted: allInputs.length,
+        ...result,
+      });
+    }
+
+    // Persistir registro de importación
+    let importacion_id = null;
+    try {
+      const reg = await sb.entities.ImportacionActivos.create({
+        file_name: file_urls.map(u => u.split('/').pop()).join(', ').slice(0, 200),
+        tipo: 'pdf',
+        total_filas: result.total_filas,
+        created_ids: result.created_ids,
+        updated_ids: result.updated_ids,
+        updated_snapshots: result.updated_snapshots,
+        snapshot_completo: result.snapshot_completo,
+        sedes_creadas_ids: result.sedes_creadas_ids,
+        estado: 'ejecutada',
+        created: result.created,
+        updated: result.updated,
+      });
+      importacion_id = reg.id;
+    } catch (e) {
+      console.error('ImportacionActivos create failed:', e.message);
+    }
 
     return Response.json({
-      ok: true,
-      sector: callerSector,
-      files: file_urls.length,
-      files_ok: fileStats.length,
-      file_errors: fileErrors.length,
-      fileErrors,
-      fileStats,
-      extracted: allInputs.length,
+      ok: true, sector: callerSector, tipo: 'pdf', importacion_id,
+      files: file_urls.length, fileErrors, fileStats, extracted: allInputs.length,
       imported: result.created + result.updated,
-      created: result.created,
-      updated: result.updated,
-      errors: result.errors,
-      duplicados: result.duplicados,
+      created: result.created, updated: result.updated, errors: result.errors,
+      duplicados: result.duplicados, sedes_creadas: result.sedes_creadas,
+      snapshot_completo: result.snapshot_completo,
       errorDetails: result.errorDetails.slice(0, 20),
-      sedes_creadas: result.sedes_creadas,
-      sedes_creadas_detalle: result.sedes_creadas_detalle,
-      sedes_totales_unicas: result.sedes_totales_unicas,
-      sedes_preexistentes: result.sedes_preexistentes,
-      parseErrors: result.parseErrors.slice(0, 20),
       auto_create_locations,
     });
   } catch (err) {

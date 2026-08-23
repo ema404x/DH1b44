@@ -1,15 +1,13 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import * as XLSX from 'npm:xlsx@0.18.5';
 import { createScopedClient, resolveCallerSector, SectorError } from '../../shared/sectorGuard.ts';
-import { normalizeName, mapEnum, findHeaderIndex, findHeaderRow, assertAllowedFileUrl, SEDE_HEADERS } from '../../shared/excelImport.ts';
+import { normalizeName, findHeaderIndex, findHeaderRow, assertAllowedFileUrl, SEDE_HEADERS } from '../../shared/excelImport.ts';
 import { bulkImportAssets } from '../../shared/assetBulkImport.ts';
 
-// Importer masivo de Activos BAPRO con auto-creación de ubicaciones.
-//
-// La lógica de resolución de sedes + bulkCreate/bulkUpdate vive ahora en
-// base44/shared/assetBulkImport.ts (compartida con importarActivosPDF).
-// Acá queda solo el parse del Excel → array de inputs crudos que se le pasa
-// al helper compartido.
+// Importer masivo de Activos BAPRO.
+//   dry_run=true  → parsea + valida SIN escribir; devuelve preview.
+//   dry_run=false → ejecuta el import real y persiste un registro
+//                   ImportacionActivos (con snapshots para rollback).
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
@@ -21,16 +19,14 @@ export default async function(req) {
     if (user.role !== 'admin' && user.role !== 'gerente') {
       return Response.json({ error: 'Forbidden: solo admin/gerente' }, { status: 403 });
     }
-
     const callerSector = resolveCallerSector(user);
     const sb = createScopedClient(base44, callerSector);
 
     const body = await req.json().catch(() => ({}));
-    const { file_url, auto_create_locations = true } = body;
+    const { file_url, auto_create_locations = true, dry_run = false } = body;
     if (!file_url || typeof file_url !== 'string') {
       return Response.json({ error: 'file_url requerido' }, { status: 400 });
     }
-
     try { assertAllowedFileUrl(file_url); }
     catch (e) { return Response.json({ error: e.message }, { status: 400 }); }
 
@@ -44,11 +40,8 @@ export default async function(req) {
     if (buffer.byteLength > MAX_FILE_SIZE) return Response.json({ error: 'Archivo demasiado grande (máx 50MB)' }, { status: 413 });
 
     let workbook;
-    try {
-      workbook = XLSX.read(new Uint8Array(buffer), { type: 'array', cellDates: true });
-    } catch (err) {
-      return Response.json({ error: `Formato Excel inválido: ${err.message}` }, { status: 400 });
-    }
+    try { workbook = XLSX.read(new Uint8Array(buffer), { type: 'array', cellDates: true }); }
+    catch (err) { return Response.json({ error: `Formato Excel inválido: ${err.message}` }, { status: 400 }); }
     if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
       return Response.json({ error: 'Workbook sin hojas' }, { status: 400 });
     }
@@ -61,7 +54,6 @@ export default async function(req) {
 
     const headerRowIdx = findHeaderRow(raw);
     const headers = raw[headerRowIdx] || [];
-
     const colSede = findHeaderIndex(headers, SEDE_HEADERS);
     const colCode = findHeaderIndex(headers, ['codigo', 'cod', 'code']);
     const colName = findHeaderIndex(headers, ['nombre', 'name', 'activo', 'descripcion', 'descripción']);
@@ -82,10 +74,8 @@ export default async function(req) {
     const colNextM = findHeaderIndex(headers, ['proximo mantenimiento', 'próximo mantenimiento', 'prox mant']);
     const colFreq = findHeaderIndex(headers, ['frecuencia', 'frecuencia (dias)']);
     const colNotes = findHeaderIndex(headers, ['notas', 'observaciones', 'obs']);
-
     const hasSedeCol = colSede >= 0;
 
-    // ── Construir inputs crudos para el helper compartido ───────────────
     const inputs = [];
     for (let i = headerRowIdx + 1; i < raw.length; i++) {
       const row = raw[i];
@@ -116,23 +106,49 @@ export default async function(req) {
       });
     }
 
-    const result = await bulkImportAssets(sb, inputs, { autoCreateLocations: auto_create_locations });
+    const result = await bulkImportAssets(sb, inputs, { autoCreateLocations: auto_create_locations, dryRun: dry_run });
+
+    // ── Modo dry-run: devolver preview ──────────────────────────────────
+    if (dry_run) {
+      return Response.json({ ok: true, sector: callerSector, tipo: 'excel', ...result });
+    }
+
+    // ── Modo real: persistir registro de importación ────────────────────
+    let importacion_id = null;
+    try {
+      const reg = await sb.entities.ImportacionActivos.create({
+        file_name: file_url.split('/').pop() || 'import.xlsx',
+        tipo: 'excel',
+        total_filas: result.total_filas,
+        created_ids: result.created_ids,
+        updated_ids: result.updated_ids,
+        updated_snapshots: result.updated_snapshots,
+        snapshot_completo: result.snapshot_completo,
+        sedes_creadas_ids: result.sedes_creadas_ids,
+        estado: 'ejecutada',
+        created: result.created,
+        updated: result.updated,
+      });
+      importacion_id = reg.id;
+    } catch (e) {
+      // El import ya se ejecutó; si falla el registro, el rollback no estará
+      // disponible pero los datos sí quedaron importados.
+      console.error('ImportacionActivos create failed:', e.message);
+    }
 
     return Response.json({
       ok: true,
       sector: callerSector,
+      tipo: 'excel',
+      importacion_id,
       imported: result.created + result.updated,
       created: result.created,
       updated: result.updated,
       errors: result.errors,
       errorDetails: result.errorDetails.slice(0, 20),
       duplicados: result.duplicados,
-      filas_invalidas: result.parseErrors.length,
-      parseErrors: result.parseErrors.slice(0, 20),
       sedes_creadas: result.sedes_creadas,
-      sedes_creadas_detalle: result.sedes_creadas_detalle,
-      sedes_totales_unicas: result.sedes_totales_unicas,
-      sedes_preexistentes: result.sedes_preexistentes,
+      snapshot_completo: result.snapshot_completo,
       auto_create_locations,
     });
   } catch (err) {

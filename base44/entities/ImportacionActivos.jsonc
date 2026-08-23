@@ -1,0 +1,171 @@
+{
+  "name": "ImportacionActivos",
+  "type": "object",
+  "properties": {
+    "file_name": {
+      "type": "string",
+      "description": "Nombre del archivo importado"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "excel",
+        "pdf"
+      ],
+      "description": "Tipo de origen del import"
+    },
+    "total_filas": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de filas procesadas (crear + actualizar + errores)"
+    },
+    "created_ids": {
+      "type": "array",
+      "description": "IDs de los assets creados en esta importaci\u00f3n (para rollback)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "updated_ids": {
+      "type": "array",
+      "description": "IDs de los assets actualizados en esta importaci\u00f3n",
+      "items": {
+        "type": "string"
+      }
+    },
+    "updated_snapshots": {
+      "type": "array",
+      "description": "Snapshot del asset ANTES de pisar, para restaurar en rollback. Slim: solo campos de negocio. Si snapshot_completo=false, solo se guardaron los ids (restauraci\u00f3n parcial).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "snapshot": {
+            "type": "object",
+            "description": "Campos del asset previos a la actualizaci\u00f3n"
+          }
+        }
+      }
+    },
+    "snapshot_completo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si updated_snapshots contiene todos los snapshots o solo ids (restauraci\u00f3n parcial)"
+    },
+    "sedes_creadas_ids": {
+      "type": "array",
+      "description": "IDs de LocationData/Edificio creados en esta importaci\u00f3n (para revertir)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "ejecutada",
+        "revertida",
+        "revertida_parcial"
+      ],
+      "default": "ejecutada"
+    },
+    "created": {
+      "type": "number",
+      "default": 0
+    },
+    "updated": {
+      "type": "number",
+      "default": 0
+    },
+    "reverted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reverted_by": {
+      "type": "string"
+    },
+    "reverted_by_email": {
+      "type": "string"
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Se estampa desde el creador; sin default."
+    }
+  },
+  "required": [
+    "file_name",
+    "tipo",
+    "sector_id"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "gerente"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
