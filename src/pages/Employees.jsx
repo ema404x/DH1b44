@@ -208,8 +208,31 @@ export default function Employees() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (data) => {
-      if (editing) return base44.entities.Employee.update(editing.id, data);
+    mutationFn: async (data) => {
+      if (editing) {
+        // ── Cambio de email = operación atómica premium ──
+        // Si el email cambió, rutear por cambiarEmailEmpleado: propaga
+        // jefe_sitio_email en OTs/Pendientes (sino el jefe pierde su carga
+        // histórica por mismatch de RLS) + re-vincula/sincroniza plataforma.
+        // Los demás campos se actualizan primero; la función re-lee la ficha
+        // ya actualizada y sincroniza rol/nombre en plataforma con los valores nuevos.
+        const oldEmail = (editing.email || '').toLowerCase().trim();
+        const newEmail = (data.email || '').toLowerCase().trim();
+        if (newEmail && oldEmail && newEmail !== oldEmail) {
+          const { email: _omit, ...rest } = data;
+          if (Object.keys(rest).length > 0) {
+            await base44.entities.Employee.update(editing.id, rest);
+          }
+          const res = await base44.functions.invoke('cambiarEmailEmpleado', {
+            employee_id: editing.id, new_email: data.email,
+          });
+          if (!res.data?.ok || res.data?.error) {
+            throw new Error(res.data?.error || 'No se pudo cambiar el email');
+          }
+          return res.data;
+        }
+        return base44.entities.Employee.update(editing.id, data);
+      }
       // El sector viene del selector explícito del formulario (siempre presente).
       // withActiveSector es backstop fail-closed: si faltara, usa la cadena central.
       const payload = withActiveSector(data, currentUser, employeeSector);
@@ -224,7 +247,23 @@ export default function Employees() {
       }
       return base44.entities.Employee.create(payload);
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['employees'] }); setDialogOpen(false); setEditing(null); },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      // Feedback premium del cambio de email atómico
+      if (result?.workorders || result?.pendientes) {
+        const w = result.workorders?.updated ?? 0;
+        const p = result.pendientes?.updated ?? 0;
+        const linkTxt = result.link?.action === 'invited'
+          ? 'Se envió invitación al nuevo email.'
+          : (result.link?.action === 'linked' ? 'Vinculado al usuario de plataforma.' : '');
+        toast({
+          title: 'Email actualizado',
+          description: `Se propagó a ${w} OT(s) y ${p} pendiente(s). ${linkTxt}`.trim(),
+        });
+      }
+      setDialogOpen(false); setEditing(null);
+    },
     onError: (err) => {
       toast({ title: 'Error al guardar', description: err?.message || 'No se pudo guardar el empleado.', variant: 'destructive' });
     }
