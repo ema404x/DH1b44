@@ -12,15 +12,21 @@ const STEP_MESSAGES = {
 Puedo ayudarte a cargar datos en el sistema de forma inteligente. Acá te cuento **qué podés importar** y cómo preparar tu archivo:
 
 **Entidades soportadas:**
-- 👥 **Empleados** — Nombre, DNI, rol, especialidad, teléfono
+- 👥 **Empleados** — Nombre, DNI, rol, especialidad, teléfono, sede
 - 🏢 **Clientes/Proveedores** — Razón social, CUIT, contacto, ciudad
 - 📦 **Materiales** — Código, nombre, unidad, stock, precio
-- 🏗️ **Proyectos** — Nombre, cliente, fechas, presupuesto
-- 🔧 **Órdenes de Trabajo** — Título, asignado, fecha programada
-- ⚙️ **Activos** — Equipos, marca, modelo, N° de serie
+- 🏗️ **Proyectos / Obras** — Nombre, cliente, ADA, fechas, presupuesto, certificación
+- 🔧 **Órdenes de Trabajo** — Título, asignado, fecha programada, tipo, prioridad
+- ⚙️ **Activos** — Equipos, marca, modelo, N° de serie, sede, criticidad (Excel o PDF)
 - 📄 **Preciario Ministerial** — Código, descripción, PU mat, PU MO
+- 📋 **Pendientes SAP** — N° SAP, establecimiento, inspector, comuna, fechas
+- 🏫 **Escuelas / Establecimientos** — Nombre, dirección, comuna, jefe de sitio
+- 🧭 **Direcciones de Jefes de Sitio** — Dirección, comuna, jefe, inspector
+- 🔥 **Equipamiento de Calefacción** — Escuela, tipo de equipo, cantidad, estado
+- 📊 **Informes de Planeación** — Periodo, establecimiento, indicadores
+- 💰 **Presupuestos de Obra** — Planilla PCP/PAPORC, rubros, importes
 
-**Tip:** No importa cómo se llamen tus columnas — la IA las va a detectar automáticamente. Podés subir un Excel con múltiples hojas y cada una se importa a su entidad correspondiente.
+**Tip:** No importa cómo se llamen tus columnas — la IA las va a detectar automáticamente. Podés subir un Excel con múltiples hojas y cada una se importa a su entidad correspondiente. Los **activos** también se pueden cargar desde uno o varios **PDF** con extracción automática.
 
 ¿Tenés preguntas antes de subir tu archivo?`,
     suggestions: [
