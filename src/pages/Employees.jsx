@@ -250,16 +250,28 @@ export default function Employees() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      // Feedback premium del cambio de email atómico
-      if (result?.workorders || result?.pendientes) {
-        const w = result.workorders?.updated ?? 0;
-        const p = result.pendientes?.updated ?? 0;
+      // Feedback premium del cambio de email atómico — suma todas las entidades propagadas
+      if (result?.propagation) {
+        const parts = [];
+        const labels = {
+          WorkOrder: 'OTs', Pendiente: 'pendientes', Certificado: 'certificados',
+          SolicitudCertificado: 'solicitudes', AlertaConfig: 'alertas',
+        };
+        let total = 0;
+        for (const [ent, fields] of Object.entries(result.propagation)) {
+          let entTotal = 0;
+          for (const f of Object.values(fields)) entTotal += (f.updated ?? 0);
+          if (entTotal > 0) {
+            parts.push(`${entTotal} ${labels[ent] || ent}`);
+            total += entTotal;
+          }
+        }
         const linkTxt = result.link?.action === 'invited'
           ? 'Se envió invitación al nuevo email.'
           : (result.link?.action === 'linked' ? 'Vinculado al usuario de plataforma.' : '');
         toast({
-          title: 'Email actualizado',
-          description: `Se propagó a ${w} OT(s) y ${p} pendiente(s). ${linkTxt}`.trim(),
+          title: total > 0 ? 'Email actualizado y datos trasladados' : 'Email actualizado',
+          description: (total > 0 ? `Se trasladó toda su info: ${parts.join(', ')}. ` : '') + linkTxt,
         });
       }
       setDialogOpen(false); setEditing(null);

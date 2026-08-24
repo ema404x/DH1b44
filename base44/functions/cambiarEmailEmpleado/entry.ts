@@ -1,29 +1,61 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { resolveCallerSector, isValidEmail, linkOrInvitePlatformUser } from "../../shared/empleadoLink.ts";
 
-// Cambio de email de empleado PREMIUM y atómico — resuelve de raíz el bug
-// "cambié el correo y ahora solo le figuran 3 OT y nada más de todo lo que tenía".
+// Cambio de email de empleado PREMIUM y atómico — traslada TODA la información
+// del empleado referenciada por email, hasta el mínimo detalle.
 //
-// ROOT CAUSE: las OTs/Pendientes históricas guardan `jefe_sitio_email`
-// (denormalizado) con el email VIEJO del jefe. La RLS de visibilidad de
-// WorkOrder/Pendiente usa `data.jefe_sitio_email = {{user.email}}`, así que
-// al cambiar el email sin propagar ese campo, el jefe pierde TODA su carga
-// histórica (RLS mismatch). El re-vincular solo arregla la ficha+plataforma,
-// no los registros que lo referencian por email.
+// ROOT CAUSE: las entidades operativas guardan el email del jefe/autor/aprobador
+// desnormalizado (jefe_sitio_email, creado_por_email, aprobado_por_email,
+// email_destinatarios). La RLS de visibilidad usa esos campos contra
+// {{user.email}}, así que al cambiar el correo sin propagarlos el empleado
+// pierde TODA su carga histórica (RLS mismatch).
+//
+// NOTA DE PLATAFORMA: created_by_id es un campo system inmutable (el SDK ignora
+// silenciosamente cualquier intento de setearlo — verificado). Por eso el
+// traslado se hace por los campos desnormalizados por EMAIL, que son los que
+// la RLS usa para identificar al empleado. Esa propagación cubre todo lo que
+// el empleado "es dueño" operativamente.
 //
 // REGLA DE ORO — cambio de email atómico en un solo lugar:
 //   1. Capturar old_email (de la ficha, o pasado explícito para reparar).
 //   2. Actualizar emp.email = new_email (si cambió).
-//   3. Propagar jefe_sitio_email old→new en WorkOrder y Pendiente del sector.
-//      Seguro: el filtro es { sector_id, jefe_sitio_email: oldEmail } — solo
-//      pega los registros que efectivamente tenían el email viejo del jefe.
+//   3. Propagar email old→new en TODAS las entidades con campos de email:
+//        - WorkOrder.jefe_sitio_email
+//        - Pendiente.jefe_sitio_email
+//        - Certificado.creado_por_email + aprobado_por_email
+//        - SolicitudCertificado.jefe_sitio_email + aprobado_por_email
+//        - AlertaConfig.email_destinatarios[] (array — reemplaza el elemento)
+//      Seguro: el filtro es { sector_id, [campo]: oldEmail } — solo pega los
+//      registros que efectivamente tenían el email viejo del empleado.
 //   4. Re-vincular usuario de plataforma por new_email (o auto-invitar) +
 //      sincronizar nombre/sector/rol.
 //   5. Sector guard fail-closed. Admin-only.
 //
 // `old_email` opcional sirve para REPARACIÓN: cuando el email ya fue cambiado
-// (como Juan) y los registros quedaron con el email viejo, se pasa old_email
-// para que la propagación rescate esos registros huérfanos.
+// y los registros quedaron con el email viejo, se pasa old_email para que la
+// propagación rescate esos registros huérfanos.
+
+// Tabla de propagación de email — data-driven para mantenerse fácilmente.
+// array: true → el campo es un array de emails (reemplazo de elemento).
+const EMAIL_PROPAGATION = [
+  { entity: "WorkOrder", fields: [{ key: "jefe_sitio_email", array: false }] },
+  { entity: "Pendiente", fields: [{ key: "jefe_sitio_email", array: false }] },
+  {
+    entity: "Certificado",
+    fields: [
+      { key: "creado_por_email", array: false },
+      { key: "aprobado_por_email", array: false },
+    ],
+  },
+  {
+    entity: "SolicitudCertificado",
+    fields: [
+      { key: "jefe_sitio_email", array: false },
+      { key: "aprobado_por_email", array: false },
+    ],
+  },
+  { entity: "AlertaConfig", fields: [{ key: "email_destinatarios", array: true }] },
+];
 
 Deno.serve(async (req) => {
   try {
@@ -86,47 +118,71 @@ Deno.serve(async (req) => {
       tasks.push(sb.entities.Employee.update(emp.id, { email: newEmail }).catch(() => {}));
     }
 
-    // ── 2) Propagar jefe_sitio_email: old → new en WorkOrder y Pendiente ──
-    const wResult = { matched: 0, updated: 0, remaining: 0 };
-    const pResult = { matched: 0, updated: 0, remaining: 0 };
+    // ── 2) Propagar email old→new en TODAS las entidades con campos de email ──
+    const propagation = {};
     if (oldEmail && oldEmail !== newEmail) {
-      // WorkOrder
-      try {
-        const wMatch = await sb.entities.WorkOrder.filter({
-          sector_id: emp.sector_id, jefe_sitio_email: oldEmail,
-        });
-        wResult.matched = (wMatch || []).length;
-        if (wResult.matched > 0) {
-          await sb.entities.WorkOrder.updateMany(
-            { sector_id: emp.sector_id, jefe_sitio_email: oldEmail },
-            { $set: { jefe_sitio_email: newEmail } }
-          ).catch((e) => { wResult.error = e.message; });
-          const wLeft = await sb.entities.WorkOrder.filter({
-            sector_id: emp.sector_id, jefe_sitio_email: oldEmail,
-          }).catch(() => []);
-          wResult.remaining = (wLeft || []).length;
-          wResult.updated = wResult.matched - wResult.remaining;
+      for (const spec of EMAIL_PROPAGATION) {
+        const entityApi = sb.entities[spec.entity];
+        if (!entityApi) {
+          propagation[spec.entity] = { error: 'entidad no disponible en el SDK' };
+          continue;
         }
-      } catch (e) { wResult.error = e.message; }
-
-      // Pendiente
-      try {
-        const pMatch = await sb.entities.Pendiente.filter({
-          sector_id: emp.sector_id, jefe_sitio_email: oldEmail,
-        });
-        pResult.matched = (pMatch || []).length;
-        if (pResult.matched > 0) {
-          await sb.entities.Pendiente.updateMany(
-            { sector_id: emp.sector_id, jefe_sitio_email: oldEmail },
-            { $set: { jefe_sitio_email: newEmail } }
-          ).catch((e) => { pResult.error = e.message; });
-          const pLeft = await sb.entities.Pendiente.filter({
-            sector_id: emp.sector_id, jefe_sitio_email: oldEmail,
-          }).catch(() => []);
-          pResult.remaining = (pLeft || []).length;
-          pResult.updated = pResult.matched - pResult.remaining;
+        const perField = {};
+        for (const f of spec.fields) {
+          const fieldResult = { matched: 0, updated: 0, remaining: 0 };
+          try {
+            if (f.array) {
+              // Array de emails: filtrar por sector, filtrar client-side los que
+              // contienen oldEmail, y reemplazar el elemento en cada uno.
+              const all = await entityApi.filter({ sector_id: emp.sector_id });
+              const hits = (all || []).filter(r =>
+                Array.isArray(r[f.key]) &&
+                r[f.key].some(e => (e || '').toLowerCase().trim() === oldEmail)
+              );
+              fieldResult.matched = hits.length;
+              if (hits.length > 0) {
+                const updates = hits.map(r => {
+                  const newArr = r[f.key].map(e =>
+                    (e || '').toLowerCase().trim() === oldEmail ? newEmail : e
+                  );
+                  return { id: r.id, [f.key]: newArr };
+                });
+                // bulkUpdate soporta hasta 500 con cambios distintos por registro
+                try {
+                  await entityApi.bulkUpdate(updates);
+                } catch (e) {
+                  // fallback individual si bulkUpdate falla
+                  for (const u of updates) {
+                    await entityApi.update(u.id, { [f.key]: u[f.key] }).catch(() => {});
+                  }
+                  fieldResult.fallback = e.message;
+                }
+              }
+            } else {
+              // Escalar: filter + updateMany $set
+              const match = await entityApi.filter({
+                sector_id: emp.sector_id, [f.key]: oldEmail,
+              });
+              fieldResult.matched = (match || []).length;
+              if (fieldResult.matched > 0) {
+                await entityApi.updateMany(
+                  { sector_id: emp.sector_id, [f.key]: oldEmail },
+                  { $set: { [f.key]: newEmail } }
+                ).catch((e) => { fieldResult.error = e.message; });
+                const left = await entityApi.filter({
+                  sector_id: emp.sector_id, [f.key]: oldEmail,
+                }).catch(() => []);
+                fieldResult.remaining = (left || []).length;
+                fieldResult.updated = fieldResult.matched - fieldResult.remaining;
+              }
+            }
+          } catch (e) {
+            fieldResult.error = e.message;
+          }
+          perField[f.key] = fieldResult;
         }
-      } catch (e) { pResult.error = e.message; }
+        propagation[spec.entity] = perField;
+      }
     }
 
     // ── 3) Re-vincular usuario de plataforma por newEmail (o invitar) ──
@@ -140,8 +196,7 @@ Deno.serve(async (req) => {
       old_email: oldEmail,
       new_email: newEmail,
       email_changed: empEmailNorm !== newEmail,
-      workorders: wResult,
-      pendientes: pResult,
+      propagation,
       link: linkInfo,
     });
   } catch (error) {
