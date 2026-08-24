@@ -28,6 +28,10 @@
       "type": "boolean",
       "default": false
     },
+    "creado_por_email": {
+      "type": "string",
+      "description": "Email del usuario que emiti\u00f3 el certificado. Se estampa en emitirCertificado (el cert se crea via service role, que deja created_by_id en null). Permite que el creador siga viendo su certificado mientras est\u00e1 pendiente de aprobaci\u00f3n (estado 'emitido'), a\u00fan sin aprobado_por_email."
+    },
     "emprendimiento": {
       "type": "string"
     },
@@ -258,6 +262,9 @@
             },
             {
               "created_by_id": "{{user.id}}"
+            },
+            {
+              "data.creado_por_email": "{{user.email}}"
             },
             {
               "data.aprobado_por_email": "{{user.email}}"
