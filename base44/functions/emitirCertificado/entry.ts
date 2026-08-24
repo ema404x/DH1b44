@@ -35,9 +35,13 @@ export default async function(req) {
 
     const displayName = display_name || employee?.full_name || user.full_name || user.email;
 
-    // 1) Crear el certificado emitido con sector_id garantizado
+    // 1) Crear el certificado emitido con sector_id garantizado y email del
+    //    creador estampado. Como el cert se crea via service role, created_by_id
+    //    queda en null — sin creado_por_email el creador perdería visibilidad RLS
+    //    mientras el cert está 'emitido' (pendiente de aprobación gerencial),
+    //    ya que aprobado_por_email solo se setea al aprobar.
     const { id: _id, ...rest } = data;
-    const certPayload = { ...rest, estado: 'emitido', sector_id: callerSector };
+    const certPayload = { ...rest, estado: 'emitido', sector_id: callerSector, creado_por_email: userEmail };
     const cert = await base44.asServiceRole.entities.Certificado.create(certPayload);
 
     // 2) Crear la solicitud de aprobación (vinculada al nuevo cert)
