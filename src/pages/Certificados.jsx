@@ -31,9 +31,20 @@ export default function Certificados() {
   const queryClient = useQueryClient();
   const { user, displayName, isSuperAdmin, loading } = useCurrentUser();
 
+  // Visibilidad por propietario vía backend (getCertificadosForUser):
+  // resuelve de forma robusta quién es el dueño de cada cert —incluyendo los
+  // de service-role cuyo dueño real (jefe_sitio_email) solo está en la
+  // SolicitudCertificado vinculada—. Sin esto, un jefe que generó certificados
+  // vía emitirCertificado no los ve (created_by_id="service_..." y
+  // creado_por_email puede faltar → el RLS no lo matchea).
+  // Admin ve todo su sector; el resto ve solo los propios. Sector-scoped →
+  // aplica a ambos sectores sin lógica específica.
   const { data: certificados = [], isLoading } = useQuery({
     queryKey: ['certificados'],
-    queryFn: () => base44.entities.Certificado.list('-created_date', 200),
+    queryFn: async () => {
+      const res = await base44.functions.invoke('getCertificadosForUser');
+      return res.data?.certificados || [];
+    },
     enabled: !loading,
     staleTime: 0,
     refetchOnWindowFocus: true,
