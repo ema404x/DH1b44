@@ -179,31 +179,27 @@ export default function Employees() {
     [employees, users, rolePermissions]
   );
 
-  // Re-vincular: busca el usuario de plataforma cuyo email coincide con el empleado
-  // y lo vincula directamente. Si no hay match, limpia el user_id stale.
+  // Re-vincular vía backend premium (revincularEmpleado):
+  //  - lookup server-side del usuario de plataforma por email (sin tope 500)
+  //  - si hay match: vincula + sincroniza nombre/sector/rol
+  //  - si no hay match: auto-invita el email (en vez de borrar destructivamente
+  //    el user_id y fallar — que era el bug "no me deja volver a vincularlo")
+  //  - sector guard fail-closed en el backend
   const relinkMutation = useMutation({
     mutationFn: async (emp) => {
-      if (!emp.email) return { matched: false };
-      const matchingUser = users.find(
-        u => u.email?.toLowerCase().trim() === emp.email?.toLowerCase().trim()
-      );
-      if (matchingUser) {
-        await base44.entities.Employee.update(emp.id, { user_id: matchingUser.id });
-        return { matched: true };
+      const res = await base44.functions.invoke('revincularEmpleado', { employee_id: emp.id });
+      if (!res.data?.ok || res.data?.error) {
+        throw new Error(res.data?.error || 'No se pudo completar la operación');
       }
-      // No hay usuario de plataforma con ese email → limpiar user_id stale
-      if (emp.user_id) {
-        await base44.entities.Employee.update(emp.id, { user_id: null });
-      }
-      return { matched: false };
+      return res.data;
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      if (result?.matched) {
-        toast({ title: 'Empleado vinculado', description: 'El usuario se vinculó correctamente.' });
-      } else {
-        toast({ title: 'Sin usuario coincidente', description: 'No hay usuario de plataforma con ese email. Invitalo primero.', variant: 'destructive' });
+      if (result?.action === 'linked') {
+        toast({ title: 'Empleado vinculado', description: result.message || 'El usuario se vinculó correctamente.' });
+      } else if (result?.action === 'invited') {
+        toast({ title: 'Invitación enviada', description: result.message || 'Se envió invitación al email del empleado.', variant: 'default' });
       }
     },
     onError: (err) => {
