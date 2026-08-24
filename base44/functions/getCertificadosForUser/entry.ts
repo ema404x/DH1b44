@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { certVisibleToUser } from "../../shared/certVisibility.ts";
 
 // Visibilidad de certificados por propietario (regla de oro: backend-first
 // cuando el RLS no resuelve de forma confiable quién es el dueño de cada registro).
@@ -58,32 +59,28 @@ Deno.serve(async (req) => {
       return Response.json({ certificados: all, isAdmin: true });
     }
 
-    // ── Resto: resolver por propietario (2 queries + join en memoria) ──
-    const [allCerts, sols] = await Promise.all([
+    // ── Resto: resolver por propietario (helper compartido + join en memoria) ──
+    // Se traen los certs del sector y las solicitudes donde el caller es el
+    // jefe (jefe_sitio_email). Se agrupan por certificado_id y se pasa cada
+    // cert por certVisibleToUser — fuente única de verdad de propiedad.
+    const [allCerts, mySols] = await Promise.all([
       sb.entities.Certificado.filter({ sector_id: callerSector }, '-created_date', 500).catch(() => []),
       userEmail
         ? sb.entities.SolicitudCertificado.filter({ sector_id: callerSector, jefe_sitio_email: userEmail }).catch(() => [])
         : [],
     ]);
 
-    // IDs de certs vinculados a solicitudes donde el jefe es el caller.
-    // Es el camino que resuelve los certs de service-role cuyo dueño real
-    // (jefe_sitio_email) solo está en la solicitud — caso Gastón Massa.
-    const certIdsFromSols = new Set(
-      (sols || []).map(s => s.certificado_id).filter(Boolean)
-    );
+    const solsByCert = new Map<string, any[]>();
+    for (const s of (mySols || [])) {
+      if (!s.certificado_id) continue;
+      const arr = solsByCert.get(s.certificado_id) || [];
+      arr.push(s);
+      solsByCert.set(s.certificado_id, arr);
+    }
 
-    const mine = (allCerts || []).filter(c => {
-      if (c.sector_id && c.sector_id !== callerSector) return false; // defensa en profundidad
-      if (c.created_by_id && c.created_by_id === user.id) return true;
-      if (userEmail && (c.creado_por_email || '').toLowerCase() === userEmail) return true;
-      if (userEmail && (c.aprobado_por_email || '').toLowerCase() === userEmail) return true;
-      if (c.id && certIdsFromSols.has(c.id)) return true;
-      return false;
-    });
-
-    // Ya vienen ordenados por created_date desc desde el filter; re-aseguramos.
-    mine.sort((a, b) => new Date(b.created_date || 0).getTime() - new Date(a.created_date || 0).getTime());
+    const mine = (allCerts || [])
+      .filter(c => certVisibleToUser(c, user, callerSector, solsByCert.get(c.id) || []))
+      .sort((a, b) => new Date(b.created_date || 0).getTime() - new Date(a.created_date || 0).getTime());
 
     return Response.json({ certificados: mine, isAdmin: false });
   } catch (error) {

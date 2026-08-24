@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { certVisibleToUser } from "../../shared/certVisibility.ts";
 
 Deno.serve(async (req) => {
   try {
@@ -27,8 +28,14 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { action, certificado_id } = body || {};
 
-    // Obtener un certificado específico (service role — sin RLS)
-    // Gerencia puede ver cualquier certificado; otros usuarios solo los que crearon
+    // Obtener un certificado específico (service role — sin RLS).
+    // Gerencia/admin ven cualquier cert de su sector (oversight/aprobación).
+    // El resto ve solo los certs que crearon, resuelto de forma robusta vía
+    // certVisibleToUser — que incluye el dueño real (jefe_sitio_email de la
+    // SolicitudCertificado vinculada) para los certs de service-role cuyo
+    // created_by_id="service_..." no matchea ningún humano. Sin esto, un jefe
+    // que generó su cert vía emitirCertificado no puede verlo (403) — caso
+    // Gastón Massa / CERT-3AA160.
     if (action === 'get' && certificado_id) {
       const cert = await sb.entities.Certificado.get(certificado_id);
       if (!cert) {
@@ -38,8 +45,12 @@ Deno.serve(async (req) => {
       if (cert.sector_id !== callerSector) {
         return Response.json({ error: 'Forbidden — certificado de otro sector. Cambiá de sector activo.' }, { status: 403 });
       }
-      const isCreator = cert?.created_by_id === user.id;
-      if (!isGerencia && !isCreator) {
+      if (isGerencia) {
+        return Response.json({ certificado: cert });
+      }
+      // No-gerencia: resolver propiedad (incluye solicitud vinculada).
+      const sols = await sb.entities.SolicitudCertificado.filter({ certificado_id }).catch(() => []);
+      if (!certVisibleToUser(cert, user, callerSector, sols || [])) {
         return Response.json({ error: 'Forbidden — sin acceso a este certificado' }, { status: 403 });
       }
       return Response.json({ certificado: cert });
