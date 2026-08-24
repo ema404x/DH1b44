@@ -51,21 +51,11 @@ export default function Foro() {
   const crearHiloMut = useMutation({
     mutationFn: (data) => base44.entities.ForoHilo.create(data),
     onSuccess: async (hiloCreado) => {
-      // Notificar a todos si es anuncio
-      if (hiloCreado.tipo === 'anuncio') {
-        const otrosUsuarios = usuarios.filter(u => u.id !== user?.id);
-        await Promise.all(otrosUsuarios.map(u =>
-          base44.entities.ForoNotificacion.create({
-            usuario_id: u.id,
-            tipo: 'anuncio',
-            hilo_id: hiloCreado.id,
-            hilo_titulo: hiloCreado.titulo,
-            actor_nombre: displayName || user?.full_name || user?.email,
-              leida: false,
-              })
-            ));
-            }
-            // Notificar menciones
+      // Anuncios: la notificación masiva sectorizada la hace el backend vía
+      // automation (notificarAnuncioForo) on ForoHilo create tipo='anuncio' —
+      // notifica a cada usuario del sector del autor (no a todos los sectores).
+      // Acá solo quedan las menciones (usuario-a-usuario, no masivas).
+      // Notificar menciones
             if (hiloCreado.menciones?.length) {
             const mencionados = usuarios.filter(u =>
               hiloCreado.menciones.some(m => (u.full_name || "").toLowerCase().includes(m.toLowerCase()))
