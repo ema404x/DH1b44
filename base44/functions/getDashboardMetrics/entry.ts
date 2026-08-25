@@ -130,6 +130,23 @@ export default async function (req) {
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const thisMonthStr = dateOnly(thisMonthStart);
 
+    // Plazo de vencimiento de OTs del sector (AlertaConfig). El reloj de
+    // vencimiento solo corre para OTs en en_progreso; arranca desde
+    // fecha_inicio_real (cuando la OT entró en progreso), no desde la creación.
+    let otPlazoDays = 1;
+    try {
+      const otCfgs = await sb.entities.AlertaConfig.filter({ tipo: 'ot_vencida', sector_id: callerSector, activo: true });
+      if (otCfgs.length) otPlazoDays = otCfgs[0].dias_vencimiento_ot || 1;
+    } catch {}
+    const esVencida = (ot) => {
+      if (ot.status !== 'en_progreso') return false;
+      const startRaw = ot.fecha_inicio_real || ot.scheduled_date;
+      if (!startRaw) return false;
+      const t = new Date(startRaw).getTime();
+      if (isNaN(t)) return false;
+      return (now.getTime() - t) >= otPlazoDays * 86400000;
+    };
+
     const sec = { sector_id: callerSector };
     // Scope de usuario para no-super-admin (espejo del RLS de WorkOrder/Pendiente).
     const userEmail = (user.email || '').toLowerCase().trim();
@@ -147,10 +164,9 @@ export default async function (req) {
       efficiency = null;
     if (canRead('WorkOrder')) {
       if (isSuperAdmin) {
-        const [pend, prog, overdue, compMonth, urgent, compl, nonCancel] = await Promise.all([
+        const [pend, prog, compMonth, urgent, compl, nonCancel] = await Promise.all([
           fetchAll(sb, 'WorkOrder', { ...sec, status: { $in: ['pendiente', 'asignada'] } }),
           fetchAll(sb, 'WorkOrder', { ...sec, status: 'en_progreso' }),
-          fetchAll(sb, 'WorkOrder', { ...sec, status: { $nin: ['completada', 'cancelada'] }, scheduled_date: { $lt: now.toISOString() } }),
           fetchAll(sb, 'WorkOrder', { ...sec, status: 'completada', completed_date: { $gte: thisMonthStr } }),
           fetchAll(sb, 'WorkOrder', { ...sec, status: { $in: ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'] }, priority: { $in: ['urgente', 'alta'] } }),
           fetchAll(sb, 'WorkOrder', { ...sec, status: 'completada' }),
@@ -158,7 +174,9 @@ export default async function (req) {
         ]);
         pendingOrders = pend.length;
         inProgressOrders = prog.length;
-        overdueOrders = overdue.length;
+        // Solo las OTs en en_progreso pueden estar vencidas (reloj desde
+        // fecha_inicio_real, plazo = dias_vencimiento_ot del sector).
+        overdueOrders = prog.filter(esVencida).length;
         completedThisMonth = compMonth.length;
         urgentOrders = urgent.length;
         const validOrders = nonCancel.length;
@@ -171,10 +189,7 @@ export default async function (req) {
         const mine = mergeDedupe(lists);
         pendingOrders = mine.filter((o) => ['pendiente', 'asignada'].includes(o.status)).length;
         inProgressOrders = mine.filter((o) => o.status === 'en_progreso').length;
-        overdueOrders = mine.filter((o) => {
-          try { return o.scheduled_date && new Date(o.scheduled_date) < now && !['completada', 'cancelada'].includes(o.status); }
-          catch { return false; }
-        }).length;
+        overdueOrders = mine.filter(esVencida).length;
         completedThisMonth = mine.filter((o) => o.completed_date && o.status === 'completada' && new Date(o.completed_date) >= thisMonthStart).length;
         urgentOrders = mine.filter((o) => ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'].includes(o.status) && ['urgente', 'alta'].includes(o.priority)).length;
         const validOrders = mine.filter((o) => o.status !== 'cancelada').length;

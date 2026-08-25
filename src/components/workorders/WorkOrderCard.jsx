@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { isPast, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { Zap, MapPin, Wrench, User, CheckCircle2 } from 'lucide-react';
 import WorkOrderQRButton from './WorkOrderQRButton';
 import { useResolveCreator } from '@/hooks/useResolveCreator';
@@ -27,7 +27,16 @@ const STATUS_LABELS = {
 
 function WorkOrderCard({ order, onOpen, onShowQR, onComplete, onStart, canComplete }) {
   const { resolveOTOwner } = useResolveCreator();
-  const isOverdue = (() => { try { return order.scheduled_date && isPast(parseISO(order.scheduled_date)) && !['completada','cancelada'].includes(order.status); } catch { return false; } })();
+  const isOverdue = (() => {
+    try {
+      // Solo las OTs en en_progreso pueden vencer; el reloj arranca desde
+      // fecha_inicio_real (cuando la OT entró en progreso), no desde la creación.
+      if (order.status !== 'en_progreso') return false;
+      const start = order.fecha_inicio_real || order.scheduled_date;
+      if (!start) return false;
+      return (Date.now() - parseISO(start).getTime()) >= 86400000;
+    } catch { return false; }
+  })();
   const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
   const isTerminal = ['completada', 'cancelada'].includes(order.status);
 

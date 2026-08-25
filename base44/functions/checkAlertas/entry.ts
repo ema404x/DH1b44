@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       necesitaAssets    ? sb.entities.Asset.filter({}, '-updated_date', 300).catch(() => [])                         : Promise.resolve([]),
       necesitaMaterials  ? sb.entities.Material.filter({}, '-updated_date', 300).catch(() => [])                      : Promise.resolve([]),
       necesitaPendientes ? sb.entities.Pendiente.filter({ estado: 'pendiente' }, '-fecha_limite', 200).catch(() => [])                : Promise.resolve([]),
-      necesitaWOs        ? sb.entities.WorkOrder.filter({ status: { $nin: ['completada', 'cancelada'] } }, '-updated_date', 200).catch(() => [])                     : Promise.resolve([]),
+      necesitaWOs        ? sb.entities.WorkOrder.filter({ status: 'en_progreso' }, '-updated_date', 200).catch(() => [])                     : Promise.resolve([]),
     ]);
 
     // Índice de logs de hoy para lookup O(1)
@@ -210,11 +210,15 @@ Deno.serve(async (req) => {
       if (cfg.tipo === 'ot_vencida') {
         const diasLimite = cfg.dias_vencimiento_ot || 1;
         const nuevasAlertas = [];
+        // Solo las OTs en progreso pueden vencer. El plazo empieza a correr
+        // cuando la OT entra en en_progreso (fecha_inicio_real). Pendiente,
+        // asignada y obra nunca caen en vencimiento.
         for (const ot of scopedWOs) {
-          if (!ot.scheduled_date) continue;
-          if (['completada', 'cancelada'].includes(ot.status)) continue;
+          if (ot.status !== 'en_progreso') continue;
+          const inicioRaw = ot.fecha_inicio_real || ot.scheduled_date;
+          if (!inicioRaw) continue;
           if (keyExistente('ot_vencida', ot.id)) continue;
-          const diasVencidos = Math.ceil((ahora - new Date(ot.scheduled_date)) / 86400000);
+          const diasVencidos = Math.ceil((ahora - new Date(inicioRaw)) / 86400000);
           if (diasVencidos >= diasLimite) {
             const nivel = diasVencidos >= 7 ? 'critical' : 'warning';
             
