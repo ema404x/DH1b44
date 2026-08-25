@@ -112,6 +112,19 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Stamping de scheduled_date en WorkOrder al crear (regla de oro) ──
+    // Una OT sin fecha agendada queda "flotando". Al guardarla (create) sin
+    // fecha, se estampa la fecha del día (tz America/Buenos_Aires). Solo en
+    // create: en update no se toca — el backfill ya cubrió las históricas con
+    // su created_date. No aplica a Pendiente (esos usan fecha_emision_sap).
+    if (entityName === 'WorkOrder' && event.type === 'create' && !data.scheduled_date) {
+      try {
+        updates.scheduled_date = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Buenos_Aires' });
+      } catch (_) {
+        updates.scheduled_date = new Date().toISOString().slice(0, 10);
+      }
+    }
+
     // Si no hay nada que actualizar, salir
     if (Object.keys(updates).length === 0) {
       return Response.json({ success: true, skipped: true });
