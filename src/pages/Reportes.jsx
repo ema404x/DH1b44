@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -10,71 +10,76 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend, AreaChart, Area, ComposedChart, Scatter, ScatterChart
+  ResponsiveContainer, Legend, AreaChart, Area, ComposedChart,
 } from 'recharts';
 import {
   BarChart2, TrendingUp, Clock, Package, Wrench, CheckCircle2, AlertTriangle, Download,
-  Filter, FileText, Target, Users, Activity, Zap, RefreshCw, CalendarDays, ClipboardList
+  Filter, Target, Users, Activity, CalendarDays, ClipboardList, RefreshCw, RotateCcw, Building2,
 } from 'lucide-react';
 import { exportKPIsPDF } from '@/utils/exportPDF';
-import { format, parseISO, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, isWithinInterval } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { format, subMonths } from 'date-fns';
+import { KpiSkeleton, TableSkeleton, KpiCard } from '@/components/reportes/shared';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6'];
+const TOOLTIP_STYLE = { backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px', color: '#e2e8f0' };
 
-function KpiMetric({ title, value, subtitle, icon: IconComponent, color = 'blue', trend }) {
-  const colorMap = {
-    blue: 'from-blue-500/20 to-blue-600/10 border-blue-500/30',
-    green: 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/30',
-    amber: 'from-amber-500/20 to-amber-600/10 border-amber-500/30',
-    purple: 'from-purple-500/20 to-purple-600/10 border-purple-500/30',
-    red: 'from-red-500/20 to-red-600/10 border-red-500/30',
-  };
+const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.05 } } };
+const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } };
 
-  const iconColorMap = {
-    blue: 'text-blue-400', green: 'text-emerald-400', amber: 'text-amber-400',
-    purple: 'text-purple-400', red: 'text-red-400',
-  };
+const SECTOR_LABEL = { escuela: 'Escuela', bapro: 'BAPRO' };
 
+function ChartCard({ title, children, className = '' }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -5 }}>
-      <Card className={`border bg-gradient-to-br ${colorMap[color]} backdrop-blur-xl shadow-lg border-slate-700/50`}>
-        <CardContent className="pt-5 pb-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${iconColorMap[color]}`}>
-              {IconComponent && <IconComponent className="h-5 w-5" />}
-            </div>
-            {trend && (
-              <Badge className={`text-xs ${trend > 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
-                {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}%
-              </Badge>
-            )}
-          </div>
-          <div className="text-2xl font-bold text-white">{value}</div>
-          <div className="text-xs font-semibold text-slate-400 mt-2 uppercase tracking-wide">{title}</div>
-          {subtitle && <div className="text-xs text-slate-500 mt-1">{subtitle}</div>}
-        </CardContent>
-      </Card>
-    </motion.div>
+    <Card className={`border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg ${className}`}>
+      <CardHeader className="pb-2"><CardTitle className="text-sm text-white">{title}</CardTitle></CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   );
+}
+function Empty({ text = 'Sin datos' }) {
+  return <div className="text-center py-12 text-slate-500 text-sm">{text}</div>;
 }
 
 export default function Reportes() {
+  const [dateFrom, setDateFrom] = useState(format(subMonths(new Date(), 5), 'yyyy-MM-dd'));
+  const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [comuna, setComuna] = useState('all');
+  const [jefe, setJefe] = useState('all');
+  const [proyecto, setProyecto] = useState('all');
+  const [tecnico, setTecnico] = useState('all');
+  const [exportingPDF, setExportingPDF] = useState(false);
   const [resumenSemanal, setResumenSemanal] = useState(null);
   const [loadingResumen, setLoadingResumen] = useState(false);
   const [resumenFecha, setResumenFecha] = useState(null);
-  const [exportingPDF, setExportingPDF] = useState(false);
+
+  // Un único round-trip: filtros + agregados sobre el total del sector (backend-first).
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['reportes-gerenciales', { dateFrom, dateTo, comuna, jefe, proyecto, tecnico }],
+    queryFn: () => base44.functions.invoke('getReportesGerenciales', { dateFrom, dateTo, comuna, jefe, proyecto, tecnico }).then(r => r.data),
+    staleTime: 5 * 60 * 1000,
+    placeholderData: (prev) => prev,
+  });
+
+  const filtros = data?.filtros || { comunas: [], jefes: [], proyectos: [], tecnicos: [] };
+  const kpis = data?.kpis || { total: 0, completadas: 0, canceladas: 0, eficiencia: 0, costoMaterialTotal: 0, horasPromedio: 0, timeLogsCount: 0 };
+  const otsPorMes = data?.otsPorMes || [];
+  const otsPorTipo = data?.otsPorTipo || [];
+  const eficienciaPorTecnico = data?.eficienciaPorTecnico || [];
+  const costosPorProyecto = data?.costosPorProyecto || [];
+  const empleados = data?.empleados || [];
+  const materiales = data?.materiales || [];
+  const pend = data?.pendientes || { total: 0, activos: 0, resueltos: 0, vencidos: 0, sinAsignar: 0, tasaResolucion: 0, mttr: null, backlog: null, aging: [], porEstado: [], porTipo: [], porPrioridad: [], porJefe: [], porComuna: [] };
+
+  const anyFilterActive = [comuna, jefe, proyecto, tecnico].some(v => v !== 'all');
+  const limpiarFiltros = () => { setComuna('all'); setJefe('all'); setProyecto('all'); setTecnico('all'); };
 
   const handleExportPDF = async () => {
     setExportingPDF(true);
     try {
-      await exportKPIsPDF({ orders: filteredOrders, timeLogs: filteredTimeLogs, materials, assets: [], dateFrom, dateTo });
-    } catch (e) {
-      console.error('Error exportando PDF:', e);
-    } finally {
-      setExportingPDF(false);
-    }
+      await exportKPIsPDF({ orders: data?.ordersExport || [], timeLogs: data?.timeLogsExport || [], materials: materiales, assets: [], dateFrom, dateTo });
+    } catch (e) { console.error('Error exportando PDF:', e); }
+    finally { setExportingPDF(false); }
   };
 
   const fetchResumenSemanal = async () => {
@@ -83,274 +88,13 @@ export default function Reportes() {
       const res = await base44.functions.invoke('resumenSemanal', {});
       setResumenSemanal(res.data);
       setResumenFecha(new Date());
-    } finally {
-      setLoadingResumen(false);
-    }
+    } finally { setLoadingResumen(false); }
   };
 
-  const [dateFrom, setDateFrom] = useState(format(subMonths(new Date(), 5), 'yyyy-MM-dd'));
-  const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [comunaFilter, setComunaFilter] = useState('all');
-  const [jefeFilter, setJefeFilter] = useState('all');
-  const [projectFilter, setProjectFilter] = useState('all');
-  const [tecnicoFilter, setTecnicoFilter] = useState('all');
-
-  // Reportes usa keys propias para no contaminar el caché del Dashboard.
-  // Los datos analíticos toleran 5 min de desfase (staleTime alto = menos refetches).
-  // Límites razonables: los reportes no necesitan más de N registros para ser útiles.
-  const STALE_5M  = 5  * 60 * 1000;
-  const STALE_10M = 10 * 60 * 1000;
-
-  const { data: orders = [] }    = useQuery({ queryKey: ['workorders-reportes'],  queryFn: () => base44.entities.WorkOrder.list('-created_date', 1000),    staleTime: STALE_5M  });
-  const { data: projects = [] }  = useQuery({ queryKey: ['projects-reportes'],    queryFn: () => base44.entities.Project.list('-updated_date', 300),        staleTime: STALE_10M });
-  const { data: timeLogs = [] }  = useQuery({ queryKey: ['timelogs-reportes'],    queryFn: () => base44.entities.TimeLog.list('-created_date', 500),        staleTime: STALE_10M });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'],            queryFn: () => base44.entities.Material.list('-updated_date', 300),       staleTime: STALE_10M });
-  const { data: employees = [] } = useQuery({ queryKey: ['employees'],            queryFn: () => base44.entities.Employee.list('-updated_date', 200),       staleTime: STALE_10M });
-  const { data: locations = [] } = useQuery({ queryKey: ['locations-reportes'],   queryFn: () => base44.entities.LocationData.list('-updated_date', 500),   staleTime: STALE_10M });
-  const { data: pendientes = [] }= useQuery({ queryKey: ['pendientes-reportes'],  queryFn: () => base44.entities.Pendiente.list('-created_date', 1000),     staleTime: STALE_5M  });
-
-  // Get unique filter options
-  const comunasUnicas = ['8A', '8B', '10A'];
-  // Solo empleados cuyo rol incluye "jefe"
-  const jefesUnicos = employees
-    .filter(e => e.role && e.role.toLowerCase().includes('jefe'))
-    .map(e => e.full_name)
-    .filter(Boolean)
-    .sort();
-  // Excluir jefes de sitio — tienen su propio filtro dedicado
-  const tecnicosUnicos = [...new Set(employees.filter(e => !e.role || !e.role.toLowerCase().includes('jefe')).map(e => e.full_name).filter(Boolean))].sort();
-
-  // Build location → jefe/comuna lookup for enriching orders
-  const locationLookup = useMemo(() => {
-    const map = {};
-    locations.forEach(l => { map[l.ubic_tecnica] = l; map[l.establecimiento] = l; });
-    return map;
-  }, [locations]);
-
-  // Rango de fechas con "hasta" ajustado a fin del día (incluye registros de hoy)
-  const dateRange = useMemo(() => {
-    const from = new Date(dateFrom);
-    const to = new Date(dateTo);
-    to.setHours(23, 59, 59, 999);
-    return { from, to };
-  }, [dateFrom, dateTo]);
-
-  // Resuelve comuna de una OT: lookup en LocationData o campo directo en la OT
-  const resolveComuna = (o) => {
-    const loc = locationLookup[o.location_qr_name] || locationLookup[o.location] || {};
-    return loc.comuna || o.comuna || null;
-  };
-  // Resuelve jefe de sitio: lookup en LocationData o campo directo en la OT
-  const resolveJefe = (o) => {
-    const loc = locationLookup[o.location_qr_name] || locationLookup[o.location] || {};
-    return loc.jefe_sitio || o.jefe_sitio || null;
-  };
-
-  // Filter data — OTs
-  const filteredOrders = useMemo(() => {
-    const { from, to } = dateRange;
-    return orders.filter(o => {
-      const date = o.created_date ? new Date(o.created_date) : null;
-      const inRange = !date || (date >= from && date <= to);
-      const inProject = projectFilter === 'all' || o.project_name === projectFilter;
-      const matchTecnico = tecnicoFilter === 'all' || o.assigned_name === tecnicoFilter;
-      const matchJefe = jefeFilter === 'all' || resolveJefe(o) === jefeFilter;
-      const matchComuna = comunaFilter === 'all' || resolveComuna(o) === comunaFilter;
-
-      return inRange && inProject && matchComuna && matchJefe && matchTecnico;
-    });
-  }, [orders, dateRange, projectFilter, comunaFilter, jefeFilter, tecnicoFilter, locationLookup]);
-
-  // Filter data — Pendientes (mismos criterios que OTs, usando campos directos)
-  const filteredPendientes = useMemo(() => {
-    const { from, to } = dateRange;
-    return pendientes.filter(p => {
-      const date = p.created_date ? new Date(p.created_date) : null;
-      const inRange = !date || (date >= from && date <= to);
-      const matchComuna = comunaFilter === 'all' || p.comuna === comunaFilter;
-      const matchJefe = jefeFilter === 'all' || p.jefe_sitio === jefeFilter;
-      // Pendientes no tienen project_name directo; si hay filtro de proyecto, descartar
-      const matchProject = projectFilter === 'all' || (p.proyecto_nombre && p.proyecto_nombre === projectFilter);
-      return inRange && matchComuna && matchJefe && matchProject;
-    });
-  }, [pendientes, dateRange, comunaFilter, jefeFilter, projectFilter]);
-
-  // Filter data — TimeLogs (respeta rango de fechas y técnico seleccionado)
-  const filteredTimeLogs = useMemo(() => {
-    const { from, to } = dateRange;
-    return timeLogs.filter(l => {
-      const date = l.created_date ? new Date(l.created_date) : null;
-      const inRange = !date || (date >= from && date <= to);
-      const matchTecnico = tecnicoFilter === 'all' || (l.employee_name || l.user_name) === tecnicoFilter;
-      return inRange && matchTecnico;
-    });
-  }, [timeLogs, dateRange, tecnicoFilter]);
-
-  // Gráficos por mes
-  const months = eachMonthOfInterval({ start: new Date(dateFrom), end: new Date(dateTo) });
-  const otsPorMes = months.map(month => {
-    const start = startOfMonth(month);
-    const end = endOfMonth(month);
-    const monthOrders = filteredOrders.filter(o => {
-      const d = o.created_date ? new Date(o.created_date) : null;
-      return d && isWithinInterval(d, { start, end });
-    });
-    return {
-      mes: format(month, 'MMM yy', { locale: es }),
-      total: monthOrders.length,
-      completadas: monthOrders.filter(o => o.status === 'completada').length,
-      pendientes: monthOrders.filter(o => !['completada', 'cancelada'].includes(o.status)).length,
-      en_progreso: monthOrders.filter(o => o.status === 'en_progreso').length,
-    };
-  });
-
-  // OTs por tipo
-  const typeLabels = {
-    mantenimiento_preventivo: 'Preventivo', mantenimiento_correctivo: 'Correctivo',
-    instalacion: 'Instalación', inspeccion: 'Inspección', reparacion: 'Reparación', emergencia: 'Emergencia'
-  };
-  const otsPorTipo = Object.entries(typeLabels).map(([key, label]) => ({
-    name: label,
-    value: filteredOrders.filter(o => o.type === key).length,
-  })).filter(d => d.value > 0);
-
-  // Eficiencia por técnico (excluye jefes de sitio — no ejecutan OTs, las validan)
-  const jefeNamesLower = new Set(jefesUnicos.map(n => n.toLowerCase().trim()));
-  const eficienciaPorTecnico = Object.entries(
-    filteredOrders.reduce((acc, o) => {
-      if (!o.assigned_name) return acc;
-      if (jefeNamesLower.has(o.assigned_name.toLowerCase().trim())) return acc;
-      if (!acc[o.assigned_name]) acc[o.assigned_name] = { total: 0, completadas: 0 };
-      acc[o.assigned_name].total++;
-      if (o.status === 'completada') acc[o.assigned_name].completadas++;
-      return acc;
-    }, {})
-  ).map(([name, data]) => ({
-    name,
-    total: data.total,
-    completadas: data.completadas,
-    eficiencia: data.total > 0 ? Math.round((data.completadas / data.total) * 100) : 0
-  })).sort((a, b) => b.eficiencia - a.eficiencia).slice(0, 8);
-
-  // Costos por proyecto
-  const costosPorProyecto = Object.entries(
-    filteredOrders.reduce((acc, o) => {
-      if (!o.project_name) return acc;
-      if (!acc[o.project_name]) acc[o.project_name] = 0;
-      acc[o.project_name] += (o.materials_used || []).reduce((s, m) => s + (m.quantity * m.unit_cost || 0), 0);
-      return acc;
-    }, {})
-  ).map(([name, costo]) => ({ name, costo }))
-    .sort((a, b) => b.costo - a.costo)
-    .slice(0, 6);
-
-  // KPIs Pendientes (respeta filtros globales)
-  const pendientesActivos = filteredPendientes.filter(p => !['resuelto', 'cancelado'].includes(p.estado));
-  const pendientesResueltos = filteredPendientes.filter(p => p.estado === 'resuelto');
-  const tasaResolucionPend = filteredPendientes.length > 0 ? Math.round((pendientesResueltos.length / filteredPendientes.length) * 100) : 0;
-
-  // Vencidos: fecha_limite pasada y no resuelto
-  const hoy = new Date();
-  const pendientesVencidos = pendientesActivos.filter(p => p.fecha_limite && new Date(p.fecha_limite) < hoy);
-
-  // MTTR — Tiempo medio de resolución (días) para pendientes resueltos en el período
-  const mttrPendientes = useMemo(() => {
-    const tiempos = pendientesResueltos
-      .map(p => {
-        try {
-          if (!p.fecha_resolucion || !p.fecha_asignacion) return null;
-          const dias = (new Date(p.fecha_resolucion) - new Date(p.fecha_asignacion)) / (1000 * 60 * 60 * 24);
-          return dias >= 0 ? dias : null;
-        } catch { return null; }
-      })
-      .filter(d => d !== null);
-    return tiempos.length > 0 ? Math.round((tiempos.reduce((a, b) => a + b, 0) / tiempos.length) * 10) / 10 : null;
-  }, [pendientesResueltos]);
-
-  // Aging — Distribución de pendientes activos por antigüedad (días desde creación)
-  const agingPendientes = useMemo(() => {
-    const buckets = { '0-7d': 0, '8-30d': 0, '31-60d': 0, '>60d': 0 };
-    pendientesActivos.forEach(p => {
-      try {
-        const dias = Math.floor((hoy - new Date(p.created_date)) / (1000 * 60 * 60 * 24));
-        if (dias <= 7) buckets['0-7d']++;
-        else if (dias <= 30) buckets['8-30d']++;
-        else if (dias <= 60) buckets['31-60d']++;
-        else buckets['>60d']++;
-      } catch {}
-    });
-    return Object.entries(buckets).map(([rango, count]) => ({ rango, count }));
-  }, [pendientesActivos, hoy]);
-
-  // Backlog ratio — pendientes activos vs resueltos en el período
-  const backlogRatio = pendientesResueltos.length > 0
-    ? Math.round((pendientesActivos.length / pendientesResueltos.length) * 10) / 10
-    : null;
-
-  // Pendientes por estado
-  const pendientesPorEstado = ['pendiente', 'asignado', 'en_progreso', 'resuelto', 'cancelado'].map(estado => ({
-    name: { pendiente: 'Pendiente', asignado: 'Asignado', en_progreso: 'En Progreso', resuelto: 'Resuelto', cancelado: 'Cancelado' }[estado],
-    value: filteredPendientes.filter(p => p.estado === estado).length,
-  })).filter(d => d.value > 0);
-
-  // Pendientes por tipo
-  const pendientesPorTipo = ['mantenimiento', 'obra', 'inspeccion', 'emergencia'].map(tipo => ({
-    name: { mantenimiento: 'Mantenimiento', obra: 'Obra', inspeccion: 'Inspección', emergencia: 'Emergencia' }[tipo],
-    value: filteredPendientes.filter(p => p.tipo === tipo).length,
-  })).filter(d => d.value > 0);
-
-  // Pendientes por prioridad
-  const pendientesPorPrioridad = ['urgente', 'alta', 'media', 'baja'].map(p => ({
-    name: { urgente: 'Urgente', alta: 'Alta', media: 'Media', baja: 'Baja' }[p],
-    total: filteredPendientes.filter(x => x.prioridad === p).length,
-    resueltos: filteredPendientes.filter(x => x.prioridad === p && x.estado === 'resuelto').length,
-  })).filter(d => d.total > 0).map(d => ({ ...d, eficiencia: Math.round((d.resueltos / d.total) * 100) }));
-
-  // Pendientes por jefe de sitio (nombre completo, sin truncar)
-  const pendientesPorJefe = Object.entries(
-    filteredPendientes.reduce((acc, p) => {
-      const j = p.jefe_sitio || 'Sin asignar';
-      if (!acc[j]) acc[j] = { total: 0, resueltos: 0, vencidos: 0 };
-      acc[j].total++;
-      if (p.estado === 'resuelto') acc[j].resueltos++;
-      if (!['resuelto','cancelado'].includes(p.estado) && p.fecha_limite && new Date(p.fecha_limite) < hoy) acc[j].vencidos++;
-      return acc;
-    }, {})
-  ).map(([jefe, data]) => ({
-    jefe,
-    ...data,
-    eficiencia: data.total > 0 ? Math.round((data.resueltos / data.total) * 100) : 0,
-  })).sort((a, b) => b.total - a.total).slice(0, 8);
-
-  // Pendientes por comuna
-  const pendientesPorComuna = ['8A', '8B', '10A'].map(c => ({
-    comuna: c,
-    total: filteredPendientes.filter(p => p.comuna === c).length,
-    resueltos: filteredPendientes.filter(p => p.comuna === c && p.estado === 'resuelto').length,
-    activos: filteredPendientes.filter(p => p.comuna === c && !['resuelto','cancelado'].includes(p.estado)).length,
-  })).filter(d => d.total > 0);
-
-  // KPIs — Eficiencia excluye OTs canceladas (no contabilizan contra cumplimiento)
-  const completadas = filteredOrders.filter(o => o.status === 'completada').length;
-  const canceladas = filteredOrders.filter(o => o.status === 'cancelada').length;
-  const otsValidas = filteredOrders.length - canceladas;
-  const eficiencia = otsValidas > 0 ? Math.round((completadas / otsValidas) * 100) : 0;
-  // Horas promedio respeta filtros (período + técnico)
-  const horasPromedio = filteredTimeLogs.length > 0 ? Math.round(filteredTimeLogs.reduce((s, l) => s + (l.hours || 0), 0) / filteredTimeLogs.length * 10) / 10 : 0;
-  const costoMaterialTotal = filteredOrders.reduce((s, o) => s + (o.materials_used || []).reduce((ms, m) => ms + (m.quantity * m.unit_cost || 0), 0), 0);
-
-  const container = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.1 } }
-  };
-
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 }
-  };
+  const chartLoading = isLoading && !data;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 space-y-6 page-enter">
       {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-teal-500/30 rounded-full blur-3xl opacity-20 animate-pulse" />
@@ -358,584 +102,449 @@ export default function Reportes() {
       </div>
 
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
-                <BarChart2 className="h-6 w-6 text-white" />
-              </div>
-              Reportes Gerenciales
-            </h1>
-            <p className="text-slate-400 mt-1">Análisis integral de proyectos, operaciones e inventario</p>
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
+              <BarChart2 className="h-6 w-6 text-white" />
+            </div>
+            Reportes Gerenciales
+          </h1>
+          <div className="flex items-center gap-2 mt-2">
+            <p className="text-slate-400 text-sm">Análisis integral de proyectos, operaciones e inventario</p>
+            {data?.sector && (
+              <Badge className="gap-1 bg-teal-500/15 text-teal-300 border-teal-500/30">
+                <Building2 className="h-3 w-3" /> {SECTOR_LABEL[data.sector] || data.sector}
+              </Badge>
+            )}
           </div>
-          <Button onClick={handleExportPDF} disabled={exportingPDF} className="gap-2 bg-teal-600 hover:bg-teal-500">
-            {exportingPDF ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            {exportingPDF ? 'Generando...' : 'Exportar PDF'}
-          </Button>
         </div>
+        <Button onClick={handleExportPDF} disabled={exportingPDF || chartLoading} className="gap-2 bg-teal-600 hover:bg-teal-500">
+          {exportingPDF ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          {exportingPDF ? 'Generando...' : 'Exportar PDF'}
+        </Button>
       </motion.div>
 
       {/* Filtros Avanzados */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-        <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-          <CardContent className="pt-5 pb-5">
-            <div className="flex items-center gap-2 mb-4">
+      <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+        <CardContent className="pt-5 pb-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-teal-400" />
               <span className="text-sm font-semibold text-white">Filtros Avanzados</span>
+              {isFetching && !isLoading && <RefreshCw className="h-3 w-3 text-teal-400 animate-spin" />}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Desde</label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={e => setDateFrom(e.target.value)}
-                  className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Hasta</label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={e => setDateTo(e.target.value)}
-                  className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Comuna</label>
-                <Select value={comunaFilter} onValueChange={setComunaFilter}>
-                  <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {comunasUnicas.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Jefe de Sitio</label>
-                <Select value={jefeFilter} onValueChange={setJefeFilter}>
-                  <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {jefesUnicos.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Proyecto</label>
-                <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {projects.map(p => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Técnico</label>
-                <Select value={tecnicoFilter} onValueChange={setTecnicoFilter}>
-                  <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {tecnicosUnicos.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            {anyFilterActive && (
+              <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="h-7 text-xs text-slate-300 hover:text-white gap-1">
+                <RotateCcw className="h-3 w-3" /> Limpiar
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Desde</label>
+              <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white" />
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+            <div>
+              <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Hasta</label>
+              <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Comuna</label>
+              <Select value={comuna} onValueChange={setComuna}>
+                <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {filtros.comunas.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Jefe de Sitio</label>
+              <Select value={jefe} onValueChange={setJefe}>
+                <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {filtros.jefes.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Proyecto</label>
+              <Select value={proyecto} onValueChange={setProyecto}>
+                <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {filtros.proyectos.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Técnico</label>
+              <Select value={tecnico} onValueChange={setTecnico}>
+                <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {filtros.tecnicos.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* KPIs */}
-      <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <motion.div variants={item}>
-          <KpiMetric title="Órdenes Totales" value={filteredOrders.length} subtitle={`${completadas} completadas`} icon={Wrench} color="blue" />
+      {chartLoading ? (
+        <KpiSkeleton count={4} />
+      ) : (
+        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <motion.div variants={item}><KpiCard label="Órdenes Totales" value={kpis.total} sub={`${kpis.completadas} completadas`} icon={Wrench} accent="blue" /></motion.div>
+          <motion.div variants={item}><KpiCard label="Tasa Cumplimiento" value={`${kpis.eficiencia}%`} sub="Completadas / válidas" icon={CheckCircle2} accent="emerald" /></motion.div>
+          <motion.div variants={item}><KpiCard label="Costo Materiales" value={fmt(kpis.costoMaterialTotal)} sub="Total invertido" icon={Package} accent="amber" /></motion.div>
+          <motion.div variants={item}><KpiCard label="Prom. Horas/Registro" value={`${kpis.horasPromedio}h`} sub={`${kpis.timeLogsCount} registros`} icon={Clock} accent="purple" /></motion.div>
         </motion.div>
-        <motion.div variants={item}>
-          <KpiMetric title="Tasa Cumplimiento" value={`${eficiencia}%`} subtitle="Completadas/Totales" icon={CheckCircle2} color="green" />
-        </motion.div>
-        <motion.div variants={item}>
-          <KpiMetric title="Costo Materiales" value={fmt(costoMaterialTotal)} subtitle="Total invertido" icon={Package} color="amber" />
-        </motion.div>
-        <motion.div variants={item}>
-          <KpiMetric title="Prom. Horas/Registro" value={`${horasPromedio}h`} subtitle={`${timeLogs.length} registros`} icon={Clock} color="purple" />
-        </motion.div>
-      </motion.div>
+      )}
 
       {/* Tabs */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-        <Tabs defaultValue="operaciones" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 bg-slate-800/50 border border-slate-700/50">
-            <TabsTrigger value="operaciones" className="gap-1.5 text-xs"><Activity className="h-3.5 w-3.5" /> Operaciones</TabsTrigger>
-            <TabsTrigger value="personal" className="gap-1.5 text-xs"><Users className="h-3.5 w-3.5" /> Personal</TabsTrigger>
-            <TabsTrigger value="financiero" className="gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" /> Financiero</TabsTrigger>
-            <TabsTrigger value="inventario" className="gap-1.5 text-xs"><Package className="h-3.5 w-3.5" /> Inventario</TabsTrigger>
-            <TabsTrigger value="pendientes" className="gap-1.5 text-xs"><ClipboardList className="h-3.5 w-3.5" /> Pendientes</TabsTrigger>
-            <TabsTrigger value="semanal" className="gap-1.5 text-xs"><CalendarDays className="h-3.5 w-3.5" /> Semanal</TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="operaciones" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 bg-slate-800/50 border border-slate-700/50">
+          <TabsTrigger value="operaciones" className="gap-1.5 text-xs"><Activity className="h-3.5 w-3.5" /> Operaciones</TabsTrigger>
+          <TabsTrigger value="personal" className="gap-1.5 text-xs"><Users className="h-3.5 w-3.5" /> Personal</TabsTrigger>
+          <TabsTrigger value="financiero" className="gap-1.5 text-xs"><TrendingUp className="h-3.5 w-3.5" /> Financiero</TabsTrigger>
+          <TabsTrigger value="inventario" className="gap-1.5 text-xs"><Package className="h-3.5 w-3.5" /> Inventario</TabsTrigger>
+          <TabsTrigger value="pendientes" className="gap-1.5 text-xs"><ClipboardList className="h-3.5 w-3.5" /> Pendientes</TabsTrigger>
+          <TabsTrigger value="semanal" className="gap-1.5 text-xs"><CalendarDays className="h-3.5 w-3.5" /> Semanal</TabsTrigger>
+        </TabsList>
 
-          {/* Operaciones */}
-          <TabsContent value="operaciones" className="mt-4 space-y-4">
+        {/* Operaciones */}
+        <TabsContent value="operaciones" className="mt-4 space-y-4">
+          {chartLoading ? <TableSkeleton rows={6} cols={6} /> : (
             <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <motion.div variants={item}>
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Órdenes por Mes</CardTitle></CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <AreaChart data={otsPorMes}>
-                        <defs>
-                          <linearGradient id="colorCompletadas" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                        <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} allowDecimals={false} />
-                        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px', color: '#e2e8f0' }} />
-                        <Area type="monotone" dataKey="completadas" stroke="#10b981" fillOpacity={1} fill="url(#colorCompletadas)" name="Completadas" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
+                <ChartCard title="Órdenes por Mes">
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart data={otsPorMes}>
+                      <defs><linearGradient id="cCompl" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.8} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                      <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} allowDecimals={false} />
+                      <Tooltip contentStyle={TOOLTIP_STYLE} />
+                      <Area type="monotone" dataKey="completadas" stroke="#10b981" fillOpacity={1} fill="url(#cCompl)" name="Completadas" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartCard>
               </motion.div>
-
               <motion.div variants={item}>
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Órdenes por Tipo</CardTitle></CardHeader>
-                  <CardContent className="flex items-center justify-center">
+                <ChartCard title="Órdenes por Tipo">
+                  {otsPorTipo.length === 0 ? <Empty /> : (
                     <ResponsiveContainer width="100%" height={250}>
                       <PieChart>
                         <Pie data={otsPorTipo} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
                           {otsPorTipo.map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
                         </Pie>
-                        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
+                        <Tooltip contentStyle={TOOLTIP_STYLE} />
                       </PieChart>
                     </ResponsiveContainer>
-                  </CardContent>
-                </Card>
+                  )}
+                </ChartCard>
               </motion.div>
-
               <motion.div variants={item} className="lg:col-span-2">
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Evolución: Completadas vs Pendientes</CardTitle></CardHeader>
-                  <CardContent>
+                <ChartCard title="Evolución: Completadas vs Pendientes">
+                  {otsPorMes.length === 0 ? <Empty /> : (
                     <ResponsiveContainer width="100%" height={250}>
                       <ComposedChart data={otsPorMes}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                         <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                        <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} />
+                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} allowDecimals={false} />
+                        <Tooltip contentStyle={TOOLTIP_STYLE} />
                         <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
-                        <Bar dataKey="completadas" fill="#10b981" name="Completadas" radius={[4,4,0,0]} />
+                        <Bar dataKey="completadas" fill="#10b981" name="Completadas" radius={[4, 4, 0, 0]} />
                         <Line type="monotone" dataKey="pendientes" stroke="#f59e0b" name="Pendientes" strokeWidth={2} />
                       </ComposedChart>
                     </ResponsiveContainer>
-                  </CardContent>
-                </Card>
+                  )}
+                </ChartCard>
               </motion.div>
             </motion.div>
-          </TabsContent>
+          )}
+        </TabsContent>
 
-          {/* Personal */}
-          <TabsContent value="personal" className="mt-4 space-y-4">
+        {/* Personal */}
+        <TabsContent value="personal" className="mt-4 space-y-4">
+          {chartLoading ? <TableSkeleton rows={6} cols={6} /> : (
             <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <motion.div variants={item} className="lg:col-span-2">
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Eficiencia por Técnico (OTs)</CardTitle></CardHeader>
-                  <CardContent>
-                    {eficienciaPorTecnico.length === 0 ? (
-                      <div className="text-center py-12 text-slate-500">Sin órdenes asignadas</div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={eficienciaPorTecnico}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                          <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} angle={-45} textAnchor="end" height={80} />
-                          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} domain={[0,100]} />
-                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} formatter={(v, n) => [n === 'eficiencia' ? `${v}%` : v, n === 'eficiencia' ? 'Eficiencia' : n === 'total' ? 'Total OTs' : 'Completadas']} />
-                          <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
-                          <Bar dataKey="total" fill="#334155" name="Total OTs" radius={[4,4,0,0]} />
-                          <Bar dataKey="completadas" fill="#10b981" name="Completadas" radius={[4,4,0,0]} />
-                          <Bar dataKey="eficiencia" fill="#06b6d4" name="Eficiencia %" radius={[4,4,0,0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </CardContent>
-                </Card>
+                <ChartCard title="Eficiencia por Técnico (OTs)">
+                  {eficienciaPorTecnico.length === 0 ? <Empty text="Sin órdenes asignadas" /> : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={eficienciaPorTecnico}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} angle={-45} textAnchor="end" height={80} />
+                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} domain={[0, 100]} />
+                        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, n) => [n === 'eficiencia' ? `${v}%` : v, n === 'eficiencia' ? 'Eficiencia' : n === 'total' ? 'Total OTs' : 'Completadas']} />
+                        <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
+                        <Bar dataKey="total" fill="#334155" name="Total OTs" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="completadas" fill="#10b981" name="Completadas" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="eficiencia" fill="#06b6d4" name="Eficiencia %" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </ChartCard>
               </motion.div>
-
               <motion.div variants={item} className="lg:col-span-2">
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Plantel de Empleados</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-1">
-                      {employees.length === 0 ? (
-                        <p className="text-sm text-slate-500 col-span-3 text-center py-6">Sin empleados registrados</p>
-                      ) : employees.map(e => {
-                        const otsEmp = orders.filter(o => o.assigned_name === e.full_name);
-                        const completadas = otsEmp.filter(o => o.status === 'completada').length;
-                        const statusColors = { activo: 'bg-emerald-500/20 text-emerald-300', licencia: 'bg-amber-500/20 text-amber-300', vacaciones: 'bg-blue-500/20 text-blue-300', inactivo: 'bg-slate-500/20 text-slate-400' };
-                        return (
-                          <div key={e.id} className="bg-slate-700/30 rounded-lg border border-slate-600/30 p-3 flex flex-col gap-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-sm font-semibold text-white truncate">{e.full_name}</span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full flex-shrink-0 ${statusColors[e.status] || 'bg-slate-500/20 text-slate-400'}`}>{e.status || 'activo'}</span>
-                            </div>
-                            <span className="text-xs text-slate-400 capitalize">{e.specialty || e.role || '—'}</span>
-                            <div className="text-[11px] text-slate-500 mt-1">
-                              {otsEmp.length} OTs · {completadas} completadas
-                              {otsEmp.length > 0 && <span className="ml-1 text-cyan-400">({Math.round(completadas/otsEmp.length*100)}%)</span>}
-                            </div>
+                <ChartCard title="Plantel de Empleados">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-1">
+                    {empleados.length === 0 ? <p className="text-sm text-slate-500 col-span-3 text-center py-6">Sin empleados registrados</p> : empleados.map(e => {
+                      const statusColors = { activo: 'bg-emerald-500/20 text-emerald-300', licencia: 'bg-amber-500/20 text-amber-300', vacaciones: 'bg-blue-500/20 text-blue-300', inactivo: 'bg-slate-500/20 text-slate-400' };
+                      return (
+                        <div key={e.id} className="bg-slate-700/30 rounded-lg border border-slate-600/30 p-3 flex flex-col gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-white truncate">{e.full_name || '—'}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full flex-shrink-0 ${statusColors[e.status] || 'bg-slate-500/20 text-slate-400'}`}>{e.status || 'activo'}</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
+                          <span className="text-xs text-slate-400 capitalize">{e.specialty || e.role || '—'}</span>
+                          <div className="text-[11px] text-slate-500 mt-1">
+                            {e.ots} OTs · {e.completadas} completadas
+                            {e.ots > 0 && <span className="ml-1 text-cyan-400">({Math.round(e.completadas / e.ots * 100)}%)</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ChartCard>
               </motion.div>
             </motion.div>
-          </TabsContent>
+          )}
+        </TabsContent>
 
-          {/* Financiero */}
-          <TabsContent value="financiero" className="mt-4 space-y-4">
+        {/* Financiero */}
+        <TabsContent value="financiero" className="mt-4 space-y-4">
+          {chartLoading ? <TableSkeleton rows={6} cols={6} /> : (
             <motion.div variants={container} initial="hidden" animate="show">
               <motion.div variants={item}>
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Costos por Proyecto</CardTitle></CardHeader>
-                  <CardContent>
-                    {costosPorProyecto.length === 0 ? (
-                      <div className="text-center py-12 text-slate-500">Sin datos de costos</div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={costosPorProyecto} layout="vertical">
-                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                          <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                          <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#94a3b8' }} width={120} />
-                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} formatter={(v) => fmt(v)} />
-                          <Bar dataKey="costo" fill="#f59e0b" radius={[0,4,4,0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </CardContent>
-                </Card>
+                <ChartCard title="Costos por Proyecto">
+                  {costosPorProyecto.length === 0 ? <Empty text="Sin datos de costos" /> : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={costosPorProyecto} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                        <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#94a3b8' }} width={120} />
+                        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => fmt(v)} />
+                        <Bar dataKey="costo" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </ChartCard>
               </motion.div>
             </motion.div>
-          </TabsContent>
+          )}
+        </TabsContent>
 
-          {/* Inventario */}
-          <TabsContent value="inventario" className="mt-4 space-y-4">
+        {/* Inventario */}
+        <TabsContent value="inventario" className="mt-4 space-y-4">
+          {chartLoading ? <TableSkeleton rows={6} cols={6} /> : (
             <motion.div variants={container} initial="hidden" animate="show">
               <motion.div variants={item}>
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Stock vs Mínimo</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {materials.filter(m => m.min_stock > 0).length === 0 ? (
-                        <p className="text-sm text-slate-500 text-center py-8">Sin materiales con stock mínimo</p>
-                      ) : materials.filter(m => m.min_stock > 0).map(m => {
-                        const pct = Math.min((m.stock / m.min_stock) * 100, 100);
-                        const isLow = m.stock <= m.min_stock;
-                        return (
-                          <div key={m.id} className="space-y-1">
-                            <div className="flex justify-between text-xs">
-                              <span className="font-medium text-slate-300 truncate">{m.name}</span>
-                              <span className={isLow ? 'text-red-400 font-bold' : 'text-emerald-400'}>
-                                {m.stock} / {m.min_stock}
-                              </span>
-                            </div>
-                            <div className="w-full bg-slate-700/50 rounded-full h-2">
-                              <div className={`h-2 rounded-full transition-all ${isLow ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
-                            </div>
+                <ChartCard title="Stock vs Mínimo">
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {materiales.length === 0 ? <p className="text-sm text-slate-500 text-center py-8">Sin materiales con stock mínimo</p> : materiales.map(m => {
+                      const pct = Math.min((m.stock / m.min_stock) * 100, 100);
+                      const isLow = m.stock <= m.min_stock;
+                      return (
+                        <div key={m.id} className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-medium text-slate-300 truncate">{m.name}</span>
+                            <span className={isLow ? 'text-red-400 font-bold' : 'text-emerald-400'}>{m.stock} / {m.min_stock}</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </motion.div>
-          </TabsContent>
-          {/* Pendientes */}
-          <TabsContent value="pendientes" className="mt-4 space-y-4">
-            {/* KPIs Pendientes */}
-            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <motion.div variants={item}>
-                <KpiMetric title="Total Pendientes" value={filteredPendientes.length} subtitle={`${pendientesActivos.length} activos`} icon={ClipboardList} color="blue" />
-              </motion.div>
-              <motion.div variants={item}>
-                <KpiMetric title="Tasa Resolución" value={`${tasaResolucionPend}%`} subtitle={`${pendientesResueltos.length} resueltos`} icon={CheckCircle2} color="green" />
-              </motion.div>
-              <motion.div variants={item}>
-                <KpiMetric title="Vencidos" value={pendientesVencidos.length} subtitle="Fecha límite superada" icon={AlertTriangle} color="red" />
-              </motion.div>
-              <motion.div variants={item}>
-                <KpiMetric title="Sin Asignar" value={filteredPendientes.filter(p => !p.jefe_sitio && !['resuelto','cancelado'].includes(p.estado)).length} subtitle="Requieren atención" icon={Target} color="amber" />
-              </motion.div>
-            </motion.div>
-
-            {/* Métricas profesionales: MTTR, Aging, Backlog */}
-            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <motion.div variants={item}>
-                <KpiMetric title="MTTR (días)" value={mttrPendientes !== null ? `${mttrPendientes}d` : '—'} subtitle="Tiempo medio de resolución" icon={Clock} color="purple" />
-              </motion.div>
-              <motion.div variants={item}>
-                <KpiMetric title="Backlog Ratio" value={backlogRatio !== null ? `${backlogRatio}x` : '—'} subtitle="Activos / resueltos período" icon={Activity} color="blue" />
-              </motion.div>
-              <motion.div variants={item} className="col-span-2 lg:col-span-1">
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg border-slate-700/50">
-                  <CardContent className="pt-5 pb-5">
-                    <div className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">Aging de Pendientes Activos</div>
-                    <div className="space-y-2">
-                      {agingPendientes.map(a => {
-                        const maxCount = Math.max(...agingPendientes.map(x => x.count), 1);
-                        const pct = (a.count / maxCount) * 100;
-                        const color = a.rango === '0-7d' ? 'bg-emerald-500' : a.rango === '8-30d' ? 'bg-amber-500' : a.rango === '31-60d' ? 'bg-orange-500' : 'bg-red-500';
-                        return (
-                          <div key={a.rango} className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-400 w-12 flex-shrink-0">{a.rango}</span>
-                            <div className="flex-1 bg-slate-700/50 rounded-full h-3 overflow-hidden">
-                              <div className={`h-3 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-xs text-white font-bold w-6 text-right tabular-nums">{a.count}</span>
+                          <div className="w-full bg-slate-700/50 rounded-full h-2">
+                            <div className={`h-2 rounded-full transition-all ${isLow ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
                           </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ChartCard>
               </motion.div>
             </motion.div>
+          )}
+        </TabsContent>
 
-            <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Por estado */}
-              <motion.div variants={item}>
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Distribución por Estado</CardTitle></CardHeader>
-                  <CardContent className="flex items-center justify-center">
-                    {pendientesPorEstado.length === 0 ? (
-                      <div className="text-center py-12 text-slate-500">Sin datos</div>
-                    ) : (
+        {/* Pendientes */}
+        <TabsContent value="pendientes" className="mt-4 space-y-4">
+          {chartLoading ? <><KpiSkeleton count={4} /><TableSkeleton rows={6} cols={6} /></> : (
+            <>
+              <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <motion.div variants={item}><KpiCard label="Total Pendientes" value={pend.total} sub={`${pend.activos} activos`} icon={ClipboardList} accent="blue" /></motion.div>
+                <motion.div variants={item}><KpiCard label="Tasa Resolución" value={`${pend.tasaResolucion}%`} sub={`${pend.resueltos} resueltos`} icon={CheckCircle2} accent="emerald" /></motion.div>
+                <motion.div variants={item}><KpiCard label="Vencidos" value={pend.vencidos} sub="Fecha límite superada" icon={AlertTriangle} accent="red" /></motion.div>
+                <motion.div variants={item}><KpiCard label="Sin Asignar" value={pend.sinAsignar} sub="Requieren atención" icon={Target} accent="amber" /></motion.div>
+              </motion.div>
+
+              <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <motion.div variants={item}><KpiCard label="MTTR (días)" value={pend.mttr !== null ? `${pend.mttr}d` : '—'} sub="Tiempo medio resolución" icon={Clock} accent="purple" /></motion.div>
+                <motion.div variants={item}><KpiCard label="Backlog Ratio" value={pend.backlog !== null ? `${pend.backlog}x` : '—'} sub="Activos / resueltos" icon={Activity} accent="blue" /></motion.div>
+                <motion.div variants={item}>
+                  <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg border-slate-700/50">
+                    <CardContent className="pt-5 pb-5">
+                      <div className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">Aging de Pendientes Activos</div>
+                      <div className="space-y-2">
+                        {pend.aging.map(a => {
+                          const maxCount = Math.max(...pend.aging.map(x => x.count), 1);
+                          const pct = (a.count / maxCount) * 100;
+                          const color = a.rango === '0-7d' ? 'bg-emerald-500' : a.rango === '8-30d' ? 'bg-amber-500' : a.rango === '31-60d' ? 'bg-orange-500' : 'bg-red-500';
+                          return (
+                            <div key={a.rango} className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-400 w-12 flex-shrink-0">{a.rango}</span>
+                              <div className="flex-1 bg-slate-700/50 rounded-full h-3 overflow-hidden">
+                                <div className={`h-3 rounded-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-xs text-white font-bold w-6 text-right tabular-nums">{a.count}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </motion.div>
+
+              <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <motion.div variants={item}>
+                  <ChartCard title="Distribución por Estado">
+                    {pend.porEstado.length === 0 ? <Empty /> : (
                       <ResponsiveContainer width="100%" height={250}>
                         <PieChart>
-                          <Pie data={pendientesPorEstado} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}>
-                            {pendientesPorEstado.map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
+                          <Pie data={pend.porEstado} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                            {pend.porEstado.map((_, idx) => <Cell key={idx} fill={COLORS[idx % COLORS.length]} />)}
                           </Pie>
-                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '8px' }} />
+                          <Tooltip contentStyle={TOOLTIP_STYLE} />
                         </PieChart>
                       </ResponsiveContainer>
                     )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              {/* Por prioridad */}
-              <motion.div variants={item}>
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Eficiencia por Prioridad</CardTitle></CardHeader>
-                  <CardContent>
-                    {pendientesPorPrioridad.length === 0 ? (
-                      <div className="text-center py-12 text-slate-500">Sin datos</div>
-                    ) : (
+                  </ChartCard>
+                </motion.div>
+                <motion.div variants={item}>
+                  <ChartCard title="Eficiencia por Prioridad">
+                    {pend.porPrioridad.length === 0 ? <Empty /> : (
                       <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={pendientesPorPrioridad}>
+                        <BarChart data={pend.porPrioridad}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                           <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} />
                           <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} formatter={(v, n) => [n === 'eficiencia' ? `${v}%` : v, n === 'eficiencia' ? 'Eficiencia %' : n === 'total' ? 'Total' : 'Resueltos']} />
+                          <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, n) => [n === 'eficiencia' ? `${v}%` : v, n === 'eficiencia' ? 'Eficiencia %' : n === 'total' ? 'Total' : 'Resueltos']} />
                           <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
-                          <Bar dataKey="total" fill="#334155" name="Total" radius={[4,4,0,0]} />
-                          <Bar dataKey="resueltos" fill="#10b981" name="Resueltos" radius={[4,4,0,0]} />
-                          <Bar dataKey="eficiencia" fill="#06b6d4" name="Eficiencia %" radius={[4,4,0,0]} />
+                          <Bar dataKey="total" fill="#334155" name="Total" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="resueltos" fill="#10b981" name="Resueltos" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="eficiencia" fill="#06b6d4" name="Eficiencia %" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              {/* Por jefe de sitio */}
-              <motion.div variants={item} className="lg:col-span-2">
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Eficiencia por Jefe de Sitio</CardTitle></CardHeader>
-                  <CardContent>
-                    {pendientesPorJefe.length === 0 ? (
-                      <div className="text-center py-12 text-slate-500">Sin jefes asignados</div>
-                    ) : (
+                  </ChartCard>
+                </motion.div>
+                <motion.div variants={item} className="lg:col-span-2">
+                  <ChartCard title="Eficiencia por Jefe de Sitio">
+                    {pend.porJefe.length === 0 ? <Empty text="Sin jefes asignados" /> : (
                       <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={pendientesPorJefe}>
+                        <BarChart data={pend.porJefe}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                           <XAxis dataKey="jefe" tick={{ fontSize: 10, fill: '#94a3b8' }} angle={-30} textAnchor="end" height={70} />
                           <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }} formatter={(v, n) => [n === 'eficiencia' ? `${v}%` : v, { total: 'Total', resueltos: 'Resueltos', vencidos: 'Vencidos', eficiencia: 'Eficiencia %' }[n] || n]} />
+                          <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, n) => [v, { total: 'Total', resueltos: 'Resueltos', vencidos: 'Vencidos', eficiencia: 'Eficiencia %' }[n] || n]} />
                           <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
-                          <Bar dataKey="total" fill="#3b82f6" name="Total" radius={[4,4,0,0]} />
-                          <Bar dataKey="resueltos" fill="#10b981" name="Resueltos" radius={[4,4,0,0]} />
-                          <Bar dataKey="vencidos" fill="#ef4444" name="Vencidos" radius={[4,4,0,0]} />
+                          <Bar dataKey="total" fill="#3b82f6" name="Total" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="resueltos" fill="#10b981" name="Resueltos" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="vencidos" fill="#ef4444" name="Vencidos" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              {/* Por comuna */}
-              <motion.div variants={item} className="lg:col-span-2">
-                <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm text-white">Pendientes por Comuna</CardTitle></CardHeader>
-                  <CardContent>
-                    {pendientesPorComuna.length === 0 ? (
-                      <div className="text-center py-12 text-slate-500">Sin datos por comuna</div>
-                    ) : (
+                  </ChartCard>
+                </motion.div>
+                <motion.div variants={item} className="lg:col-span-2">
+                  <ChartCard title="Pendientes por Comuna">
+                    {pend.porComuna.length === 0 ? <Empty text="Sin datos por comuna" /> : (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {pendientesPorComuna.map((c, i) => (
+                        {pend.porComuna.map(c => (
                           <div key={c.comuna} className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4 space-y-3">
                             <div className="flex items-center justify-between">
                               <span className="text-lg font-bold text-white">Comuna {c.comuna}</span>
                               <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">{c.total} total</span>
                             </div>
                             <div className="space-y-1.5">
-                              <div className="flex justify-between text-xs">
-                                <span className="text-slate-400">Resueltos</span>
-                                <span className="text-emerald-400 font-semibold">{c.resueltos}</span>
-                              </div>
-                              <div className="flex justify-between text-xs">
-                                <span className="text-slate-400">Activos</span>
-                                <span className="text-amber-400 font-semibold">{c.activos}</span>
-                              </div>
+                              <div className="flex justify-between text-xs"><span className="text-slate-400">Resueltos</span><span className="text-emerald-400 font-semibold">{c.resueltos}</span></div>
+                              <div className="flex justify-between text-xs"><span className="text-slate-400">Activos</span><span className="text-amber-400 font-semibold">{c.activos}</span></div>
                               <div className="w-full bg-slate-600/50 rounded-full h-2 mt-2">
                                 <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${c.total > 0 ? (c.resueltos / c.total) * 100 : 0}%` }} />
                               </div>
-                              <div className="text-xs text-slate-500 text-right">{c.total > 0 ? Math.round((c.resueltos/c.total)*100) : 0}% resuelto</div>
+                              <div className="text-xs text-slate-500 text-right">{c.total > 0 ? Math.round((c.resueltos / c.total) * 100) : 0}% resuelto</div>
                             </div>
                           </div>
                         ))}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </ChartCard>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          </TabsContent>
+            </>
+          )}
+        </TabsContent>
 
-          {/* Resumen Semanal */}
-          <TabsContent value="semanal" className="mt-4 space-y-4">
-            <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
-              <CardContent className="pt-6 pb-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-white font-semibold text-base">Resumen Semanal Operativo</h3>
-                    <p className="text-slate-400 text-xs mt-1">
-                      {resumenFecha ? `Última actualización: ${resumenFecha.toLocaleString('es-AR')}` : 'Generá el resumen para ver el estado actual'}
-                    </p>
-                  </div>
-                  <Button onClick={fetchResumenSemanal} disabled={loadingResumen} className="gap-2">
-                    {loadingResumen ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    {loadingResumen ? 'Generando...' : 'Generar Resumen'}
-                  </Button>
+        {/* Resumen Semanal */}
+        <TabsContent value="semanal" className="mt-4 space-y-4">
+          <Card className="border-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-xl shadow-lg">
+            <CardContent className="pt-6 pb-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-white font-semibold text-base">Resumen Semanal Operativo</h3>
+                  <p className="text-slate-400 text-xs mt-1">{resumenFecha ? `Última actualización: ${resumenFecha.toLocaleString('es-AR')}` : 'Generá el resumen para ver el estado actual'}</p>
                 </div>
-
-                {!resumenSemanal && !loadingResumen && (
-                  <div className="text-center py-16 text-slate-500">
-                    <CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p className="text-sm">Hacé clic en "Generar Resumen" para ver el estado operativo semanal</p>
+                <Button onClick={fetchResumenSemanal} disabled={loadingResumen} className="gap-2">
+                  {loadingResumen ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  {loadingResumen ? 'Generando...' : 'Generar Resumen'}
+                </Button>
+              </div>
+              {!resumenSemanal && !loadingResumen && (
+                <div className="text-center py-16 text-slate-500">
+                  <CalendarDays className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">Hacé clic en "Generar Resumen" para ver el estado operativo semanal</p>
+                </div>
+              )}
+              {loadingResumen && (
+                <div className="text-center py-16 text-slate-400">
+                  <RefreshCw className="h-10 w-10 mx-auto mb-3 animate-spin opacity-50" />
+                  <p className="text-sm">Analizando datos...</p>
+                </div>
+              )}
+              {resumenSemanal?.resumenGlobal && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[
+                      { label: 'Pendientes Vencidos', value: resumenSemanal.resumenGlobal.vencidos, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+                      { label: 'Resueltos esta semana', value: resumenSemanal.resumenGlobal.resueltosSemana, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+                      { label: 'OTs completadas', value: resumenSemanal.resumenGlobal.otsCompletadasSemana, color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' },
+                      { label: 'Emergencias activas', value: resumenSemanal.resumenGlobal.emergenciasActivas, color: resumenSemanal.resumenGlobal.emergenciasActivas > 0 ? 'text-red-400' : 'text-slate-400', bg: resumenSemanal.resumenGlobal.emergenciasActivas > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-700/30 border-slate-600/30' },
+                    ].map((stat, i) => (
+                      <div key={i} className={`rounded-xl border p-4 text-center ${stat.bg}`}>
+                        <div className={`text-3xl font-bold ${stat.color}`}>{stat.value}</div>
+                        <div className="text-xs text-slate-400 mt-1">{stat.label}</div>
+                      </div>
+                    ))}
                   </div>
-                )}
-
-                {loadingResumen && (
-                  <div className="text-center py-16 text-slate-400">
-                    <RefreshCw className="h-10 w-10 mx-auto mb-3 animate-spin opacity-50" />
-                    <p className="text-sm">Analizando datos...</p>
-                  </div>
-                )}
-
-                {resumenSemanal?.resumenGlobal && (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                      {[
-                        { label: 'Pendientes Vencidos', value: resumenSemanal.resumenGlobal.vencidos, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
-                        { label: 'Resueltos esta semana', value: resumenSemanal.resumenGlobal.resueltosSemana, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
-                        { label: 'OTs completadas', value: resumenSemanal.resumenGlobal.otsCompletadasSemana, color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' },
-                        { label: 'Emergencias activas', value: resumenSemanal.resumenGlobal.emergenciasActivas, color: resumenSemanal.resumenGlobal.emergenciasActivas > 0 ? 'text-red-400' : 'text-slate-400', bg: resumenSemanal.resumenGlobal.emergenciasActivas > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-700/30 border-slate-600/30' },
-                      ].map((stat, i) => (
-                        <div key={i} className={`rounded-xl border p-4 text-center ${stat.bg}`}>
-                          <div className={`text-3xl font-bold ${stat.color}`}>{stat.value}</div>
-                          <div className="text-xs text-slate-400 mt-1">{stat.label}</div>
-                        </div>
-                      ))}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4 flex items-center gap-4">
+                      <AlertTriangle className="h-8 w-8 text-amber-400 flex-shrink-0" />
+                      <div><div className="text-xl font-bold text-white">{resumenSemanal.resumenGlobal.totalPendientes}</div><div className="text-xs text-slate-400">Pendientes SAP sin resolver</div></div>
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4 flex items-center gap-4">
-                        <AlertTriangle className="h-8 w-8 text-amber-400 flex-shrink-0" />
-                        <div>
-                          <div className="text-xl font-bold text-white">{resumenSemanal.resumenGlobal.totalPendientes}</div>
-                          <div className="text-xs text-slate-400">Pendientes SAP sin resolver</div>
-                        </div>
-                      </div>
-                      <div className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4 flex items-center gap-4">
-                        <Wrench className="h-8 w-8 text-blue-400 flex-shrink-0" />
-                        <div>
-                          <div className="text-xl font-bold text-white">{resumenSemanal.resumenGlobal.otsNuevasSemana}</div>
-                          <div className="text-xs text-slate-400">OTs nuevas esta semana</div>
-                        </div>
-                      </div>
+                    <div className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4 flex items-center gap-4">
+                      <Wrench className="h-8 w-8 text-blue-400 flex-shrink-0" />
+                      <div><div className="text-xl font-bold text-white">{resumenSemanal.resumenGlobal.otsNuevasSemana}</div><div className="text-xs text-slate-400">OTs nuevas esta semana</div></div>
                     </div>
-
-                    {resumenSemanal.usoPorUsuario && resumenSemanal.usoPorUsuario.length > 0 && (
-                      <div className="bg-slate-700/30 rounded-xl border border-slate-600/30 p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Clock className="h-4 w-4 text-cyan-400" />
-                          <h4 className="text-sm font-semibold text-white">Tiempo de Uso de la App por Usuario (7 días)</h4>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-slate-600/50">
-                                <th className="text-left py-2 px-3 text-xs font-semibold text-slate-400 uppercase">Usuario</th>
-                                <th className="text-right py-2 px-3 text-xs font-semibold text-slate-400 uppercase">Horas de Uso</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {resumenSemanal.usoPorUsuario.map((u, i) => {
-                                const maxHoras = Math.max(...resumenSemanal.usoPorUsuario.map(x => x.horas), 1);
-                                const pct = (u.horas / maxHoras) * 100;
-                                return (
-                                  <tr key={i} className="border-b border-slate-700/30 hover:bg-slate-600/20">
-                                    <td className="py-2 px-3 text-slate-200 font-medium">{u.nombre}</td>
-                                    <td className="py-2 px-3 text-right">
-                                      <div className="flex items-center justify-end gap-2">
-                                        <div className="w-24 bg-slate-600/50 rounded-full h-2 overflow-hidden">
-                                          <div className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" style={{ width: `${pct}%` }} />
-                                        </div>
-                                        <span className="text-cyan-400 font-bold tabular-nums w-12 text-right">{u.horas}h</span>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-        </Tabs>
-      </motion.div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
