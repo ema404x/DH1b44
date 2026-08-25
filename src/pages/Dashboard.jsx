@@ -195,11 +195,13 @@ export default function Dashboard() {
   const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: () => base44.entities.Pendiente.list('-updated_date', 200), staleTime: 60000, refetchInterval: 120000, enabled: canRead('Pendientes') });
   const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 80),    staleTime: 120000, refetchInterval: 120000, enabled: canRead('Employee') });
 
-  // KPIs agregados en backend sobre el TOTAL del sector (sin truncar).
-  // Solo admins (ven todo el sector); los jefes siguen con filterByUser
-  // client-side porque el backend no filtra por jefe. Fix del subreporte por
-  // listas truncadas (.list 100/150/200).
-  const useBackendKpis = user?.role === 'admin';
+  // KPIs agregados en backend sobre el TOTAL que el usuario puede ver (sin
+  // truncar). Regla de oro: backend-first. El backend scopea por sector para
+  // super-admins y por usuario (created_by_id ∪ jefe_sitio_email) para jefes —
+  // espejo del RLS. Así los contadores de OT no dependen del .list(150)
+  // client-side (que subreportaba y, al persistirse en IndexedDB, mostraba
+  // cifras viejas hasta el refetch → "hay que recargar varias veces").
+  const useBackendKpis = canRead('WorkOrder');
   const { data: kpis, isLoading: kpisLoading } = useQuery({
     queryKey: ['dashboard-metrics'],
     queryFn: async () => (await base44.functions.invoke('getDashboardMetrics')).data,
