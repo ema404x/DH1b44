@@ -280,7 +280,18 @@ export default function Dashboard() {
     const activeProjects   = filteredProjects.filter(p => p.status === 'en_progreso').length;
     const pendingOrders    = orders.filter(o => ['pendiente', 'asignada'].includes(o.status)).length;
     const inProgressOrders = orders.filter(o => o.status === 'en_progreso').length;
-    const overdueOrders    = orders.filter(o => { try { return o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada', 'cancelada'].includes(o.status); } catch { return false; } }).length;
+    const overdueOrders    = orders.filter(o => {
+      try {
+        // Solo las OTs en en_progreso pueden vencer; el reloj arranca desde
+        // fecha_inicio_real (cuando entró en progreso), no desde la creación.
+        // Heurística client-side (fallback mientras carga el backend, que usa
+        // el plazo exacto del sector): 1 día desde el inicio real.
+        if (o.status !== 'en_progreso') return false;
+        const start = o.fecha_inicio_real || o.scheduled_date;
+        if (!start) return false;
+        return (Date.now() - parseISO(start).getTime()) >= 86400000;
+      } catch { return false; }
+    }).length;
     const activeClients    = clients.filter(c => c.status === 'activo').length;
     const activeEmployees  = employees.filter(e => e.status === 'activo').length;
 
