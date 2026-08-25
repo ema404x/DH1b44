@@ -63,18 +63,28 @@ export default function OTEjecucionModal({ ot, onClose, onSaved }) {
   const handleSave = async (newStatus) => {
     setSaving(newStatus || 'save');
     try {
-      // 1. Guardar campos (notas, checklist, materiales) — update parcial, no toca status
-      await base44.entities.WorkOrder.update(ot.id, {
-        notes, checklist, materials_used: materialesUsados, materiales_faltantes: materialesFaltantes,
-      });
-
-      // 2. Si hay cambio de estado, rutear por la máquina (transicionEstadoOT) —
-      //    preserva fecha_inicio_real, GPS, validador y permisos.
+      const fields = {
+        notes,
+        checklist,
+        materials_used: materialesUsados,
+        materiales_faltantes: materialesFaltantes,
+      };
       if (newStatus) {
+        // Transición + persistencia de campos en un único call service-role
+        // (transicionEstadoOT). Antes se hacía un base44.entities.WorkOrder.update
+        // directo que la RLS bloquea para el operario (no es creador/jefe) → los
+        // faltantes cargados al iniciar se perdían y el jefe no los veía.
         const action = newStatus === 'en_progreso' ? 'iniciar' : 'finalizar';
-        const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: ot.id, accion: action });
+        const res = await base44.functions.invoke('transicionEstadoOT', {
+          ot_id: ot.id, accion: action, extra_data: fields,
+        });
+        if (res.data?.error) { toast.error(res.data.error); return; }
         toast.success(res.data?.mensaje || (action === 'iniciar' ? 'OT iniciada' : 'OT enviada a validación'));
       } else {
+        // Guardar sin cambiar estado: por backend service-role (actualizarOT),
+        // que valida sector + permiso (creador/asignado/jefe) y no choca con RLS.
+        const res = await base44.functions.invoke('actualizarOT', { ot_id: ot.id, patch: fields });
+        if (res.data?.error) { toast.error(res.data.error); return; }
         toast.success('Cambios guardados');
       }
       onSaved();

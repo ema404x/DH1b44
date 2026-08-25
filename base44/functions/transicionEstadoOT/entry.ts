@@ -218,26 +218,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (accion === 'finalizar') {
-      // El reporte de cierre reemplaza el estado anterior (no acumula). Si la OT
-      // fue rechazada y el operario re-finaliza, los faltantes y fotos del reporte
-      // anterior se descartan y queda exactamente lo que envía el operario ahora —
-      // coincide con ReporteForm, que inicializa photos desde ot.photos y faltantes
-      // desde [] y envía la lista completa que el operario ve en pantalla.
-      if (extra_data.materials_used !== undefined) updateData.materials_used = extra_data.materials_used;
-      if (extra_data.materiales_faltantes !== undefined) {
-        updateData.materiales_faltantes = extra_data.materiales_faltantes;
-      }
-      if (extra_data.notes !== undefined) updateData.notes = extra_data.notes;
-      if (extra_data.photos !== undefined) updateData.photos = extra_data.photos;
-
-      if (extra_data.materiales_faltantes && extra_data.materiales_faltantes.length > 0) {
-        const sinMotivo = extra_data.materiales_faltantes.filter(m => !m.motivo || !m.motivo.trim());
+    // Persistencia de campos de reporte para TODAS las acciones (iniciar,
+    // finalizar, completar, aprobar, rechazar). Centraliza la escritura en
+    // service-role: la RLS directa bloquea al operario que no es creador/jefe,
+    // así los materiales faltantes cargados al INICIAR una OT se perdían y el
+    // jefe nunca los veía. Acá se persisten junto con la transición, sin depender
+    // de la acción, con el mismo aislamiento de sector que valida la función.
+    // El reporte reemplaza (no acumula): si la OT fue rechazada y el operario
+    // re-finaliza, queda exactamente lo que envía ahora.
+    if (extra_data.checklist !== undefined) updateData.checklist = extra_data.checklist;
+    if (extra_data.materials_used !== undefined) updateData.materials_used = extra_data.materials_used;
+    if (extra_data.materiales_faltantes !== undefined) {
+      updateData.materiales_faltantes = extra_data.materiales_faltantes;
+      const faltantes = extra_data.materiales_faltantes;
+      if (Array.isArray(faltantes) && faltantes.length > 0) {
+        const sinMotivo = faltantes.filter(m => !m.motivo || !String(m.motivo).trim());
         if (sinMotivo.length > 0) {
           return Response.json({ error: 'Todos los materiales faltantes deben tener un motivo' }, { status: 400 });
         }
       }
     }
+    if (extra_data.notes !== undefined) updateData.notes = extra_data.notes;
+    if (extra_data.photos !== undefined) updateData.photos = extra_data.photos;
 
     if (accion === 'aprobar' || accion === 'completar') {
       updateData.completed_date = new Date().toISOString().split('T')[0];
