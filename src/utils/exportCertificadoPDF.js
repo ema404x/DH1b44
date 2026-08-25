@@ -23,9 +23,9 @@ const parseMonto = (v) => {
   return isNaN(n) ? 0 : n;
 };
 
-const round0 = (n) => Math.round(parseMonto(n));
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(round0(n));
-const fmtC = (v) => { const n = round0(v); if (n === 0) return '0'; return n.toLocaleString('es-AR'); };
+const round0 = (n) => { const x = parseMonto(n); return Math.round(x * 100) / 100; };
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(round0(n));
+const fmtC = (v) => { const n = round0(v); if (n === 0) return '0,00'; return n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
 const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d || '—'; } };
 
 const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
@@ -82,7 +82,7 @@ export async function exportCertificadoPDF(form) {
   const fondo_reparo_pct = parseMonto(form.fondo_reparo_pct) || 0;
   const porcentaje_pagado_anteriormente = parseMonto(form.porcentaje_pagado_anteriormente) || 0;
 
-  const montoContratado = Math.round(parseMonto(form.monto_contratado));
+  const montoContratado = Math.round(parseMonto(form.monto_contratado) * 100) / 100;
 
   const firmaGerenteUrl = form.firma_gerente_url || (form.estado === 'aprobado' ? FIRMA_RAUL_GARCIA_URL : null);
   const firmaJefeUrl = form.firma_jefe_sitio_url || null;

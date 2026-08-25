@@ -11,7 +11,7 @@ import HistorialAcumulados from './HistorialAcumulados';
 import ItemAcumulacionRow from './ItemAcumulacionRow';
 import { recalcItem, aplicarCantidadPu, aplicarPresenteUnidad, aplicarPresenteImporte, aplicarAnteriorUnidad, aplicarAnteriorImporte, matchAnteriorDesdeCert, calcularTotales } from './acumulacionUtils';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(Math.round(n || 0));
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.round((n || 0) * 100) / 100);
 const parseMonto = (v) => {
   if (v === null || v === undefined || v === '') return 0;
   if (typeof v === 'number') return isFinite(v) ? v : 0;
@@ -25,7 +25,7 @@ const parseMonto = (v) => {
   const n = parseFloat(norm);
   return isNaN(n) ? 0 : n;
 };
-const r0 = (n) => Math.round(parseMonto(n));
+const r0 = (n) => { const x = parseMonto(n); return Math.round(x * 100) / 100; };
 
 // recalcItem y la coherencia unidad↔importe viven en ./acumulacionUtils
 // (compartidas por editor, vista previa y PDF).
@@ -89,7 +89,7 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
       monto_contratado: (() => {
         const raw = initialData?.monto_contratado;
         if (!raw && raw !== 0) return '';
-        return String(Math.round(raw));
+        return String(Math.round(raw * 100) / 100);
       })(),
       porcentaje_pagado_anteriormente: initialData?.porcentaje_pagado_anteriormente ?? 0,
       porcentaje_avance: initialData?.porcentaje_avance || 0,
@@ -201,7 +201,7 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
     if (cant === '' || cant === null || cant === undefined) return;
     const nuevaCantidad = r0(cant);
     const newItems = form.items.map(item => {
-      const nuevoTotal = Math.round(nuevaCantidad * r0(item.importe_unitario));
+      const nuevoTotal = Math.round(nuevaCantidad * r0(item.importe_unitario) * 100) / 100;
       return recalcItem({
         ...item,
         cantidad: nuevaCantidad,
@@ -237,7 +237,7 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
       const saldoImporte = Math.max(0, importe_total - acumAnteriorImporte);
       // Objetivo acumulado de este ítem al % ingresado; el presente es lo que
       // falta para llegar ahí desde lo ya certificado, topeado por el saldo.
-      const objetivoAcumulado = Math.round(importe_total * fraccion);
+      const objetivoAcumulado = Math.round(importe_total * fraccion * 100) / 100;
       const presenteImporte = Math.max(0, Math.min(saldoImporte, objetivoAcumulado - acumAnteriorImporte));
       const presenteUnidad = pu > 0 ? Math.round((presenteImporte / pu) * 100) / 100 : 0;
       return recalcItem({

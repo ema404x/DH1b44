@@ -1,7 +1,11 @@
 // Lógica de acumulación de medición para certificados, centralizada para que
 // editor, vista previa y PDF coincidan siempre.
 //
-// Reglas profesionales:
+// Reglas profesionales (Reglas de Oro — precisión decimal):
+//  - Todos los importes y unidades se calculan a 2 decimales (round2), NUNCA
+//    redondeo a entero. Los céntimos son parte del certificado.
+//  - Los cálculos intermedios mantienen precisión; solo se redondea a 2 dec
+//    al almacenar el valor del tramo.
 //  - importe = unidad × precio_unitario en cada tramo (anterior y presente).
 //  - acumulado presente = acumulado anterior + presente.
 //  - saldo = max(0, cantidad − acumulado presente) y max(0, total − acum. presente $).
@@ -29,17 +33,17 @@ export const round2 = (n) => Math.round(parseMonto(n) * 100) / 100;
 // de cada tramo ya son coherentes (los handlers aplicar* lo garantizan).
 // Acá solo se acumula, se calcula el saldo y se marca sobrecertificación.
 export function recalcItem(item) {
-  const cantidad = round0(item.cantidad);
-  const pu = round0(item.importe_unitario);
-  const importe_total = (cantidad > 0 && pu > 0) ? cantidad * pu : round0(item.importe_total);
+  const cantidad = round2(item.cantidad);
+  const pu = round2(item.importe_unitario);
+  const importe_total = (cantidad > 0 && pu > 0) ? cantidad * pu : round2(item.importe_total);
 
   const aau = round2(item.med_acum_anterior_unidad);
-  const aa$ = round0(item.med_acum_anterior_importe);
+  const aa$ = round2(item.med_acum_anterior_importe);
   const pu_u = round2(item.med_presente_unidad);
-  const p$ = round0(item.med_presente_importe);
+  const p$ = round2(item.med_presente_importe);
 
   const apu = round2(aau + pu_u);
-  const ap$ = round0(aa$ + p$);
+  const ap$ = round2(aa$ + p$);
   const su = Math.max(0, round2(cantidad - apu));
   const s$ = Math.max(0, importe_total - ap$);
   const sobrecertificado = cantidad > 0 && apu > cantidad + 0.001;
@@ -63,26 +67,26 @@ export function recalcItem(item) {
 
 // Editar UNIDAD del tramo presente → importe = unidad × pu
 export function aplicarPresenteUnidad(item, unidad) {
-  const pu = round0(item.importe_unitario);
+  const pu = round2(item.importe_unitario);
   const u = round2(unidad);
   return { ...item, med_presente_unidad: u, med_presente_importe: Math.round(u * pu), _med_editado: true };
 }
 // Editar IMPORTE del tramo presente → unidad = importe / pu
 export function aplicarPresenteImporte(item, importe) {
-  const pu = round0(item.importe_unitario);
-  const imp = round0(importe);
+  const pu = round2(item.importe_unitario);
+  const imp = round2(importe);
   return { ...item, med_presente_importe: imp, med_presente_unidad: pu > 0 ? round2(imp / pu) : 0, _med_editado: true };
 }
 // Editar UNIDAD del tramo anterior → importe = unidad × pu (marca override)
 export function aplicarAnteriorUnidad(item, unidad) {
-  const pu = round0(item.importe_unitario);
+  const pu = round2(item.importe_unitario);
   const u = round2(unidad);
   return { ...item, med_acum_anterior_unidad: u, med_acum_anterior_importe: Math.round(u * pu), _anterior_override: true };
 }
 // Editar IMPORTE del tramo anterior → unidad = importe / pu (marca override)
 export function aplicarAnteriorImporte(item, importe) {
-  const pu = round0(item.importe_unitario);
-  const imp = round0(importe);
+  const pu = round2(item.importe_unitario);
+  const imp = round2(importe);
   return { ...item, med_acum_anterior_importe: imp, med_acum_anterior_unidad: pu > 0 ? round2(imp / pu) : 0, _anterior_override: true };
 }
 
@@ -90,8 +94,8 @@ export function aplicarAnteriorImporte(item, importe) {
 // presente fue editado, mantiene la unidad elegida y recalcula su importe.
 // Si no fue editado, el presente cubre todo el ítem (unidad = cantidad).
 export function aplicarCantidadPu(item) {
-  const cantidad = round0(item.cantidad);
-  const pu = round0(item.importe_unitario);
+  const cantidad = round2(item.cantidad);
+  const pu = round2(item.importe_unitario);
   const importe_total = cantidad * pu;
   const next = { ...item, cantidad, importe_unitario: pu, importe_total };
   if (item._med_editado) {
@@ -122,7 +126,7 @@ export function matchAnteriorDesdeCert(items, certAnterior) {
     return {
       ...it,
       med_acum_anterior_unidad: round2(prev.med_acum_presente_unidad ?? prev.med_acum_anterior_unidad ?? 0),
-      med_acum_anterior_importe: round0(prev.med_acum_presente_importe ?? prev.med_acum_anterior_importe ?? 0),
+      med_acum_anterior_importe: round2(prev.med_acum_presente_importe ?? prev.med_acum_anterior_importe ?? 0),
     };
   });
 }
@@ -147,21 +151,21 @@ export function matchAnteriorDesdeCert(items, certAnterior) {
 export function calcularTotales(form) {
   const items = (form && form.items) || [];
   const totalItem = (it) =>
-    round0(it.importe_total) || Math.round(parseMonto(it.cantidad) * round0(it.importe_unitario));
+    round2(it.importe_total) || Math.round(parseMonto(it.cantidad) * round2(it.importe_unitario));
 
-  const subtotalContrato = round0(items.reduce((acc, it) => acc + totalItem(it), 0));
+  const subtotalContrato = round2(items.reduce((acc, it) => acc + totalItem(it), 0));
 
   const hasMedicion = items.some((it) => {
     if (it._med_editado) return true;
     if (it.med_presente_importe == null) return false;
-    return round0(it.med_presente_importe) !== totalItem(it);
+    return round2(it.med_presente_importe) !== totalItem(it);
   });
 
   const totalPresente = hasMedicion
-    ? round0(items.reduce((acc, it) => acc + round0(it.med_presente_importe), 0))
+    ? round2(items.reduce((acc, it) => acc + round2(it.med_presente_importe), 0))
     : 0;
-  const totalAcumAnterior = round0(
-    items.reduce((acc, it) => acc + round0(it.med_acum_anterior_importe), 0)
+  const totalAcumAnterior = round2(
+    items.reduce((acc, it) => acc + round2(it.med_acum_anterior_importe), 0)
   );
 
   const pctB = parseMonto(form.porcentaje_pagado_anteriormente) || 0;
@@ -174,13 +178,13 @@ export function calcularTotales(form) {
 
   const anticipo =
     form.anticipo_monto_manual != null
-      ? round0(form.anticipo_monto_manual)
+      ? round2(form.anticipo_monto_manual)
       : parseMonto(form.anticipo_pct) > 0
         ? Math.round(baseCalculo * (parseMonto(form.anticipo_pct) / 100))
         : 0;
   const fondoReparoMonto =
     form.fondo_reparo_monto_manual != null
-      ? round0(form.fondo_reparo_monto_manual)
+      ? round2(form.fondo_reparo_monto_manual)
       : parseMonto(form.fondo_reparo_pct) > 0
         ? Math.round(baseCalculo * (parseMonto(form.fondo_reparo_pct) / 100))
         : 0;

@@ -5,7 +5,7 @@ import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 import { toast } from 'sonner';
 import { calcularTotales } from './acumulacionUtils';
 
-const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.round((n || 0) * 100) / 100);
 const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d || '—'; } };
 const parseMonto = (v) => {
   if (!v && v !== 0) return 0;
