@@ -89,7 +89,7 @@ export default async function(req) {
     // Filtrar por sector server-side: el cap de 500 aplica SOLO al sector del caller,
     // no al pool global. Antes, si otro sector tenía >500 OTs más recientes, las del
     // caller quedaban fuera del top-500 y se subreportaban ("se sale todo").
-    const allOTs = await base44.asServiceRole.entities.WorkOrder.filter({ sector_id: userSector }, '-updated_date', 500);
+    const allOTs = await base44.asServiceRole.entities.WorkOrder.filter({ sector_id: userSector }, '-updated_date', 900);
 
     // Filtro 1: sector (aislamiento entre sectores)
     let result = allOTs.filter(ot => (ot.sector_id || 'escuela') === userSector);

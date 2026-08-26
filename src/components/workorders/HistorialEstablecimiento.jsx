@@ -29,7 +29,7 @@ export default function HistorialEstablecimiento({ open, onOpenChange, onOpenOrd
   // Historial por establecimiento (todas las OTs).
   const { data: orders = [] } = useQuery({
     queryKey: ['workorders-all'],
-    queryFn: () => base44.entities.WorkOrder.list('-created_date', 500),
+    queryFn: () => base44.entities.WorkOrder.list('-created_date', 900),
     enabled: open && tab === 'establecimiento',
   });
 
@@ -37,7 +37,7 @@ export default function HistorialEstablecimiento({ open, onOpenChange, onOpenOrd
   // las suyas. Ordenadas por fecha_archivado descendente.
   const { data: archivadas = [] } = useQuery({
     queryKey: ['workorders-archivadas'],
-    queryFn: () => base44.entities.WorkOrder.filter({ archivada: true }, '-fecha_archivado', 500),
+    queryFn: () => base44.entities.WorkOrder.filter({ archivada: true }, '-fecha_archivado', 900),
     enabled: open && tab === 'archivadas',
   });
 
