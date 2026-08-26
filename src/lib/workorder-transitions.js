@@ -13,12 +13,15 @@ const DRAG_TRANSITIONS = {
 };
 
 // Estados destino que aceptan desde cualquier estado no-terminal.
-// 'completada' NO es destino flexible: exige pasar por pendiente_validacion
-// (aprobar) — validación formal. Arrastrar en_progreso→completada queda
-// bloqueado (getTransitionAction devuelve null → toast "no permitida").
+// 'completada' es destino flexible (acción 'completar'): el backend permite
+// cerrar desde cualquier estado no-terminal, pero mantiene el gate de
+// checklist + fotos obligatorias — si no pasa, devuelve 409 y la OT vuelve
+// a su estado original. Así el Kanban drag a Completada funciona desde
+// cualquier columna no-terminal.
 const FLEXIBLE_TARGETS = {
   'cancelada': 'cancelar',
   'obra': 'convertir_obra',
+  'completada': 'completar',
 };
 
 const TERMINAL_STATES = ['completada', 'cancelada'];

@@ -8,18 +8,19 @@ const TRANSICIONES_FIJAS = {
   'finalizar':      { desde: 'en_progreso',          hacia: 'pendiente_validacion' },
   'aprobar':        { desde: 'pendiente_validacion', hacia: 'completada' },
   'rechazar':       { desde: 'pendiente_validacion', hacia: 'en_progreso' },
-  // 'completar' es un alias de 'aprobar' restringido a pendiente_validacion y
-  // obra. Antes era flexible desde cualquier estado no-terminal → permitía
-  // saltar la validación formal (en_progreso → completada) y el jefe no revisaba
-  // el reporte del operario. Ahora exige pasar por pendiente_validacion
-  // (finalizar). Obra preserva su camino de cierre propio.
-  'completar':      { desde: ['pendiente_validacion', 'obra'], hacia: 'completada' },
 };
 
 // Transiciones flexibles: desde cualquier estado no-terminal
 const TRANSICIONES_FLEXIBLES = {
   'cancelar':       { hacia: 'cancelada' },
   'convertir_obra': { hacia: 'obra' },
+  // 'completar' es flexible desde cualquier estado no-terminal. No exige pasar
+  // por pendiente_validacion (el jefe puede cerrar directo), PERO mantiene el
+  // gate de checklist + fotos obligatorias (ver bloque de validación abajo):
+  // si el checklist no está completo y no hay motivos_incompleto registrados,
+  // se rechaza con 409. Así el Kanban drag a Completada funciona desde
+  // cualquier columna, y no se pierden reportes/incompletitudes.
+  'completar':      { hacia: 'completada' },
 };
 
 const ESTADOS_TERMINALES = ['completada', 'cancelada'];
