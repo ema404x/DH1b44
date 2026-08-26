@@ -71,13 +71,25 @@ export default function WorkOrders() {
   // Estabilizadas con useCallback para que las cards memoizadas (React.memo)
   // no se re-rendericen cuando cambia una referencia de callback. queryClient
   // es estable → estas funciones son estables de por vida del componente.
+  // 'Completar' avanza la OT por el flujo formal (sin atajos):
+  // - pendiente_validacion → aprobar (→ completada)
+  // - obra → completar (cierre propio de obra, permitido)
+  // - en_progreso → finalizar (→ pendiente_validacion). El jefe revisa el
+  //   reporte del operario y luego aprueba. Antes el atajo 'completar' saltaba
+  //   la validación y el reporte no se revisaba. El estado se lee del cache de
+  //   la query (sin depender de visibleOrders, declarado más abajo → TDZ).
   const handleComplete = useCallback(async (id) => {
+    const cached = queryClient.getQueryData(['workorders']) || [];
+    const order = cached.find(o => o.id === id);
+    const accion = order?.status === 'pendiente_validacion' ? 'aprobar'
+                 : order?.status === 'obra' ? 'completar'
+                 : 'finalizar';
     try {
-      const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: 'completar' });
-      toast.success(res.data.mensaje || 'OT completada');
+      const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion });
+      toast.success(res.data.mensaje || 'OT actualizada');
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Error al completar la OT';
+      const msg = err.response?.data?.error || err.message || 'Error al actualizar la OT';
       toast.error(msg);
     }
   }, [queryClient]);

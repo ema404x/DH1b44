@@ -11,6 +11,31 @@ import { isFieldRole } from "../../shared/roles.ts";
  * - Jefe de sitio / campo: ve OTs donde es creador, jefe_sitio_email, assigned_to,
  *   o donde su nombre aparece en jefe_sitio / assigned_name.
  */
+// Paginación completa de las OTs de un sector (sin cap). Para admins/gerente
+// con admin_view: el total debe ser exacto sin importar el volumen — antes el
+// cap de 900 subreportaba totales en sectores grandes. Pagina por created_date
+// (cursor estable, a diferencia de updated_date que muta) y reordena en memoria
+// por -updated_date para preservar el burbujeo de OTs recién tocadas.
+async function fetchAllSectorOTs(sb, sectorId) {
+  const all = [];
+  let cursor;
+  let prev;
+  for (let i = 0; i < 200; i++) {
+    const q = { sector_id: sectorId };
+    if (cursor) q.created_date = { $lt: cursor };
+    let batch;
+    try { batch = await sb.entities.WorkOrder.filter(q, '-created_date', 500); }
+    catch { break; }
+    all.push(...batch);
+    if (batch.length < 500) break;
+    cursor = batch[batch.length - 1]?.created_date;
+    if (!cursor || cursor === prev) break;
+    prev = cursor;
+  }
+  all.sort((a, b) => new Date(b.updated_date || 0).getTime() - new Date(a.updated_date || 0).getTime());
+  return all;
+}
+
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -89,7 +114,15 @@ export default async function(req) {
     // Filtrar por sector server-side: el cap de 500 aplica SOLO al sector del caller,
     // no al pool global. Antes, si otro sector tenía >500 OTs más recientes, las del
     // caller quedaban fuera del top-500 y se subreportaban ("se sale todo").
-    const allOTs = await base44.asServiceRole.entities.WorkOrder.filter({ sector_id: userSector }, '-updated_date', 900);
+    // Admin/gerente con admin_view: sin cap — pagina todas las OTs del sector
+    // para que el total sea exacto sin importar el volumen. Roles de campo: cap
+    // 900 (su subset se filtra client-side; las recién tocadas bubblan arriba).
+    let allOTs;
+    if (isAdminLevel) {
+      allOTs = await fetchAllSectorOTs(base44.asServiceRole, userSector);
+    } else {
+      allOTs = await base44.asServiceRole.entities.WorkOrder.filter({ sector_id: userSector }, '-updated_date', 900);
+    }
 
     // Filtro 1: sector (aislamiento entre sectores)
     let result = allOTs.filter(ot => (ot.sector_id || 'escuela') === userSector);

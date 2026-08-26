@@ -8,13 +8,18 @@ const TRANSICIONES_FIJAS = {
   'finalizar':      { desde: 'en_progreso',          hacia: 'pendiente_validacion' },
   'aprobar':        { desde: 'pendiente_validacion', hacia: 'completada' },
   'rechazar':       { desde: 'pendiente_validacion', hacia: 'en_progreso' },
+  // 'completar' es un alias de 'aprobar' restringido a pendiente_validacion y
+  // obra. Antes era flexible desde cualquier estado no-terminal → permitía
+  // saltar la validación formal (en_progreso → completada) y el jefe no revisaba
+  // el reporte del operario. Ahora exige pasar por pendiente_validacion
+  // (finalizar). Obra preserva su camino de cierre propio.
+  'completar':      { desde: ['pendiente_validacion', 'obra'], hacia: 'completada' },
 };
 
 // Transiciones flexibles: desde cualquier estado no-terminal
 const TRANSICIONES_FLEXIBLES = {
   'cancelar':       { hacia: 'cancelada' },
   'convertir_obra': { hacia: 'obra' },
-  'completar':      { hacia: 'completada' },
 };
 
 const ESTADOS_TERMINALES = ['completada', 'cancelada'];
@@ -27,7 +32,7 @@ const MENSAJES = {
   'rechazar': 'OT rechazada y devuelta al operario',
   'cancelar': 'OT cancelada',
   'convertir_obra': 'OT convertida a Futura Obra',
-  'completar': 'OT completada directamente por el Jefe de Sitio',
+  'completar': 'OT completada correctamente',
 };
 
 Deno.serve(async (req) => {
@@ -108,8 +113,11 @@ Deno.serve(async (req) => {
 
     // Validar estado actual
     if (fija) {
-      // 'iniciar' acepta tanto 'pendiente' como 'asignada' — permite arrancar la OT directo
-      const estadosValidos = accion === 'iniciar' ? ['pendiente', 'asignada'] : [fija.desde];
+      // 'iniciar' acepta tanto 'pendiente' como 'asignada' — permite arrancar la OT directo.
+      // 'completar' acepta pendiente_validacion u obra (alias formal de aprobar + cierre de obra).
+      const estadosValidos = accion === 'iniciar'
+        ? ['pendiente', 'asignada']
+        : (Array.isArray(fija.desde) ? fija.desde : [fija.desde]);
       if (!estadosValidos.includes(ot.status)) {
         const msgEstados = estadosValidos.length > 1
           ? estadosValidos.map(s => `"${s}"`).join(' o ')

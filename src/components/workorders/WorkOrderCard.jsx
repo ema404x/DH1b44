@@ -72,13 +72,14 @@ function WorkOrderCard({ order, onOpen, onShowQR, onComplete, onStart, canComple
             <Zap className="h-3.5 w-3.5" /> Iniciar
           </Button>
         )}
-        {canComplete && !isTerminal && !['pendiente', 'asignada'].includes(order.status) && (
+        {canComplete && !isTerminal && ['en_progreso', 'pendiente_validacion', 'obra'].includes(order.status) && (
           <Button
             size="sm"
             onClick={(e) => { e.stopPropagation(); onComplete(order.id); }}
             className="ml-auto h-7 px-3 text-xs gap-1 bg-emerald-600 hover:bg-emerald-500 text-white"
           >
-            <CheckCircle2 className="h-3.5 w-3.5" /> Completar
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            {order.status === 'en_progreso' ? 'Finalizar' : order.status === 'pendiente_validacion' ? 'Aprobar' : 'Completar'}
           </Button>
         )}
       </div>

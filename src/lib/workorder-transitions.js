@@ -12,11 +12,13 @@ const DRAG_TRANSITIONS = {
   'pendiente_validacion→en_progreso': 'rechazar',
 };
 
-// Estados destino que aceptan desde cualquier estado no-terminal
+// Estados destino que aceptan desde cualquier estado no-terminal.
+// 'completada' NO es destino flexible: exige pasar por pendiente_validacion
+// (aprobar) — validación formal. Arrastrar en_progreso→completada queda
+// bloqueado (getTransitionAction devuelve null → toast "no permitida").
 const FLEXIBLE_TARGETS = {
   'cancelada': 'cancelar',
   'obra': 'convertir_obra',
-  'completada': 'completar',
 };
 
 const TERMINAL_STATES = ['completada', 'cancelada'];

@@ -46,18 +46,22 @@ const parseMonto = (v) => {
   return isNaN(n) ? 0 : n;
 };
 
-// Formatea como moneda ARS sin depender de Intl (puede fallar en Deno con es-AR)
+// 2 decimales de precisión (round2) — regla de oro financiera del proyecto.
+// Evita drift contable entre certificados, acumulados y exports. round2 con
+// Number.EPSILON corrige el error de coma flotante (ej. 1.005 → 1.01).
+const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+
+// Formatea como moneda ARS con 2 decimales (coma decimal, punto miles) — es-AR.
+// Antes redondeaba a entero (Math.round) → discrepancias financieras en los
+// certificados automáticos. No usa Intl (en Deno es-AR puede fallar).
 const fmt = (v) => {
   const n = typeof v === 'number' ? v : parseMonto(v);
-  if (!n && n !== 0) return '$ 0';
-  // Formatear manualmente con puntos de miles
-  const parts = Math.round(n).toString().split('');
-  const result = [];
-  parts.reverse().forEach((d, i) => {
-    if (i > 0 && i % 3 === 0) result.push('.');
-    result.push(d);
-  });
-  return '$ ' + result.reverse().join('');
+  const r = round2(n || 0);
+  const fixed = r.toFixed(2);
+  const sign = fixed.startsWith('-') ? '-' : '';
+  const [intPart, decPart] = fixed.replace('-', '').split('.');
+  const intFmt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return '$ ' + sign + intFmt + ',' + (decPart || '00');
 };
 
 const fmtDate = (d) => {
@@ -92,19 +96,19 @@ async function generateCertificatePDF(certificado) {
   const allItems = certificado.items || [];
 
   // Para abono mensual: no hay medición parcial, el subtotal es la suma de importe_total de ítems
-  const subtotalContrato = allItems.reduce((acc, it) => {
+  const subtotalContrato = round2(allItems.reduce((acc, it) => {
     return acc + (parseMonto(it.importe_total) || (parseMonto(it.cantidad) * parseMonto(it.importe_unitario)) || 0);
-  }, 0);
+  }, 0));
 
   // Solo aplica anticipo/fondo si están explícitamente definidos y > 0 en el abono maestro
   const anticipo_pct = parseFloat(certificado.anticipo_pct) || 0;
   const fondo_reparo_pct = parseFloat(certificado.fondo_reparo_pct) || 0;
-  const pdfSubtotal = subtotalContrato || parseMonto(certificado.subtotal) || 0;
-  const pdfAnticipo = anticipo_pct > 0 ? pdfSubtotal * (anticipo_pct / 100) : 0;
-  const pdfFondoReparo = fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0;
-  const pdfTotalNeto = pdfSubtotal - pdfAnticipo - pdfFondoReparo;
+  const pdfSubtotal = round2(subtotalContrato || parseMonto(certificado.subtotal) || 0);
+  const pdfAnticipo = round2(anticipo_pct > 0 ? pdfSubtotal * (anticipo_pct / 100) : 0);
+  const pdfFondoReparo = round2(fondo_reparo_pct > 0 ? pdfSubtotal * (fondo_reparo_pct / 100) : 0);
+  const pdfTotalNeto = round2(pdfSubtotal - pdfAnticipo - pdfFondoReparo);
 
-  const montoContratado = parseMonto(certificado.monto_contratado);
+  const montoContratado = round2(parseMonto(certificado.monto_contratado));
 
   const drawPageHeader = () => {
     doc.setFillColor(15, 28, 46);
@@ -392,16 +396,16 @@ Deno.serve(async (req) => {
 
       const fechaCert = lastBizDay.toISOString().split('T')[0];
       // Parsear montos correctamente (pueden venir como strings "1.234.567")
-      const montoTotalContrato = parseMonto(abono.monto_total_contrato);
+      const montoTotalContrato = round2(parseMonto(abono.monto_total_contrato));
       const duracionMeses = Math.max(parseInt(abono.duracion_meses) || 1, 1);
-      const montoMensual = parseMonto(abono.monto_mensual) || (montoTotalContrato / duracionMeses);
+      const montoMensual = round2(parseMonto(abono.monto_mensual) || (montoTotalContrato / duracionMeses));
 
       // Usar ítems del contrato maestro si existen, sino generar ítem genérico
       const certItems = abono.items?.length
         ? abono.items.map((it, idx) => {
-            const impUnit = parseMonto(it.importe_unitario);
+            const impUnit = round2(parseMonto(it.importe_unitario));
             const cant = parseFloat(it.cantidad) || 1;
-            const impTotal = parseMonto(it.importe_total) || (cant * impUnit);
+            const impTotal = round2(parseMonto(it.importe_total) || (cant * impUnit));
             return {
               numero: idx + 1,
               descripcion: it.descripcion || `Abono mensual – ${mesPeriodoLabel}`,
@@ -420,8 +424,8 @@ Deno.serve(async (req) => {
             importe_total: montoMensual,
           }];
 
-      // Subtotal real basado en los ítems
-      const subtotalReal = certItems.reduce((acc, it) => acc + (it.importe_total || 0), 0) || montoMensual;
+      // Subtotal real basado en los ítems — round2 para precisión contable
+      const subtotalReal = round2(certItems.reduce((acc, it) => acc + (it.importe_total || 0), 0) || montoMensual);
 
       const newCert = {
         numero: certNumber,
