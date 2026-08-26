@@ -60,6 +60,16 @@
       "default": "pendiente",
       "description": "Flujo: pendiente \u2192 asignada \u2192 en_progreso \u2192 pendiente_validacion \u2192 completada"
     },
+    "archivada": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la OT fue archivada al historial (autom\u00e1tico a los 30 d\u00edas de completada). Las vistas activas (Kanban/Grilla/Stats) la ocultan; se visualiza normalmente desde el Historial. No cambia status \u2014 sigue siendo 'completada'."
+    },
+    "fecha_archivado": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que la OT pas\u00f3 al historial (archivada autom\u00e1ticamente)."
+    },
     "priority": {
       "type": "string",
       "enum": [

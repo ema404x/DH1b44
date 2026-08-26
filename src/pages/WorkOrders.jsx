@@ -226,8 +226,11 @@ export default function WorkOrders() {
   };
 
   // Las OTs ya vienen filtradas por la función backend getWorkOrdersForUser
-  // (única fuente de verdad — no se re-filtra en el frontend)
-  const visibleOrders = orders;
+  // (única fuente de verdad — no se re-filtra en el frontend).
+  // Las OTs archivadas (30 días tras completada) se ocultan de las vistas
+  // activas y se visualizan desde el Historial. No se "borran" — siguen
+  // existiendo con status='completada' + archivada=true.
+  const visibleOrders = useMemo(() => orders.filter(o => !o.archivada), [orders]);
 
   // Pre-normaliza los campos buscables UNA vez por cambio de visibleOrders (no por
   // cada tecla). NFD + strip de acentos sobre los campos de texto era el costo hot
@@ -498,7 +501,7 @@ export default function WorkOrders() {
         }}
       />
 
-      <HistorialEstablecimiento open={historialOpen} onOpenChange={setHistorialOpen} />
+      <HistorialEstablecimiento open={historialOpen} onOpenChange={setHistorialOpen} onOpenOrder={setSelectedOrder} />
 
       {selectedOrder && (() => {
         // Siempre pasar el objeto más fresco del cache — si la query se actualizó, el panel lo recibe
