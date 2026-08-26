@@ -1,5 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { esOtVencida } from '../../shared/otVencimiento.ts';
+import { resolveAndReconcileSector } from '../../shared/callerIdentity.ts';
+import { fetchAll } from '../../shared/fetchAllSector.ts';
+import { round2 } from '../../shared/round2.ts';
 
 /**
  * KPIs del Dashboard computados sobre el TOTAL que el usuario puede ver (sin
@@ -54,29 +57,9 @@ function canReadModule(perms, moduleKey) {
 const dateOnly = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-// Trae TODOS los registros que matchean el query, paginando de a 500 con un
-// cursor sobre created_date.
-async function fetchAll(sb, entity, query, sort = 'created_date') {
-  const all = [];
-  let cursor = undefined;
-  let prev = undefined;
-  for (let i = 0; i < 200; i++) {
-    let batch;
-    try {
-      const q = { ...query };
-      if (cursor) q.created_date = { $gt: cursor };
-      batch = await sb.entities[entity].filter(q, sort, 500);
-    } catch {
-      break;
-    }
-    all.push(...batch);
-    if (batch.length < 500) break;
-    cursor = batch[batch.length - 1]?.created_date;
-    if (!cursor || cursor === prev) break;
-    prev = cursor;
-  }
-  return all;
-}
+// fetchAll (base44/shared/fetchAllSector.ts): paginación robusta con cursor
+// $gte + dedupe por id de la boundary — no saltea registros con created_date
+// idéntico (imports masivos).
 
 // Merge+dedupe por id (para juntar created_by_id ∪ jefe_sitio_email sin dobles).
 function mergeDedupe(lists) {
@@ -96,25 +79,23 @@ export default async function (req) {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const callerSector = user?.data?.sector_id || user?.sector_id;
+    const sb = base44.asServiceRole;
+
+    // Resolución CANÓNICA del sector: ficha Employee primero, reconciliando
+    // user.data.sector_id si está desfasado (igual que getWorkOrdersForUser).
+    // Antes leíamos solo user.data.sector_id → KPIs sobre sector equivocado
+    // hasta re-login.
+    const { sector: callerSector, employee } = await resolveAndReconcileSector(sb, user);
     if (!callerSector) {
       return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
     }
 
-    const sb = base44.asServiceRole;
-
     // ── Resolver permisos + rol de empleado (espejo del frontend) ──
+    // Reutiliza la ficha Employee ya resuelta en resolveAndReconcileSector.
     let perms = {};
     let employeeRole = null;
     if (user.role !== 'admin') {
-      let emp = null;
-      try {
-        const byEmail = await sb.entities.Employee.filter({ email: user.email });
-        emp = byEmail.find(
-          (e) => (e.email || '').toLowerCase().trim() === (user.email || '').toLowerCase().trim()
-        );
-      } catch {}
-      employeeRole = emp?.role || user.role || '';
+      employeeRole = employee?.role || user.role || '';
       if (employeeRole) {
         try {
           const allRps = await sb.entities.RolePermission.list('created_date', 500);
@@ -153,13 +134,17 @@ export default async function (req) {
       efficiency = null;
     if (canRead('WorkOrder')) {
       if (isSuperAdmin) {
+        // KPIs de pipeline ACTIVO: excluyen archivadas (las archivadas son del
+        // historial, no del tablero activo). archivada: { $ne: true } cubre
+        // tanto true como ausente (default false).
+        const notArchived = { archivada: { $ne: true } };
         const [pend, prog, compMonth, urgent, compl, nonCancel] = await Promise.all([
-          fetchAll(sb, 'WorkOrder', { ...sec, status: { $in: ['pendiente', 'asignada'] } }),
-          fetchAll(sb, 'WorkOrder', { ...sec, status: 'en_progreso' }),
-          fetchAll(sb, 'WorkOrder', { ...sec, status: 'completada', completed_date: { $gte: thisMonthStr } }),
-          fetchAll(sb, 'WorkOrder', { ...sec, status: { $in: ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'] }, priority: { $in: ['urgente', 'alta'] } }),
-          fetchAll(sb, 'WorkOrder', { ...sec, status: 'completada' }),
-          fetchAll(sb, 'WorkOrder', { ...sec, status: { $ne: 'cancelada' } }),
+          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: { $in: ['pendiente', 'asignada'] } }),
+          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: 'en_progreso' }),
+          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: 'completada', completed_date: { $gte: thisMonthStr } }),
+          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: { $in: ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'] }, priority: { $in: ['urgente', 'alta'] } }),
+          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: 'completada' }),
+          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: { $ne: 'cancelada' } }),
         ]);
         pendingOrders = pend.length;
         inProgressOrders = prog.length;
@@ -175,13 +160,15 @@ export default async function (req) {
           userScopeQueries.map((q) => fetchAll(sb, 'WorkOrder', { ...sec, ...q }))
         );
         const mine = mergeDedupe(lists);
-        pendingOrders = mine.filter((o) => ['pendiente', 'asignada'].includes(o.status)).length;
-        inProgressOrders = mine.filter((o) => o.status === 'en_progreso').length;
-        overdueOrders = mine.filter(o => esOtVencida(o, now)).length;
-        completedThisMonth = mine.filter((o) => o.completed_date && o.status === 'completada' && new Date(o.completed_date) >= thisMonthStart).length;
-        urgentOrders = mine.filter((o) => ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'].includes(o.status) && ['urgente', 'alta'].includes(o.priority)).length;
-        const validOrders = mine.filter((o) => o.status !== 'cancelada').length;
-        const compl = mine.filter((o) => o.status === 'completada').length;
+        // Pipeline activo: excluye archivadas (historial).
+        const activeMine = mine.filter((o) => !o.archivada);
+        pendingOrders = activeMine.filter((o) => ['pendiente', 'asignada'].includes(o.status)).length;
+        inProgressOrders = activeMine.filter((o) => o.status === 'en_progreso').length;
+        overdueOrders = activeMine.filter(o => esOtVencida(o, now)).length;
+        completedThisMonth = activeMine.filter((o) => o.completed_date && o.status === 'completada' && new Date(o.completed_date) >= thisMonthStart).length;
+        urgentOrders = activeMine.filter((o) => ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'].includes(o.status) && ['urgente', 'alta'].includes(o.priority)).length;
+        const validOrders = activeMine.filter((o) => o.status !== 'cancelada').length;
+        const compl = activeMine.filter((o) => o.status === 'completada').length;
         efficiency = validOrders > 0 ? Math.round((compl / validOrders) * 100) : 0;
       }
     }
@@ -225,10 +212,10 @@ export default async function (req) {
         fetchAll(sb, 'Invoice', { ...sec, status: 'pagada', payment_date: { $gte: lastMonthStr, $lt: thisMonthStr } }),
         fetchAll(sb, 'Invoice', { ...sec, status: 'pendiente' }),
       ]);
-      revenueThisMonth = thisM.reduce((s, i) => s + (i.total || 0), 0);
-      revenueLastMonth = lastM.reduce((s, i) => s + (i.total || 0), 0);
+      revenueThisMonth = round2(thisM.reduce((s, i) => s + (i.total || 0), 0));
+      revenueLastMonth = round2(lastM.reduce((s, i) => s + (i.total || 0), 0));
       revenueTrend = revenueLastMonth > 0 ? Math.round(((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100) : 0;
-      pendingInvoices = pendInv.reduce((s, i) => s + (i.total || 0), 0);
+      pendingInvoices = round2(pendInv.reduce((s, i) => s + (i.total || 0), 0));
     }
 
     // ── Material ──

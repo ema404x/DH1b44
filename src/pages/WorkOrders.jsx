@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import { fetchAllList } from '@/lib/fetchAllList';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { motion } from 'framer-motion';
@@ -133,16 +134,19 @@ export default function WorkOrders() {
   // Direcciones — fuente canónica de jefes de sitio.
   // Se usa para resolver el jefe_sitio de OTs que no lo tienen poblado,
   // cruzando la dirección de la OT contra la dirección de la Direccion.
+  // fetchAllList pagina con skip hasta traer TODAS las del sector (RLS ya
+  // filtra): antes el tope 500 dejaba lookup incompleto en sectores grandes y
+  // resolveJefe no resolvía jefes de OTs sin jefe_sitio directo.
   const { data: direcciones = [] } = useQuery({
     queryKey: ['direcciones-jefes'],
-    queryFn: () => base44.entities.Direccion.list('-created_date', 500),
+    queryFn: () => fetchAllList('Direccion', '-created_date'),
     staleTime: 5 * 60 * 1000,
   });
 
   // Empleados — para resolver email y user_id al filtrar por jefe_sitio u operario
   const { data: employees = [] } = useQuery({
     queryKey: ['employees-filter-lookup'],
-    queryFn: () => base44.entities.Employee.list('-updated_date', 500),
+    queryFn: () => fetchAllList('Employee', '-updated_date'),
     staleTime: 5 * 60 * 1000,
   });
 

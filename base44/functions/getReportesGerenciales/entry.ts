@@ -1,4 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { resolveAndReconcileSector } from '../../shared/callerIdentity.ts';
+import { fetchAll } from '../../shared/fetchAllSector.ts';
+import { round2 } from '../../shared/round2.ts';
 
 /**
  * Reportes Gerenciales — backend-first.
@@ -24,27 +27,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 const norm = (s) =>
   (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
-async function fetchAll(sb, entity, query, sort = 'created_date') {
-  const all = [];
-  let cursor = undefined;
-  let prev = undefined;
-  for (let i = 0; i < 200; i++) {
-    let batch;
-    try {
-      const q = { ...query };
-      if (cursor) q.created_date = { $gt: cursor };
-      batch = await sb.entities[entity].filter(q, sort, 500);
-    } catch {
-      break;
-    }
-    all.push(...batch);
-    if (batch.length < 500) break;
-    cursor = batch[batch.length - 1]?.created_date;
-    if (!cursor || cursor === prev) break;
-    prev = cursor;
-  }
-  return all;
-}
+// fetchAll (base44/shared/fetchAllSector.ts): paginación robusta con cursor
+// $gte + dedupe por id de la boundary — no saltea registros con created_date
+// idéntico (imports masivos).
 
 const monthKey = (d) => {
   const dt = new Date(d);
@@ -71,7 +56,11 @@ export default async function (req) {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const callerSector = user?.data?.sector_id || user?.sector_id;
+    const sb = base44.asServiceRole;
+
+    // Resolución CANÓNICA del sector: ficha Employee primero, reconciliando
+    // user.data.sector_id si está desfasado (igual que getWorkOrdersForUser).
+    const { sector: callerSector } = await resolveAndReconcileSector(sb, user);
     if (!callerSector) {
       return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
     }
@@ -88,7 +77,6 @@ export default async function (req) {
       return Response.json({ error: 'Faltan dateFrom/dateTo' }, { status: 400 });
     }
 
-    const sb = base44.asServiceRole;
     const sec = { sector_id: callerSector };
 
     // ── Fetch paralelo (todo el sector, paginado) ──
@@ -198,9 +186,11 @@ export default async function (req) {
     const canceladas = filteredOrders.filter((o) => o.status === 'cancelada').length;
     const otsValidas = filteredOrders.length - canceladas;
     const eficiencia = otsValidas > 0 ? Math.round((completadas / otsValidas) * 100) : 0;
-    const costoMaterialTotal = filteredOrders.reduce(
-      (s, o) => s + (o.materials_used || []).reduce((ms, m) => ms + (m.quantity || 0) * (m.unit_cost || 0), 0),
-      0
+    const costoMaterialTotal = round2(
+      filteredOrders.reduce(
+        (s, o) => s + (o.materials_used || []).reduce((ms, m) => ms + (m.quantity || 0) * (m.unit_cost || 0), 0),
+        0
+      )
     );
     const horasPromedio = filteredTimeLogs.length > 0
       ? Math.round((filteredTimeLogs.reduce((s, l) => s + (l.hours || 0), 0) / filteredTimeLogs.length) * 10) / 10
@@ -250,7 +240,7 @@ export default async function (req) {
       cpMap.set(o.project_name, (cpMap.get(o.project_name) || 0) + c);
     });
     const costosPorProyecto = [...cpMap.entries()]
-      .map(([name, costo]) => ({ name, costo }))
+      .map(([name, costo]) => ({ name, costo: round2(costo) }))
       .sort((a, b) => b.costo - a.costo)
       .slice(0, 6);
 
