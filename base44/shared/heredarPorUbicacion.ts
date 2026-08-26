@@ -106,13 +106,23 @@ export async function heredarPorUbicacion(sb: any, payload: any, dry_run = false
 
   const resuelto: Record<string, number> = {};
   const warnings: string[] = [];
-  if (!new_email) warnings.push(`Nuevo jefe "${new_jefe}" sin Employee con email: se mueve el nombre pero no se stampaea jefe_sitio_email (RLS incompleta).`);
 
   // Helper para reasignar una entidad dada una fn de match por colegio.
+  // FAIL-CLOSED para entidades con RLS por email (WorkOrder/Pendiente): si el
+  // nuevo jefe no tiene email resuelto, NO movemos el nombre — dejar jefe_sitio
+  // con el nuevo nombre pero jefe_sitio_email='' vuelve invisibles los registros
+  // (RLS exige jefe_sitio_email==user.email) para el nuevo Y el viejo jefe.
+  // Las entidades sin emailField (Asset/Edificio/Inspección/Equipamiento) no
+  // dependen de email para RLS → heredan el nombre igual (sin vacío).
   async function reasignar(entityName: string, emailField: string | undefined, colegioMatch: (r: any) => boolean) {
     const recs = await fetchAll(sb, entityName, { sector_id: sector });
     const matches = recs.filter((r) => colegioMatch(r) && esOldJefe(r, emailField));
     if (!matches.length) { resuelto[entityName] = 0; return; }
+    if (emailField && !new_email) {
+      warnings.push(`${entityName}: ${matches.length} registro(s) NO reasignados — el nuevo jefe "${new_jefe}" no tiene Employee con email (RLS quedaría incompleta). Asociá un Employee con email en el sector y reasigná de nuevo.`);
+      resuelto[entityName] = 0;
+      return;
+    }
     const updates = matches.map((r) => {
       const u: any = { id: r.id, jefe_sitio: new_jefe };
       if (emailField) u[emailField] = new_email;

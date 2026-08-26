@@ -96,8 +96,15 @@ Deno.serve(async (req) => {
 
     // ── Procesar configs ──
     for (const cfg of configs) {
-      // Sector de la config: explícito, o el del caller (manual), o global (scheduled legacy).
+      // Sector de la config: explícito, o el del caller (manual). FAIL-CLOSED:
+      // una config sin sector_id que corre scheduled (callerSector=null) se salta
+      // — sin sector, el scope cae a "todo el pool" y genera alertas cross-sector
+      // (fuga de aislamiento). No se inventa sector por defecto.
       const cfgSector = cfg.sector_id || callerSector;
+      if (!cfgSector) {
+        resumen.push({ config: cfg.nombre, tipo: cfg.tipo, alertas: 0, notificadas: 0, nivel_minimo: cfg.nivel_minimo_notificar || 'critical', skipped: 'config sin sector_id (fail-closed)' });
+        continue;
+      }
       const scopedAssets    = cfgSector ? assets.filter(a => !a.sector_id || a.sector_id === cfgSector) : assets;
       const scopedMaterials  = cfgSector ? materials.filter(m => !m.sector_id || m.sector_id === cfgSector) : materials;
       const scopedPendientes = cfgSector ? pendientesVencidos.filter(p => !p.sector_id || p.sector_id === cfgSector) : pendientesVencidos;
