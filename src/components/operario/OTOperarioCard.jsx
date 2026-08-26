@@ -1,7 +1,8 @@
 import React from 'react';
 import { Clock, MapPin, AlertCircle, Wrench, CheckCircle, ChevronRight, Calendar } from 'lucide-react';
-import { format, parseISO, isPast, differenceInDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { diasVencimientoOt } from '@/lib/otVencimiento';
 
 const STATUS_CONFIG = {
   pendiente:    { label: 'Pendiente',    color: 'text-amber-400',    bg: 'bg-amber-400/10',   ring: 'ring-amber-400/20',   icon: Clock },
@@ -33,8 +34,8 @@ export default function OTOperarioCard({ ot, onOpen }) {
   const StatusIcon = cfg.icon;
 
   const parsedDate = ot.scheduled_date ? parseISO(ot.scheduled_date) : null;
-  const isOverdue = parsedDate && isPast(new Date(parsedDate.getTime() + 86399000)) && ot.status !== 'completada' && ot.status !== 'cancelada';
-  const daysLeft = parsedDate ? differenceInDays(parsedDate, new Date()) : null;
+  const dv = diasVencimientoOt(ot);
+  const isOverdue = dv !== null && dv > 0;
 
   return (
     <button
@@ -74,9 +75,9 @@ export default function OTOperarioCard({ ot, onOpen }) {
       <div className="relative flex items-center justify-between text-[11px] mt-2 pt-3 border-t border-slate-800/80">
         <span className="text-slate-500 font-medium">{TYPE_LABELS[ot.type] || ot.type?.replace(/_/g, ' ') || '—'}</span>
         {parsedDate && (
-          <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-400 font-semibold' : daysLeft !== null && daysLeft <= 1 ? 'text-amber-400 font-medium' : 'text-slate-500'}`}>
+          <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-400 font-semibold' : dv === 0 || dv === -1 ? 'text-amber-400 font-medium' : 'text-slate-500'}`}>
             <Calendar className="h-3 w-3" />
-            {isOverdue ? 'Vencida' : daysLeft === 0 ? 'Hoy' : daysLeft === 1 ? 'Mañana' : format(parsedDate, 'dd MMM', { locale: es })}
+            {isOverdue ? 'Vencida' : dv === 0 ? 'Hoy' : dv === -1 ? 'Mañana' : format(parsedDate, 'dd MMM', { locale: es })}
           </span>
         )}
       </div>

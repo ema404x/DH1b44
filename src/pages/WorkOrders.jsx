@@ -32,6 +32,7 @@ import { getTransitionAction } from '@/lib/workorder-transitions';
 import AdvancedFilters from '@/components/workorders/AdvancedFilters';
 import { useResolveCreator } from '@/hooks/useResolveCreator';
 import { isJefeSitioRole } from '@/lib/roles';
+import { esOtVencida } from '@/lib/otVencimiento';
 
 
 
@@ -287,9 +288,7 @@ export default function WorkOrders() {
     })();
     const matchDateFrom = !advFilters.date_from || (o.scheduled_date && o.scheduled_date >= advFilters.date_from);
     const matchDateTo = !advFilters.date_to || (o.scheduled_date && o.scheduled_date <= advFilters.date_to);
-    const matchOverdue = !advFilters.overdue_only || (() => {
-      try { return o.scheduled_date && isPast(parseISO(o.scheduled_date)) && !['completada','cancelada'].includes(o.status); } catch { return false; }
-    })();
+    const matchOverdue = !advFilters.overdue_only || esOtVencida(o);
 
     return matchSearch && matchStatus && matchPriority && matchType && matchOperario && matchJefe && matchDateFrom && matchDateTo && matchOverdue;
     }).map(({ o }) => o);

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { diasVencimientoOt } from '../../shared/otVencimiento.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -38,7 +39,7 @@ Deno.serve(async (req) => {
       necesitaAssets    ? sb.entities.Asset.filter({}, '-updated_date', 300).catch(() => [])                         : Promise.resolve([]),
       necesitaMaterials  ? sb.entities.Material.filter({}, '-updated_date', 300).catch(() => [])                      : Promise.resolve([]),
       necesitaPendientes ? sb.entities.Pendiente.filter({ estado: 'pendiente' }, '-fecha_limite', 200).catch(() => [])                : Promise.resolve([]),
-      necesitaWOs        ? sb.entities.WorkOrder.filter({ status: 'en_progreso' }, '-updated_date', 200).catch(() => [])                     : Promise.resolve([]),
+      necesitaWOs        ? sb.entities.WorkOrder.filter({ status: { $in: ['pendiente', 'asignada', 'en_progreso', 'pendiente_validacion', 'obra'] } }, '-updated_date', 300).catch(() => []) : Promise.resolve([]),
     ]);
 
     // Índice de logs de hoy para lookup O(1)
@@ -206,36 +207,30 @@ Deno.serve(async (req) => {
         }
       }
 
-      // 4. OTs VENCIDAS
+      // 4. OTs VENCIDAS — REGLA DE ORO (base44/shared/otVencimiento.ts)
+      // Una OT está vencida si está activa (no terminal) y HOY superó la fecha
+      // programada (scheduled_date). El deadline es la propia fecha programada;
+      // no se usa fecha_inicio_real ni dias_vencimiento_ot. Aplica a ambos
+      // sectores (escuela y bapro) de forma idéntica.
       if (cfg.tipo === 'ot_vencida') {
-        const diasLimite = cfg.dias_vencimiento_ot || 1;
         const nuevasAlertas = [];
-        // Solo las OTs en progreso pueden vencer. El plazo empieza a correr
-        // cuando la OT entra en en_progreso (fecha_inicio_real). Pendiente,
-        // asignada y obra nunca caen en vencimiento.
         for (const ot of scopedWOs) {
-          if (ot.status !== 'en_progreso') continue;
-          const inicioRaw = ot.fecha_inicio_real || ot.scheduled_date;
-          if (!inicioRaw) continue;
+          const dv = diasVencimientoOt(ot, ahora);
+          if (dv === null || dv <= 0) continue;          // no vencida (sin fecha / aún no supera el día programado)
           if (keyExistente('ot_vencida', ot.id)) continue;
-          const diasVencidos = Math.ceil((ahora - new Date(inicioRaw)) / 86400000);
-          if (diasVencidos >= diasLimite) {
-            const nivel = diasVencidos >= 7 ? 'critical' : 'warning';
-            
-            const alerta = {
-              config_id: cfg.id, tipo: 'ot_vencida', nivel,
-              titulo: `OT vencida hace ${diasVencidos} día${diasVencidos !== 1 ? 's' : ''}`,
-              mensaje: `La OT "${ot.title}" (${ot.code || ot.id}) lleva ${diasVencidos} días sin completar.`,
-              entidad_tipo: 'WorkOrder', entidad_id: ot.id, entidad_nombre: ot.title,
-              email_enviado: false, leida: false, sector_id: cfgSector, fecha_alerta: ahora.toISOString()
-            };
-            nuevasAlertas.push(alerta);
-            
-            if (debeNotificar(cfg, nivel)) {
-              alertasParaNotificar.push(alerta);
-            }
-            alertasGeneradas.push({ nombre: ot.title, nivel });
+          const nivel = dv >= 7 ? 'critical' : 'warning';
+          const alerta = {
+            config_id: cfg.id, tipo: 'ot_vencida', nivel,
+            titulo: `OT vencida hace ${dv} día${dv !== 1 ? 's' : ''}`,
+            mensaje: `La OT "${ot.title}" (${ot.code || ot.id}) superó su fecha programada (${ot.scheduled_date}) hace ${dv} día${dv !== 1 ? 's' : ''}.`,
+            entidad_tipo: 'WorkOrder', entidad_id: ot.id, entidad_nombre: ot.title,
+            email_enviado: false, leida: false, sector_id: cfgSector, fecha_alerta: ahora.toISOString()
+          };
+          nuevasAlertas.push(alerta);
+          if (debeNotificar(cfg, nivel)) {
+            alertasParaNotificar.push(alerta);
           }
+          alertasGeneradas.push({ nombre: ot.title, nivel });
         }
         if (nuevasAlertas.length > 0) {
           await sb.entities.AlertaLog.bulkCreate(nuevasAlertas);

@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, User, Zap, Wrench, QrCode } from 'lucide-react';
-import { parseISO } from 'date-fns';
 import WorkOrderQRButton from './WorkOrderQRButton';
 import { useResolveCreator } from '@/hooks/useResolveCreator';
+import { esOtVencida } from '@/lib/otVencimiento';
 
 const COLUMNS = [
   { id: 'pendiente',   label: 'Pendiente',   color: 'border-t-yellow-500',  dot: 'bg-yellow-500',  count_bg: 'bg-yellow-500/20 text-yellow-400' },
@@ -25,16 +25,7 @@ const priorityColors = {
 
 function KanbanCard({ order, index, onOpen, onShowQR }) {
   const { resolveOTOwner } = useResolveCreator();
-  const isOverdue = (() => {
-    try {
-      // Solo las OTs en en_progreso pueden vencer; el reloj arranca desde
-      // fecha_inicio_real (cuando la OT entró en progreso), no desde la creación.
-      if (order.status !== 'en_progreso') return false;
-      const start = order.fecha_inicio_real || order.scheduled_date;
-      if (!start) return false;
-      return (Date.now() - parseISO(start).getTime()) >= 86400000;
-    } catch { return false; }
-  })();
+  const isOverdue = esOtVencida(order);
   const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
 
   return (

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { esOtVencida } from '../../shared/otVencimiento.ts';
 
 /**
  * KPIs del Dashboard computados sobre el TOTAL que el usuario puede ver (sin
@@ -130,22 +131,9 @@ export default async function (req) {
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const thisMonthStr = dateOnly(thisMonthStart);
 
-    // Plazo de vencimiento de OTs del sector (AlertaConfig). El reloj de
-    // vencimiento solo corre para OTs en en_progreso; arranca desde
-    // fecha_inicio_real (cuando la OT entró en progreso), no desde la creación.
-    let otPlazoDays = 1;
-    try {
-      const otCfgs = await sb.entities.AlertaConfig.filter({ tipo: 'ot_vencida', sector_id: callerSector, activo: true });
-      if (otCfgs.length) otPlazoDays = otCfgs[0].dias_vencimiento_ot || 1;
-    } catch {}
-    const esVencida = (ot) => {
-      if (ot.status !== 'en_progreso') return false;
-      const startRaw = ot.fecha_inicio_real || ot.scheduled_date;
-      if (!startRaw) return false;
-      const t = new Date(startRaw).getTime();
-      if (isNaN(t)) return false;
-      return (now.getTime() - t) >= otPlazoDays * 86400000;
-    };
+    // REGLA DE ORO — vencimiento de OT (base44/shared/otVencimiento.ts):
+    // una OT está vencida si está activa (no terminal) y HOY superó la fecha
+    // programada (scheduled_date). Aplica a ambos sectores de forma idéntica.
 
     const sec = { sector_id: callerSector };
     // Scope de usuario para no-super-admin (espejo del RLS de WorkOrder/Pendiente).
@@ -174,9 +162,8 @@ export default async function (req) {
         ]);
         pendingOrders = pend.length;
         inProgressOrders = prog.length;
-        // Solo las OTs en en_progreso pueden estar vencidas (reloj desde
-        // fecha_inicio_real, plazo = dias_vencimiento_ot del sector).
-        overdueOrders = prog.filter(esVencida).length;
+        // Vencidas: OTs activas que superaron su fecha programada (regla de oro).
+        overdueOrders = nonCancel.filter(o => esOtVencida(o, now)).length;
         completedThisMonth = compMonth.length;
         urgentOrders = urgent.length;
         const validOrders = nonCancel.length;
@@ -189,7 +176,7 @@ export default async function (req) {
         const mine = mergeDedupe(lists);
         pendingOrders = mine.filter((o) => ['pendiente', 'asignada'].includes(o.status)).length;
         inProgressOrders = mine.filter((o) => o.status === 'en_progreso').length;
-        overdueOrders = mine.filter(esVencida).length;
+        overdueOrders = mine.filter(o => esOtVencida(o, now)).length;
         completedThisMonth = mine.filter((o) => o.completed_date && o.status === 'completada' && new Date(o.completed_date) >= thisMonthStart).length;
         urgentOrders = mine.filter((o) => ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'].includes(o.status) && ['urgente', 'alta'].includes(o.priority)).length;
         const validOrders = mine.filter((o) => o.status !== 'cancelada').length;
