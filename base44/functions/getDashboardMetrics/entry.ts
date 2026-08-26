@@ -132,8 +132,9 @@ export default async function (req) {
     const thisMonthStr = dateOnly(thisMonthStart);
 
     // REGLA DE ORO — vencimiento de OT (base44/shared/otVencimiento.ts):
-    // una OT está vencida si está activa (no terminal) y HOY superó la fecha
-    // programada (scheduled_date). Aplica a ambos sectores de forma idéntica.
+    // una OT está vencida SÓLO si está en en_progreso y HOY superó su fecha
+    // programada (scheduled_date). Pendiente/asignada/obra/validación nunca
+    // se cuentan como vencidas. Aplica a ambos sectores de forma idéntica.
 
     const sec = { sector_id: callerSector };
     // Scope de usuario para no-super-admin (espejo del RLS de WorkOrder/Pendiente).
@@ -162,8 +163,8 @@ export default async function (req) {
         ]);
         pendingOrders = pend.length;
         inProgressOrders = prog.length;
-        // Vencidas: OTs activas que superaron su fecha programada (regla de oro).
-        overdueOrders = nonCancel.filter(o => esOtVencida(o, now)).length;
+        // Vencidas: OTs en en_progreso que superaron su fecha programada (regla de oro).
+        overdueOrders = prog.filter(o => esOtVencida(o, now)).length;
         completedThisMonth = compMonth.length;
         urgentOrders = urgent.length;
         const validOrders = nonCancel.length;

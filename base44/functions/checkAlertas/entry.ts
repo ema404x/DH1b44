@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
       necesitaAssets    ? sb.entities.Asset.filter({}, '-updated_date', 300).catch(() => [])                         : Promise.resolve([]),
       necesitaMaterials  ? sb.entities.Material.filter({}, '-updated_date', 300).catch(() => [])                      : Promise.resolve([]),
       necesitaPendientes ? sb.entities.Pendiente.filter({ estado: 'pendiente' }, '-fecha_limite', 200).catch(() => [])                : Promise.resolve([]),
-      necesitaWOs        ? sb.entities.WorkOrder.filter({ status: { $in: ['pendiente', 'asignada', 'en_progreso', 'pendiente_validacion', 'obra'] } }, '-updated_date', 300).catch(() => []) : Promise.resolve([]),
+      necesitaWOs        ? sb.entities.WorkOrder.filter({ status: 'en_progreso' }, '-updated_date', 300).catch(() => []) : Promise.resolve([]),
     ]);
 
     // Índice de logs de hoy para lookup O(1)
@@ -208,10 +208,10 @@ Deno.serve(async (req) => {
       }
 
       // 4. OTs VENCIDAS — REGLA DE ORO (base44/shared/otVencimiento.ts)
-      // Una OT está vencida si está activa (no terminal) y HOY superó la fecha
-      // programada (scheduled_date). El deadline es la propia fecha programada;
-      // no se usa fecha_inicio_real ni dias_vencimiento_ot. Aplica a ambos
-      // sectores (escuela y bapro) de forma idéntica.
+      // Una OT está vencida SÓLO si está en en_progreso y HOY superó la fecha
+      // programada (scheduled_date). Pendiente, asignada, obra y validación
+      // nunca se marcan vencidas. El deadline es la propia fecha programada;
+      // no se usa fecha_inicio_real ni dias_vencimiento_ot. Ambos sectores.
       if (cfg.tipo === 'ot_vencida') {
         const nuevasAlertas = [];
         for (const ot of scopedWOs) {

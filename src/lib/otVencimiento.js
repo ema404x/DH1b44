@@ -7,35 +7,24 @@
  *
  * REGLA:
  *  Una OT está VENCIDA si y sólo si:
- *    1. Está en un estado ACTIVO (no terminal: no completada ni cancelada), Y
+ *    1. Está en estado en_progreso (ejecución activa), Y
  *    2. Tiene fecha programada (scheduled_date), Y
  *    3. La fecha de HOY (calendario, huso Argentina) es POSTERIOR a la fecha
  *       programada.
  *
  *  El deadline es la propia fecha programada. NO se usa fecha_inicio_real ni
- *  dias_vencimiento_ot. Una OT que pasa a en_progreso hoy NO está vencida
- *  aunque su scheduled_date sea hoy; lo estará recién cuando el calendario
- *  supere ese día. Corrige el bug donde toda OT en en_progreso se marcaba
- *  vencida al instante (el reloj caía a scheduled_date, que suele estar en el
- *  pasado).
+ *  dias_vencimiento_ot. Pendiente, asignada, obra y pendiente_validación NUNCA
+ *  se marcan vencidas — no tienen ejecución en curso que retrasar. Sólo la OT
+ *  que está siendo ejecutada (en_progreso) puede superar su fecha programada.
  *
  *  Fail-safes (sin vacíos ni bugs):
+ *   - Estado distinto de en_progreso → false.
  *   - Sin scheduled_date → false.  - Fecha inválida → false.
- *   - Estados terminales → false.  - scheduled_date == hoy → false.
+ *   - scheduled_date == hoy → false.
  *
  *  Timezone: "hoy" se calcula en huso Argentina (UTC-3, sin DST desde 2009),
  *  igual en cliente y backend → flag consistente sin depender del runtime.
  */
-
-export const OT_ACTIVE_STATES = [
-  'pendiente',
-  'asignada',
-  'en_progreso',
-  'pendiente_validacion',
-  'obra',
-];
-
-export const OT_TERMINAL_STATES = ['completada', 'cancelada'];
 
 const AR_OFFSET_MS = -3 * 60 * 60 * 1000; // UTC-3 (Argentina, sin DST)
 
@@ -61,32 +50,31 @@ function toDateStr(value) {
 
 /**
  * Determina si una OT está vencida según la regla de oro.
+ * Sólo aplica a OTs en en_progreso; el resto nunca se considera vencida.
  * @param {object} ot  registro de WorkOrder (mínimo { status, scheduled_date }).
  * @param {Date}   now instante de referencia (inyectable para tests).
  * @returns {boolean}
  */
 export function esOtVencida(ot, now = new Date()) {
   if (!ot) return false;
-  const status = ot.status;
-  if (!status || OT_TERMINAL_STATES.includes(status)) return false;
-  if (!OT_ACTIVE_STATES.includes(status)) return false;
+  if (ot.status !== 'en_progreso') return false; // sólo la ejecución activa puede vencer
   const scheduled = toDateStr(ot.scheduled_date);
   if (!scheduled) return false; // sin fecha programada → fail-safe
   return arDateStr(now) > scheduled;
 }
 
 /**
- * Diferencia en días calendario entre HOY y la fecha programada
- * (positivo = días vencida, 0 = vence hoy, negativo = días restantes).
- * No aplica a estados terminales ni a OTs sin fecha (devuelve null).
+ * Diferencia en días calendario entre HOY y la fecha programada de una OT en
+ * en_progreso (positivo = días vencida, 0 = vence hoy, negativo = días restantes).
+ * Para cualquier otro estado (o sin fecha) devuelve null. Útil para badges
+ * "Vence hoy / Mañana / Vencida hace N días" en el portal del operario.
  * @param {object} ot
  * @param {Date}   now
  * @returns {number|null}
  */
 export function diasVencimientoOt(ot, now = new Date()) {
   if (!ot) return null;
-  const status = ot.status;
-  if (!status || OT_TERMINAL_STATES.includes(status) || !OT_ACTIVE_STATES.includes(status)) return null;
+  if (ot.status !== 'en_progreso') return null; // sólo la ejecución activa puede vencer
   const scheduled = toDateStr(ot.scheduled_date);
   if (!scheduled) return null;
   const today = arDateStr(now);
