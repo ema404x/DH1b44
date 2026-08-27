@@ -171,16 +171,6 @@
         {
           "$or": [
             {
-              "user_condition": {
-                "role": "admin"
-              }
-            },
-            {
-              "user_condition": {
-                "role": "gerente"
-              }
-            },
-            {
               "created_by_id": "{{user.id}}"
             },
             {
