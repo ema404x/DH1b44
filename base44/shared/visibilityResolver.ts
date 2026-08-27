@@ -93,3 +93,72 @@ export async function resolveEstablecimientosDeJefe(
   } catch {}
   return set;
 }
+
+/**
+ * Predicado de visibilidad de WorkOrders — espejo de la rama no-Tablet de
+ * getWorkOrdersForUser. Un jefe de sitio ve las OTs donde es responsable
+ * (jefe_sitio_email / jefe_sitio==name), las que creó, y las que le asignaron
+ * (assigned_to / assigned_name==name). Con admin_view → todo el sector.
+ *
+ * NOTA de consistencia: NO se extiende por establecimientos. La OT no tiene
+ * campo establecimiento canónico y el módulo Órdenes (getWorkOrdersForUser) no
+ * usa ese cruce → añadirlo aquí rompería "el jefe ve N OTs vencidas en Órdenes
+ * ⇒ N alertas en el banner". El set se conserva en la firma para futura
+ * extensión pero hoy no filtra.
+ */
+export function filterWorkOrdersByVisibility(
+  allOTs: any[],
+  userId: string,
+  userEmail: string,
+  displayName: string,
+  _establecimientosSet: Set<string>,
+  adminView: boolean,
+): any[] {
+  if (adminView) return allOTs;
+  return allOTs.filter((ot) =>
+    (ot.created_by_id && ot.created_by_id === userId) ||
+    (ot.jefe_sitio_email && ot.jefe_sitio_email.toLowerCase().trim() === userEmail) ||
+    (ot.assigned_to && ot.assigned_to === userId) ||
+    (displayName && norm(ot.assigned_name) === norm(displayName)) ||
+    (displayName && ot.jefe_sitio && norm(ot.jefe_sitio) === norm(displayName))
+  );
+}
+
+/**
+ * Predicado de visibilidad de Pendientes — espejo de getPendientesForUser.
+ * Visibilidad propia: las que creó, las donde es jefe_sitio (por email), y las
+ * de establecimientos/sitios donde es jefe asignado. Con admin_view el caller
+ * ya pasa todo el sector (no filtra).
+ */
+export function filterPendientesByVisibility(
+  all: any[],
+  userId: string,
+  userEmail: string,
+  establecimientosSet: Set<string>,
+): any[] {
+  return all.filter((p) =>
+    (p.created_by_id && p.created_by_id === userId) ||
+    (p.jefe_sitio_email && p.jefe_sitio_email.toLowerCase().trim() === userEmail) ||
+    (p.establecimiento && establecimientosSet.has(norm(p.establecimiento))) ||
+    (p.sitio && establecimientosSet.has(norm(p.sitio)))
+  );
+}
+
+/**
+ * Predicado de visibilidad de Assets — con admin_view → todo el sector. Sin
+ * admin_view → assets cuyo jefe_sitio==user.name, o cuyos establecimientos
+ * (sede/location) están a cargo del jefe.
+ */
+export function filterAssetsByVisibility(
+  all: any[],
+  displayName: string,
+  establecimientosSet: Set<string>,
+  adminView: boolean,
+): any[] {
+  if (adminView) return all;
+  return all.filter((a) =>
+    (displayName && a.jefe_sitio && norm(a.jefe_sitio) === norm(displayName)) ||
+    (a.sede && establecimientosSet.has(norm(a.sede))) ||
+    (a.location && establecimientosSet.has(norm(a.location)))
+  );
+}

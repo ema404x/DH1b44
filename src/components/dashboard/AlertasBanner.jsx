@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ShieldAlert, Package, Clock, X, ChevronDown, ChevronUp, CheckCheck, ExternalLink } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { AlertTriangle, ShieldAlert, Package, Clock, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { toast } from 'sonner';
 
 const TIPO_CONFIG = {
-  garantia_activo:   { icon: ShieldAlert, color: 'text-purple-400', glow: 'shadow-purple-500/20', bg: 'bg-purple-500/10', border: 'border-purple-500/30', label: 'Garantía', href: '/activos' },
-  stock_material:    { icon: Package,     color: 'text-red-400',    glow: 'shadow-red-500/20',    bg: 'bg-red-500/10',    border: 'border-red-500/30',    label: 'Stock',    href: '/inventario' },
-  pendiente_vencido: { icon: Clock,       color: 'text-amber-400',  glow: 'shadow-amber-500/20',  bg: 'bg-amber-500/10',  border: 'border-amber-500/30',  label: 'Pendiente', href: '/activos' },
+  ot_vencida:        { icon: AlertTriangle, color: 'text-red-400',    glow: 'shadow-red-500/20',    bg: 'bg-red-500/10',    border: 'border-red-500/30',    label: 'OT',       href: '/ordenes' },
+  garantia_activo:   { icon: ShieldAlert,    color: 'text-purple-400', glow: 'shadow-purple-500/20', bg: 'bg-purple-500/10', border: 'border-purple-500/30', label: 'Garantía', href: '/activos' },
+  stock_material:    { icon: Package,        color: 'text-red-400',    glow: 'shadow-red-500/20',    bg: 'bg-red-500/10',    border: 'border-red-500/30',    label: 'Stock',    href: '/inventario' },
+  pendiente_vencido: { icon: Clock,          color: 'text-amber-400',  glow: 'shadow-amber-500/20',  bg: 'bg-amber-500/10',  border: 'border-amber-500/30',  label: 'Pendiente', href: '/activos' },
 };
 
 const NIVEL_CONFIG = {
@@ -20,51 +20,16 @@ const NIVEL_CONFIG = {
   info:     { dot: 'bg-blue-500',  label: 'Info',     rowBg: 'bg-blue-500/5',   badge: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
 };
 
+// Alertas VIVAS: se calculan en el backend (getAlertasForUser) según la
+// visibilidad del usuario (admin_view del Control de Acceso + responsables).
+// Desaparecen solas al resolver la OT/pendiente/garantía → sin descarte manual.
 export default function AlertasBanner() {
   const [expanded, setExpanded] = useState(false);
-  const qc = useQueryClient();
 
   const { data: alertas = [] } = useQuery({
     queryKey: ['alertas-activas'],
-    queryFn: async () => {
-      const logs = await base44.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 100);
-      if (logs.length === 0) return [];
-
-      // Verificar que las entidades referenciadas aún existen.
-      // Si la entidad fue eliminada, marcar la alerta como leída automáticamente.
-      // Filtrar alertas muy viejas (más de 30 días) automáticamente
-      const hace30dias = new Date();
-      hace30dias.setDate(hace30dias.getDate() - 30);
-
-      const logsRecientes = [];
-      for (const alerta of logs) {
-        if (alerta.fecha_alerta && new Date(alerta.fecha_alerta) < hace30dias) {
-          // Marcar como leída en background sin esperar
-          base44.entities.AlertaLog.update(alerta.id, { leida: true }).catch(() => {});
-          continue;
-        }
-        logsRecientes.push(alerta);
-      }
-
-      return logsRecientes;
-    },
+    queryFn: async () => (await base44.functions.invoke('getAlertasForUser')).data.alertas || [],
     refetchInterval: 5 * 60 * 1000,
-  });
-
-  const marcarLeida = useMutation({
-    mutationFn: (id) => base44.entities.AlertaLog.update(id, { leida: true }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['alertas-activas'] }),
-    onError: () => toast.error('No se pudo marcar la alerta'),
-  });
-
-  const marcarTodasLeidas = useMutation({
-    mutationFn: async () => {
-      // Marcar TODAS las no leídas (no solo las visibles)
-      const todas = await base44.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 500);
-      await Promise.all(todas.map(a => base44.entities.AlertaLog.update(a.id, { leida: true })));
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['alertas-activas'] }); toast.success('Alertas marcadas como leídas'); },
-    onError: () => toast.error('No se pudieron marcar las alertas'),
   });
 
   if (alertas.length === 0) return null;
@@ -112,14 +77,6 @@ export default function AlertasBanner() {
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
-            size="sm"
-            className="text-[11px] h-7 gap-1 text-muted-foreground hover:text-foreground hover:bg-white/8"
-            onClick={() => marcarTodasLeidas.mutate()}
-          >
-            <CheckCheck className="h-3 w-3" /> Marcar leídas
-          </Button>
-          <Button
-            variant="ghost"
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-white/8"
             onClick={() => setExpanded(e => !e)}
@@ -138,7 +95,7 @@ export default function AlertasBanner() {
 
           return (
             <div
-              key={alerta.id}
+              key={`${alerta.tipo}-${alerta.entidad_id}`}
               className={`flex items-center gap-3 px-4 py-2.5 group transition-colors hover:bg-white/5 ${nivel.rowBg}`}
             >
               {/* Icono */}
@@ -158,7 +115,7 @@ export default function AlertasBanner() {
                 <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{alerta.mensaje}</p>
               </div>
 
-              {/* Tiempo + acciones */}
+              {/* Tiempo + acción */}
               <div className="flex items-center gap-1 flex-shrink-0">
                 {alerta.fecha_alerta && (
                   <span className="text-[10px] text-muted-foreground/60 hidden sm:block">
@@ -171,14 +128,6 @@ export default function AlertasBanner() {
                       <ExternalLink className="h-3 w-3 text-muted-foreground" />
                     </Button>
                   </Link>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 hover:bg-white/10"
-                    onClick={() => marcarLeida.mutate(alerta.id)}
-                  >
-                    <X className="h-3 w-3 text-muted-foreground" />
-                  </Button>
                 </div>
               </div>
             </div>
