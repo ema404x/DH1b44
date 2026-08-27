@@ -85,7 +85,7 @@ export default function PendientesTab() {
 
   const { data: pendientes = [], isLoading } = useQuery({
     queryKey: ['pendientes'],
-    queryFn: () => base44.entities.Pendiente.list('-created_date'),
+    queryFn: async () => (await base44.functions.invoke('getPendientesForUser')).data.pendientes || [],
   });
 
   const saveMutation = useMutation({
@@ -151,8 +151,10 @@ export default function PendientesTab() {
     }
   };
 
+  // La visibilidad la define el backend (getPendientesForUser respeta admin_view
+  // + establecimientos asignados). filterByUser solo re-aplica sector.
   const visiblePendientes = useMemo(() =>
-    filterByUser(pendientes, ['jefe_sitio', 'jefe_sitio_email', 'inspector', 'created_by'])
+    filterByUser(pendientes)
   , [pendientes, filterByUser]);
 
   // Stats per commune (for tab badges)

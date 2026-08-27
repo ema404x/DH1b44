@@ -69,7 +69,7 @@ export default function Calefaccion() {
 
   const { data: equipos = [], isLoading, refetch } = useQuery({
     queryKey: ['calefaccion'],
-    queryFn: () => base44.entities.EquipamientoCalefaccion.list('-created_date', 5000),
+    queryFn: async () => (await base44.functions.invoke('getEquipamientoCalefaccionForUser')).data.equipos || [],
   });
 
   const equiposCategoria = useMemo(() => {

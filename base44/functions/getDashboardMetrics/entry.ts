@@ -3,6 +3,7 @@ import { esOtVencida } from '../../shared/otVencimiento.ts';
 import { resolveAndReconcileSector } from '../../shared/callerIdentity.ts';
 import { fetchAll } from '../../shared/fetchAllSector.ts';
 import { round2 } from '../../shared/round2.ts';
+import { resolveAdminView, resolveEstablecimientosDeJefe, norm } from '../../shared/visibilityResolver.ts';
 
 /**
  * KPIs del Dashboard computados sobre el TOTAL que el usuario puede ver (sin
@@ -234,26 +235,30 @@ export default async function (req) {
     }
 
     // ── Pendientes ──
+    // Visibilidad regida por admin_view (Ver Todo) del rol del empleado — no por
+    // isSuperAdmin. Un gerente sin admin_view para Pendientes ve solo los propios
+    // + los de sus establecimientos asignados. Sin ficha de empleado (super-admin
+    // puro) → admin_view=true → todo el sector.
     let pendientesActivos = null, pendientesResueltos = null, pendientesUrgentes = null;
     if (canRead('Pendientes')) {
-      if (isSuperAdmin) {
-        const [act, res, urg] = await Promise.all([
-          fetchAll(sb, 'Pendiente', { ...sec, estado: { $in: ['pendiente', 'asignado', 'en_progreso'] } }),
-          fetchAll(sb, 'Pendiente', { ...sec, estado: 'resuelto' }),
-          fetchAll(sb, 'Pendiente', { ...sec, prioridad: 'urgente', estado: { $ne: 'resuelto' } }),
-        ]);
-        pendientesActivos = act.length;
-        pendientesResueltos = res.length;
-        pendientesUrgentes = urg.length;
+      const allPends = await fetchAll(sb, 'Pendiente', sec);
+      const pendAdminView = await resolveAdminView(sb, employee, 'Pendientes');
+      let mine;
+      if (pendAdminView) {
+        mine = allPends;
       } else {
-        const lists = await Promise.all(
-          userScopeQueries.map((q) => fetchAll(sb, 'Pendiente', { ...sec, ...q }))
+        const establecimientos = await resolveEstablecimientosDeJefe(sb, callerSector, employee?.full_name || user.full_name || '');
+        const uEmail = (user.email || '').toLowerCase().trim();
+        mine = allPends.filter((p) =>
+          (p.created_by_id && p.created_by_id === user.id) ||
+          (p.jefe_sitio_email && p.jefe_sitio_email.toLowerCase().trim() === uEmail) ||
+          (p.establecimiento && establecimientos.has(norm(p.establecimiento))) ||
+          (p.sitio && establecimientos.has(norm(p.sitio)))
         );
-        const mine = mergeDedupe(lists);
-        pendientesActivos = mine.filter((p) => ['pendiente', 'asignado', 'en_progreso'].includes(p.estado)).length;
-        pendientesResueltos = mine.filter((p) => p.estado === 'resuelto').length;
-        pendientesUrgentes = mine.filter((p) => p.prioridad === 'urgente' && p.estado !== 'resuelto').length;
       }
+      pendientesActivos = mine.filter((p) => ['pendiente', 'asignado', 'en_progreso'].includes(p.estado)).length;
+      pendientesResueltos = mine.filter((p) => p.estado === 'resuelto').length;
+      pendientesUrgentes = mine.filter((p) => p.prioridad === 'urgente' && p.estado !== 'resuelto').length;
     }
 
     return Response.json({

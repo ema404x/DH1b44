@@ -41,13 +41,13 @@ export function useCurrentUser() {
   const isAdmin = isSuperAdmin;
 
   /**
-   * Filtra una lista de registros según el usuario actual.
-   * El RLS del backend ya garantiza que el usuario solo reciba los registros
-   * que puede ver (created_by_id, jefe_sitio_email, sector_id).
-   * Este filtro solo aplica aislamiento por sector para admins/gerentes
-   * que ven múltiples registros dentro de su sector.
+   * Filtro client-side de aislamiento por sector. NO aplica ownership: la
+   * visibilidad real (created_by_id, jefe_sitio, establecimientos asignados,
+   * admin_view) la define el backend en las funciones get*ForUser — este helper
+   * solo restringe por sector_id como red de seguridad. Los argumentos extra
+   * (fields) se ignoran por compatibilidad con llamadas legacy.
    */
-  function filterByUser(list, fields = []) {
+  function filterByUser(list) {
     if (!currentUser) return list;
 
     // Aislar por sector_id — un admin en sector BAPRO no debe ver registros del sector escuela.

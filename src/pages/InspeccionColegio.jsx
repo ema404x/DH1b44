@@ -127,10 +127,13 @@ export default function InspeccionColegioPage() {
 
   const { data: rawInspecciones = [], isLoading } = useQuery({
     queryKey: ['inspecciones'],
-    queryFn: () => base44.entities.InspeccionColegio.list('-created_date', 50),
+    queryFn: async () => (await base44.functions.invoke('getInspeccionesForUser')).data.inspecciones || [],
     staleTime: 0,
   });
-  const inspecciones = filterByUser(rawInspecciones, ['jefe_sitio', 'created_by']);
+  // La visibilidad la define el backend (getInspeccionesForUser respeta admin_view
+  // del rol de empleado + establecimientos asignados). filterByUser solo re-aplica
+  // sector (no-op de ownership).
+  const inspecciones = filterByUser(rawInspecciones);
 
   const { data: locations = [] } = useQuery({
     queryKey: ['locationData'],

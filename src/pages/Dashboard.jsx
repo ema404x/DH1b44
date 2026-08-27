@@ -193,7 +193,7 @@ export default function Dashboard() {
   const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),    staleTime: 60000, refetchInterval: 120000, enabled: canRead('Invoice') });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),   staleTime: 120000, refetchInterval: 120000, enabled: canRead('Inventory') });
   const { data: assets = [] }    = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 100),      staleTime: 120000, refetchInterval: 120000, enabled: canRead('Asset') });
-  const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: () => base44.entities.Pendiente.list('-updated_date', 200), staleTime: 60000, refetchInterval: 120000, enabled: canRead('Pendientes') });
+  const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: async () => (await base44.functions.invoke('getPendientesForUser')).data.pendientes || [], staleTime: 60000, refetchInterval: 120000, enabled: canRead('Pendientes') });
   const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 80),    staleTime: 120000, refetchInterval: 120000, enabled: canRead('Employee') });
 
   // KPIs agregados en backend sobre el TOTAL que el usuario puede ver (sin
@@ -215,7 +215,7 @@ export default function Dashboard() {
   // Pendientes filtrados: admin ve todos, jefe de sitio solo los suyos
   // filterByUser prioriza employeeName (ficha de empleado) sobre full_name de plataforma
   const pendientes = useMemo(() =>
-    filterByUser(allPendientes, ['jefe_sitio', 'jefe_sitio_email'])
+    filterByUser(allPendientes)
   , [allPendientes, filterByUser]);
 
   const allUserOrders = useMemo(() =>
