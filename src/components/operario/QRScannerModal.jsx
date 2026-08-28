@@ -114,29 +114,21 @@ export default function QRScannerModal({ open, onClose, onResult }) {
         dispatchResult(parseQRContent(decodedText));
       }, () => { /* frame sin QR — normal */ });
 
-      // Selección de cámara robusta: facingMode falla en algunos Android donde
-      // el label no expone "environment". Enumeramos los dispositivos y elegimos
-      // la trasera por label; si no, la última cámara disponible (suele ser la
-      // trasera en teléfonos). Finales: cualquier cámara es mejor que ninguna.
+      // Selección de cámara: secuencia probada y ACOTADA. No recorremos todas
+      // las cámaras en bucle — cada start() extra puede dejar un MediaStream
+      // abierto en algunos Android y trabar la cámara ("en uso"), impidiendo
+      // escanear. Máximo 3 intentos: trasera (facingMode) → frontal → trasera
+      // por ID explícita (para Android cuyo label no expone "environment").
       const tryStart = async (cam) => { try { await onStart(cam); return true; } catch { return false; } };
 
-      let started = false;
-      // 1) facingMode environment (rápido, pide permiso)
-      started = await tryStart({ facingMode: 'environment' });
-      // 2) facingMode user (desktop / sólo frontal)
+      let started = await tryStart({ facingMode: 'environment' });
       if (!started) started = await tryStart({ facingMode: 'user' });
-      // 3) Enumeración explícita de dispositivos (fallback robusto)
       if (!started) {
         try {
           const cams = await Html5Qrcode.getCameras();
           if (cams && cams.length) {
             const back = cams.find((c) => /back|rear|environment|trasera|posteri/i.test(c.label || ''));
-            const pick = back?.id || cams[cams.length - 1].id || cams[0].id;
-            started = await tryStart(pick);
-            if (!started) {
-              // probar cada cámara hasta una que arranque
-              for (const c of cams) { if (await tryStart(c.id)) { started = true; break; } }
-            }
+            if (back) started = await tryStart(back.id);
           }
         } catch (_) {}
       }
