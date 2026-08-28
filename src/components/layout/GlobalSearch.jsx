@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Search, FolderKanban, ClipboardList, Users, Package, X } from 'lucide-react';
@@ -83,23 +84,37 @@ export default function GlobalSearch({ variant = 'bar' }) {
         </button>
       )}
 
-      {/* Modal */}
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
+      {/* Modal — portado a document.body para escapar del stacking context del
+          MobileHeader (relative z-30), que atrapaba el z-50 y dejaba la barra
+          inferior (z-40) por encima del backdrop, impidiendo cerrarlo en móvil. */}
+      {open && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[6vh] sm:pt-[10vh] px-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
           <div className="relative w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
             {/* Input */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 border-b border-border">
               <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <input
                 ref={inputRef}
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Buscar proyectos, OTs, clientes, materiales..."
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground min-w-0"
               />
-              {query && <button onClick={() => setQuery('')}><X className="h-4 w-4 text-muted-foreground hover:text-foreground" /></button>}
-              <kbd className="text-[10px] bg-muted border border-border rounded px-1.5 py-0.5 font-mono text-muted-foreground">Esc</kbd>
+              {query && (
+                <button onClick={() => setQuery('')} aria-label="Limpiar" className="p-1.5 -mr-1 rounded-md active:bg-muted">
+                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                </button>
+              )}
+              {/* Cerrar — siempre visible, tap target cómodo en móvil (Esc no existe) */}
+              <button
+                onClick={() => setOpen(false)}
+                aria-label="Cerrar buscador"
+                className="p-1.5 rounded-md active:bg-muted hover:bg-white/10 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <kbd className="hidden sm:inline-flex text-[10px] bg-muted border border-border rounded px-1.5 py-0.5 font-mono text-muted-foreground">Esc</kbd>
             </div>
 
             {/* Results */}
@@ -145,7 +160,7 @@ export default function GlobalSearch({ variant = 'bar' }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   );
 }
