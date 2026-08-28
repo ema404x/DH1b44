@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import { X, ScanLine, Camera, AlertCircle, CheckCircle2, Keyboard, Loader2 } from 'lucide-react';
 
@@ -84,11 +85,22 @@ export default function QRScannerModal({ open, onClose, onResult }) {
     setError(null);
     setUnrecognized(false);
     try {
+      // Guard: esperar a que el contenedor exista en el DOM (el modal acaba de
+      // abrirse). Sin esto, en aperturas rápidas Html5Qrcode lanza "Element not
+      // found" y el escáner nunca arranca.
+      let waitCount = 0;
+      while (!document.getElementById(containerId) && waitCount < 20) {
+        await new Promise((r) => setTimeout(r, 50));
+        waitCount++;
+      }
+      if (!document.getElementById(containerId)) {
+        throw new Error('Contenedor de cámara no disponible');
+      }
       const html5QrCode = new Html5Qrcode(containerId);
       scannerRef.current = html5QrCode;
 
       const config = {
-        fps: 15,
+        fps: 12,
         qrbox: (vw, vh) => {
           const minEdge = Math.min(vw, vh);
           return { width: Math.floor(minEdge * 0.7), height: Math.floor(minEdge * 0.7) };
@@ -102,17 +114,33 @@ export default function QRScannerModal({ open, onClose, onResult }) {
         dispatchResult(parseQRContent(decodedText));
       }, () => { /* frame sin QR — normal */ });
 
-      try {
-        // Preferir cámara trasera (móvil en obra)
-        await onStart({ facingMode: 'environment' });
-      } catch (e1) {
-        // Sin cámara trasera (desktop / sólo frontal) → intentar la frontal.
+      // Selección de cámara robusta: facingMode falla en algunos Android donde
+      // el label no expone "environment". Enumeramos los dispositivos y elegimos
+      // la trasera por label; si no, la última cámara disponible (suele ser la
+      // trasera en teléfonos). Finales: cualquier cámara es mejor que ninguna.
+      const tryStart = async (cam) => { try { await onStart(cam); return true; } catch { return false; } };
+
+      let started = false;
+      // 1) facingMode environment (rápido, pide permiso)
+      started = await tryStart({ facingMode: 'environment' });
+      // 2) facingMode user (desktop / sólo frontal)
+      if (!started) started = await tryStart({ facingMode: 'user' });
+      // 3) Enumeración explícita de dispositivos (fallback robusto)
+      if (!started) {
         try {
-          await onStart({ facingMode: 'user' });
-        } catch (e2) {
-          throw e2;
-        }
+          const cams = await Html5Qrcode.getCameras();
+          if (cams && cams.length) {
+            const back = cams.find((c) => /back|rear|environment|trasera|posteri/i.test(c.label || ''));
+            const pick = back?.id || cams[cams.length - 1].id || cams[0].id;
+            started = await tryStart(pick);
+            if (!started) {
+              // probar cada cámara hasta una que arranque
+              for (const c of cams) { if (await tryStart(c.id)) { started = true; break; } }
+            }
+          }
+        } catch (_) {}
       }
+      if (!started) throw new Error('No camera available');
       setScanning(true);
     } catch (err) {
       console.error('QR scanner start error:', err);
@@ -177,8 +205,11 @@ export default function QRScannerModal({ open, onClose, onResult }) {
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  // Portal a document.body: escapa el stacking context de layouts con z-index
+  // (AppLayout/MobileBottomNav z-40) que dejaban la barra inferior por encima
+  // del modal e interceptaban los taps / tapaban la cámara.
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-sm max-h-[90vh] flex flex-col bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
@@ -318,7 +349,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }
 
 /**
