@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { isFieldRole } from "../../shared/roles.ts";
+import { fetchAll } from "../../shared/fetchAllSector.ts";
 
 /**
  * Devuelve las OTs que el usuario actual puede ver.
@@ -11,31 +12,6 @@ import { isFieldRole } from "../../shared/roles.ts";
  * - Jefe de sitio / campo: ve OTs donde es creador, jefe_sitio_email, assigned_to,
  *   o donde su nombre aparece en jefe_sitio / assigned_name.
  */
-// Paginación completa de las OTs de un sector (sin cap). Para admins/gerente
-// con admin_view: el total debe ser exacto sin importar el volumen — antes el
-// cap de 900 subreportaba totales en sectores grandes. Pagina por created_date
-// (cursor estable, a diferencia de updated_date que muta) y reordena en memoria
-// por -updated_date para preservar el burbujeo de OTs recién tocadas.
-async function fetchAllSectorOTs(sb, sectorId) {
-  const all = [];
-  let cursor;
-  let prev;
-  for (let i = 0; i < 200; i++) {
-    const q = { sector_id: sectorId };
-    if (cursor) q.created_date = { $lt: cursor };
-    let batch;
-    try { batch = await sb.entities.WorkOrder.filter(q, '-created_date', 500); }
-    catch { break; }
-    all.push(...batch);
-    if (batch.length < 500) break;
-    cursor = batch[batch.length - 1]?.created_date;
-    if (!cursor || cursor === prev) break;
-    prev = cursor;
-  }
-  all.sort((a, b) => new Date(b.updated_date || 0).getTime() - new Date(a.updated_date || 0).getTime());
-  return all;
-}
-
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -119,7 +95,14 @@ export default async function(req) {
     // 900 (su subset se filtra client-side; las recién tocadas bubblan arriba).
     let allOTs;
     if (isAdminLevel) {
-      allOTs = await fetchAllSectorOTs(base44.asServiceRole, userSector);
+      // Paginación determinística con fetchAll ($gte + $nin + dedupe por id):
+      // el cursor $lt naïve salteaba OTs con created_date idéntico (típico en
+      // bulk imports), haciendo que el total variara entre recargas. fetchAll
+      // trae TODAS las OTs del sector sin saltear boundaries. Reordenamos en
+      // memoria por -updated_date para preservar el burbujeo de OTs recién
+      // tocadas (regla de oro: la OT vieja iniciada por QR bubbla al top).
+      allOTs = (await fetchAll(base44.asServiceRole, 'WorkOrder', { sector_id: userSector }))
+        .sort((a, b) => new Date(b.updated_date || 0).getTime() - new Date(a.updated_date || 0).getTime());
     } else {
       allOTs = await base44.asServiceRole.entities.WorkOrder.filter({ sector_id: userSector }, '-updated_date', 900);
     }

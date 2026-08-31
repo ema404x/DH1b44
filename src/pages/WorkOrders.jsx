@@ -124,9 +124,12 @@ export default function WorkOrders() {
       const res = await base44.functions.invoke('getWorkOrdersForUser', {});
       return res.data.orders || [];
     },
-    // Esta lista es la fuente del total visible — forzar datos frescos al montar
-    // y al volver a la pestaña, sin servir cache stale (evita totales desactualizados).
-    staleTime: 0,
+    // staleTime 30s: al volver de otra página dentro de 30s no refetchea → el
+    // conteo hidratado desde IndexedDB no salta. refetchOnMount/focus solo
+    // disparan si pasó staleTime. PullToRefresh sigue forzando refresco manual.
+    // Antes staleTime: 0 hacía que cada montaje refetchea y el total fluctuara
+    // visible entre el cache hidratado y el dato fresco (bug "el número se modifica").
+    staleTime: 30 * 1000,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
