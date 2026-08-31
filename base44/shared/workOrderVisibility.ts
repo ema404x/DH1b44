@@ -214,13 +214,12 @@ export async function getVisibleWorkOrders(
   const ctx = await buildOtVisibilityContext(sb, user);
   if (!ctx) return { orders: [], total: 0, role: null, ctx: null };
 
-  // fetchAll trae TODAS las OTs del sector (sin cap, sin saltos en boundaries).
-  // Reordenamos en memoria por -updated_date para preservar el burbujeo de OTs
-  // recién tocadas (regla de oro: OT vieja iniciada por QR bubbla al top).
-  const all = (await fetchAll(sb, 'WorkOrder', { sector_id: ctx.sector })).sort(
-    (a: any, b: any) =>
-      new Date(b.updated_date || 0).getTime() - new Date(a.updated_date || 0).getTime(),
-  );
+  // fetchAll trae TODAS las OTs del sector en una sola llamada (sin cursor,
+  // sin saltos — el SDK no soporta operadores sobre campos built-in, así que
+  // la paginación vieja perdía registros). Orden -updated_date directo para
+  // preservar el burbujeo de OTs recién tocadas (regla de oro: OT vieja
+  // iniciada por QR bubbla al top).
+  const all = await fetchAll(sb, 'WorkOrder', { sector_id: ctx.sector }, '-updated_date');
 
   const orders = all.filter((ot: any) => otEsVisiblePara(ot, ctx));
   return {

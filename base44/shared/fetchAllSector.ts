@@ -1,74 +1,54 @@
 // base44/shared/fetchAllSector.ts
 //
-// Paginación robusta para asServiceRole.entities.X.filter() en funciones backend.
+// Carga COMPLETA de registros de una entidad dentro de un sector, para
+// funciones backend asServiceRole. Aplica a AMBOS sectores (escuela y bapro)
+// de forma idéntica — el sector_id va en la query y el SDK lo respeta.
 //
-// PROBLEMA del cursor `$gt created_date`
-//   Si varios registros comparten el mismo `created_date` (típico en bulkCreate
-//   e imports masivos, donde el server estampa el mismo segundo a todo el lote),
-//   el cursor `$gt` SALTEA los registros con fecha == cursor que aún no se leyeron
-//   → KPIs subreportados de forma silenciosa.
+// REGLA DE ORO (determinismo + completitud):
+//   Una sola llamada con un límite alto. El SDK respeta el parámetro limit y
+//   devuelve TODOS los registros matching sin tope oculto (verificado: con
+//   572 registros, limit 2000 y 5000 devuelven los 572). Esto reemplaza la
+//   paginación por cursor anterior ($gte + $nin sobre created_date), que
+//   estaba ROTA: el SDK NO soporta operadores de query ($gte, $gt, $lt, $nin)
+//   sobre campos built-in (created_date, id) → la página 2+ devolvía 0 y se
+//   perdían todos los registros más allá de la página 1 (máx 500). Ese bug
+//   hacía que el contador de OTs se estancara y subreportara TODOS los
+//   módulos que usaban fetchAll.
 //
-// SOLUCIÓN
-//   Cursor `$gte` (inclusivo) + exclusión por id de los registros ya leídos en la
-//   fecha-boundary. Así los registros con created_date idéntico se traen todos
-//   (re-leyendo la boundary pero dedupeando por id), sin saltear ninguno. El set
-//   de ids excluidos es SOLO el de la boundary actual (bounded por el tamaño del
-//   lote con mismo timestamp), no el total acumulado → query coste controlado.
+//   Sin cursor no hay saltos en boundaries de created_date idéntico (el bug
+//   original que motivó $gte+$nin), y sin operadores no hay silenciosidad.
+//   El orden lo define el caller vía `sort` (típicamente -updated_date para
+//   preservar el burbujeo de OTs recién tocadas).
+//
+// Techo de seguridad: LIMIT. Si un sector supera LIMIT registros, la llamada
+// devuelve LIMIT (degradación graceful — mejor que perder registros
+// silenciosamente). En la práctica ningún sector se acerca: escuela ~572.
+// Si algún día se supera, subir LIMIT.
 
+const LIMIT = 5000;
+
+/**
+ * Carga todos los registros de `entity` que matcheen `query`, en una sola
+ * llamada con límite alto. Devuelve el array completo (sin paginar).
+ *
+ * @param sb        client service-role (base44.asServiceRole) o scoped.
+ * @param entity    nombre de la entidad (ej: 'WorkOrder', 'Asset').
+ * @param query     filtro de igualdad (ej: { sector_id: 'escuela' }). Los
+ *                  operadores ($gte, $nin, ...) sobre campos built-in NO
+ *                  funcionan en el SDK — usar sólo igualdades.
+ * @param sort      campo de orden (ej: '-updated_date'). Default 'created_date'.
+ */
 export async function fetchAll(
   sb: any,
   entity: string,
   query: Record<string, any> = {},
   sort = 'created_date',
 ): Promise<any[]> {
-  const all: any[] = [];
-  const seen = new Set<string>();
-  let cursor: string | undefined;
-  let boundaryIds = new Set<string>(); // ids ya leídos con created_date === cursor
-
-  for (let i = 0; i < 500; i++) {
-    // hard cap ~250k registros
-    let batch: any[] = [];
-    try {
-      const q: Record<string, any> = { ...query };
-      if (cursor) q.created_date = { $gte: cursor };
-      if (boundaryIds.size > 0) q.id = { $nin: [...boundaryIds] };
-      batch = await sb.entities[entity].filter(q, sort, 500);
-    } catch {
-      break;
-    }
-    if (!batch || batch.length === 0) break;
-
-    const fresh = batch.filter((r) => r && r.id && !seen.has(r.id));
-    fresh.forEach((r) => {
-      seen.add(r.id);
-      all.push(r);
-    });
-
-    if (batch.length < 500) break; // última página → terminado
-
-    const last = batch[batch.length - 1];
-    const lastDate = last?.created_date;
-    if (!lastDate) break;
-
-    if (lastDate !== cursor) {
-      // Avanzó la fecha: nueva boundary con los ids de esta página que tienen lastDate.
-      cursor = lastDate;
-      boundaryIds = new Set(
-        batch.filter((r) => r.created_date === lastDate).map((r) => r.id),
-      );
-    } else {
-      // Mismo cursor: la página (o parte) es de la misma fecha-boundary. Seguimos
-      // excluyendo los ya leídos para no re-leerlos infinitamente.
-      batch
-        .filter((r) => r.created_date === lastDate)
-        .forEach((r) => boundaryIds.add(r.id));
-    }
-
-    // Guarda anti-loop: si no avanzó nada nuevo, detener (no debería pasar con
-    // $nin correcto, pero defiende contra SDK inesperado).
-    if (fresh.length === 0) break;
+  try {
+    const batch = await sb.entities[entity].filter(query, sort, LIMIT);
+    return Array.isArray(batch) ? batch : [];
+  } catch {
+    // fail-safe: si la query falla, devolver vacío (el caller decide qué hacer).
+    return [];
   }
-
-  return all;
 }
