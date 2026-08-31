@@ -142,4 +142,12 @@ export const PERSISTED_QUERY_KEYS = [
   'certificados',
   'obras_certificacion',
   'informes',
+  // ── OPTIMIZACIÓN DE CARGA ──
+  // KPIs del Dashboard + lookups de Órdenes: hidratar desde IndexedDB al
+  // arrancar para pintar instantáneamente en la próxima visita, en vez de
+  // skeleton en blanco. Válido para ambos sectores (la query-key es la
+  // misma; el dato sectorial se persista por separado naturalmente).
+  'dashboard-metrics',
+  'direcciones-jefes',
+  'employees-filter-lookup',
 ];

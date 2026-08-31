@@ -59,7 +59,7 @@ const KPI_COLORS = {
   primary: { icon: 'bg-primary/15 text-primary',         top: 'border-t-primary' },
 };
 
-function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, href, alert }) {
+const KpiCard = React.memo(function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, href, alert }) {
   const cfg = KPI_COLORS[color] || KPI_COLORS.blue;
   const inner = (
     <div className="h-full group">
@@ -90,7 +90,7 @@ function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, hr
     </div>
   );
   return href ? <Link to={href} className="block h-full">{inner}</Link> : inner;
-}
+});
 
 function KpiCardSkeleton() {
   return (
@@ -103,6 +103,42 @@ function KpiCardSkeleton() {
     </div>
   );
 }
+
+// Item de actividad memoizado: evita re-renderizar las 6 filas cuando el
+// Dashboard re-renderiza por cambios en filtros u otros paneles. Las props
+// (o, isLast) son estables entre renders si `orders` no cambió.
+const ActivityFeedItem = React.memo(function ActivityFeedItem({ o, isLast }) {
+  const sc = STATUS_COLORS[o.status] || STATUS_COLORS.pendiente;
+  const pc = PRIORITY_COLORS[o.priority] || PRIORITY_COLORS.media;
+  const date = o.updated_date || o.created_date;
+  return (
+    <div className={cn("flex items-start gap-3 py-3", !isLast && "border-b border-border")}>
+      <div className="mt-1 flex-shrink-0 flex flex-col items-center gap-1">
+        <div className={cn("h-2 w-2 rounded-full", sc.dot)} />
+        {!isLast && <div className="w-px flex-1 bg-border h-full min-h-[1rem]" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate leading-tight">{o.title}</p>
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full border capitalize", pc)}>{o.priority}</span>
+          {o.location_qr_name && (
+            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              <MapPin className="h-2.5 w-2.5" />{o.location_qr_name}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <p className={cn("text-[10px] font-medium capitalize", sc.text)}>{o.status?.replace('_', ' ')}</p>
+        {date && (
+          <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+            {formatDistanceToNow(new Date(date), { locale: es, addSuffix: true })}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+});
 
 function ActivityFeed({ orders }) {
   const recent = useMemo(() =>
@@ -121,43 +157,14 @@ function ActivityFeed({ orders }) {
 
   return (
     <div className="space-y-0">
-      {recent.map((o, i) => {
-        const sc = STATUS_COLORS[o.status] || STATUS_COLORS.pendiente;
-        const pc = PRIORITY_COLORS[o.priority] || PRIORITY_COLORS.media;
-        const date = o.updated_date || o.created_date;
-        return (
-          <div key={o.id} className={cn("flex items-start gap-3 py-3", i < recent.length - 1 && "border-b border-border")}>
-            <div className="mt-1 flex-shrink-0 flex flex-col items-center gap-1">
-              <div className={cn("h-2 w-2 rounded-full", sc.dot)} />
-              {i < recent.length - 1 && <div className="w-px flex-1 bg-border h-full min-h-[1rem]" />}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate leading-tight">{o.title}</p>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full border capitalize", pc)}>{o.priority}</span>
-                {o.location_qr_name && (
-                  <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                    <MapPin className="h-2.5 w-2.5" />{o.location_qr_name}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <p className={cn("text-[10px] font-medium capitalize", sc.text)}>{o.status?.replace('_', ' ')}</p>
-              {date && (
-                <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                  {formatDistanceToNow(new Date(date), { locale: es, addSuffix: true })}
-                </p>
-              )}
-            </div>
-          </div>
-        );
-      })}
+      {recent.map((o, i) => (
+        <ActivityFeedItem key={o.id} o={o} isLast={i === recent.length - 1} />
+      ))}
     </div>
   );
 }
 
-function QuickActionCard({ icon: Icon, label, desc, href, color }) {
+const QuickActionCard = React.memo(function QuickActionCard({ icon: Icon, label, desc, href, color }) {
   return (
     <Link to={href}>
       <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/40 hover:bg-muted hover:-translate-y-0.5 transition-all duration-150 cursor-pointer group h-full">
@@ -172,7 +179,7 @@ function QuickActionCard({ icon: Icon, label, desc, href, color }) {
       </div>
     </Link>
   );
-}
+});
 
 export default function Dashboard() {
   const { isAdmin, filterByUser, userPermissions, user, displayName } = useCurrentUser();
@@ -186,15 +193,21 @@ export default function Dashboard() {
     return userPermissions[moduleKey]?.read === true;
   }, [user, userPermissions]);
 
-  // Solo fetchar si el usuario tiene acceso al módulo
-  const { data: projects = [] }  = useQuery({ queryKey: ['projects'],   queryFn: () => base44.entities.Project.list('-updated_date', 100),   staleTime: 60000, refetchInterval: 120000, enabled: canRead('Project') });
-  const { data: allOrders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 150),  staleTime: 60000, refetchInterval: 60000,  enabled: canRead('WorkOrder') });
-  const { data: clients = [] }   = useQuery({ queryKey: ['clients'],    queryFn: () => base44.entities.Client.list('-updated_date', 100),     staleTime: 120000, refetchInterval: 120000, enabled: canRead('Client') });
-  const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),    staleTime: 60000, refetchInterval: 120000, enabled: canRead('Invoice') });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),   staleTime: 120000, refetchInterval: 120000, enabled: canRead('Inventory') });
-  const { data: assets = [] }    = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 100),      staleTime: 120000, refetchInterval: 120000, enabled: canRead('Asset') });
-  const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: async () => (await base44.functions.invoke('getPendientesForUser')).data.pendientes || [], staleTime: 60000, refetchInterval: 120000, enabled: canRead('Pendientes') });
-  const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 80),    staleTime: 120000, refetchInterval: 120000, enabled: canRead('Employee') });
+  // ── OPTIMIZACIÓN DE CARGA (cache + frontend) ──
+  // staleTime 5min para todas las queries de respaldo + sin refetchInterval:
+  // el único refetch automático es al volver a la pestaña si pasó staleTime,
+  // más PullToRefresh manual. Elimina los refetch cada 60-120s en background
+  // que re-pedían datos perpetuamente. La frescura percibida es la misma
+  // porque el primer montaje refetcha si stale. Aplica idéntico a ambos sectores.
+  const STALE_5MIN = 5 * 60 * 1000;
+  const { data: projects = [] }  = useQuery({ queryKey: ['projects'],   queryFn: () => base44.entities.Project.list('-updated_date', 100),   staleTime: STALE_5MIN, enabled: canRead('Project') });
+  const { data: allOrders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 150),  staleTime: STALE_5MIN, enabled: canRead('WorkOrder') });
+  const { data: clients = [] }   = useQuery({ queryKey: ['clients'],    queryFn: () => base44.entities.Client.list('-updated_date', 100),     staleTime: STALE_5MIN, enabled: canRead('Client') });
+  const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),    staleTime: STALE_5MIN, enabled: canRead('Invoice') });
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),   staleTime: STALE_5MIN, enabled: canRead('Inventory') });
+  const { data: assets = [] }    = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 100),      staleTime: STALE_5MIN, enabled: canRead('Asset') });
+  const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: async () => (await base44.functions.invoke('getPendientesForUser')).data.pendientes || [], staleTime: STALE_5MIN, enabled: canRead('Pendientes') });
+  const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 80),    staleTime: STALE_5MIN, enabled: canRead('Employee') });
 
   // KPIs agregados en backend sobre el TOTAL que el usuario puede ver (sin
   // truncar). Regla de oro: backend-first. El backend scopea por sector para
@@ -203,10 +216,12 @@ export default function Dashboard() {
   // client-side (que subreportaba y, al persistirse en IndexedDB, mostraba
   // cifras viejas hasta el refetch → "hay que recargar varias veces").
   const useBackendKpis = canRead('WorkOrder');
+  // KPIs agregados: staleTime 3min (más fresco que las listas) y sin
+  // refetchInterval. Se refresca solo al montar si está stale + PullToRefresh.
   const { data: kpis, isLoading: kpisLoading } = useQuery({
     queryKey: ['dashboard-metrics'],
     queryFn: async () => (await base44.functions.invoke('getDashboardMetrics')).data,
-    staleTime: 60000, refetchInterval: 120000, retry: 1,
+    staleTime: 3 * 60 * 1000, retry: 1,
     enabled: useBackendKpis,
   });
   const B = (useBackendKpis && kpis) ? kpis : null;
