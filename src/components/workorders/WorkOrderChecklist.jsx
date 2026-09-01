@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Input } from '@/components/ui/input';
 import { Plus, Trash2, Camera, Image, X, Loader2, CheckCircle2, Circle } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function WorkOrderChecklist({ checklist = [], onChange }) {
   const [newTask, setNewTask] = useState('');
@@ -31,9 +32,14 @@ export default function WorkOrderChecklist({ checklist = [], onChange }) {
   const uploadPhoto = async (id, file) => {
     if (!file) return;
     setUploadingId(id);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    onChange(checklist.map(t => t.id === id ? { ...t, photo_url: file_url } : t));
-    setUploadingId(null);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      onChange(checklist.map(t => t.id === id ? { ...t, photo_url: file_url } : t));
+    } catch (e) {
+      toast.error('No se pudo subir la foto. Intentalo de nuevo.');
+    } finally {
+      setUploadingId(null);
+    }
   };
 
   const removePhoto = (id) => {

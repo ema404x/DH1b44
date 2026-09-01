@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
-import { canManageOT } from "../../shared/roles.ts";
+import { isAdminLevelRole } from "../../shared/roles.ts";
+import { resolveOtPermissions } from "../../shared/otPermissions.ts";
 
 // Transiciones fijas: desde un estado exacto hacia otro
 const TRANSICIONES_FIJAS = {
@@ -67,33 +68,16 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Orden de trabajo no encontrada' }, { status: 404 });
     }
 
-    // ── Resolución canónica del sector del caller ──
-    // ALINEADA con getWorkOrdersForUser: la ficha de Empleado es la fuente canónica
-    // de sector (decisión del proyecto). Resolvemos primero por email y luego por
-    // user_id; si la ficha tiene sector, es la verdad. Sin esto, un jefe con
-    // data.sector_id stale en la plataforma ve sus OTs (getWorkOrdersForUser corrige
-    // vía la ficha) pero al transicionar recibe 403 "pertenece a otro sector" porque
-    // acá se leía solo user.data.sector_id. cambiarSectorActivo sincroniza ficha Y
-    // plataforma a la vez, así que esto nunca regresa un cambio de sector legítimo.
-    const userEmail = (user.email || '').toLowerCase().trim();
-    let employee = null;
-    if (userEmail) {
-      const byEmail = await base44.asServiceRole.entities.Employee
-        .filter({ email: userEmail }).catch(() => []);
-      employee = byEmail && byEmail.length > 0 ? byEmail[0] : null;
-    }
-    if (!employee && user.id) {
-      const byUid = await base44.asServiceRole.entities.Employee
-        .filter({ user_id: user.id }).catch(() => []);
-      employee = byUid && byUid.length > 0 ? byUid[0] : null;
-    }
-    const callerSector = employee?.sector_id || user?.data?.sector_id || user?.sector_id;
-    const callerEsAdmin = ['admin', 'gerente'].includes(user.role || '');
+    // ── Permisos canónicos (Control de Acceso) ──
+    // Sector, admin_view y permisos de escritura se resuelven desde la ficha de
+    // Empleado + RolePermission — NO desde el rol de plataforma. Cierra el bypass
+    // donde un jefe_sitio con platformRole='admin' operaba cualquier OT del sector.
+    // Un super-admin puro (sin ficha) conserva acceso total (trusted).
+    const P = await resolveOtPermissions(base44, user);
+    const employee = P.employee;
 
-    // Reconciliación best-effort (igual que getWorkOrdersForUser): si la ficha tiene
-    // sector y difiere del usuario de plataforma, alinear data.sector_id al de la
-    // ficha. Idempotente y no interrumpe si la escritura falla. Así RLS y otros
-    // lectores también quedan en el sector correcto sin pedir re-login.
+    // Reconciliación best-effort: si la ficha tiene sector y difiere del usuario de
+    // plataforma, alinear data.sector_id. Idempotente, no interrumpe si falla.
     try {
       if (employee?.sector_id) {
         const platformSector = user.data?.sector_id || user.sector_id;
@@ -105,12 +89,15 @@ Deno.serve(async (req) => {
         }
       }
     } catch (_) {}
-    // Aislamiento de raíz: TODOS (incluido admin/gerente) deben operar solo OTs de su
-    // sector activo. Para ver/tocar otro sector hay que cambiar de sector activo.
-    // No existe bypass por rol — el bypass sería exactamente lo que rompe el aislamiento.
-    if (ot.sector_id !== callerSector) {
+    // Aislamiento de raíz: todos (salvo super-admin puro) operan solo OTs de su
+    // sector activo. No existe bypass por rol de plataforma.
+    if (!P.superAdmin && ot.sector_id !== P.callerSector) {
       return Response.json({ error: 'Esta OT pertenece a otro sector. Cambiá de sector activo para operarla.' }, { status: 403 });
     }
+    // callerEsAdmin: admin-level por ROL DE EMPLEADO (no plataforma). Define si al
+    // iniciar la OT el que escanea la reclama (operario) o respeta la asignación
+    // previa del jefe (admin/gerente).
+    const callerEsAdmin = P.superAdmin || isAdminLevelRole(employee?.role);
 
     // Validar estado actual
     if (fija) {
@@ -137,18 +124,11 @@ Deno.serve(async (req) => {
 
     const nuevoEstado = fija ? fija.hacia : flexible.hacia;
 
-    // Permisos: aprobar/rechazar solo jefe de sitio, admin o gerente.
-    // El rol 'jefe_sitio' vive en la entidad Employee (el rol de plataforma es 'user'),
-    // así que hay que buscar la ficha del empleado por user_id.
-    const userRole = user.role || '';
-    const esAdminPlataforma = ['admin', 'gerente'].includes(userRole);
-    // Reutiliza el employee resuelto arriba (sector canónico) — evita un fetch
-    // duplicado y garantiza consistencia entre el chequeo de sector y el de rol.
-    let esJefe = esAdminPlataforma;
-    if (!esJefe) {
-      esJefe = canManageOT(employee?.role);
-    }
-    if ((accion === 'aprobar' || accion === 'rechazar' || accion === 'completar') && !esJefe) {
+    // Permisos de cierre (aprobar/rechazar/completar): canApprove se resuelve desde
+    // RolePermission.WorkOrder.approve con fallback legacy al rol jefe_sitio/admin.
+    // Un platform-admin con ficha jefe_sitio queda regido por su ficha, no por la
+    // plataforma — consistente con la visibilidad (resolveAdminView).
+    if ((accion === 'aprobar' || accion === 'rechazar' || accion === 'completar') && !P.canApprove) {
       return Response.json({ error: 'Solo el Jefe de Sitio, Admin o Gerente puede completar o rechazar OTs' }, { status: 403 });
     }
 

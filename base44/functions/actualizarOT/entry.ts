@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { resolveOtPermissions } from "../../shared/otPermissions.ts";
 
 // Actualiza campos de una OT de forma robusta, sin depender del RLS directo
 // sobre user.data.sector_id (que falla con 403 cuando el sector de plataforma
@@ -43,20 +44,14 @@ export default async function (req) {
       return Response.json({ error: 'Falta patch' }, { status: 400 });
     }
 
-    // Sector canónico: la ficha de Empleado es la fuente de verdad (igual que
-    // eliminarOT / getActivosSector). user.data como fallback.
-    const userEmail = (user.email || '').toLowerCase().trim();
-    let employee = null;
-    if (userEmail) {
-      const empResults = await base44.asServiceRole.entities.Employee.filter({ email: userEmail });
-      employee = empResults[0] || null;
-    }
-    if (!employee && user.id) {
-      const empByUserId = await base44.asServiceRole.entities.Employee.filter({ user_id: user.id });
-      employee = empByUserId[0] || null;
-    }
-    const callerSector = employee?.sector_id || user.data?.sector_id || user.sector_id;
-    if (!callerSector) {
+    // Permisos canónicos vía Control de Acceso (RolePermission) + ficha de Empleado.
+    // Cierra el bypass de platform-role: un jefe_sitio con platformRole='admin' ya
+    // no edita cualquier OT del sector — sólo las que posee (creador/asignada) o si
+    // su rol tiene WorkOrder.update/admin_view. Super-admin puro (sin ficha)
+    // conserva acceso total.
+    const P = await resolveOtPermissions(base44, user);
+    const employee = P.employee;
+    if (!P.callerSector && !P.superAdmin) {
       return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
     }
 
@@ -67,13 +62,15 @@ export default async function (req) {
     } catch (_) { /* not found */ }
     if (!ot) return Response.json({ error: 'Orden de trabajo no encontrada' }, { status: 404 });
 
-    // Aislamiento por sector: la OT debe ser del mismo sector del caller.
-    if (ot.sector_id !== callerSector) {
+    // Aislamiento por sector (salvo super-admin puro sin sector).
+    if (!P.superAdmin && ot.sector_id !== P.callerSector) {
       return Response.json({ error: 'Esta OT pertenece a otro sector. Cambiá de sector activo para operarla.' }, { status: 403 });
     }
 
-    // Permiso de update — espeja la RLS y cierra el gap (assigned_to / nombre).
-    const role = user.role || '';
+    // Permiso de update: admin-level (canUpdateAny) O dueño (creador/asignada).
+    // canUpdateAny viene de RolePermission.WorkOrder.update o admin-level del rol de
+    // empleado — nunca del rol de plataforma.
+    const userEmail = (user.email || '').toLowerCase().trim();
     const isCreator = ot.created_by_id && ot.created_by_id === user.id;
     const isAssignedByEmail = ot.jefe_sitio_email && (ot.jefe_sitio_email || '').toLowerCase().trim() === userEmail;
     const isAssignedByTo = ot.assigned_to && ot.assigned_to === user.id;
@@ -82,12 +79,7 @@ export default async function (req) {
       const empName = norm(employee.full_name);
       isAssignedByName = !!empName && (norm(ot.jefe_sitio) === empName || norm(ot.assigned_name) === empName);
     }
-    const canUpdate = role === 'admin'
-      || role === 'gerente'
-      || isCreator
-      || isAssignedByEmail
-      || isAssignedByTo
-      || isAssignedByName;
+    const canUpdate = P.canUpdateAny || isCreator || isAssignedByEmail || isAssignedByTo || isAssignedByName;
     if (!canUpdate) {
       return Response.json({ error: 'No tenés permiso para editar esta OT' }, { status: 403 });
     }

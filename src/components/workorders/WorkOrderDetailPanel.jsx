@@ -200,15 +200,14 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   };
 
   const closeAfterSaveRef = useRef(false);
-  // OTs del sector escuela → rutea por el backend actualizarOT (service-role +
-  // guard de sector explícito) para bybassear el gap de RLS que bloquea a un jefe
-  // de actualizar OTs asignadas a él por nombre (sin jefe_sitio_email/created_by
-  // que lo respalde). OTs de otros sectores → SDK directo (RLS), sin cambios.
-  const isEscuelaOT = order.sector_id === 'escuela';
+  // Rutea TODAS las actualizaciones por el backend actualizarOT (service-role +
+  // guard de sector explícito). Cierra el gap de RLS que bloquea a un jefe de
+  // actualizar OTs asignadas a él por nombre (sin jefe_sitio_email/created_by que
+  // lo respalde) en CUALQUIER sector, no sólo escuela. El backend valida sector y
+  // permisos canónicos (Control de Acceso) — sin bypass por rol de plataforma.
   const saveMutation = useMutation({
-    mutationFn: (d) => isEscuelaOT
-      ? base44.functions.invoke('actualizarOT', { ot_id: order.id, patch: d }).then(r => r.data?.ot)
-      : base44.entities.WorkOrder.update(order.id, d),
+    mutationFn: (d) =>
+      base44.functions.invoke('actualizarOT', { ot_id: order.id, patch: d }).then(r => r.data?.ot),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
@@ -369,14 +368,12 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     // Flush de campos pendientes antes de convertir — mismo motivo que handleStateAction
     if (dirtyRef.current.size > 0) flushDirty();
     try {
-      // 1) Primero el cambio de estado (acción principal). Si falla, no se crea
-      //    ningún pendiente huérfano.
-      await base44.functions.invoke('transicionEstadoOT', { ot_id: order.id, accion: 'convertir_obra' });
-      // 2) Luego crear el pendiente de tipo obra, propagando sector_id y
-      //    jefe_sitio_email de la OT original — preserva aislamiento entre sectores
-      //    y visibilidad del jefe por RLS.
+      // 1) Crear el pendiente de obra PRIMERO. Si la transición falla después, se
+      //    elimina para no dejar huérfano. Propaga sector_id y jefe_sitio_email de la
+      //    OT original — preserva aislamiento entre sectores y visibilidad del jefe.
+      let pendienteId = null;
       try {
-        await base44.entities.Pendiente.create({
+        const created = await base44.entities.Pendiente.create({
           descripcion: data.title,
           tipo: 'obra',
           estado: 'pendiente',
@@ -390,11 +387,22 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
           observaciones: data.description || '',
           fecha_limite: data.scheduled_date || undefined,
         });
+        pendienteId = created?.id || null;
       } catch (e) {
-        // La OT ya quedó en estado "obra" (acción principal OK). El pendiente es
-        // tracking secundario — no se revierte el estado. Avisar al usuario.
-        console.error('Pendiente de obra no se pudo crear (OT ya convertida):', e);
-        toast.warning('OT convertida, pero no se pudo crear el pendiente de obra asociado');
+        // Sin pendiente no tiene sentido convertir — abortar antes de tocar el estado.
+        console.error('No se pudo crear el pendiente de obra:', e);
+        toast.error('No se pudo crear el pendiente de obra. La OT no fue modificada.');
+        return;
+      }
+      // 2) Cambio de estado (acción principal). Si falla, revertir eliminando el
+      //    pendiente recién creado — queda todo como antes (atomicidad).
+      try {
+        await base44.functions.invoke('transicionEstadoOT', { ot_id: order.id, accion: 'convertir_obra' });
+      } catch (err) {
+        if (pendienteId) {
+          await base44.entities.Pendiente.delete(pendienteId).catch(() => {});
+        }
+        throw err;
       }
       queryClient.invalidateQueries({ queryKey: ['pendientes'] });
       queryClient.invalidateQueries({ queryKey: ['workorders'] });

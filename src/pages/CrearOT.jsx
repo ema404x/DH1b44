@@ -247,6 +247,19 @@ export default function CrearOT() {
     queryFn: () => base44.entities.Employee.list('full_name', 500),
     staleTime: 300000,
   });
+  // Operarios del sector vía backend (getOperariosSector): fuente canónica para
+  // resolver el responsable/jefe tipeado → user_id + email al crear la OT. Sin
+  // esto la OT queda con nombre pero sin assigned_to/jefe_sitio_email → el jefe no
+  // la ve por RLS ni puede operarla desde el arranque.
+  const { data: operariosSector = [] } = useQuery({
+    queryKey: ['operarios-sector-crear', employeeSector],
+    queryFn: async () => {
+      const res = await base44.functions.invoke('getOperariosSector');
+      return res.data?.operarios || [];
+    },
+    staleTime: 600_000,
+    retry: false,
+  });
   // Los jefes de sitio no pueden asignar OTs a otros jefes de sitio — solo a operarios.
   // Los gerentes/admins sí pueden asignar a cualquier empleado, incluyendo jefes.
   const isJefeRole = (role) => role && role.toLowerCase().replace(/[\s_]+/g, '').includes('jefe');
@@ -257,6 +270,19 @@ export default function CrearOT() {
       .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '')),
     [employees, isSuperAdmin]
   );
+
+  // Resuelve el nombre del responsable/jefe → { user_id, email, is_jefe } usando
+  // operariosSector (canónica, sector-scoped) con fallback a activeEmployees.
+  // Estampa assigned_to + jefe_sitio_email al crear la OT → visibilidad RLS desde t=0.
+  const resolveResponsable = useCallback((name) => {
+    const target = normName(name);
+    if (!target) return null;
+    const match = operariosSector.find(o => normName(o.full_name) === target);
+    if (match) return { user_id: match.user_id || '', email: (match.email || '').toLowerCase().trim(), is_jefe: !!match.is_jefe };
+    const emp = activeEmployees.find(e => normName(e.full_name) === target);
+    if (emp) return { user_id: emp.user_id || '', email: (emp.email || '').toLowerCase().trim(), is_jefe: isJefeRole(emp.role) };
+    return null;
+  }, [operariosSector, activeEmployees]);
 
   // ── Mutation ─────────────────────────────────────────────────────────────────
 
@@ -454,6 +480,10 @@ export default function CrearOT() {
       });
     } else {
       const responsable = assignedName.trim() || autoJefeSitio || '';
+      // Resolver responsable → user_id + email para que la OT sea visible y operable
+      // por RLS desde el momento de la creación (no sólo al re-asignar en el panel).
+      const resolved = responsable ? resolveResponsable(responsable) : null;
+      const resolvedJefe = autoJefeSitio ? resolveResponsable(autoJefeSitio) : null;
       createMutation.mutate({
         title: title.trim(),
         type,
@@ -469,7 +499,12 @@ export default function CrearOT() {
         location: locationLabel,
         project_name: selectedLocation?.project_name || '',
         assigned_name: responsable || undefined,
+        assigned_to: resolved?.user_id || undefined,
+        // jefe_sitio_email: si el responsable es jefe, su email; si no, el del jefe
+        // del activo (autoJefeSitio) si tiene cuenta. Garantiza visibilidad RLS.
         jefe_sitio: autoJefeSitio || undefined,
+        jefe_sitio_email: (resolved?.is_jefe && resolved.email) ? resolved.email
+                       : (resolvedJefe?.email ? resolvedJefe.email : undefined),
       });
     }
   };

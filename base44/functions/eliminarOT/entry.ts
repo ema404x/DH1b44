@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { resolveOtPermissions, explicitOrLegacy } from "../../shared/otPermissions.ts";
 
 // Elimina una OT de forma robusta, sin depender del RLS directo sobre
 // user.data.sector_id (que falla con 403 cuando el sector de plataforma queda
@@ -19,21 +20,14 @@ export default async function(req) {
     const { ot_id } = body;
     if (!ot_id) return Response.json({ error: 'Falta ot_id' }, { status: 400 });
 
-    // Sector canónico: la ficha de Empleado es la fuente de verdad. Si el
-    // usuario de plataforma quedó con data.sector_id stale, usar el sector de
-    // la ficha evita el 403 espurio del SDK directo.
-    const userEmail = (user.email || '').toLowerCase().trim();
-    let employee = null;
-    if (userEmail) {
-      const empResults = await base44.asServiceRole.entities.Employee.filter({ email: userEmail });
-      employee = empResults[0] || null;
-    }
-    if (!employee && user.id) {
-      const empByUserId = await base44.asServiceRole.entities.Employee.filter({ user_id: user.id });
-      employee = empByUserId[0] || null;
-    }
-    const callerSector = employee?.sector_id || user.data?.sector_id || user.sector_id;
-    if (!callerSector) {
+    // Permisos canónicos vía Control de Acceso (RolePermission) + ficha de Empleado.
+    // Cierra el bypass de platform-role: un jefe_sitio con platformRole='admin' ya
+    // no borra OTs del sector salvo que su rol lo permita explícitamente. Conserva
+    // el comportamiento legacy exacto (admin siempre; gerente sólo bapro) como
+    // fallback cuando RolePermission no define delete. Super-admin puro conserva
+    // acceso total.
+    const P = await resolveOtPermissions(base44, user);
+    if (!P.callerSector && !P.superAdmin) {
       return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
     }
 
@@ -45,15 +39,16 @@ export default async function(req) {
     } catch (_) { /* not found */ }
     if (!ot) return Response.json({ error: 'Orden de trabajo no encontrada' }, { status: 404 });
 
-    // Aislamiento por sector: la OT debe ser del mismo sector del caller.
-    if (ot.sector_id !== callerSector) {
+    // Aislamiento por sector (salvo super-admin puro sin sector).
+    if (!P.superAdmin && ot.sector_id !== P.callerSector) {
       return Response.json({ error: 'Esta OT pertenece a otro sector. Cambiá de sector activo para operarla.' }, { status: 403 });
     }
 
-    // Permiso de borrado — espeja la RLS de WorkOrder.delete:
-    //   admin + sector  |  gerente + sector 'bapro'
-    const role = user.role || '';
-    const canDelete = role === 'admin' || (role === 'gerente' && ot.sector_id === 'bapro');
+    // Permiso de borrado: RolePermission.WorkOrder.delete con fallback al legacy
+    // (admin + sector | gerente + bapro). Sin bypass por rol de plataforma.
+    const empRole = P.employee?.role || '';
+    const legacyDelete = empRole === 'admin' || (empRole === 'gerente' && ot.sector_id === 'bapro');
+    const canDelete = P.superAdmin || explicitOrLegacy(P.perms, 'delete', legacyDelete);
     if (!canDelete) {
       return Response.json({ error: 'No tenés permiso para eliminar esta OT' }, { status: 403 });
     }
