@@ -41,12 +41,16 @@ Deno.serve(async (req) => {
       actorEmail = (event.type === 'update' ? old_data?.created_by : data?.created_by) || 'sistema';
     }
 
+    // Sector de la ENTIDAD auditada (regla de oro). Las automaciones corren sin
+    // sesión, así que el sector del actor no es confiable; el de la entidad sí.
+    // Estampa sector_id para que el RLS aísle la auditoría entre sectores.
     const auditEntry = {
       entity_type: event.entity_name,
       entity_id: event.entity_id,
       action: event.type,
       user_email: actorEmail,
       user_role: actorEmail === 'sistema' ? 'sistema' : 'usuario',
+      sector_id: data?.sector_id || old_data?.sector_id || null,
       timestamp: new Date().toISOString(),
       old_values: event.type === 'update' ? old_data : null,
       new_values: event.type === 'update' ? data : null,

@@ -5,10 +5,10 @@ import { esOtVencida } from '../../shared/otVencimiento.ts';
 import {
   resolveAdminView,
   resolveEstablecimientosDeJefe,
-  filterWorkOrdersByVisibility,
   filterPendientesByVisibility,
   filterAssetsByVisibility,
 } from '../../shared/visibilityResolver.ts';
+import { buildOtVisibilityContext, otEsVisiblePara } from '../../shared/workOrderVisibility.ts';
 
 /**
  * Devuelve las alertas ACTIVAS que el usuario actual debe ver — vivas, sin
@@ -52,10 +52,15 @@ export default async function (req) {
 
     // ── 1. OTs VENCIDAS (regla de oro) ──
     if (tiposActivos.has('ot_vencida')) {
-      const adminView = await resolveAdminView(sb, employee, 'WorkOrder');
+      // Visibilidad CANÓNICA de OT (workOrderVisibility.ts) — mismo predicado
+      // que Órdenes/Portal/Dashboard. Antes usaba filterWorkOrdersByVisibility
+      // (visibilityResolver viejo) que omitía el linkage Tablet→jefe, así un
+      // operario podía no ver alertas de OTs que sí veía en su portal.
+      const otCtx = await buildOtVisibilityContext(sb, user);
       const allOTs = await fetchAll(sb, 'WorkOrder', { sector_id: sector, status: 'en_progreso' });
-      const visibles = allOTs.filter((ot) => ot.archivada !== true);
-      const mias = filterWorkOrdersByVisibility(visibles, userId, userEmail, displayName, establecimientos, adminView);
+      const mias = otCtx
+        ? allOTs.filter((ot) => ot.archivada !== true && otEsVisiblePara(ot, otCtx))
+        : [];
       for (const ot of mias) {
         if (!esOtVencida(ot, ahora)) continue;
         const dv = Math.ceil((ahora.getTime() - new Date(ot.scheduled_date + 'T00:00:00Z').getTime()) / 86400000);
