@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { History, Search, CheckCircle2, Clock, Archive, FileClock } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useResolveCreator } from '@/hooks/useResolveCreator';
 
 const statusColors = {
   pendiente: 'bg-yellow-100 text-yellow-700',
@@ -25,6 +26,8 @@ export default function HistorialEstablecimiento({ open, onOpenChange, onOpenOrd
   const [tab, setTab] = useState('establecimiento');
   const [search, setSearch] = useState('');
   const [selectedEstab, setSelectedEstab] = useState('');
+  const [selectedJefe, setSelectedJefe] = useState('');
+  const { resolveCreator } = useResolveCreator();
 
   // Historial por establecimiento (todas las OTs).
   const { data: orders = [] } = useQuery({
@@ -47,12 +50,35 @@ export default function HistorialEstablecimiento({ open, onOpenChange, onOpenOrd
     return [...set].sort();
   }, [orders]);
 
+  // Jefes de sitio únicos presentes en las OTs archivadas — para el dropdown de
+  // filtro. Se arma desde las archivadas cargadas (no de Employees) para no
+  // listar jefes que no tienen nada archivado.
+  const jefes = useMemo(() => {
+    const set = new Set();
+    archivadas.forEach(o => { if (o.jefe_sitio) set.add(o.jefe_sitio); });
+    return [...set].sort();
+  }, [archivadas]);
+
   const filtered = useMemo(() => {
     if (tab === 'archivadas') {
-      const q = search.toLowerCase();
-      return archivadas.filter(o =>
-        !q || o.title?.toLowerCase().includes(q) || o.location?.toLowerCase().includes(q) || o.assigned_name?.toLowerCase().includes(q)
-      );
+      // Normalización NFD + strip acentos: "sophia" matchea "Sofía Aguilera"
+      // aunque el usuario escriba sin acentos/mayúsculas. Incluye jefe_sitio,
+      // jefe_sitio_email y el creador (resuelto a nombre) — antes el 82% de
+      // las OTs de escuela con assigned_name vacío no se encontraban.
+      const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const q = norm(search);
+      return archivadas.filter(o => {
+        const matchJefe = !selectedJefe || o.jefe_sitio === selectedJefe;
+        const creador = resolveCreator(o.created_by_id, '');
+        const matchSearch = !q ||
+          norm(o.title).includes(q) ||
+          norm(o.location).includes(q) ||
+          norm(o.assigned_name).includes(q) ||
+          norm(o.jefe_sitio).includes(q) ||
+          norm(o.jefe_sitio_email).includes(q) ||
+          norm(creador).includes(q);
+        return matchJefe && matchSearch;
+      });
     }
     return orders.filter(o => {
       const matchSearch = !search || o.title?.toLowerCase().includes(search.toLowerCase()) || o.location?.toLowerCase().includes(search.toLowerCase());
@@ -127,6 +153,17 @@ export default function HistorialEstablecimiento({ open, onOpenChange, onOpenOrd
                 </SelectContent>
               </Select>
             )}
+            {tab === 'archivadas' && (
+              <Select value={selectedJefe || null} onValueChange={(v) => setSelectedJefe(v || '')}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Todos los jefes..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={null}>Todos</SelectItem>
+                  {jefes.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder={tab === 'archivadas' ? "Buscar archivadas..." : "Buscar..."} value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
@@ -164,6 +201,8 @@ export default function HistorialEstablecimiento({ open, onOpenChange, onOpenOrd
                   <div className="flex gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
                     {o.location && <span>📍 {o.location}</span>}
                     {o.assigned_name && <span>👤 {o.assigned_name}</span>}
+                    {tab === 'archivadas' && o.jefe_sitio && <span>🧑‍💼 {o.jefe_sitio}</span>}
+                    {tab === 'archivadas' && (() => { const c = resolveCreator(o.created_by_id, ''); return c ? <span>✍️ {c}</span> : null; })()}
                     {o.created_date && <span>📅 {format(parseISO(o.created_date), "dd/MM/yyyy", { locale: es })}</span>}
                     {o.completed_date && <span className="text-emerald-600">✅ {format(parseISO(o.completed_date), "dd/MM/yyyy", { locale: es })}</span>}
                     {tab === 'archivadas' && o.fecha_archivado && (
