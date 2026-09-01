@@ -10,8 +10,11 @@
 //  Un usuario ve una OT si, y sólo si:
 //    1. La OT pertenece a SU sector (aislamiento entre sectores), Y
 //    2. Cumple alguna condición de visibilidad según su rol:
-//       a. Admin-view (platform admin o permiso "Ver Todo" del rol de
-//          empleado): ve TODAS las OTs del sector.
+//       a. Admin-view (permiso "Ver Todo" del rol del EMPLEADO en Control de
+//          Acceso, o super-admin puro sin ficha de empleado): ve TODAS las
+//          OTs del sector. El rol de plataforma NUNCA hace bypass: un
+//          jefe_sitio con platformRole='admin' se rige por el admin_view de
+//          su ficha de empleado, igual que en Inspecciones/Pendientes.
 //       b. Rol de campo (jefe_sitio / operario / inspector / ...): ve las
 //          OTs donde es creador, jefe_sitio (por email), asignado (por id o
 //          nombre), o que fueron creadas/asignadas por su jefe de sitio
@@ -90,11 +93,13 @@ export async function buildOtVisibilityContext(
   const employeeRole = (employee?.role || '').toLowerCase().trim();
   const employeeName = employee?.full_name || user?.full_name || '';
 
-  // Admin-view: platform admin (cambia de sector explícitamente) o el
-  // permiso explícito "Ver Todo" del rol del EMPLEADO. Sin heurísticas
-  // hardcodeadas — el Control de Acceso (RolePermission) es la única fuente.
-  const isAdminView =
-    user?.role === 'admin' || (await resolveAdminView(sb, employee, 'WorkOrder'));
+  // Admin-view: permiso explícito "Ver Todo" del rol del EMPLEADO en Control
+  // de Acceso (RolePermission), o super-admin puro (sin ficha de empleado).
+  // El rol de plataforma NUNCA hace bypass: un jefe_sitio con
+  // platformRole='admin' se rige por el admin_view de su ficha, igual que el
+  // cliente (useCurrentUser.isSuperAdmin). Cierra el leak donde el jefe veía
+  // TODAS las OTs del sector sin tener "Ver Todo" tildado en Control de Acceso.
+  const isAdminView = await resolveAdminView(sb, employee, 'WorkOrder');
   const isField = isFieldRole(employeeRole);
 
   // Linkage jefe de sitio: el operario de campo ejecuta el trabajo que le

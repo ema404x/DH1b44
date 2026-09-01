@@ -1,0 +1,97 @@
+{
+  "name": "TutorialProgress",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "ID del usuario propietario del progreso. Clave de visibilidad (RLS)."
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario (denormalizado para reportes)"
+    },
+    "module_id": {
+      "type": "string",
+      "description": "ID del m\u00f3dulo del tutorial (ej: 'ordenes', 'dashboard')."
+    },
+    "module_title": {
+      "type": "string",
+      "description": "T\u00edtulo del m\u00f3dulo (denormalizado para reporte sin join)"
+    },
+    "completed": {
+      "type": "boolean",
+      "default": false,
+      "description": "True cuando el quiz fue aprobado"
+    },
+    "quiz_score": {
+      "type": "number",
+      "default": 0,
+      "description": "Puntaje del quiz aprobatorio (0-100). 100 = todas correctas."
+    },
+    "quiz_answers": {
+      "type": "array",
+      "description": "Respuestas del intento aprobatorio",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string"
+          },
+          "correct": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "attempts": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad de intentos del quiz hasta aprobar"
+    },
+    "completed_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de aprobaci\u00f3n del quiz"
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector del usuario al completar (aislamiento para reportes por sector)"
+    }
+  },
+  "required": [
+    "user_id",
+    "module_id"
+  ],
+  "rls": {
+    "create": {},
+    "read": {
+      "$or": [
+        {
+          "data.user_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.user_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
