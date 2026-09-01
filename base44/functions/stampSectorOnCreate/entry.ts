@@ -27,11 +27,23 @@ Deno.serve(async (req) => {
     // resolución de jefe_sitio_email al MISMO sector. Esto previene la fuga
     // cross-sector: un "Juan Pérez" del sector B no debe matchear una OT del
     // sector A (RLS daría visibilidad al jefe del otro sector via email).
+    // CANONICAL: Employee.sector_id es la fuente de verdad (igual que
+    // resolveAndReconcileSector usado por buildOtVisibilityContext). El sector
+    // de plataforma (User.sector_id) puede estar desfasado/stale → estampar
+    // desde ahí atribuye la OT al sector equivocado y el creador la pierde
+    // (otEsVisiblePara usa el sector del Empleado). Resolvemos primero por
+    // user_id en la ficha Employee; si no hay ficha, backstop en el user de
+    // plataforma (super-admin puro sin ficha).
     let recordSector = data.sector_id || null;
     if (!recordSector && data.created_by_id) {
       try {
-        const creator = await sb.entities.User.get(data.created_by_id);
-        recordSector = creator?.sector_id || creator?.data?.sector_id || null;
+        const emps = await sb.entities.Employee.filter({ user_id: data.created_by_id });
+        const emp = emps?.[0];
+        recordSector = emp?.sector_id || null;
+        if (!recordSector) {
+          const creator = await sb.entities.User.get(data.created_by_id);
+          recordSector = creator?.data?.sector_id || creator?.sector_id || null;
+        }
       } catch (_) { /* queda null */ }
     }
 
