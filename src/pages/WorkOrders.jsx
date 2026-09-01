@@ -81,7 +81,7 @@ export default function WorkOrders() {
   //   la validación y el reporte no se revisaba. El estado se lee del cache de
   //   la query (sin depender de visibleOrders, declarado más abajo → TDZ).
   const handleComplete = useCallback(async (id) => {
-    if (!isOnline) { toast.info('Sin conexión — modo offline. No se puede cambiar el estado hasta reconectar.'); return; }
+    if (!navigator.onLine) { toast.info('Sin conexión — modo offline. No se puede cambiar el estado hasta reconectar.'); return; }
     const cached = queryClient.getQueryData(['workorders'])?.orders || [];
     const order = cached.find(o => o.id === id);
     const accion = order?.status === 'pendiente_validacion' ? 'aprobar'
@@ -95,10 +95,10 @@ export default function WorkOrders() {
       const msg = err.response?.data?.error || err.message || 'Error al actualizar la OT';
       toast.error(msg);
     }
-  }, [queryClient, isOnline]);
+  }, [queryClient]);
 
   const handleStart = useCallback(async (id) => {
-    if (!isOnline) { toast.info('Sin conexión — modo offline. No se puede iniciar la OT hasta reconectar.'); return; }
+    if (!navigator.onLine) { toast.info('Sin conexión — modo offline. No se puede iniciar la OT hasta reconectar.'); return; }
     try {
       const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: 'iniciar' });
       toast.success(res.data.mensaje || 'OT iniciada');
@@ -107,7 +107,7 @@ export default function WorkOrders() {
       const msg = err.response?.data?.error || err.message || 'Error al iniciar la OT';
       toast.error(msg);
     }
-  }, [queryClient, isOnline]);
+  }, [queryClient]);
   const { allowed: canCreate } = usePermission('WorkOrder', 'create');
   const { allowed: canDelete } = usePermission('WorkOrder', 'delete');
   const { resolveCreator } = useResolveCreator();
