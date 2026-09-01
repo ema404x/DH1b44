@@ -14,11 +14,13 @@ export default function KpisJefeSitio({ filterJefe = '', filterCutoff = null }) 
     staleTime: 1000 * 60 * 5,
   });
 
-  const { data: orders = [] } = useQuery({
+  const { data: _ordersRaw = [] } = useQuery({
     queryKey: ['workorders'],
     queryFn: () => base44.entities.WorkOrder.list('-updated_date', 300),
     staleTime: 1000 * 60 * 5,
   });
+  // ['workorders'] puede hidratarse como objeto {orders,...} desde el cache persistido.
+  const orders = Array.isArray(_ordersRaw) ? _ordersRaw : (_ordersRaw?.orders || []);
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
