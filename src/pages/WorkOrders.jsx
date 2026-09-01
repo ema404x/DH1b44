@@ -82,7 +82,7 @@ export default function WorkOrders() {
   //   la query (sin depender de visibleOrders, declarado más abajo → TDZ).
   const handleComplete = useCallback(async (id) => {
     if (!navigator.onLine) { toast.info('Sin conexión — modo offline. No se puede cambiar el estado hasta reconectar.'); return; }
-    const cached = queryClient.getQueryData(['workorders'])?.orders || [];
+    const cached = queryClient.getQueryData(['workorders-board'])?.orders || [];
     const order = cached.find(o => o.id === id);
     const accion = order?.status === 'pendiente_validacion' ? 'aprobar'
                  : order?.status === 'obra' ? 'completar'
@@ -90,7 +90,7 @@ export default function WorkOrders() {
     try {
       const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion });
       toast.success(res.data.mensaje || 'OT actualizada');
-      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Error al actualizar la OT';
       toast.error(msg);
@@ -102,7 +102,7 @@ export default function WorkOrders() {
     try {
       const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: 'iniciar' });
       toast.success(res.data.mensaje || 'OT iniciada');
-      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Error al iniciar la OT';
       toast.error(msg);
@@ -113,16 +113,16 @@ export default function WorkOrders() {
   const { resolveCreator } = useResolveCreator();
 
   const handleRefresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['workorders'] });
+    await queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
   };
 
   const { isOnline, pendingCount, queueCreate } = useOfflineQueue((count) => {
     toast.success(`${count} OT${count !== 1 ? 's' : ''} sincronizada${count !== 1 ? 's' : ''}`);
-    queryClient.invalidateQueries({ queryKey: ['workorders'] });
+    queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['workorders'],
+    queryKey: ['workorders-board'],
     queryFn: async () => {
       const res = await base44.functions.invoke('getWorkOrdersForUser', {});
       return res.data; // { orders, total, role, ctx }
@@ -214,13 +214,13 @@ export default function WorkOrders() {
     onSuccess: (ot) => {
       if (ot?._offline) {
         // No refetcheamos offline (fallaría). Inyectamos la OT local en el cache.
-        queryClient.setQueryData(['workorders'], (old) => {
+        queryClient.setQueryData(['workorders-board'], (old) => {
           const base = old && Array.isArray(old.orders) ? old : { orders: [], ...(old || {}) };
           return { ...base, orders: [ot, ...(base.orders || [])] };
         });
         toast.info('OT guardada sin conexión. Se sincronizará al reconectar.');
       } else {
-        queryClient.invalidateQueries({ queryKey: ['workorders'] });
+        queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
         queryClient.invalidateQueries({ queryKey: ['workorders-campo'] });
       }
     },
@@ -236,7 +236,7 @@ export default function WorkOrders() {
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
       setSelectedOrder(null);
       toast.success('OT eliminada correctamente');
     },
@@ -252,7 +252,7 @@ export default function WorkOrders() {
     const action = getTransitionAction(order.status, newStatus);
     if (!action) {
       toast.error('Esa transición de estado no está permitida');
-      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
       return;
     }
     try {
@@ -260,11 +260,11 @@ export default function WorkOrders() {
       // preserva permisos, validaciones y efectos secundarios (GPS, fechas, validador).
       const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: action });
       toast.success(res.data.mensaje);
-      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Error al cambiar el estado';
       toast.error(msg);
-      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
     }
   };
 

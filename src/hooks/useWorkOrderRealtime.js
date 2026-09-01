@@ -28,7 +28,7 @@ export function useWorkOrderRealtime(ctx, isOnline) {
       const id = event?.id || data?.id;
       if (!type || !id) return;
 
-      queryClient.setQueryData(['workorders'], (old) => {
+      queryClient.setQueryData(['workorders-board'], (old) => {
         const base =
           old && typeof old === 'object' && Array.isArray(old.orders)
             ? old

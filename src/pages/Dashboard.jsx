@@ -201,7 +201,9 @@ export default function Dashboard() {
   // porque el primer montaje refetcha si stale. Aplica idéntico a ambos sectores.
   const STALE_5MIN = 5 * 60 * 1000;
   const { data: projects = [] }  = useQuery({ queryKey: ['projects'],   queryFn: () => base44.entities.Project.list('-updated_date', 100),   staleTime: STALE_5MIN, enabled: canRead('Project') });
-  const { data: allOrders = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 150),  staleTime: STALE_5MIN, enabled: canRead('WorkOrder') });
+  const { data: _allOrdersRaw = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 150),  staleTime: STALE_5MIN, enabled: canRead('WorkOrder') });
+  // ['workorders'] se comparte con WorkOrders (getWorkOrdersForUser → shape {orders,...}). Normalizamos.
+  const allOrders = Array.isArray(_allOrdersRaw) ? _allOrdersRaw : (_allOrdersRaw?.orders || []);
   const { data: clients = [] }   = useQuery({ queryKey: ['clients'],    queryFn: () => base44.entities.Client.list('-updated_date', 100),     staleTime: STALE_5MIN, enabled: canRead('Client') });
   const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),    staleTime: STALE_5MIN, enabled: canRead('Invoice') });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),   staleTime: STALE_5MIN, enabled: canRead('Inventory') });

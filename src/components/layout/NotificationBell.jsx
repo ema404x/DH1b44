@@ -43,6 +43,8 @@ export default function NotificationBell() {
   // Reutiliza el cache global — staleTime alto para no re-fetchear solo por abrir el panel
   const STALE = 1000 * 60 * 10;
   const { data: orders    = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 80),  staleTime: STALE, refetchOnWindowFocus: false });
+  // ['workorders'] puede tener shape array (WorkOrder.list) u objeto {orders,...} (getWorkOrdersForUser). Normalizamos.
+  const workOrders = Array.isArray(orders) ? orders : (orders?.orders || []);
   const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 50),  staleTime: STALE, refetchOnWindowFocus: false });
   const { data: assets    = [] } = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 50),     staleTime: STALE, refetchOnWindowFocus: false });
   const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 50),   staleTime: STALE, refetchOnWindowFocus: false });
@@ -73,7 +75,7 @@ export default function NotificationBell() {
 
   const systemAlerts = useMemo(() => {
     const alerts = [];
-    const overdueOrders = orders.filter(o => o.scheduled_date && safeIsPast(o.scheduled_date) && !['completada','cancelada'].includes(o.status));
+    const overdueOrders = workOrders.filter(o => o.scheduled_date && safeIsPast(o.scheduled_date) && !['completada','cancelada'].includes(o.status));
     if (overdueOrders.length > 0) alerts.push({ id: 'ot-overdue', title: `${overdueOrders.length} OT${overdueOrders.length > 1 ? 's' : ''} vencida${overdueOrders.length > 1 ? 's' : ''}`, message: 'Órdenes con fecha pasada sin completar', type: 'warning', read: false });
     const lowStock = materials.filter(m => typeof m.stock === 'number' && typeof m.min_stock === 'number' && m.stock <= m.min_stock && m.min_stock > 0);
     if (lowStock.length > 0) alerts.push({ id: 'stock-low', title: 'Stock bajo detectado', message: `${lowStock.length} material${lowStock.length > 1 ? 'es' : ''} por debajo del mínimo`, type: 'warning', read: false });
@@ -82,7 +84,7 @@ export default function NotificationBell() {
     const overdueInvoices = invoices.filter(i => i.status === 'vencida' || (i.due_date && safeIsPast(i.due_date) && i.status === 'pendiente'));
     if (overdueInvoices.length > 0) alerts.push({ id: 'invoice-overdue', title: 'Facturas vencidas', message: `${overdueInvoices.length} factura${overdueInvoices.length > 1 ? 's' : ''} pendiente${overdueInvoices.length > 1 ? 's' : ''} de cobro`, type: 'error', read: false });
     return alerts;
-  }, [orders, materials, assets, invoices]);
+  }, [workOrders, materials, assets, invoices]);
 
   const allNotifs = [...systemAlerts, ...notifications];
   const unread = allNotifs.filter(n => !n.read).length;
