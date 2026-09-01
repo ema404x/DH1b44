@@ -23,13 +23,13 @@ const priorityColors = {
   urgente: 'bg-red-900/60 text-red-300 font-bold',
 };
 
-function KanbanCard({ order, index, onOpen, onShowQR }) {
+function KanbanCard({ order, index, onOpen, onShowQR, readOnly }) {
   const { resolveOTOwner } = useResolveCreator();
   const isOverdue = esOtVencida(order);
   const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
 
   return (
-    <Draggable draggableId={order.id} index={index}>
+    <Draggable draggableId={order.id} index={index} isDragDisabled={readOnly}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
@@ -90,7 +90,7 @@ function KanbanCard({ order, index, onOpen, onShowQR }) {
 
 const KANBAN_VISIBLE_LIMIT = 40; // máximo de cards visibles por columna
 
-function KanbanColumn({ col, orders, onOpen, onShowQR }) {
+function KanbanColumn({ col, orders, onOpen, onShowQR, readOnly }) {
   const [showAll, setShowAll] = React.useState(false);
   const visible = showAll ? orders : orders.slice(0, KANBAN_VISIBLE_LIMIT);
   const hidden = orders.length - KANBAN_VISIBLE_LIMIT;
@@ -121,6 +121,7 @@ function KanbanColumn({ col, orders, onOpen, onShowQR }) {
                 index={index}
                 onOpen={onOpen}
                 onShowQR={onShowQR}
+                readOnly={readOnly}
               />
             ))}
             {provided.placeholder}
@@ -144,7 +145,7 @@ function KanbanColumn({ col, orders, onOpen, onShowQR }) {
   );
 }
 
-export default function KanbanBoard({ orders, onOpen, onShowQR, onStatusChange }) {
+export default function KanbanBoard({ orders, onOpen, onShowQR, onStatusChange, readOnly }) {
   const grouped = COLUMNS.reduce((acc, col) => {
     acc[col.id] = orders.filter(o => o.status === col.id);
     return acc;
@@ -167,6 +168,7 @@ export default function KanbanBoard({ orders, onOpen, onShowQR, onStatusChange }
             orders={grouped[col.id] || []}
             onOpen={onOpen}
             onShowQR={onShowQR}
+            readOnly={readOnly}
           />
         ))}
       </div>

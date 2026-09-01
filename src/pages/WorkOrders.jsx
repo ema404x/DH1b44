@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Search, Plus, ClipboardList, MapPin,
   Zap, Wrench, TrendingUp,
-  Layers, History, Smartphone, LayoutGrid, Kanban, User, SlidersHorizontal, CheckCircle2
+  Layers, History, Smartphone, LayoutGrid, Kanban, User, SlidersHorizontal, CheckCircle2, WifiOff
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import KanbanBoard from '@/components/workorders/KanbanBoard';
@@ -34,6 +34,7 @@ import AdvancedFilters from '@/components/workorders/AdvancedFilters';
 import { useResolveCreator } from '@/hooks/useResolveCreator';
 import { isJefeSitioRole } from '@/lib/roles';
 import { esOtVencida } from '@/lib/otVencimiento';
+import { useWorkOrderRealtime } from '@/hooks/useWorkOrderRealtime';
 
 
 
@@ -80,7 +81,8 @@ export default function WorkOrders() {
   //   la validación y el reporte no se revisaba. El estado se lee del cache de
   //   la query (sin depender de visibleOrders, declarado más abajo → TDZ).
   const handleComplete = useCallback(async (id) => {
-    const cached = queryClient.getQueryData(['workorders']) || [];
+    if (!isOnline) { toast.info('Sin conexión — modo offline. No se puede cambiar el estado hasta reconectar.'); return; }
+    const cached = queryClient.getQueryData(['workorders'])?.orders || [];
     const order = cached.find(o => o.id === id);
     const accion = order?.status === 'pendiente_validacion' ? 'aprobar'
                  : order?.status === 'obra' ? 'completar'
@@ -93,9 +95,10 @@ export default function WorkOrders() {
       const msg = err.response?.data?.error || err.message || 'Error al actualizar la OT';
       toast.error(msg);
     }
-  }, [queryClient]);
+  }, [queryClient, isOnline]);
 
   const handleStart = useCallback(async (id) => {
+    if (!isOnline) { toast.info('Sin conexión — modo offline. No se puede iniciar la OT hasta reconectar.'); return; }
     try {
       const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: 'iniciar' });
       toast.success(res.data.mensaje || 'OT iniciada');
@@ -104,7 +107,7 @@ export default function WorkOrders() {
       const msg = err.response?.data?.error || err.message || 'Error al iniciar la OT';
       toast.error(msg);
     }
-  }, [queryClient]);
+  }, [queryClient, isOnline]);
   const { allowed: canCreate } = usePermission('WorkOrder', 'create');
   const { allowed: canDelete } = usePermission('WorkOrder', 'delete');
   const { resolveCreator } = useResolveCreator();
@@ -113,16 +116,16 @@ export default function WorkOrders() {
     await queryClient.invalidateQueries({ queryKey: ['workorders'] });
   };
 
-  const { isOnline, pendingCount } = useOfflineQueue((count) => {
+  const { isOnline, pendingCount, queueCreate } = useOfflineQueue((count) => {
     toast.success(`${count} OT${count !== 1 ? 's' : ''} sincronizada${count !== 1 ? 's' : ''}`);
     queryClient.invalidateQueries({ queryKey: ['workorders'] });
   });
 
-  const { data: orders = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['workorders'],
     queryFn: async () => {
       const res = await base44.functions.invoke('getWorkOrdersForUser', {});
-      return res.data.orders || [];
+      return res.data; // { orders, total, role, ctx }
     },
     // staleTime 30s: al volver de otra página dentro de 30s no refetchea → el
     // conteo hidratado desde IndexedDB no salta. refetchOnMount/focus solo
@@ -133,6 +136,13 @@ export default function WorkOrders() {
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
+
+  const orders = data?.orders || [];
+  const ctx = data?.ctx || null;
+
+  // ── Realtime: suscribe a eventos de WorkOrder y aplica al cache en vivo ──
+  // Offline: no suscribe (el tablero queda en modo lectura con el snapshot).
+  useWorkOrderRealtime(ctx, isOnline);
 
   // Direcciones — fuente canónica de jefes de sitio.
   // Se usa para resolver el jefe_sitio de OTs que no lo tienen poblado,
@@ -196,10 +206,23 @@ export default function WorkOrders() {
   }, [addrToJefe]);
 
   const createMutation = useMutation({
-    mutationFn: async (data) => base44.entities.WorkOrder.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workorders'] });
-      queryClient.invalidateQueries({ queryKey: ['workorders-campo'] });
+    mutationFn: async (data) => {
+      if (isOnline) return await base44.entities.WorkOrder.create(data);
+      // Offline: encola en IndexedDB y devuelve la OT local (con _offline).
+      return await queueCreate(data);
+    },
+    onSuccess: (ot) => {
+      if (ot?._offline) {
+        // No refetcheamos offline (fallaría). Inyectamos la OT local en el cache.
+        queryClient.setQueryData(['workorders'], (old) => {
+          const base = old && Array.isArray(old.orders) ? old : { orders: [], ...(old || {}) };
+          return { ...base, orders: [ot, ...(base.orders || [])] };
+        });
+        toast.info('OT guardada sin conexión. Se sincronizará al reconectar.');
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['workorders'] });
+        queryClient.invalidateQueries({ queryKey: ['workorders-campo'] });
+      }
     },
   });
 
@@ -223,6 +246,7 @@ export default function WorkOrders() {
   });
 
   const handleStatusChange = async (id, newStatus) => {
+    if (!isOnline) { toast.info('Sin conexión — modo offline. No se puede mover la OT hasta reconectar.'); return; }
     const order = visibleOrders.find(o => o.id === id);
     if (!order || order.status === newStatus) return;
     const action = getTransitionAction(order.status, newStatus);
@@ -339,6 +363,13 @@ export default function WorkOrders() {
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 space-y-6">
+      {/* Banner offline */}
+      {!isOnline && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
+          <WifiOff className="h-4 w-4 shrink-0" />
+          <span><strong>Modo offline</strong> — tablero en solo lectura. Las OTs nuevas se guardan localmente y se sincronizan al reconectar.</span>
+        </div>
+      )}
       {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-500/30 rounded-full blur-3xl opacity-20 animate-pulse" />
@@ -485,6 +516,7 @@ export default function WorkOrders() {
               onOpen={setSelectedOrder}
               onShowQR={setQrOrder}
               onStatusChange={handleStatusChange}
+              readOnly={!isOnline}
             />
           )}
         </motion.div>
@@ -503,7 +535,7 @@ export default function WorkOrders() {
               onShowQR={setQrOrder}
               onComplete={handleComplete}
               onStart={handleStart}
-              canComplete={canCompleteOT}
+              canComplete={canCompleteOT && isOnline}
             />
           ))}
         </motion.div>

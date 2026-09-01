@@ -24,7 +24,10 @@ export default async function(req) {
 
     if (!ctx) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
 
-    return Response.json({ orders, total, role });
+    // ctx: contexto de visibilidad del caller (su identidad + linkage jefe).
+    // Se expone al frontend para filtrar eventos realtime (otEsVisiblePara)
+    // sin ir al backend por cada evento. Es data del propio usuario — sin leak.
+    return Response.json({ orders, total, role, ctx });
   } catch (error) {
     return Response.json({ error: error.message, stack: error.stack }, { status: 500 });
   }

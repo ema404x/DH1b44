@@ -6,6 +6,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { isJefeSitioRole } from '@/lib/roles';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -104,6 +105,7 @@ export default function CrearOT() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { isSuperAdmin, employeeSector, employeeRole, displayName } = useCurrentUser();
+  const { isOnline, queueCreate } = useOfflineQueue();
   // Un jefe de sitio que crea una OT solo debe ver sus direcciones vinculadas (no
   // las de todos los jefes). Aplica solo en escuela, donde existe el vínculo
   // Direccion.jefe_sitio → asset.name/location. Admins/gerentes y otros sectores
@@ -287,13 +289,23 @@ export default function CrearOT() {
   // ── Mutation ─────────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.WorkOrder.create(data),
+    mutationFn: async (data) => {
+      if (isOnline) return await base44.entities.WorkOrder.create(data);
+      // Offline: encola en IndexedDB y devuelve la OT local (con _offline).
+      return await queueCreate(data);
+    },
     onSuccess: (ot) => {
-      queryClient.invalidateQueries({ queryKey: ['workorders'] });
-      queryClient.invalidateQueries({ queryKey: ['workorders-campo'] });
-      setCreatedOT(ot);
-      setStep(5);
-      toast.success('¡Orden de trabajo creada exitosamente!');
+      if (ot?._offline) {
+        setCreatedOT(ot);
+        setStep(5);
+        toast.success('OT guardada sin conexión. Se sincronizará al reconectar.');
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['workorders'] });
+        queryClient.invalidateQueries({ queryKey: ['workorders-campo'] });
+        setCreatedOT(ot);
+        setStep(5);
+        toast.success('¡Orden de trabajo creada exitosamente!');
+      }
     },
     onError: () => toast.error('Error al crear la OT. Intente nuevamente.'),
   });
@@ -554,7 +566,9 @@ export default function CrearOT() {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-foreground">
-              {modoGuardado === 'futura_obra' ? '¡Futura Obra Registrada!' : '¡OT Creada!'}
+              {modoGuardado === 'futura_obra'
+                ? '¡Futura Obra Registrada!'
+                : createdOT?._offline ? '¡OT Guardada (offline)!' : '¡OT Creada!'}
             </h2>
             <p className="text-muted-foreground text-sm mt-1 font-medium">{createdOT.title || createdOT.descripcion}</p>
             <div className="mt-3 space-y-1 text-xs text-muted-foreground">
@@ -567,10 +581,15 @@ export default function CrearOT() {
             </div>
           </div>
           <div className="space-y-2">
-            {modoGuardado === 'ot' && (
+            {modoGuardado === 'ot' && !createdOT?._offline && (
               <Button className="w-full gap-2" onClick={() => setShowQR(true)}>
                 <QrCode className="h-4 w-4" /> Ver QR de la OT
               </Button>
+            )}
+            {modoGuardado === 'ot' && createdOT?._offline && (
+              <div className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300 text-center">
+                Pendiente de sincronización — el QR estará disponible al reconectar.
+              </div>
             )}
             {modoGuardado === 'futura_obra' && (
               <Button className="w-full gap-2 bg-amber-500 hover:bg-amber-600 text-white" onClick={() => navigate('/activos')}>
