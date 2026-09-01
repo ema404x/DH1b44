@@ -4,25 +4,22 @@ import { resolveAndReconcileSector } from '../../shared/callerIdentity.ts';
 import { fetchAll } from '../../shared/fetchAllSector.ts';
 import { round2 } from '../../shared/round2.ts';
 import { resolveAdminView, resolveEstablecimientosDeJefe, norm } from '../../shared/visibilityResolver.ts';
+import { getVisibleWorkOrders } from '../../shared/workOrderVisibility.ts';
 
 /**
  * KPIs del Dashboard computados sobre el TOTAL que el usuario puede ver (sin
- * truncar). Regla de oro: backend-first.
+ * truncar). Regla de oro: backend-first, fuente única de visibilidad.
  *
- * Antes esta función sólo computaba KPIs sector-wide (para admins). Los jefes
- * quedaban fuera y el Dashboard los contaba client-side sobre .list(150) →
- * subreporte en cuanto un jefe superaba 150 OTs, y como la query 'workorders'
- * se persiste en IndexedDB, al montar se hidrataba con 150 viejos → contadores
- * desactualizados que recién se corregían al refetch ("hay que recargar varias
- * veces").
+ * Visibilidad de OT: delegada a getVisibleWorkOrders (workOrderVisibility.ts),
+ * el MISMO predicado que usan la página Órdenes y el Portal Operario. Así los
+ * contadores del Dashboard son idénticos a los de las otras vistas — sin
+ * lógica de scope duplicada (antes había computeIsSuperAdmin + userScopeQueries
+ * + mergeDedupe que omitía assigned_to/nombre/linkage y generaba discrepancias).
  *
- * Ahora:
- *  - Super-admin (admin/gerente sin rol de campo): KPIs sector-wide (igual que
- *    antes), con queries filtradas por estado (eficiente).
- *  - No super-admin (jefe/inspector/técnico/user): KPIs scopeados al usuario
- *    (created_by_id == user.id OR jefe_sitio_email == user.email), espejo del
- *    RLS de WorkOrder/Pendiente. Se traen TODAS sus OTs/pendientes paginando
- *    (sin tope 150) y se computan los KPIs en JS — contadores exactos.
+ * Performance: antes ~17 fetchAll (6 sobre WorkOrder solo). Ahora 8 fetchAll
+ * totales — uno por módulo — disparados en un único Promise.all, con los KPIs
+ * computados en memoria sobre el array ya cargado. WorkOrder pasó de 6 recorridos
+ * paginados a 1.
  *
  * Reglas innegociables:
  *  - Fail closed en sector: si el usuario no tiene sector_id → 403.
@@ -39,7 +36,10 @@ const ADMIN_LEVEL_ROLES = ['admin', 'gerente', 'gerencia', 'administrativo', 'ge
 
 function isFieldRole(r) { return FIELD_ROLES.includes(normalizeRole(r)); }
 function isAdminLevelRole(r) { return ADMIN_LEVEL_ROLES.includes(normalizeRole(r)); }
-// Espejo exacto de useCurrentUser.isSuperAdmin.
+// Espejo exacto de useCurrentUser.isSuperAdmin. Se devuelve en la respuesta para
+// que el frontend no deba recalcularlo (algunos componentes lo consumen del
+// payload del Dashboard). NO se usa para scope de OT — eso lo resuelve
+// getVisibleWorkOrders via admin_view del rol del empleado.
 function computeIsSuperAdmin(platformRole, employeeRole) {
   if ((platformRole === 'admin' && !isFieldRole(employeeRole)) ||
       platformRole === 'gerente' ||
@@ -58,22 +58,6 @@ function canReadModule(perms, moduleKey) {
 const dateOnly = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-// fetchAll (base44/shared/fetchAllSector.ts): paginación robusta con cursor
-// $gte + dedupe por id de la boundary — no saltea registros con created_date
-// idéntico (imports masivos).
-
-// Merge+dedupe por id (para juntar created_by_id ∪ jefe_sitio_email sin dobles).
-function mergeDedupe(lists) {
-  const seen = new Set();
-  const out = [];
-  for (const list of lists) {
-    for (const r of list) {
-      if (r && r.id && !seen.has(r.id)) { seen.add(r.id); out.push(r); }
-    }
-  }
-  return out;
-}
-
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
@@ -84,15 +68,12 @@ export default async function (req) {
 
     // Resolución CANÓNICA del sector: ficha Employee primero, reconciliando
     // user.data.sector_id si está desfasado (igual que getWorkOrdersForUser).
-    // Antes leíamos solo user.data.sector_id → KPIs sobre sector equivocado
-    // hasta re-login.
     const { sector: callerSector, employee } = await resolveAndReconcileSector(sb, user);
     if (!callerSector) {
       return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
     }
 
     // ── Resolver permisos + rol de empleado (espejo del frontend) ──
-    // Reutiliza la ficha Employee ya resuelta en resolveAndReconcileSector.
     let perms = {};
     let employeeRole = null;
     if (user.role !== 'admin') {
@@ -111,127 +92,121 @@ export default async function (req) {
 
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const thisMonthStr = dateOnly(thisMonthStart);
-
-    // REGLA DE ORO — vencimiento de OT (base44/shared/otVencimiento.ts):
-    // una OT está vencida SÓLO si está en en_progreso y HOY superó su fecha
-    // programada (scheduled_date). Pendiente/asignada/obra/validación nunca
-    // se cuentan como vencidas. Aplica a ambos sectores de forma idéntica.
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
     const sec = { sector_id: callerSector };
-    // Scope de usuario para no-super-admin (espejo del RLS de WorkOrder/Pendiente).
-    const userEmail = (user.email || '').toLowerCase().trim();
-    const userScopeQueries = isSuperAdmin ? null : [
-      { created_by_id: user.id },
-      { jefe_sitio_email: userEmail },
-    ];
 
-    // ── WorkOrder ──
+    // ── Disparar TODAS las cargas de datos en paralelo ──
+    // Un fetchAll por módulo; KPIs se computan en memoria sobre el array ya
+    // cargado. getVisibleWorkOrders es la fuente única de OTs visibles (mismo
+    // predicado que Órdenes/Portal) — un solo recorrido paginado de WorkOrder
+    // reemplaza los 6 que había antes.
+    const loadKeys = [];
+    const loadPromises = [];
+    if (canRead('WorkOrder')) {
+      loadKeys.push('workorders');
+      loadPromises.push(getVisibleWorkOrders(sb, user).then((r) => r.orders));
+    }
+    if (canRead('Project')) {
+      loadKeys.push('projects');
+      loadPromises.push(fetchAll(sb, 'Project', sec));
+    }
+    if (canRead('Client')) {
+      loadKeys.push('clients');
+      loadPromises.push(fetchAll(sb, 'Client', sec));
+    }
+    if (canRead('Employee')) {
+      loadKeys.push('employees');
+      loadPromises.push(fetchAll(sb, 'Employee', { ...sec, status: 'activo' }));
+    }
+    if (canRead('Invoice')) {
+      loadKeys.push('invoices');
+      loadPromises.push(fetchAll(sb, 'Invoice', { ...sec, status: { $in: ['pagada', 'pendiente'] } }));
+    }
+    if (canRead('Inventory')) {
+      loadKeys.push('materials');
+      loadPromises.push(fetchAll(sb, 'Material', sec));
+    }
+    if (canRead('Asset')) {
+      loadKeys.push('assets');
+      loadPromises.push(fetchAll(sb, 'Asset', { ...sec, next_maintenance: { $lt: now.toISOString() } }));
+    }
+    if (canRead('Pendientes')) {
+      loadKeys.push('pendientes');
+      loadPromises.push(fetchAll(sb, 'Pendiente', sec));
+    }
+
+    const loadedValues = await Promise.all(loadPromises);
+    const loaded = {};
+    loadKeys.forEach((k, i) => { loaded[k] = loadedValues[i]; });
+
+    // ── WorkOrder KPIs (1 sola carga, filtros en memoria) ──
+    // Pipeline activo: excluye archivadas (las archivadas son del historial,
+    // no del tablero activo). archivada: { $ne: true } en JS equivale a !o.archivada
+    // (cubre tanto true como ausente/default false).
     let pendingOrders = null,
       inProgressOrders = null,
       overdueOrders = null,
       completedThisMonth = null,
       urgentOrders = null,
       efficiency = null;
-    if (canRead('WorkOrder')) {
-      if (isSuperAdmin) {
-        // KPIs de pipeline ACTIVO: excluyen archivadas (las archivadas son del
-        // historial, no del tablero activo). archivada: { $ne: true } cubre
-        // tanto true como ausente (default false).
-        const notArchived = { archivada: { $ne: true } };
-        const [pend, prog, compMonth, urgent, compl, nonCancel] = await Promise.all([
-          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: { $in: ['pendiente', 'asignada'] } }),
-          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: 'en_progreso' }),
-          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: 'completada', completed_date: { $gte: thisMonthStr } }),
-          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: { $in: ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'] }, priority: { $in: ['urgente', 'alta'] } }),
-          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: 'completada' }),
-          fetchAll(sb, 'WorkOrder', { ...sec, ...notArchived, status: { $ne: 'cancelada' } }),
-        ]);
-        pendingOrders = pend.length;
-        inProgressOrders = prog.length;
-        // Vencidas: OTs en en_progreso que superaron su fecha programada (regla de oro).
-        overdueOrders = prog.filter(o => esOtVencida(o, now)).length;
-        completedThisMonth = compMonth.length;
-        urgentOrders = urgent.length;
-        const validOrders = nonCancel.length;
-        efficiency = validOrders > 0 ? Math.round((compl.length / validOrders) * 100) : 0;
-      } else {
-        // Jefe/operario: traer TODAS sus OTs (paginado, sin tope 150) y contar en JS.
-        const lists = await Promise.all(
-          userScopeQueries.map((q) => fetchAll(sb, 'WorkOrder', { ...sec, ...q }))
-        );
-        const mine = mergeDedupe(lists);
-        // Pipeline activo: excluye archivadas (historial).
-        const activeMine = mine.filter((o) => !o.archivada);
-        pendingOrders = activeMine.filter((o) => ['pendiente', 'asignada'].includes(o.status)).length;
-        inProgressOrders = activeMine.filter((o) => o.status === 'en_progreso').length;
-        overdueOrders = activeMine.filter(o => esOtVencida(o, now)).length;
-        completedThisMonth = activeMine.filter((o) => o.completed_date && o.status === 'completada' && new Date(o.completed_date) >= thisMonthStart).length;
-        urgentOrders = activeMine.filter((o) => ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'].includes(o.status) && ['urgente', 'alta'].includes(o.priority)).length;
-        const validOrders = activeMine.filter((o) => o.status !== 'cancelada').length;
-        const compl = activeMine.filter((o) => o.status === 'completada').length;
-        efficiency = validOrders > 0 ? Math.round((compl / validOrders) * 100) : 0;
-      }
+    if (loaded.workorders) {
+      const active = loaded.workorders.filter((o) => !o.archivada);
+      pendingOrders = active.filter((o) => ['pendiente', 'asignada'].includes(o.status)).length;
+      inProgressOrders = active.filter((o) => o.status === 'en_progreso').length;
+      // Vencidas: OTs en en_progreso que superaron su fecha programada (regla de oro).
+      overdueOrders = active.filter((o) => esOtVencida(o, now)).length;
+      completedThisMonth = active.filter((o) => o.completed_date && o.status === 'completada' && new Date(o.completed_date) >= thisMonthStart).length;
+      urgentOrders = active.filter((o) => ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'].includes(o.status) && ['urgente', 'alta'].includes(o.priority)).length;
+      const validOrders = active.filter((o) => o.status !== 'cancelada').length;
+      const compl = active.filter((o) => o.status === 'completada').length;
+      efficiency = validOrders > 0 ? Math.round((compl / validOrders) * 100) : 0;
     }
 
     // ── Project ──
     let activeProjects = null, totalProjects = null;
-    if (canRead('Project')) {
-      const [allP, activeP] = await Promise.all([
-        fetchAll(sb, 'Project', sec),
-        fetchAll(sb, 'Project', { ...sec, status: 'en_progreso' }),
-      ]);
-      totalProjects = allP.length;
-      activeProjects = activeP.length;
+    if (loaded.projects) {
+      totalProjects = loaded.projects.length;
+      activeProjects = loaded.projects.filter((p) => p.status === 'en_progreso').length;
     }
 
     // ── Client ──
     let activeClients = null, totalClients = null;
-    if (canRead('Client')) {
-      const [allC, activeC] = await Promise.all([
-        fetchAll(sb, 'Client', sec),
-        fetchAll(sb, 'Client', { ...sec, status: 'activo' }),
-      ]);
-      totalClients = allC.length;
-      activeClients = activeC.length;
+    if (loaded.clients) {
+      totalClients = loaded.clients.length;
+      activeClients = loaded.clients.filter((c) => c.status === 'activo').length;
     }
 
     // ── Employee ──
     let activeEmployees = null;
-    if (canRead('Employee')) {
-      const activeE = await fetchAll(sb, 'Employee', { ...sec, status: 'activo' });
-      activeEmployees = activeE.length;
+    if (loaded.employees) {
+      activeEmployees = loaded.employees.length;
     }
 
     // ── Invoice ──
     let revenueThisMonth = null, revenueLastMonth = null, revenueTrend = null, pendingInvoices = null;
-    if (canRead('Invoice')) {
-      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthStr = dateOnly(lastMonthStart);
-      const [thisM, lastM, pendInv] = await Promise.all([
-        fetchAll(sb, 'Invoice', { ...sec, status: 'pagada', payment_date: { $gte: thisMonthStr } }),
-        fetchAll(sb, 'Invoice', { ...sec, status: 'pagada', payment_date: { $gte: lastMonthStr, $lt: thisMonthStr } }),
-        fetchAll(sb, 'Invoice', { ...sec, status: 'pendiente' }),
-      ]);
-      revenueThisMonth = round2(thisM.reduce((s, i) => s + (i.total || 0), 0));
-      revenueLastMonth = round2(lastM.reduce((s, i) => s + (i.total || 0), 0));
+    if (loaded.invoices) {
+      const inv = loaded.invoices;
+      const paidThisM = inv.filter((i) => i.status === 'pagada' && i.payment_date && new Date(i.payment_date) >= thisMonthStart);
+      const paidLastM = inv.filter((i) => i.status === 'pagada' && i.payment_date && new Date(i.payment_date) >= lastMonthStart && new Date(i.payment_date) < thisMonthStart);
+      const pend = inv.filter((i) => i.status === 'pendiente');
+      revenueThisMonth = round2(paidThisM.reduce((s, i) => s + (i.total || 0), 0));
+      revenueLastMonth = round2(paidLastM.reduce((s, i) => s + (i.total || 0), 0));
       revenueTrend = revenueLastMonth > 0 ? Math.round(((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100) : 0;
-      pendingInvoices = round2(pendInv.reduce((s, i) => s + (i.total || 0), 0));
+      pendingInvoices = round2(pend.reduce((s, i) => s + (i.total || 0), 0));
     }
 
     // ── Material ──
     let lowStockItems = null, totalMaterials = null;
-    if (canRead('Inventory')) {
-      const allM = await fetchAll(sb, 'Material', sec);
-      totalMaterials = allM.length;
-      lowStockItems = allM.filter((m) => m.stock <= m.min_stock && m.min_stock > 0).length;
+    if (loaded.materials) {
+      totalMaterials = loaded.materials.length;
+      lowStockItems = loaded.materials.filter((m) => m.stock <= m.min_stock && m.min_stock > 0).length;
     }
 
     // ── Asset ──
     let overdueAssets = null;
-    if (canRead('Asset')) {
-      const od = await fetchAll(sb, 'Asset', { ...sec, next_maintenance: { $lt: now.toISOString() } });
-      overdueAssets = od.length;
+    if (loaded.assets) {
+      overdueAssets = loaded.assets.length;
     }
 
     // ── Pendientes ──
@@ -240,8 +215,8 @@ export default async function (req) {
     // + los de sus establecimientos asignados. Sin ficha de empleado (super-admin
     // puro) → admin_view=true → todo el sector.
     let pendientesActivos = null, pendientesResueltos = null, pendientesUrgentes = null;
-    if (canRead('Pendientes')) {
-      const allPends = await fetchAll(sb, 'Pendiente', sec);
+    if (loaded.pendientes) {
+      const allPends = loaded.pendientes;
       const pendAdminView = await resolveAdminView(sb, employee, 'Pendientes');
       let mine;
       if (pendAdminView) {
