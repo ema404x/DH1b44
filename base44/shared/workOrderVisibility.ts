@@ -165,20 +165,9 @@ export async function buildOtVisibilityContext(
 export function otEsVisiblePara(ot: any, ctx: OtVisibilityContext): boolean {
   if (!ot || !ctx) return false;
 
-  // CREADOR — ownership AUTORITATIVA, antes del gate de sector.
-  // El creador NUNCA pierde sus propias OTs por un fallo de stamping de sector:
-  // race del automation (OT creada, sector_id aún no estampado), drift de
-  // user.data.sector_id vs Employee.sector_id (la OT queda en el sector
-  // equivocado), o stamping fallido (sector_id null → SIN_SECTOR).
-  // NO fuga cross-sector: sólo el ÚNICO creador gana visibilidad mediante su
-  // propio id; todos los demás usuarios siguen sujetos al gate de sector abajo.
-  // Esto recupera para el creador las OTs que el query sector-scoped no carga
-  // cuando el sector_id quedó mal/nulo (getVisibleWorkOrders trae también el
-  // bucket del creador para que este check alcance a evaluarlas).
-  if (ot.created_by_id && ot.created_by_id === ctx.userId) return true;
-
-  // Aislamiento entre sectores + fail-closed: OT sin sector_id → excluida
-  // para todos los demás (no se atribuye por default a ningún sector).
+  // Aislamiento entre sectores + fail-closed: OT sin sector_id → excluida.
+  // (Antes: (ot.sector_id || 'escuela') === sector — atribuía OTs bapro sin
+  //  sector_id al sector escuela. Ahora se exige sector_id explícito.)
   if (!ot.sector_id || ot.sector_id !== ctx.sector) return false;
 
   // a. Admin-view: todo el sector.
@@ -188,9 +177,11 @@ export function otEsVisiblePara(ot: any, ctx: OtVisibilityContext): boolean {
   const otName = norm(ot.assigned_name);
   const otJefeName = norm(ot.jefe_sitio);
 
-  // Visibilidad PROPIA (no-creador): jefe por email, asignado por id,
-  // asignado por nombre, o jefe_sitio por nombre.
+  // Visibilidad PROPIA (todos los roles autenticados con sector):
+  // creador, jefe por email, asignado por id, asignado por nombre, o
+  // jefe_sitio por nombre.
   const propia =
+    (!!ot.created_by_id && ot.created_by_id === ctx.userId) ||
     (!!ot.jefe_sitio_email && ot.jefe_sitio_email.toLowerCase().trim() === ctx.userEmail) ||
     (!!ot.assigned_to && ot.assigned_to === ctx.userId) ||
     (!!myName && !!otName && otName === myName) ||
@@ -228,31 +219,12 @@ export async function getVisibleWorkOrders(
   const ctx = await buildOtVisibilityContext(sb, user);
   if (!ctx) return { orders: [], total: 0, role: null, ctx: null };
 
-  // Doble carga y dedupe — para que el creador NUNCA pierda sus propias OTs:
-  //  • Bucket del sector: todas las OTs con sector_id == ctx.sector (canónico
-  //    del Empleado). Cubre el caso normal y el admin_view.
-  //  • Bucket del creador: OTs con created_by_id == ctx.userId, SIN filtro de
-  //    sector. Recupera las OTs que quedaron mal estampadas (drift de
-  //    user.data.sector_id vs Employee.sector_id) o con sector_id null/SIN_SECTOR
-  //    por una race del automation o stamping fallido. El predicado
-  //    otEsVisiblePara las admite sólo para el creador (ownership autoritativa);
-  //    ningún otro usuario las ve (gate de sector). No fuga cross-sector.
-  // Orden -updated_date para preservar el burbujeo de OTs recién tocadas
-  // (regla de oro: OT vieja iniciada por QR bubbla al top).
-  const [sectorOrders, creatorOrders] = await Promise.all([
-    fetchAll(sb, 'WorkOrder', { sector_id: ctx.sector }, '-updated_date'),
-    ctx.userId
-      ? fetchAll(sb, 'WorkOrder', { created_by_id: ctx.userId }, '-updated_date').catch(() => [])
-      : Promise.resolve([]),
-  ]);
-
-  const seen = new Set<string>();
-  const all: any[] = [];
-  for (const o of [...(sectorOrders || []), ...(creatorOrders || [])]) {
-    if (!o || seen.has(o.id)) continue;
-    seen.add(o.id);
-    all.push(o);
-  }
+  // fetchAll trae TODAS las OTs del sector en una sola llamada (sin cursor,
+  // sin saltos — el SDK no soporta operadores sobre campos built-in, así que
+  // la paginación vieja perdía registros). Orden -updated_date directo para
+  // preservar el burbujeo de OTs recién tocadas (regla de oro: OT vieja
+  // iniciada por QR bubbla al top).
+  const all = await fetchAll(sb, 'WorkOrder', { sector_id: ctx.sector }, '-updated_date');
 
   const orders = all.filter((ot: any) => otEsVisiblePara(ot, ctx));
   return {
