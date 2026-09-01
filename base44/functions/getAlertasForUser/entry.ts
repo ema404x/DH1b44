@@ -157,6 +157,33 @@ export default async function (req) {
       // sin admin_view → sin alertas de stock (materiales sin ownership por jefe)
     }
 
+    // ── 5. FACTURAS VENCIDAS (sólo admin_view('Invoice')) ──
+    // Las facturas son financieras: no pertenecen a un jefe de sitio. Sólo las
+    // ve quien tenga "Ver Todo" en Facturación (admin_view del rol de empleado),
+    // respetando el aislamiento por sector. Sin admin_view → sin alerta (no es
+    // competencia de un operario/jefe saber de cobros).
+    const adminViewInv = await resolveAdminView(sb, employee, 'Invoice');
+    if (adminViewInv) {
+      const all = await fetchAll(sb, 'Invoice', { sector_id: sector, status: { $in: ['pendiente', 'vencida'] } });
+      for (const inv of all) {
+        const dueMs = inv.due_date ? new Date(inv.due_date + 'T00:00:00Z').getTime() : null;
+        const esVencida = inv.status === 'vencida' || (dueMs != null && dueMs < ahora.getTime());
+        if (!esVencida) continue;
+        const dv = dueMs != null ? Math.ceil((ahora.getTime() - dueMs) / 86400000) : 0;
+        const nivel = dv >= 30 ? 'critical' : 'warning';
+        alertas.push({
+          tipo: 'factura_vencida',
+          nivel,
+          titulo: `Factura vencida: ${inv.code || inv.client_name || inv.id}`,
+          mensaje: `La factura de "${inv.client_name || 'sin cliente'}"${inv.due_date ? ` venció el ${inv.due_date}` : ' está vencida'}.`,
+          entidad_tipo: 'Invoice',
+          entidad_id: inv.id,
+          entidad_nombre: inv.code || inv.client_name || inv.id,
+          fecha_alerta: ahora.toISOString(),
+        });
+      }
+    }
+
     // Orden: críticas primero, luego warning, luego info
     const orden = { critical: 0, warning: 1, info: 2 };
     alertas.sort((a, b) => (orden[a.nivel] ?? 3) - (orden[b.nivel] ?? 3));

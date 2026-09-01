@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck, AlertTriangle, Info, CheckCircle2, X, AlertCircle, Package, Wrench, Receipt, ClipboardList } from 'lucide-react';
+import { Bell, CheckCheck, AlertTriangle, Info, CheckCircle2, X, AlertCircle, Package, Wrench, Receipt, ClipboardList, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isPast, parseISO, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -15,19 +15,21 @@ const TYPE_CONFIG = {
   error:   { icon: AlertCircle,   bg: 'bg-red-500/15',     icon_color: 'text-red-400',     border: 'border-red-500/30',     dot: 'bg-red-400'     },
 };
 
-const SYSTEM_ICONS = {
-  'ot-overdue':      ClipboardList,
-  'stock-low':       Package,
-  'maint-overdue':   Wrench,
-  'invoice-overdue': Receipt,
+// Mapeo de tipos de alerta del backend (getAlertasForUser) a ícono + ruta +
+// etiquetas para el agrupamiento en la campana. La visibilidad de cada alerta
+// la resuelve el backend (regla de oro: admin_view del rol de empleado +
+// responsables por sector). Un jefe de sitio sólo recibe alertas de su
+// ámbito; quien tiene "Ver Todo" recibe todo el sector. Ambos sectores idénticos.
+const TIPO_UI = {
+  ot_vencida:        { icon: ClipboardList, path: '/ordenes',     single: 'OT vencida',            plural: 'OTs vencidas' },
+  pendiente_vencido: { icon: Clock,         path: '/activos',     single: 'Pendiente vencido',     plural: 'Pendientes vencidos' },
+  garantia_activo:   { icon: Wrench,        path: '/activos',     single: 'Garantía por vencer',  plural: 'Garantías por vencer' },
+  stock_material:    { icon: Package,       path: '/inventario',  single: 'Material con stock bajo', plural: 'Materiales con stock bajo' },
+  factura_vencida:   { icon: Receipt,       path: '/facturacion', single: 'Factura vencida',       plural: 'Facturas vencidas' },
 };
 
-const systemAlertPaths = {
-  'ot-overdue':      '/ordenes',
-  'stock-low':       '/inventario',
-  'maint-overdue':   '/activos',
-  'invoice-overdue': '/facturacion',
-};
+const NIVEL_RANK = { critical: 0, warning: 1, info: 2 };
+const nivelToType = (n) => (n === 'critical' ? 'error' : n === 'warning' ? 'warning' : 'info');
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -40,14 +42,17 @@ export default function NotificationBell() {
     staleTime: 1000 * 60 * 2,
   });
 
-  // Reutiliza el cache global — staleTime alto para no re-fetchear solo por abrir el panel
-  const STALE = 1000 * 60 * 10;
-  const { data: orders    = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 80),  staleTime: STALE, refetchOnWindowFocus: false });
-  // ['workorders'] puede tener shape array (WorkOrder.list) u objeto {orders,...} (getWorkOrdersForUser). Normalizamos.
-  const workOrders = Array.isArray(orders) ? orders : (orders?.orders || []);
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 50),  staleTime: STALE, refetchOnWindowFocus: false });
-  const { data: assets    = [] } = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 50),     staleTime: STALE, refetchOnWindowFocus: false });
-  const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 50),   staleTime: STALE, refetchOnWindowFocus: false });
+  // Alertas del sistema: ÚNICA fuente de verdad = getAlertasForUser (backend).
+  // Comparte el cache con AlertasBanner (mismo queryKey) → una sola petición
+  // alimenta ambos componentes y la visibilidad queda scopeada por el backend
+  // (jefe ve lo suyo; admin_view ve todo el sector). Antes se computaba
+  // client-side sobre caches sin scope → cada usuario veía TODO.
+  const { data: alertas = [] } = useQuery({
+    queryKey: ['alertas-activas'],
+    queryFn: async () => (await base44.functions.invoke('getAlertasForUser')).data.alertas || [],
+    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
 
   const markReadMutation = useMutation({
     mutationFn: (id) => base44.entities.Notification.update(id, { read: true }),
@@ -67,24 +72,33 @@ export default function NotificationBell() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
-  // Bug fix: guard para fechas inválidas/null antes de parseISO para evitar crashes silenciosos
-  const safeIsPast = (dateStr) => {
-    if (!dateStr) return false;
-    try { return isPast(parseISO(dateStr)); } catch { return false; }
-  };
-
+  // Agrupa las alertas del backend por tipo → una entrada resumen por tipo
+  // (con conteo y el peor nivel), igual al UX previo pero con datos scopeados.
   const systemAlerts = useMemo(() => {
-    const alerts = [];
-    const overdueOrders = workOrders.filter(o => o.scheduled_date && safeIsPast(o.scheduled_date) && !['completada','cancelada'].includes(o.status));
-    if (overdueOrders.length > 0) alerts.push({ id: 'ot-overdue', title: `${overdueOrders.length} OT${overdueOrders.length > 1 ? 's' : ''} vencida${overdueOrders.length > 1 ? 's' : ''}`, message: 'Órdenes con fecha pasada sin completar', type: 'warning', read: false });
-    const lowStock = materials.filter(m => typeof m.stock === 'number' && typeof m.min_stock === 'number' && m.stock <= m.min_stock && m.min_stock > 0);
-    if (lowStock.length > 0) alerts.push({ id: 'stock-low', title: 'Stock bajo detectado', message: `${lowStock.length} material${lowStock.length > 1 ? 'es' : ''} por debajo del mínimo`, type: 'warning', read: false });
-    const overdueAssets = assets.filter(a => a.next_maintenance && safeIsPast(a.next_maintenance));
-    if (overdueAssets.length > 0) alerts.push({ id: 'maint-overdue', title: `${overdueAssets.length} mantenimiento${overdueAssets.length > 1 ? 's' : ''} vencido${overdueAssets.length > 1 ? 's' : ''}`, message: 'Activos con mantenimiento programado vencido', type: 'error', read: false });
-    const overdueInvoices = invoices.filter(i => i.status === 'vencida' || (i.due_date && safeIsPast(i.due_date) && i.status === 'pendiente'));
-    if (overdueInvoices.length > 0) alerts.push({ id: 'invoice-overdue', title: 'Facturas vencidas', message: `${overdueInvoices.length} factura${overdueInvoices.length > 1 ? 's' : ''} pendiente${overdueInvoices.length > 1 ? 's' : ''} de cobro`, type: 'error', read: false });
-    return alerts;
-  }, [workOrders, materials, assets, invoices]);
+    const groups = {};
+    for (const a of alertas) {
+      (groups[a.tipo] = groups[a.tipo] || []).push(a);
+    }
+    return Object.entries(groups).map(([tipo, items]) => {
+      const ui = TIPO_UI[tipo] || { icon: AlertTriangle, path: '/ordenes', single: tipo, plural: tipo };
+      const worst = items.reduce(
+        (acc, a) => ((NIVEL_RANK[a.nivel] ?? 3) < (NIVEL_RANK[acc.nivel] ?? 3) ? a : acc),
+        items[0],
+      );
+      const isPlural = items.length > 1;
+      return {
+        id: tipo,
+        iconKey: tipo,
+        path: ui.path,
+        title: `${items.length} ${isPlural ? ui.plural : ui.single}`,
+        message: isPlural
+          ? `${items.length} casos en tu ámbito (${items.filter(i => i.nivel === 'critical').length} crítico${items.filter(i => i.nivel === 'critical').length !== 1 ? 's' : ''})`
+          : worst.mensaje,
+        type: nivelToType(worst.nivel),
+        read: false,
+      };
+    });
+  }, [alertas]);
 
   const allNotifs = [...systemAlerts, ...notifications];
   const unread = allNotifs.filter(n => !n.read).length;
@@ -92,13 +106,15 @@ export default function NotificationBell() {
   const handleOpen = () => {
     const newOpen = !open;
     setOpen(newOpen);
-    // Solo refrescar notificaciones (las demás queries usan cache global con staleTime alto)
-    if (newOpen) qc.invalidateQueries({ queryKey: ['notifications'] });
+    if (newOpen) {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['alertas-activas'] });
+    }
   };
 
   const handleClick = (n) => {
-    const isSystem = typeof n.id === 'string' && systemAlertPaths[n.id];
-    if (isSystem) { navigate(systemAlertPaths[n.id]); setOpen(false); }
+    const isSystem = typeof n.id === 'string' && n.path;
+    if (isSystem) { navigate(n.path); setOpen(false); }
     else if (n.id && !n.read) markReadMutation.mutate(n.id);
   };
 
@@ -165,7 +181,7 @@ export default function NotificationBell() {
                       </div>
                       {systemAlerts.map(n => {
                         const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.info;
-                        const Icon = SYSTEM_ICONS[n.id] || cfg.icon;
+                        const Icon = (TIPO_UI[n.iconKey] || {}).icon || cfg.icon;
                         return (
                           <button key={n.id} onClick={() => handleClick(n)}
                             className={cn('w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left transition-all hover:scale-[1.01] active:scale-[0.99]', cfg.bg, 'border', cfg.border)}>

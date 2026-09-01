@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ShieldAlert, Package, Clock, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, Package, Clock, Receipt, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow, parseISO } from 'date-fns';
@@ -12,6 +12,7 @@ const TIPO_CONFIG = {
   garantia_activo:   { icon: ShieldAlert,    color: 'text-purple-400', glow: 'shadow-purple-500/20', bg: 'bg-purple-500/10', border: 'border-purple-500/30', label: 'Garantía', href: '/activos' },
   stock_material:    { icon: Package,        color: 'text-red-400',    glow: 'shadow-red-500/20',    bg: 'bg-red-500/10',    border: 'border-red-500/30',    label: 'Stock',    href: '/inventario' },
   pendiente_vencido: { icon: Clock,          color: 'text-amber-400',  glow: 'shadow-amber-500/20',  bg: 'bg-amber-500/10',  border: 'border-amber-500/30',  label: 'Pendiente', href: '/activos' },
+  factura_vencida:   { icon: Receipt,        color: 'text-red-400',    glow: 'shadow-red-500/20',    bg: 'bg-red-500/10',    border: 'border-red-500/30',    label: 'Factura',  href: '/facturacion' },
 };
 
 const NIVEL_CONFIG = {
