@@ -250,6 +250,10 @@ export default function WorkOrders() {
   // activas y se visualizan desde el Historial. No se "borran" — siguen
   // existiendo con status='completada' + archivada=true.
   const visibleOrders = useMemo(() => orders.filter(o => !o.archivada), [orders]);
+  // OTs archivadas (auto-archivo 30 días tras completada) — visibles en
+  // Historial. Se muestran en el header para que el total no se perciba como
+  // pérdida: "44 activas · 55 archivadas (Historial)".
+  const archivedCount = orders.length - visibleOrders.length;
 
   // Pre-normaliza los campos buscables UNA vez por cambio de visibleOrders (no por
   // cada tecla). NFD + strip de acentos sobre los campos de texto era el costo hot
@@ -350,7 +354,9 @@ export default function WorkOrders() {
             </div>
             <div className="min-w-0">
               <h1 className="text-xl sm:text-3xl font-bold text-white truncate">Órdenes de Trabajo</h1>
-              <p className="text-slate-400 text-xs sm:text-sm">{stats.total} órdenes en total {!isOnline && '• Offline'}</p>
+              <p className="text-slate-400 text-xs sm:text-sm">
+                {stats.total} activas{archivedCount > 0 ? ` · ${archivedCount} archivadas (Historial)` : ''}{!isOnline && ' • Offline'}
+              </p>
             </div>
           </div>
           <div className="flex gap-1 shrink-0">
