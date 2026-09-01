@@ -52,6 +52,10 @@
       "type": "string",
       "description": "IP del cliente"
     },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector del actor (logAudit) o de la entidad auditada (autoLogAudit). A\u00edsla la auditor\u00eda entre sectores \u2014 un gerente/admin de 'escuela' no ve los logs de 'bapro' y viceversa. Se estampa al crear; sin default. Los logs hist\u00f3ricos sin sector_id quedan invisibles para gerentes (fail-closed) hasta que se backfillen."
+    },
     "notes": {
       "type": "string",
       "description": "Notas adicionales"
@@ -79,16 +83,23 @@
       ]
     },
     "read": {
-      "$or": [
+      "$and": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "data.sector_id": "{{user.data.sector_id}}"
         },
         {
-          "user_condition": {
-            "role": "gerente"
-          }
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
         }
       ]
     },
