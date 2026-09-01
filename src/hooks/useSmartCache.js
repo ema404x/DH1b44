@@ -7,6 +7,12 @@
  *   2. En paralelo: QueryClient hace fetch normal en background
  *   3. Cuando llegan los datos frescos: React Query actualiza la UI automáticamente
  *   4. Tras cada fetch exitoso: guarda los datos en cache para la próxima vez
+ *
+ * BLINDAJE shape-safe (v3):
+ *   Tanto la hidratación como la persistencia validan el shape del dato contra
+ *   KEY_SHAPES (persistCache.validateShape). Así un consumidor nunca recibe un
+ *   dato con shape ajeno inyectado desde el cache, y un dato con shape incorrecto
+ *   nunca se persiste. Cierra la clase de bug del TypeError: orders.filter.
  */
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -14,6 +20,7 @@ import {
   loadAllCacheEntries,
   saveCacheEntry,
   pruneCacheDB,
+  validateShape,
   PERSISTED_QUERY_KEYS,
 } from '@/lib/persistCache';
 
@@ -33,7 +40,8 @@ export function useSmartCache() {
       for (const entry of entries) {
         const currentData = queryClient.getQueryData([entry.queryKey]);
         // Solo hidratar si aún no hay datos en memoria (evitar reemplazar datos frescos)
-        if (!currentData && entry.data) {
+        // y si el shape del cacheado valida contra el declarado (shape-safe).
+        if (!currentData && entry.data && validateShape(entry.queryKey, entry.data)) {
           queryClient.setQueryData([entry.queryKey], entry.data, {
             updatedAt: entry.savedAt,
           });
@@ -59,7 +67,9 @@ export function useSmartCache() {
       const data = event.query.state.data;
       if (!data) return;
 
-      // Guardar en background sin bloquear la UI
+      // Guardar en background sin bloquear la UI.
+      // saveCacheEntry valida shape internamente — si el dato no coincide con
+      // el shape declarado para la clave, no se persiste (no envenena).
       saveCacheEntry(key, data);
     });
 
