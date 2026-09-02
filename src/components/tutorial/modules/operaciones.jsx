@@ -81,7 +81,7 @@ export const OPERACIONES_MODULES = [
           'Elegí el tipo correcto: preventivo (planificado), correctivo (falla), emergencia (urgencia inmediata) — define el flujo y los SLA',
           'Asigná SIEMPRE un responsable (técnico o jefe de sitio) con email válido — una OT sin asignado nadie la ejecuta ni la ve',
           'Definí prioridad realista: reservá "Urgente" para riesgo de seguridad o servicio crítico; abusar banaliza las alertas',
-          'Estimá horas con criterio: sirve para medir cumplimiento real vs. presupuestado en los KPIs',
+          'Ante cualquier duda, además contás con soporte las 24 hs con Alice',
           'Cargá el checklist con tareas medibles y verificables — el operario firma contra eso, no contra un texto vago',
           'Las OTs urgentes aparecen destacadas en el dashboard y disparan alertas por email al responsable',
           'Si la OT surge de una emergencia, se crea automáticamente con prioridad Urgente y responsable asignado',
