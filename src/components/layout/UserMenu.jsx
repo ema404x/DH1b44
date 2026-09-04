@@ -30,8 +30,8 @@ export default function UserMenu() {
         <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
           {initials}
         </div>
-        <span className="hidden md:block text-sm font-medium max-w-[120px] truncate text-slate-300">{displayName}</span>
-        <ChevronDown className="h-3.5 w-3.5 text-slate-500 hidden md:block" />
+        <span className="hidden lg:block text-sm font-medium max-w-[120px] truncate text-slate-300">{displayName}</span>
+        <ChevronDown className="h-3.5 w-3.5 text-slate-500 hidden lg:block" />
       </button>
 
       {open && (

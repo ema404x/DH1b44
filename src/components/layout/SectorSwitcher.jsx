@@ -62,10 +62,10 @@ export default function SectorSwitcher() {
         className="flex items-center justify-center gap-2 h-11 w-11 lg:h-9 lg:w-auto lg:px-3 rounded-lg border border-border bg-card/50 hover:bg-accent transition-colors text-sm"
       >
         <span className="text-base leading-none">{currentSector?.icono || '🏢'}</span>
-        <span className="font-medium max-w-[100px] truncate hidden sm:inline">
+        <span className="font-medium max-w-[100px] truncate hidden lg:inline">
           {currentSectorName}
         </span>
-        <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase tracking-wide">
+        <span className="hidden lg:inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase tracking-wide">
           Viendo: {currentSectorName}
         </span>
         <ChevronDown className={cn("w-3.5 h-3.5 transition-transform hidden lg:block", open && "rotate-180")} />
