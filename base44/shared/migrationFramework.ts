@@ -131,6 +131,25 @@ export async function rollbackMigration(
  * Scanner 'recon' — reconocimiento genérico. Cuenta y muestrea registros que matchean
  * un filtro, sin proponer cambios específicos. Útil como pre-flight de cualquier migración.
  */
+/**
+ * Ejecuta un scanner y devuelve TODAS las proposals (sin cap de muestras).
+ * Usado por las funciones de backfill en la fase de apply — necesitan la lista completa.
+ */
+export async function getDryRunProposals(
+  base44ServiceRole: any,
+  scannerId: string,
+  params: Record<string, any> = {}
+): Promise<any[]> {
+  const scanner = SCANNER_REGISTRY[scannerId];
+  if (!scanner) {
+    throw new Error(
+      `Scanner '${scannerId}' no registrado. Disponibles: ${Object.keys(SCANNER_REGISTRY).join(', ') || '(ninguno)'}`
+    );
+  }
+  const result = await scanner(base44ServiceRole, params || {});
+  return result.proposals || [];
+}
+
 export const SCANNER_REGISTRY: Record<string, (base44: any, params: any) => Promise<{ proposals: any[]; alertas: string[] }>> = {
   recon: async (base44, params) => {
     const { entity_name, query_filter = {}, fields = [] } = params;
@@ -146,5 +165,55 @@ export const SCANNER_REGISTRY: Record<string, (base44: any, params: any) => Prom
       reason: 'Coincide con el filtro de migración — candidato a modificación',
     }));
     return { proposals, alertas: [] };
+  },
+
+  /**
+   * Scanner backfill_completed_date — propone completed_date para OTs en estado
+   * 'completada' que nunca recibieron la fecha (pre-guard). Fallback en cascada:
+   *   1. fecha_validacion (timestamp exacto del cierre)
+   *   2. fecha_inicio_real + 1 día (estimación conservadora)
+   *   3. updated_date (última modificación — último recurso)
+   * Solo lectura — no escribe. Devuelve proposals con proposed_values calculados.
+   */
+  backfill_completed_date: async (base44, _params) => {
+    const records = await base44.entities.WorkOrder.filter({
+      status: 'completada',
+      completed_date: null,
+    });
+    const proposals = records.map((r: any) => {
+      let proposedDate: string | null = null;
+      let source: string = '';
+      if (r.fecha_validacion) {
+        proposedDate = String(r.fecha_validacion).split('T')[0];
+        source = 'fecha_validacion';
+      } else if (r.fecha_inicio_real) {
+        const d = new Date(r.fecha_inicio_real);
+        d.setDate(d.getDate() + 1);
+        proposedDate = d.toISOString().split('T')[0];
+        source = 'fecha_inicio_real + 1 día';
+      } else if (r.updated_date) {
+        proposedDate = String(r.updated_date).split('T')[0];
+        source = 'updated_date (última modificación)';
+      } else {
+        return {
+          id: r.id,
+          entity_name: 'WorkOrder',
+          current_values: { status: r.status, completed_date: r.completed_date, fecha_validacion: r.fecha_validacion, updated_date: r.updated_date },
+          proposed_values: null,
+          reason: 'Sin fuente de fecha disponible — requiere revisión manual',
+        };
+      }
+      return {
+        id: r.id,
+        entity_name: 'WorkOrder',
+        current_values: { status: r.status, completed_date: r.completed_date, fecha_validacion: r.fecha_validacion, updated_date: r.updated_date },
+        proposed_values: { completed_date: proposedDate },
+        reason: `Fecha propuesta desde ${source}: ${proposedDate}`,
+      };
+    });
+    const alertas = proposals.filter((p: any) => !p.proposed_values).length > 0
+      ? [`${proposals.filter((p: any) => !p.proposed_values).length} OT(s) sin fuente de fecha — requieren revisión manual`]
+      : [];
+    return { proposals, alertas };
   },
 };
