@@ -327,7 +327,13 @@ export default function PortalOperario() {
     setOrders(prev => prev.map(o => o.id === updatedOT.id ? { ...o, ...updatedOT } : o));
   }, []);
 
-  const { pendingCount, syncing, queueTransition } = usePortalOfflineActions({ onOptimisticUpdate: handleOptimisticUpdate });
+  const { pendingCount, syncing, queueTransition } = usePortalOfflineActions({
+    onOptimisticUpdate: handleOptimisticUpdate,
+    onSyncComplete: ({ conflicts }) => {
+      // Tras conflictos la UI optimista quedó inconsistente: recargar el estado real.
+      if (conflicts > 0) reloadOrders();
+    },
+  });
 
   // Cargar datos del establecimiento (ubicación) o del activo según el parámetro.
   // ?loc=<id>   → OTs de una ubicación (escuelas).

@@ -36,13 +36,29 @@ const PRIORITY_STYLE = {
   urgente: { chip: 'bg-red-500/15 text-red-300 border-red-500/25',     label: '🚨 URGENTE' },
 };
 
-function FotoUploader({ photos, onAdd, onRemove }) {
+function FotoUploader({ photos, onAdd, onRemove, offline, onAddPending }) {
   const fileRef = React.useRef();
   const [uploading, setUploading] = useState(false);
 
   const handleFiles = async (files) => {
     if (!files?.length) return;
     setUploading(true);
+    // Offline: guardar base64 localmente (sin subir). Se suben al sincronizar.
+    if (offline && onAddPending) {
+      for (const file of Array.from(files)) {
+        await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64 = reader.result.split(',')[1];
+            onAddPending({ base64, fileName: file.name, mimeType: file.type, dataUrl: reader.result });
+            resolve();
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+      setUploading(false);
+      return;
+    }
     for (const file of Array.from(files)) {
       const reader = new FileReader();
       await new Promise((resolve) => {
@@ -58,6 +74,8 @@ function FotoUploader({ photos, onAdd, onRemove }) {
     setUploading(false);
   };
 
+  const srcOf = (p) => (typeof p === 'string' ? p : p.dataUrl);
+
   return (
     <div className="space-y-3">
       {photos.length > 0 && (
@@ -66,13 +84,18 @@ function FotoUploader({ photos, onAdd, onRemove }) {
           initial="hidden" animate="show"
           variants={{ show: { transition: { staggerChildren: 0.04 } } }}
         >
-          {photos.map((url, idx) => (
+          {photos.map((p, idx) => (
             <motion.div
               key={idx}
               variants={{ hidden: { opacity: 0, scale: 0.9 }, show: { opacity: 1, scale: 1 } }}
               className="relative aspect-square rounded-xl overflow-hidden border-2 border-border group"
             >
-              <img src={url} alt="" className="w-full h-full object-cover" />
+              <img src={srcOf(p)} alt="" className="w-full h-full object-cover" />
+              {typeof p !== 'string' && (
+                <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/80 text-white">
+                  Pendiente
+                </span>
+              )}
               <button
                 onClick={() => onRemove(idx)}
                 className="absolute top-1 right-1 h-7 w-7 rounded-full bg-black/70 text-white flex items-center justify-center backdrop-blur-sm active:scale-90 transition"
@@ -90,7 +113,7 @@ function FotoUploader({ photos, onAdd, onRemove }) {
         className="w-full h-16 rounded-2xl border-2 border-dashed border-border bg-card/40 active:bg-card/60 flex items-center justify-center gap-3 text-foreground font-bold text-base transition-colors disabled:opacity-50"
       >
         {uploading
-          ? <><Loader2 className="h-5 w-5 animate-spin text-primary" /> Subiendo...</>
+          ? <><Loader2 className="h-5 w-5 animate-spin text-primary" /> {offline ? 'Guardando...' : 'Subiendo...'}</>
           : <><Camera className="h-6 w-6 text-primary" /> {photos.length > 0 ? 'Agregar otra foto' : 'Sacar foto'}</>
         }
       </button>
@@ -99,7 +122,8 @@ function FotoUploader({ photos, onAdd, onRemove }) {
 }
 
 export default function EjecutarOTEnPortal({ order, locationName, onBack, onCompleted, isOnline = true, onQueueOffline }) {
-  const [photos, setPhotos] = useState([]);
+  // Items de foto mixtos: string (URL ya subida) | { base64, dataUrl, ... } (pendiente de subir al sync).
+  const [photoItems, setPhotoItems] = useState([]);
   const [saving, setSaving] = useState(false);
   const [showDesc, setShowDesc] = useState(true);
   const [gpsStatus, setGpsStatus] = useState(null);
@@ -171,35 +195,50 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
       try {
         const gpsData = await capturar();
         setGpsStatus(gpsData.gps_status);
-        const extraData = {};
+        const operario_sesion = getNombre();
+
+        // Separar extraData de iniciar (sin fotos) y finalizar (con fotos).
+        // iniciar no usa fotos; finalizar lleva URLs ya subidas + pending_photos
+        // (base64 que el hook sube al sincronizar).
+        const iniciarExtra = { operario_sesion };
         if (gpsData.gps_status === 'capturado') {
-          extraData.gps = { latitude: gpsData.gps_latitude, longitude: gpsData.gps_longitude, accuracy: gpsData.gps_accuracy };
+          iniciarExtra.gps = { latitude: gpsData.gps_latitude, longitude: gpsData.gps_longitude, accuracy: gpsData.gps_accuracy };
         } else {
-          extraData.gps_status = gpsData.gps_status;
+          iniciarExtra.gps_status = gpsData.gps_status;
         }
-        if (photos.length > 0) {
-          extraData.photos = [...(order.photos || []), ...photos];
+
+        const uploadedUrls = photoItems.filter((p) => typeof p === 'string');
+        const pendingBlobs = photoItems
+          .filter((p) => typeof p !== 'string')
+          .map((p) => ({ base64: p.base64, fileName: p.fileName, mimeType: p.mimeType }));
+
+        const finalizarExtra = { ...iniciarExtra };
+        if (uploadedUrls.length > 0) {
+          finalizarExtra.photos = [...(order.photos || []), ...uploadedUrls];
+        }
+        if (pendingBlobs.length > 0) {
+          finalizarExtra.pending_photos = pendingBlobs;
         }
 
         // 1-paso: si la OT no fue iniciada todavía, iniciar+finalizar en secuencia.
         if (!otStarted && !isAlreadyInProgress) {
           if (offline && onQueueOffline) {
-            const optimisticInit = { ...order, status: 'en_progreso', operario_sesion: getNombre(), assigned_name: getNombre(), fecha_inicio_real: new Date().toISOString(), _pending_sync: true };
-            onQueueOffline(order, 'iniciar', { ...extraData, operario_sesion: getNombre() }, optimisticInit);
+            const optimisticInit = { ...order, status: 'en_progreso', operario_sesion, assigned_name: operario_sesion, fecha_inicio_real: new Date().toISOString(), _pending_sync: true };
+            onQueueOffline(order, 'iniciar', iniciarExtra, optimisticInit);
           } else {
-            const initRes = await runTransition('iniciar', { ...extraData, operario_sesion: getNombre() });
+            const initRes = await runTransition('iniciar', iniciarExtra);
             if (initRes.error) { setGpsStatus(null); return; }
           }
         }
 
         if (offline && onQueueOffline) {
-          const optimistic = { ...order, status: 'pendiente_validacion', ...extraData, _pending_sync: true };
-          onQueueOffline(order, 'finalizar', extraData, optimistic);
+          const optimistic = { ...order, status: 'pendiente_validacion', ...finalizarExtra, _pending_sync: true };
+          onQueueOffline(order, 'finalizar', finalizarExtra, optimistic);
           if (onCompleted) onCompleted(optimistic);
           return;
         }
 
-        const res = await runTransition('finalizar', extraData);
+        const res = await runTransition('finalizar', finalizarExtra);
         if (res.error) { setGpsStatus(null); return; }
         if (onCompleted && res.ot) onCompleted(res.ot);
       } catch (err) {
@@ -212,7 +251,7 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
 
   const pr = PRIORITY_STYLE[order.priority] || PRIORITY_STYLE.media;
   const isUrgente = order.priority === 'urgente';
-  const needsPhoto = order.require_photos && photos.length === 0;
+  const needsPhoto = order.require_photos && photoItems.length === 0;
   const hasDesc = !!order.description;
   const hasRefPhotos = order.photos?.length > 0;
 
@@ -295,9 +334,11 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
             Fotos del trabajo realizado{order.require_photos ? ' *' : ' (opcional)'}
           </p>
           <FotoUploader
-            photos={photos}
-            onAdd={url => setPhotos(prev => [...prev, url])}
-            onRemove={idx => setPhotos(prev => prev.filter((_, i) => i !== idx))}
+            photos={photoItems}
+            offline={offline}
+            onAdd={url => setPhotoItems(prev => [...prev, url])}
+            onAddPending={(blob) => setPhotoItems(prev => [...prev, blob])}
+            onRemove={idx => setPhotoItems(prev => prev.filter((_, i) => i !== idx))}
           />
         </div>
       </div>
