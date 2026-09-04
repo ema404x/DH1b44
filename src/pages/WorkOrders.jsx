@@ -127,10 +127,15 @@ export default function WorkOrders() {
   const { data, isLoading } = useQuery({
     queryKey: ['workorders-board'],
     queryFn: async () => {
-      // scope='own': cada usuario ve solo sus OTs (creador/asignado/jefe_sitio),
-      // incluso admins. Mismo predicado que el Dashboard — sin filtrar aquí por
-      // roles de gestión, el backend ya aísla por propiedad.
-      const res = await base44.functions.invoke('getWorkOrdersForUser', { scope: 'own' });
+      // Visibilidad por rol (control de acceso):
+      //  - Admin / Gerente: sin scope → ven todo su sector según RLS/RolePermission
+      //    (admin-view y linkage de jefe ya aplicados en el predicado del backend).
+      //  - Jefe de sitio / operario: scope='own' → solo sus OTs (creador/asignado/
+      //    jefe_sitio). La decisión de tier vive acá; la autorización efectiva
+      //    (qué registros) sigue en el backend (otEsVisiblePara).
+      const res = await base44.functions.invoke('getWorkOrdersForUser', {
+        scope: isGerente ? undefined : 'own',
+      });
       return res.data; // { orders, total, role, ctx }
     },
     // staleTime 30s: al volver de otra página dentro de 30s no refetchea → el
