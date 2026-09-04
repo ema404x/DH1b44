@@ -139,7 +139,7 @@ function PantallaClave({ locationName, onSuccess, onError }) {
 }
 
 // ── Lista de OTs ────────────────────────────────────────────────────────────
-function ListaOTs({ orders, locationName, locationAddress, onSelect }) {
+function ListaOTs({ orders, locationName, locationAddress, onSelect, resolveAction }) {
   const activas = orders.filter(o => !['completada', 'cancelada', 'pendiente_validacion'].includes(o.status));
   const enValidacion = orders.filter(o => o.status === 'pendiente_validacion');
   const completadas = orders.filter(o => o.status === 'completada');
@@ -210,27 +210,40 @@ function ListaOTs({ orders, locationName, locationAddress, onSelect }) {
             >
               {activas.map(order => {
                 const pr = PRIORITY_STYLE[order.priority] || PRIORITY_STYLE.media;
+                const action = resolveAction ? resolveAction(order) : { canAct: true };
+                const locked = !action.canAct;
                 return (
                   <motion.button
                     key={order.id} variants={cardVariants}
-                    onClick={() => onSelect(order)}
-                    className="w-full bg-card rounded-2xl p-4 border border-border text-left flex items-center gap-4 active:scale-[0.98] transition-all shadow-sm relative overflow-hidden"
+                    onClick={() => !locked && onSelect(order)}
+                    disabled={locked}
+                    className={`w-full bg-card rounded-2xl p-4 border text-left flex items-center gap-4 transition-all shadow-sm relative overflow-hidden ${
+                      locked ? 'border-border/40 opacity-60 cursor-not-allowed' : 'border-border active:scale-[0.98]'
+                    }`}
                   >
                     <div className="absolute left-0 top-0 bottom-0 w-1.5">
                       <span className={`block h-full ${pr.ring}`} />
                     </div>
                     <div className="h-12 w-12 bg-primary/10 rounded-xl flex items-center justify-center shrink-0 ml-1">
-                      <Wrench className="h-6 w-6 text-primary" />
+                      <Wrench className={`h-6 w-6 ${locked ? 'text-muted-foreground/50' : 'text-primary'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-foreground text-sm leading-tight">{order.title}</p>
                       <p className="text-muted-foreground text-xs mt-0.5">{TYPE_LABEL[order.type] || order.type}</p>
-                      <span className={`inline-flex items-center gap-1.5 mt-2 px-2 py-0.5 rounded-full text-xs font-semibold border ${pr.chip}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${pr.ring}`} />
-                        {pr.label}
-                      </span>
+                      {locked ? (
+                        <span className="inline-flex items-center gap-1.5 mt-2 px-2 py-0.5 rounded-full text-xs font-semibold border bg-muted/30 text-muted-foreground border-border/50">
+                          <Lock className="h-3 w-3" /> {action.reason || 'No disponible'}
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1.5 mt-2 px-2 py-0.5 rounded-full text-xs font-semibold border ${pr.chip}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${pr.ring}`} />
+                          {pr.label}
+                        </span>
+                      )}
                     </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground/60 shrink-0" />
+                    {locked
+                      ? <Lock className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+                      : <ChevronRight className="h-5 w-5 text-muted-foreground/60 shrink-0" />}
                   </motion.button>
                 );
               })}
