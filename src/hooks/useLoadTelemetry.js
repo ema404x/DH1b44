@@ -86,6 +86,8 @@ export function useLoadTelemetry(moduleKey) {
       if (observer) observer.disconnect();
       if (stableTimer) clearTimeout(stableTimer);
       if (fallbackTimer) clearTimeout(fallbackTimer);
+      // Reset para que la próxima ruta pueda trackear de nuevo
+      trackedRef.current = false;
     };
   }, [moduleKey, currentUser?.data?.sector_id]);
 
