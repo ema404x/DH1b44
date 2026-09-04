@@ -2,15 +2,17 @@
  * Portal público para operarios — acceso vía QR del establecimiento
  * Flujo: Escanear QR → Ingresar clave → Ver lista de OTs → Ejecutar
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import {
   CheckCircle2, Loader2, AlertTriangle, Lock, ArrowLeft,
-  MapPin, ClipboardList, ChevronRight, Wrench, ShieldCheck, Building2
+  MapPin, ClipboardList, ChevronRight, Wrench, ShieldCheck, Building2, WifiOff, User
 } from 'lucide-react';
 import EjecutarOTEnPortal from '@/components/workorders/EjecutarOTEnPortal';
-import { setClave } from '@/lib/operarioClave';
+import { setClave, setNombre, getNombre } from '@/lib/operarioClave';
+import { usePortalOfflineActions } from '@/hooks/usePortalOfflineActions';
+import { canActOn } from '@/lib/workOrderActions';
 
 const callFn = async (payload) => {
   const res = await base44.functions.invoke('publicFichar', payload);
@@ -42,23 +44,29 @@ const stagger = { show: { transition: { staggerChildren: 0.05 } } };
 
 // ── Pantalla de clave ───────────────────────────────────────────────────────
 function PantallaClave({ locationName, onSuccess, onError }) {
-  const [clave, setClave] = useState('');
+  const [clave, setClaveInput] = useState('');
+  const [nombre, setNombreInput] = useState(getNombre() || '');
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!clave.trim()) return;
+    if (!nombre.trim()) {
+      setError('Ingresá tu nombre para registrar tu trabajo.');
+      return;
+    }
     setChecking(true);
     setError('');
     const res = await callFn({ action: 'verifyOperarioPassword', password: clave.trim() });
     setChecking(false);
     if (res?.valid) {
-      setClave(clave.trim()); // cachea la clave para reenviarla en updateWorkOrder
+      setClave(clave.trim()); // cachea la clave para transicionEstadoOT (modo portal)
+      setNombre(nombre.trim()); // cachea el nombre como operario_sesion
       onSuccess();
     } else {
       setError('Clave incorrecta. Consultá con tu supervisor.');
-      setClave('');
+      setClaveInput('');
     }
   };
 
@@ -85,13 +93,26 @@ function PantallaClave({ locationName, onSuccess, onError }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
+            <label className="block text-sm font-semibold text-muted-foreground mb-2">Tu nombre</label>
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                value={nombre}
+                onChange={e => setNombreInput(e.target.value)}
+                placeholder="Ej: Juan Pérez"
+                className="w-full h-14 rounded-2xl border-2 border-border bg-background/60 pl-12 pr-4 text-base font-medium text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground/60 mt-1.5">Se registra en cada OT que toqués para trazabilidad.</p>
+          </div>
+          <div>
             <label className="block text-sm font-semibold text-muted-foreground mb-2">Clave de acceso</label>
             <input
               type="password"
               value={clave}
-              onChange={e => setClave(e.target.value)}
+              onChange={e => setClaveInput(e.target.value)}
               placeholder="••••••••"
-              autoFocus
               inputMode="numeric"
               className="w-full h-14 rounded-2xl border-2 border-border bg-background/60 px-4 text-xl font-bold text-center tracking-[0.3em] text-foreground placeholder:tracking-[0.3em] placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary transition-colors"
             />
@@ -106,7 +127,7 @@ function PantallaClave({ locationName, onSuccess, onError }) {
           )}
           <button
             type="submit"
-            disabled={checking || !clave.trim()}
+            disabled={checking || !clave.trim() || !nombre.trim()}
             className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-bold text-lg flex items-center justify-center gap-3 disabled:opacity-40 active:scale-[0.98] transition-all shadow-lg shadow-primary/25"
           >
             {checking ? <Loader2 className="h-5 w-5 animate-spin" /> : <><ShieldCheck className="h-5 w-5" /> Ingresar</>}
@@ -265,30 +286,78 @@ export default function PortalOperario() {
   const [locationData, setLocationData] = useState(null);
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+
+  // Cache de OTs por ubicación/activo para reingreso offline.
+  const CACHE_PREFIX = assetId ? `portal-asset-${assetId}` : `portal-loc-${locationId}`;
+  const cacheOrders = useCallback((ords) => {
+    try { localStorage.setItem(CACHE_PREFIX, JSON.stringify({ orders: ords, cachedAt: Date.now() })); } catch {}
+  }, [CACHE_PREFIX]);
+  const loadCachedOrders = useCallback(() => {
+    try {
+      const c = JSON.parse(localStorage.getItem(CACHE_PREFIX));
+      return c?.orders || [];
+    } catch { return []; }
+  }, [CACHE_PREFIX]);
+
+  // Upsert optimista: actualiza una OT en la lista visible (cuando vuelve del
+  // offline o de una transición) sin recargar todo.
+  const handleOptimisticUpdate = useCallback((updatedOT) => {
+    setOrders(prev => prev.map(o => o.id === updatedOT.id ? { ...o, ...updatedOT } : o));
+  }, []);
+
+  const { pendingCount, syncing, queueTransition } = usePortalOfflineActions({ onOptimisticUpdate: handleOptimisticUpdate });
 
   // Cargar datos del establecimiento (ubicación) o del activo según el parámetro.
   // ?loc=<id>   → OTs de una ubicación (escuelas).
   // ?asset=<id> → OTs de un activo (mismo flujo: clave → lista → ejecutar).
   useEffect(() => {
-    if (assetId) {
-      callFn({ action: 'getWorkOrdersForAsset', assetId })
-        .then(res => {
+    const loadOrders = async () => {
+      if (assetId) {
+        try {
+          const res = await callFn({ action: 'getWorkOrdersForAsset', assetId });
           setLocationData({ name: res.assetName || 'Activo', address: res.assetSede || '' });
           setOrders(res.workOrders || []);
+          cacheOrders(res.workOrders || []);
           setPhase('pin');
-        })
-        .catch(() => setPhase('error'));
-      return;
-    }
-    if (!locationId) { setPhase('error'); return; }
-    callFn({ action: 'getWorkOrderForLocation', locationId })
-      .then(res => {
+        } catch {
+          // Offline fallback: cargar cache si existe
+          const cached = loadCachedOrders();
+          if (cached.length > 0) {
+            setLocationData({ name: 'Activo', address: '' });
+            setOrders(cached);
+          }
+          setPhase('pin');
+        }
+        return;
+      }
+      if (!locationId) { setPhase('error'); return; }
+      try {
+        const res = await callFn({ action: 'getWorkOrderForLocation', locationId });
         setLocationData({ name: res.locationName, address: res.locationAddress });
         setOrders(res.workOrders || []);
+        cacheOrders(res.workOrders || []);
         setPhase('pin');
-      })
-      .catch(() => setPhase('error'));
-  }, [locationId, assetId]);
+      } catch {
+        // Offline fallback: cargar cache si existe
+        const cached = loadCachedOrders();
+        if (cached.length > 0) {
+          setLocationData({ name: 'Ubicación', address: '' });
+          setOrders(cached);
+        }
+        setPhase('pin');
+      }
+    };
+    loadOrders();
+  }, [locationId, assetId, cacheOrders, loadCachedOrders]);
 
   const handleAuthSuccess = () => setPhase('list');
 
@@ -344,14 +413,33 @@ export default function PortalOperario() {
     />
   );
 
+  const resolveAction = (ot) => {
+    const operarioSesion = getNombre();
+    return canActOn(ot, { operarioSesion });
+  };
+
   // ── Lista ──
   if (phase === 'list') return (
-    <ListaOTs
-      orders={orders}
-      locationName={locationData?.name}
-      locationAddress={locationData?.address}
-      onSelect={handleSelectOrder}
-    />
+    <>
+      {(!isOnline || pendingCount > 0) && (
+        <div className="fixed top-0 inset-x-0 z-50 flex items-center gap-2 bg-amber-500/15 border-b border-amber-500/30 text-amber-300 text-xs font-medium px-4 py-2"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          {syncing ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <WifiOff className="h-4 w-4 shrink-0" />}
+          {syncing
+            ? `Sincronizando ${pendingCount} acción(es) pendiente(s)...`
+            : !isOnline
+              ? `Sin conexión — tus OTs se guardan y se envían al volver online.`
+              : `${pendingCount} acción(es) pendiente(s) de sincronizar.`}
+        </div>
+      )}
+      <ListaOTs
+        orders={orders}
+        locationName={locationData?.name}
+        locationAddress={locationData?.address}
+        onSelect={handleSelectOrder}
+        resolveAction={resolveAction}
+      />
+    </>
   );
 
   // ── Ejecutar OT individual ──
@@ -361,6 +449,8 @@ export default function PortalOperario() {
       locationName={locationData?.name}
       onBack={() => { setPhase('list'); reloadOrders(); }}
       onCompleted={handleOrderCompleted}
+      isOnline={isOnline}
+      onQueueOffline={queueTransition}
     />
   );
 

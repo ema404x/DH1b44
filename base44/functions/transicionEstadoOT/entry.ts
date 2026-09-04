@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { isAdminLevelRole } from "../../shared/roles.ts";
 import { resolveOtPermissions } from "../../shared/otPermissions.ts";
+import { verificarClaveOperario } from "../../shared/operarioAuth.ts";
 
 // Transiciones fijas: desde un estado exacto hacia otro
 const TRANSICIONES_FIJAS = {
@@ -15,12 +16,6 @@ const TRANSICIONES_FIJAS = {
 const TRANSICIONES_FLEXIBLES = {
   'cancelar':       { hacia: 'cancelada' },
   'convertir_obra': { hacia: 'obra' },
-  // 'completar' es flexible desde cualquier estado no-terminal. No exige pasar
-  // por pendiente_validacion (el jefe puede cerrar directo), PERO mantiene el
-  // gate de checklist + fotos obligatorias (ver bloque de validación abajo):
-  // si el checklist no está completo y no hay motivos_incompleto registrados,
-  // se rechaza con 409. Así el Kanban drag a Completada funciona desde
-  // cualquier columna, y no se pierden reportes/incompletitudes.
   'completar':      { hacia: 'completada' },
 };
 
@@ -37,17 +32,37 @@ const MENSAJES = {
   'completar': 'OT completada correctamente',
 };
 
+// Normaliza strings para comparación de nombres (operario_sesion, assigned_name)
+const normName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'No autorizado' }, { status: 401 });
-
     const body = await req.json();
-    const { ot_id, accion, extra_data = {} } = body;
+    const { ot_id, accion, extra_data = {}, auth_mode = 'session', operario_password, operario_sesion } = body;
+
+    const isPortal = auth_mode === 'portal';
+    let user = null;
+
+    // ── Autenticación según modo ──
+    // session: auth.me() (módulo autenticado, kanban, etc.)
+    // portal:  clave de operario compartida (verificarClaveOperario). Sin sesión.
+    if (isPortal) {
+      const { valid, configured } = await verificarClaveOperario(base44, operario_password);
+      if (!configured) return Response.json({ error: 'Servicio no configurado' }, { status: 503 });
+      if (!valid) return Response.json({ error: 'Clave de operario requerida' }, { status: 401 });
+    } else {
+      user = await base44.auth.me();
+      if (!user) return Response.json({ error: 'No autorizado' }, { status: 401 });
+    }
 
     if (!ot_id || !accion) {
       return Response.json({ error: 'Faltan parámetros: ot_id y accion son obligatorios' }, { status: 400 });
+    }
+
+    // El portal solo puede iniciar o finalizar — nunca aprobar/rechazar/cancelar.
+    if (isPortal && !['iniciar', 'finalizar'].includes(accion)) {
+      return Response.json({ error: 'El portal público solo puede iniciar o finalizar OTs' }, { status: 403 });
     }
 
     const fija = TRANSICIONES_FIJAS[accion];
@@ -60,49 +75,54 @@ Deno.serve(async (req) => {
 
     // Lectura con asServiceRole: la RLS de WorkOrder no tiene rama para el operario
     // (solo creador / jefe_sitio_email / admin+sector / gerente+sector), así que un
-    // operario que escanea una OT libre recibe null → 404 → "no pasa nada".
-    // Los permisos de la transición ya los controla la función explícitamente (login
-    // obligatorio + canManageOT), así que la lectura no debe chocar con la RLS.
+    // operario que escanea una OT libre recibe null → 404. Los permisos de la
+    // transición ya los controla la función explícitamente.
     const ot = await base44.asServiceRole.entities.WorkOrder.get(ot_id);
     if (!ot) {
       return Response.json({ error: 'Orden de trabajo no encontrada' }, { status: 404 });
     }
 
-    // ── Permisos canónicos (Control de Acceso) ──
-    // Sector, admin_view y permisos de escritura se resuelven desde la ficha de
-    // Empleado + RolePermission — NO desde el rol de plataforma. Cierra el bypass
-    // donde un jefe_sitio con platformRole='admin' operaba cualquier OT del sector.
-    // Un super-admin puro (sin ficha) conserva acceso total (trusted).
-    const P = await resolveOtPermissions(base44, user);
-    const employee = P.employee;
+    // ── Resolución de sector, permisos y flags según modo ──
+    let callerSector, callerEsAdmin, canApprove;
 
-    // Reconciliación best-effort: si la ficha tiene sector y difiere del usuario de
-    // plataforma, alinear data.sector_id. Idempotente, no interrumpe si falla.
-    try {
-      if (employee?.sector_id) {
-        const platformSector = user.data?.sector_id || user.sector_id;
-        if (platformSector && platformSector !== employee.sector_id) {
-          await base44.asServiceRole.entities.User.update(user.id, {
-            sector_id: employee.sector_id,
-            data: { ...user.data, sector_id: employee.sector_id },
-          });
-        }
+    if (isPortal) {
+      // Modo portal: el sector se resuelve desde la OT misma (ya estampada en
+      // creación). El operario del portal nunca es admin ni puede aprobar.
+      // Fail-closed: si la OT no tiene sector_id (legacy), rechazar.
+      if (!ot.sector_id) {
+        return Response.json({ error: 'La OT no tiene sector asignado (legacy). No se puede operar desde el portal.' }, { status: 403 });
       }
-    } catch (_) {}
-    // Aislamiento de raíz: todos (salvo super-admin puro) operan solo OTs de su
-    // sector activo. No existe bypass por rol de plataforma.
-    if (!P.superAdmin && ot.sector_id !== P.callerSector) {
-      return Response.json({ error: 'Esta OT pertenece a otro sector. Cambiá de sector activo para operarla.' }, { status: 403 });
+      callerSector = ot.sector_id;
+      callerEsAdmin = false;
+      canApprove = false;
+    } else {
+      const P = await resolveOtPermissions(base44, user);
+      const employee = P.employee;
+
+      // Reconciliación best-effort: si la ficha tiene sector y difiere del
+      // usuario de plataforma, alinear data.sector_id. Idempotente.
+      try {
+        if (employee?.sector_id) {
+          const platformSector = user.data?.sector_id || user.sector_id;
+          if (platformSector && platformSector !== employee.sector_id) {
+            await base44.asServiceRole.entities.User.update(user.id, {
+              sector_id: employee.sector_id,
+              data: { ...user.data, sector_id: employee.sector_id },
+            });
+          }
+        }
+      } catch (_) {}
+
+      if (!P.superAdmin && ot.sector_id !== P.callerSector) {
+        return Response.json({ error: 'Esta OT pertenece a otro sector. Cambiá de sector activo para operarla.' }, { status: 403 });
+      }
+      callerSector = P.callerSector;
+      callerEsAdmin = P.superAdmin || isAdminLevelRole(employee?.role);
+      canApprove = P.canApprove;
     }
-    // callerEsAdmin: admin-level por ROL DE EMPLEADO (no plataforma). Define si al
-    // iniciar la OT el que escanea la reclama (operario) o respeta la asignación
-    // previa del jefe (admin/gerente).
-    const callerEsAdmin = P.superAdmin || isAdminLevelRole(employee?.role);
 
     // Validar estado actual
     if (fija) {
-      // 'iniciar' acepta tanto 'pendiente' como 'asignada' — permite arrancar la OT directo.
-      // 'completar' acepta pendiente_validacion u obra (alias formal de aprobar + cierre de obra).
       const estadosValidos = accion === 'iniciar'
         ? ['pendiente', 'asignada']
         : (Array.isArray(fija.desde) ? fija.desde : [fija.desde]);
@@ -122,13 +142,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    const nuevoEstado = fija ? fija.hacia : flexible.hacia;
-
-    // Permisos de cierre (aprobar/rechazar/completar): canApprove se resuelve desde
-    // RolePermission.WorkOrder.approve con fallback legacy al rol jefe_sitio/admin.
-    // Un platform-admin con ficha jefe_sitio queda regido por su ficha, no por la
-    // plataforma — consistente con la visibilidad (resolveAdminView).
-    if ((accion === 'aprobar' || accion === 'rechazar' || accion === 'completar') && !P.canApprove) {
+    // Permisos de cierre (aprobar/rechazar/completar)
+    if ((accion === 'aprobar' || accion === 'rechazar' || accion === 'completar') && !canApprove) {
       return Response.json({ error: 'Solo el Jefe de Sitio, Admin o Gerente puede completar o rechazar OTs' }, { status: 403 });
     }
 
@@ -137,10 +152,17 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Debe asignar un operario antes de cambiar el estado a "Asignada"' }, { status: 400 });
     }
 
-    // Validar checklist y fotos obligatorias antes de cerrar la OT (completar/aprobar).
-    // Centralizado en el backend: cubre TODOS los caminos (tarjeta, kanban, dropdown, panel)
-    // y evita cerrar OTs con tareas pendientes. Si la OT se cierra incompleta a propósito,
-    // debe registrar motivos_incompleto (escape hatch del flujo "incompleto").
+    // ── Control de propiedad (portal) ──
+    // Al finalizar una OT en_progreso, el operario_sesion del request debe
+    // coincidir con el estampado al iniciar. Replica el isOwnerOf del módulo
+    // adaptado al modelo sin login.
+    if (isPortal && accion === 'finalizar' && ot.status === 'en_progreso') {
+      if (ot.operario_sesion && operario_sesion && normName(ot.operario_sesion) !== normName(operario_sesion)) {
+        return Response.json({ error: 'La trabaja otro operario' }, { status: 409 });
+      }
+    }
+
+    // Validar checklist y fotos obligatorias antes de cerrar la OT
     if (accion === 'completar' || accion === 'aprobar') {
       const motivosIncompleto = (ot.motivos_incompleto || []).filter(m => m.texto && m.texto.trim());
       if (motivosIncompleto.length === 0) {
@@ -159,6 +181,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    const nuevoEstado = fija ? fija.hacia : flexible.hacia;
     const updateData = { status: nuevoEstado };
 
     if (accion === 'asignar' && extra_data.assigned_name) {
@@ -166,12 +189,6 @@ Deno.serve(async (req) => {
     }
 
     if (accion === 'iniciar') {
-      // Cualquier operario que escanea la OT puede iniciarla, sin importar a quién
-      // esté asignada — la asignación del jefe es una sugerencia, no un lock. Al
-      // iniciar, el operario que escanea pasa a ser el trabajador (assigned_to +
-      // assigned_name) en el bloque de abajo. Los admins/gerentes respetan
-      // extra_data.assigned_to (inician desde el kanban sin reclamarla).
-
       if (extra_data.gps) {
         updateData.gps_latitude = extra_data.gps.latitude;
         updateData.gps_longitude = extra_data.gps.longitude;
@@ -183,14 +200,16 @@ Deno.serve(async (req) => {
       }
       updateData.fecha_inicio_real = new Date().toISOString();
 
-      // El que inicia la OT pasa a ser el operario que la trabaja.
-      // - Operario (no admin): assigned_to = user.id (usuario del backend, siempre
-      //   disponible) y assigned_name = displayName del que escanea (sobreescribe la
-      //   asignación previa del jefe). Sin esto, assigned_name quedaría con el
-      //   operario original y assigned_to con el que escaneó → mismatch visible.
-      // - Admin/gerente: respeta extra_data.assigned_to y solo completa
-      //   assigned_name si estaba vacío (no pisa la asignación del jefe).
-      if (!callerEsAdmin) {
+      if (isPortal) {
+        // Portal: el operario_sesion (nombre manuscrito) reemplaza a user.id
+        // como identidad de propiedad. No hay assigned_to (sin user.id real).
+        if (operario_sesion) {
+          updateData.operario_sesion = operario_sesion;
+          if (ot.assigned_name !== operario_sesion) {
+            updateData.assigned_name = operario_sesion;
+          }
+        }
+      } else if (!callerEsAdmin) {
         if (ot.assigned_to !== user.id) {
           updateData.assigned_to = user.id;
         }
@@ -207,14 +226,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Persistencia de campos de reporte para TODAS las acciones (iniciar,
-    // finalizar, completar, aprobar, rechazar). Centraliza la escritura en
-    // service-role: la RLS directa bloquea al operario que no es creador/jefe,
-    // así los materiales faltantes cargados al INICIAR una OT se perdían y el
-    // jefe nunca los veía. Acá se persisten junto con la transición, sin depender
-    // de la acción, con el mismo aislamiento de sector que valida la función.
-    // El reporte reemplaza (no acumula): si la OT fue rechazada y el operario
-    // re-finaliza, queda exactamente lo que envía ahora.
+    // Persistencia de campos de reporte para TODAS las acciones
     if (extra_data.checklist !== undefined) updateData.checklist = extra_data.checklist;
     if (extra_data.materials_used !== undefined) updateData.materials_used = extra_data.materials_used;
     if (extra_data.materiales_faltantes !== undefined) {
@@ -233,7 +245,9 @@ Deno.serve(async (req) => {
     if (accion === 'aprobar' || accion === 'completar') {
       updateData.completed_date = new Date().toISOString().split('T')[0];
       updateData.fecha_validacion = new Date().toISOString();
-      updateData.validado_por = user.full_name || user.email || 'Jefe de Sitio';
+      updateData.validado_por = isPortal
+        ? (operario_sesion || 'Portal')
+        : (user.full_name || user.email || 'Jefe de Sitio');
     }
 
     if (accion === 'rechazar') {
@@ -243,35 +257,27 @@ Deno.serve(async (req) => {
       updateData.rechazo_comentario = extra_data.rechazo_comentario.trim();
     }
 
-    // Escritura con asServiceRole por el mismo motivo que la lectura: el update
-    // autenticado lo bloquea la RLS para el operario. El sector ya se validó arriba.
     const actualizada = await base44.asServiceRole.entities.WorkOrder.update(ot_id, updateData);
 
-    // ── Registro de historial del activo (lifecycle UpKeep) ──
-    // Solo cuando la OT llega a 'completada' y tiene asset_id. Best-effort: si
-    // falla, la transición ya quedó hecha y no se interrumpe. Estampa el sector de
-    // la OT (== callerSector, validado arriba) → AssetHistory queda aislado.
+    // ── Registro de historial del activo (lifecycle) ──
     if (nuevoEstado === 'completada' && ot.asset_id) {
       try {
         const mats = Array.isArray(actualizada.materials_used) ? actualizada.materials_used : [];
         const costoMateriales = mats.reduce((s, m) => s + ((m?.quantity || 0) * (m?.unit_cost || 0)), 0);
         const assetName = ot.asset_name || actualizada.asset_name || null;
         const fechaCierre = actualizada.completed_date || new Date().toISOString().split('T')[0];
+        const actorName = isPortal ? (operario_sesion || 'Portal') : (user.full_name || user.email || '');
         await base44.asServiceRole.entities.AssetHistory.create({
           asset_id: ot.asset_id,
           asset_name: assetName,
           tipo_evento: 'mantenimiento',
           descripcion: `OT completada: ${ot.title || ot.code || ot.id}`,
-          usuario: user.full_name || user.email || '',
-          usuario_id: user.id,
+          usuario: actorName,
+          usuario_id: isPortal ? '' : user.id,
           ot_id: ot.id,
           costo: costoMateriales || 0,
           sector_id: ot.sector_id,
         });
-        // Auto-actualizar last_maintenance/next_maintenance del activo cuando la
-        // OT es de mantenimiento (preventivo/correctivo/reparacion). UpKeep-style:
-        // el ciclo de mantenimiento se alimenta de las OTs reales, no solo manual.
-        // Defense-in-depth: re-chequea sector del asset antes de escribir.
         const esMantenimiento = ['mantenimiento_preventivo', 'mantenimiento_correctivo', 'reparacion'].includes(ot.type);
         if (esMantenimiento) {
           const asset = await base44.asServiceRole.entities.Asset.get(ot.asset_id).catch(() => null);

@@ -89,6 +89,10 @@
     "assigned_name": {
       "type": "string"
     },
+    "operario_sesion": {
+      "type": "string",
+      "description": "Operario que tom\u00f3 la OT desde el portal p\u00fablico (nombre manuscrito ingresado al desbloquear con la clave). Control de propiedad sin login: al finalizar una OT en_progreso, el backend verifica que el operario_sesion del request coincida con el de la OT. Solo aplica al portal; el m\u00f3dulo autenticado usa assigned_to (user.id)."
+    },
     "jefe_sitio": {
       "type": "string",
       "description": "Jefe de sitio responsable \u2014 vincula la OT a la tablet de su cuadrilla"

@@ -1,25 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
-
-const OPERARIO_SALT = 'b44-operario-salt-v1';
-
-async function sha256Hex(text) {
-  const data = new TextEncoder().encode(text);
-  const buf = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Verifica la clave de operario contra el hash en SecurityConfig (editable desde
-// el Centro de Seguridad). Si no hay hash en DB, cae al secreto de plataforma
-// OPERARIO_PASSWORD (migración no-ruptura). Devuelve { valid, configured }.
-async function verificarClaveOperario(base44, password) {
-  if (!password) return { valid: false, configured: false };
-  const cfg = await base44.asServiceRole.entities.SecurityConfig.list().catch(() => []);
-  const dbHash = cfg[0]?.operario_password_hash;
-  const env = Deno.env.get('OPERARIO_PASSWORD');
-  if (!dbHash && !env) return { valid: false, configured: false };
-  const valid = dbHash ? (await sha256Hex(password + OPERARIO_SALT)) === dbHash : password === env;
-  return { valid, configured: true };
-}
+import { verificarClaveOperario } from "../../shared/operarioAuth.ts";
 
 Deno.serve(async (req) => {
   try {
@@ -200,10 +180,11 @@ Deno.serve(async (req) => {
       return Response.json({ valid });
     }
 
-    // UPDATE work order — requiere la clave de operario (secreto compartido)
-    // para evitar que un atacante anónimo modifique OTs arbitrarias.
-    // Solo campos operables por el operario; los de validación/rechazo son
-    // exclusivos del jefe de sitio (vía transicionEstadoOT, autenticado).
+    // UPDATE work order — delega al motor canónico de transiciones
+    // (transicionEstadoOT en modo portal). Antes mutaba el estado directamente,
+    // saltándose la máquina de estados, checklist y fotos obligatorias. Ahora
+    // pasa por el mismo motor que el módulo autenticado, garantizando reglas
+    // consistentes. Mantiene el endpoint para no romper calls existentes.
     if (action === 'updateWorkOrder') {
       const { workOrderId, updates, password } = body;
       if (!workOrderId || !updates) return Response.json({ error: 'Parámetros requeridos' }, { status: 400 });
@@ -221,19 +202,57 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'No se puede modificar una OT completada o cancelada' }, { status: 403 });
       }
 
-      const ALLOWED_FIELDS = [
-        'status', 'checklist', 'photos', 'signature_url', 'signature_name',
-        'completed_date', 'gps_latitude', 'gps_longitude', 'gps_accuracy',
-        'gps_timestamp', 'gps_status', 'fecha_inicio_real', 'notes',
-        'materials_used', 'materiales_faltantes', 'motivos_incompleto',
-      ];
-      const safeUpdates = {};
-      for (const key of ALLOWED_FIELDS) {
-        if (key in updates) safeUpdates[key] = updates[key];
+      // Mapear el cambio de status solicitado a una acción del motor de transiciones.
+      let accion = null;
+      if (updates.status === 'pendiente_validacion' && workOrder.status === 'en_progreso') {
+        accion = 'finalizar';
+      } else if (updates.status === 'en_progreso' && ['pendiente', 'asignada'].includes(workOrder.status)) {
+        accion = 'iniciar';
+      } else if (updates.status && updates.status !== workOrder.status) {
+        return Response.json({ error: 'Cambio de estado no soportado vía este endpoint. Usá transicionEstadoOT.' }, { status: 400 });
       }
 
-      const updated = await sb.entities.WorkOrder.update(workOrderId, safeUpdates);
-      return Response.json({ success: true, workOrder: updated });
+      // Sin cambio de status → aplicar campos operables directamente (service-role).
+      if (!accion) {
+        const ALLOWED_FIELDS = [
+          'checklist', 'photos', 'signature_url', 'signature_name',
+          'gps_latitude', 'gps_longitude', 'gps_accuracy', 'gps_timestamp',
+          'gps_status', 'fecha_inicio_real', 'notes', 'materials_used',
+          'materiales_faltantes', 'motivos_incompleto',
+        ];
+        const safeUpdates = {};
+        for (const key of ALLOWED_FIELDS) {
+          if (key in updates) safeUpdates[key] = updates[key];
+        }
+        const updated = await sb.entities.WorkOrder.update(workOrderId, safeUpdates);
+        return Response.json({ success: true, workOrder: updated });
+      }
+
+      // Delegar al motor canónico en modo portal.
+      const extra_data = {};
+      if (updates.gps_latitude != null) {
+        extra_data.gps = { latitude: updates.gps_latitude, longitude: updates.gps_longitude, accuracy: updates.gps_accuracy };
+      }
+      if (updates.gps_status != null) extra_data.gps_status = updates.gps_status;
+      if (updates.checklist !== undefined) extra_data.checklist = updates.checklist;
+      if (updates.materials_used !== undefined) extra_data.materials_used = updates.materials_used;
+      if (updates.materiales_faltantes !== undefined) extra_data.materiales_faltantes = updates.materiales_faltantes;
+      if (updates.notes !== undefined) extra_data.notes = updates.notes;
+      if (updates.photos !== undefined) extra_data.photos = updates.photos;
+
+      const res = await base44.functions.invoke('transicionEstadoOT', {
+        ot_id: workOrderId,
+        accion,
+        extra_data,
+        auth_mode: 'portal',
+        operario_password: password,
+        operario_sesion: body.operario_sesion || '',
+      });
+
+      if (res.data?.error) {
+        return Response.json({ error: res.data.error }, { status: 400 });
+      }
+      return Response.json({ success: true, workOrder: res.data?.ot });
     }
 
     // ACTIVATE tablet — valida código de activación y devuelve el jefe vinculado

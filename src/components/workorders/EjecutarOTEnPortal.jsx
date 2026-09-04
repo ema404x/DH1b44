@@ -1,16 +1,28 @@
 /**
- * Pantalla de ejecución de una OT dentro del portal operario
- * Reutilizable: recibe order + callbacks, sin routing propio
+ * Pantalla de ejecución de una OT dentro del portal operario.
+ * Reutilizable: recibe order + callbacks, sin routing propio.
+ *
+ * Flujo híbrido (decideSteps):
+ *  - 1 paso (sin checklist ni fotos obligatorias): "Finalizar y Enviar" hace
+ *    iniciar+finalizar en secuencia (el operario ve una sola acción).
+ *  - 2 pasos (con checklist o require_photos): "Iniciar" primero (GPS +
+ *    operario_sesion), luego "Finalizar y Reportar" (valida propiedad).
+ *
+ * Toda mutación pasa por transicionEstadoOT con auth_mode='portal' — mismo
+ * motor de estados y validaciones que el módulo autenticado.
  */
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import {
-  CheckCircle2, Loader2, Camera, X, ChevronDown, ChevronUp, ArrowLeft, MapPin, FileText, Image as ImageIcon, AlertTriangle
+  CheckCircle2, Loader2, Camera, X, ChevronDown, ChevronUp, ArrowLeft,
+  MapPin, FileText, Image as ImageIcon, AlertTriangle, Play, Flag
 } from 'lucide-react';
 import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
 import { useOperarioClave } from '@/hooks/useOperarioClave';
 import OperarioClavePrompt from '@/components/operario/OperarioClavePrompt';
+import { decideSteps } from '@/lib/workOrderActions';
+import { getClave, getNombre } from '@/lib/operarioClave';
 
 const callFn = async (payload) => {
   const res = await base44.functions.invoke('publicFichar', payload);
@@ -25,7 +37,7 @@ const PRIORITY_STYLE = {
 };
 
 function FotoUploader({ photos, onAdd, onRemove }) {
-  const fileRef = useRef();
+  const fileRef = React.useRef();
   const [uploading, setUploading] = useState(false);
 
   const handleFiles = async (files) => {
@@ -86,32 +98,110 @@ function FotoUploader({ photos, onAdd, onRemove }) {
   );
 }
 
-export default function EjecutarOTEnPortal({ order, locationName, onBack, onCompleted }) {
+export default function EjecutarOTEnPortal({ order, locationName, onBack, onCompleted, isOnline = true, onQueueOffline }) {
   const [photos, setPhotos] = useState([]);
   const [saving, setSaving] = useState(false);
   const [showDesc, setShowDesc] = useState(true);
   const [gpsStatus, setGpsStatus] = useState(null);
+  const [otStarted, setOtStarted] = useState(order.status === 'en_progreso');
   const { capturar } = useGeolocalizacion();
   const { promptOpen: clavePromptOpen, requireClave, onPromptSuccess, onPromptClose } = useOperarioClave();
+  const offline = !isOnline;
 
-  const handleCompletar = () => {
+  const steps = decideSteps(order);
+  const isAlreadyInProgress = order.status === 'en_progreso';
+  // 2-pasos: necesita iniciar primero si no está en_progreso.
+  const needsStart = (steps === 'two' || isAlreadyInProgress === false) && !isAlreadyInProgress;
+  // Si la OT está en_progreso, siempre va a "Finalizar" sin importar steps.
+  const showStartButton = needsStart && !otStarted && steps === 'two';
+
+  const runTransition = async (accion, extraData = {}) => {
+    const clave = getClave();
+    const operario_sesion = getNombre();
+    const res = await base44.functions.invoke('transicionEstadoOT', {
+      ot_id: order.id,
+      accion,
+      extra_data: extraData,
+      auth_mode: 'portal',
+      operario_password: clave,
+      operario_sesion,
+    });
+    return res.data;
+  };
+
+  const handleIniciar = () => {
     requireClave(async (clave) => {
       setSaving(true);
       setGpsStatus('capturando');
       try {
         const gpsData = await capturar();
         setGpsStatus(gpsData.gps_status);
-        const res = await callFn({
-          action: 'updateWorkOrder',
-          password: clave,
-          workOrderId: order.id,
-          updates: {
-            status: 'pendiente_validacion',
-            ...(photos.length > 0 && { photos: [...(order.photos || []), ...photos] }),
-            ...gpsData,
-          },
-        });
-        onCompleted({ ...order, status: 'pendiente_validacion', ...res.workOrder });
+        const operario_sesion = getNombre();
+        const extraData = { operario_sesion };
+        if (gpsData.gps_status === 'capturado') {
+          extraData.gps = { latitude: gpsData.gps_latitude, longitude: gpsData.gps_longitude, accuracy: gpsData.gps_accuracy };
+        } else {
+          extraData.gps_status = gpsData.gps_status;
+        }
+
+        if (offline && onQueueOffline) {
+          const optimistic = { ...order, status: 'en_progreso', operario_sesion, assigned_name: operario_sesion, fecha_inicio_real: new Date().toISOString(), _pending_sync: true };
+          onQueueOffline(order, 'iniciar', extraData, optimistic);
+          setOtStarted(true);
+          if (onCompleted) onCompleted(optimistic);
+          return;
+        }
+
+        const res = await runTransition('iniciar', extraData);
+        if (res.error) { setGpsStatus(null); return; }
+        setOtStarted(true);
+        if (onCompleted && res.ot) onCompleted(res.ot);
+      } catch (err) {
+        setGpsStatus('no_disponible');
+      } finally {
+        setSaving(false);
+      }
+    });
+  };
+
+  const handleFinalizar = () => {
+    requireClave(async (clave) => {
+      setSaving(true);
+      setGpsStatus('capturando');
+      try {
+        const gpsData = await capturar();
+        setGpsStatus(gpsData.gps_status);
+        const extraData = {};
+        if (gpsData.gps_status === 'capturado') {
+          extraData.gps = { latitude: gpsData.gps_latitude, longitude: gpsData.gps_longitude, accuracy: gpsData.gps_accuracy };
+        } else {
+          extraData.gps_status = gpsData.gps_status;
+        }
+        if (photos.length > 0) {
+          extraData.photos = [...(order.photos || []), ...photos];
+        }
+
+        // 1-paso: si la OT no fue iniciada todavía, iniciar+finalizar en secuencia.
+        if (!otStarted && !isAlreadyInProgress) {
+          if (offline && onQueueOffline) {
+            const optimisticInit = { ...order, status: 'en_progreso', operario_sesion: getNombre(), assigned_name: getNombre(), fecha_inicio_real: new Date().toISOString(), _pending_sync: true };
+            onQueueOffline(order, 'iniciar', { ...extraData, operario_sesion: getNombre() }, optimisticInit);
+          } else {
+            const initRes = await runTransition('iniciar', { ...extraData, operario_sesion: getNombre() });
+            if (initRes.error) { setGpsStatus(null); return; }
+          }
+        }
+
+        if (offline && onQueueOffline) {
+          const optimistic = { ...order, status: 'pendiente_validacion', ...extraData, _pending_sync: true };
+          onQueueOffline(order, 'finalizar', extraData, optimistic);
+          if (onCompleted) onCompleted(optimistic);
+          return;
+        }
+
+        const res = await runTransition('finalizar', extraData);
+        if (res.error) { setGpsStatus(null); return; }
+        if (onCompleted && res.ot) onCompleted(res.ot);
       } catch (err) {
         setGpsStatus('no_disponible');
       } finally {
@@ -142,6 +232,11 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
           </span>
           <h1 className="text-white font-bold text-2xl leading-snug">{order.title}</h1>
           {locationName && <p className="text-white/70 text-sm mt-1.5 flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {locationName}</p>}
+          {otStarted && (
+            <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-400/20 text-emerald-200 border border-emerald-400/30">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> En progreso
+            </span>
+          )}
         </div>
       </div>
 
@@ -173,6 +268,21 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
               {order.photos.map((url, idx) => (
                 <div key={idx} className="aspect-video rounded-xl overflow-hidden border border-border/50">
                   <img src={url} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Checklist display (2-pasos con checklist) */}
+        {order.checklist?.length > 0 && (
+          <div className="rounded-2xl border border-border p-4 bg-card">
+            <p className="font-bold text-sm text-foreground mb-3">Tareas del checklist</p>
+            <div className="space-y-2">
+              {order.checklist.map((task, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-sm">
+                  <CheckCircle2 className={`h-4 w-4 mt-0.5 shrink-0 ${task.completed ? 'text-emerald-400' : 'text-muted-foreground/40'}`} />
+                  <span className={task.completed ? 'text-muted-foreground line-through' : 'text-foreground'}>{task.task}</span>
                 </div>
               ))}
             </div>
@@ -219,16 +329,31 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
               <MapPin className="h-3.5 w-3.5" /> Ubicación capturada
             </p>
           )}
-          <button
-            onClick={handleCompletar}
-            disabled={saving || needsPhoto}
-            className="w-full h-16 rounded-2xl bg-emerald-500 disabled:bg-muted disabled:text-muted-foreground text-white font-bold text-xl flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/30 active:scale-[0.98] transition-all"
-          >
-            {saving
-              ? <><Loader2 className="h-6 w-6 animate-spin" /> {gpsStatus === 'capturando' ? 'Localizando...' : 'Guardando...'}</>
-              : <><CheckCircle2 className="h-7 w-7" /> Finalizar y Enviar al Jefe</>
-            }
-          </button>
+
+          {/* Botón según fase del flujo híbrido */}
+          {showStartButton ? (
+            <button
+              onClick={handleIniciar}
+              disabled={saving}
+              className="w-full h-16 rounded-2xl bg-blue-600 disabled:bg-muted disabled:text-muted-foreground text-white font-bold text-xl flex items-center justify-center gap-3 shadow-lg shadow-blue-600/30 active:scale-[0.98] transition-all"
+            >
+              {saving
+                ? <><Loader2 className="h-6 w-6 animate-spin" /> Iniciando...</>
+                : <><Play className="h-7 w-7" /> Iniciar Orden</>
+              }
+            </button>
+          ) : (
+            <button
+              onClick={handleFinalizar}
+              disabled={saving || needsPhoto}
+              className="w-full h-16 rounded-2xl bg-emerald-500 disabled:bg-muted disabled:text-muted-foreground text-white font-bold text-xl flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/30 active:scale-[0.98] transition-all"
+            >
+              {saving
+                ? <><Loader2 className="h-6 w-6 animate-spin" /> {gpsStatus === 'capturando' ? 'Localizando...' : 'Guardando...'}</>
+                : <><Flag className="h-7 w-7" /> {otStarted || isAlreadyInProgress ? 'Finalizar y Enviar' : 'Finalizar y Enviar al Jefe'}</>
+              }
+            </button>
+          )}
         </div>
       </div>
 

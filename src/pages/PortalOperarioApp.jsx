@@ -13,6 +13,7 @@ import LocationOTListModal from '@/components/operario/LocationOTListModal';
 import BodyPortal from '@/components/operario/BodyPortal';
 import MisOrdenesFiltros from '@/components/operario/MisOrdenesFiltros';
 import { useOperarioOfflineActions } from '@/hooks/useOperarioOfflineActions';
+import { canActOn } from '@/lib/workOrderActions';
 
 export default function PortalOperarioApp() {
   const { currentUser, displayName } = useCurrentUser();
@@ -355,61 +356,32 @@ export default function PortalOperarioApp() {
     }
   };
 
-  const normName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-  const isOwnerOf = (ot) =>
-    ot.assigned_to === currentUser?.id ||
-    (ot.assigned_name && normName(ot.assigned_name) === normName(displayName));
-
-  // Clasifica si el operario puede actuar sobre una OT de la ubicación escaneada.
-  // Devuelve { canAct, reason }. Lo usa LocationOTListModal para mostrar las OTs
-  // no accionables como filas bloqueadas con el motivo (en vez de un botón que al
-  // clickearlo solo cierra y parece "se sale todo y ya").
-  const resolveAction = (ot) => {
-    if (ot.status === 'pendiente') return { canAct: true };
-    // Asignada → cualquier operario que escanea puede iniciarla. La asignación
-    // del jefe es una sugerencia, no un lock; al iniciar, el escaneador pasa a ser
-    // el trabajador (lo resuelve transicionEstadoOT).
-    if (ot.status === 'asignada') return { canAct: true };
-    if (ot.status === 'en_progreso') {
-      // Offline permitido: el reporte se encola y se sincroniza después.
-      if (ot.assigned_name && !isOwnerOf(ot))
-        return { canAct: false, reason: `La trabaja ${ot.assigned_name}` };
-      return { canAct: true };
-    }
-    if (ot.status === 'pendiente_validacion') return { canAct: false, reason: 'En validación' };
-    return { canAct: false, reason: ot.status || 'No disponible' };
-  };
+  // Lógica de decisión delegada a workOrderActions — single source of truth
+  // compartida con el portal público. canActOn evalúa estado + propiedad.
+  const resolveAction = (ot) =>
+    canActOn(ot, { userId: currentUser?.id, displayName });
 
   // Devuelve true si abrió un diálogo (accionable), false si solo notificó.
   // El modal de ubicación se cierra solo si abrió algo — si no, queda abierto
   // con el toast visible explicando por qué, evitando el "se sale todo y ya".
   const actOnOT = (foundOT) => {
-    if (foundOT.status === 'pendiente') {
-      setConfirmAction({ ot: foundOT, accion: 'iniciar' });
-      return true;
-    } else if (foundOT.status === 'asignada') {
-      // Cualquier operario que escanea la OT puede iniciarla — la asignación del
-      // jefe es una sugerencia, no un lock. Al iniciar, el escaneador pasa a ser
-      // el trabajador (lo resuelve transicionEstadoOT en el backend).
-      setConfirmAction({ ot: foundOT, accion: 'iniciar' });
-      return true;
-    } else if (foundOT.status === 'en_progreso') {
-      // Solo el operario que está trabajando la OT puede reportarla/cerrarla.
-      // Otro operario que escanea la misma ubicación la ve pero no puede actuar.
-      // Offline permitido: el reporte se encola y se envía al volver online.
-      if (foundOT.assigned_name && !isOwnerOf(foundOT)) {
+    const action = canActOn(foundOT, { userId: currentUser?.id, displayName });
+    if (!action.canAct) {
+      if (foundOT.status === 'pendiente_validacion') {
+        toast.info('Esta OT ya está enviada al jefe para validación');
+      } else if (foundOT.status === 'en_progreso') {
         toast.info('Esta OT la está trabajando otro operario');
-        return false;
+      } else {
+        toast.info(`La OT "${foundOT.title}" está ${foundOT.status}`);
       }
-      setReporteOT(foundOT);
-      return true;
-    } else if (foundOT.status === 'pendiente_validacion') {
-      toast.info('Esta OT ya está enviada al jefe para validación');
-      return false;
-    } else {
-      toast.info(`La OT "${foundOT.title}" está ${foundOT.status}`);
       return false;
     }
+    if (foundOT.status === 'en_progreso') {
+      setReporteOT(foundOT);
+    } else {
+      setConfirmAction({ ot: foundOT, accion: 'iniciar' });
+    }
+    return true;
   };
 
   // Skeleton shimmer solo en la primera carga real (sin data previa en cache).
