@@ -9,6 +9,9 @@ import SensitiveChangesLog from '@/components/security/SensitiveChangesLog';
 import SuspiciousActivityAlerts from '@/components/security/SuspiciousActivityAlerts';
 import AuditSystemCheck from '@/components/audit/AuditSystemCheck';
 import OperarioPasswordPanel from '@/components/security/OperarioPasswordPanel';
+import MigrationFlagsPanel from '@/components/security/MigrationFlagsPanel';
+import TelemetriaCargaPanel from '@/components/security/TelemetriaCargaPanel';
+import { Flag, Activity as ActivityIcon } from 'lucide-react';
 
 export default function Seguridad() {
   return (
@@ -55,7 +58,7 @@ export default function Seguridad() {
       </div>
 
       <Tabs defaultValue="2fa" className="w-full">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-10">
           <TabsTrigger value="2fa" className="gap-2">
             <Lock className="h-4 w-4" />
             <span className="hidden sm:inline">2FA</span>
@@ -87,6 +90,14 @@ export default function Seguridad() {
           <TabsTrigger value="operarios" className="gap-2">
             <KeyRound className="h-4 w-4" />
             <span className="hidden sm:inline">Operarios</span>
+          </TabsTrigger>
+          <TabsTrigger value="flags" className="gap-2">
+            <Flag className="h-4 w-4" />
+            <span className="hidden sm:inline">Flags</span>
+          </TabsTrigger>
+          <TabsTrigger value="telemetria" className="gap-2">
+            <ActivityIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Telemetría</span>
           </TabsTrigger>
         </TabsList>
 
@@ -179,6 +190,28 @@ export default function Seguridad() {
             </p>
           </Card>
           <OperarioPasswordPanel />
+        </TabsContent>
+
+        <TabsContent value="flags" className="space-y-4">
+          <Card className="p-6 bg-blue-50 border-blue-200">
+            <h3 className="font-bold text-blue-900 mb-2">Feature Flags de Migración Segura</h3>
+            <p className="text-sm text-blue-800">
+              Toggle de comportamiento sin redeploy. Cada migración o switch de arquitectura
+              queda detrás de un flag, para poder volver atrás en segundos si algo falla.
+            </p>
+          </Card>
+          <MigrationFlagsPanel />
+        </TabsContent>
+
+        <TabsContent value="telemetria" className="space-y-4">
+          <Card className="p-6 bg-blue-50 border-blue-200">
+            <h3 className="font-bold text-blue-900 mb-2">Telemetría de Carga</h3>
+            <p className="text-sm text-blue-800">
+              Tiempos de carga reales por módulo. Detectá degradación de performance antes
+              de que los usuarios la reporten. Mediciones P50/P95/promedio por módulo.
+            </p>
+          </Card>
+          <TelemetriaCargaPanel />
         </TabsContent>
       </Tabs>
 

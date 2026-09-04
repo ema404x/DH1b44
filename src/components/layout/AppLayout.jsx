@@ -20,6 +20,7 @@ import { useEmergencyNotifications } from '@/hooks/useEmergencyNotifications';
 import EmergencyAlert from '@/components/emergencias/EmergencyAlert';
 import { useSmartCache } from '@/hooks/useSmartCache';
 import { useAppUsageTracker } from '@/hooks/useAppUsageTracker';
+import { useLoadTelemetry } from '@/hooks/useLoadTelemetry';
 import PageErrorBoundary from '@/components/shared/PageErrorBoundary';
 
 // Estable entre renders — no se recrea nunca
@@ -42,6 +43,8 @@ export default function AppLayout() {
   useAppUsageTracker(currentUser);
   const location = useLocation();
   const navigationType = useNavigationType();
+  // Telemetría de carga — 100% aditiva, mide tiempo de carga por ruta. No afecta lógica.
+  useLoadTelemetry(location.pathname);
   const [activeEmergency, setActiveEmergency] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const navigate = useNavigate();

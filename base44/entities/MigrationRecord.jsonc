@@ -1,0 +1,107 @@
+{
+  "name": "MigrationRecord",
+  "type": "object",
+  "properties": {
+    "migration_type": {
+      "type": "string",
+      "description": "Identificador de la migraci\u00f3n (ej: 'backfill_completed_date', 'backfill_auditlog_sector'). Clave para el registro de scanners."
+    },
+    "entity_name": {
+      "type": "string",
+      "description": "Nombre de la entidad afectada por la migraci\u00f3n"
+    },
+    "snapshots": {
+      "type": "array",
+      "description": "Snapshot de los registros ANTES de pisar, para restaurar en rollback. Slim: solo campos de negocio.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "snapshot": {
+            "type": "object",
+            "description": "Campos del registro previos a la actualizaci\u00f3n"
+          }
+        }
+      }
+    },
+    "snapshot_completo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si snapshots contiene todos los registros o solo ids (restauraci\u00f3n parcial)"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "snapshot_creado",
+        "aplicado",
+        "revertido",
+        "revertido_parcial"
+      ],
+      "default": "snapshot_creado",
+      "description": "Estado de la migraci\u00f3n"
+    },
+    "total_registros": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de registros afectados/snapshoteados"
+    },
+    "aplicado_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora en que se aplic\u00f3 la migraci\u00f3n"
+    },
+    "aplicado_por": {
+      "type": "string",
+      "description": "Email del admin que aplic\u00f3 la migraci\u00f3n"
+    },
+    "reverted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora del rollback"
+    },
+    "reverted_by": {
+      "type": "string",
+      "description": "Email del admin que ejecut\u00f3 el rollback"
+    },
+    "dry_run_report": {
+      "type": "object",
+      "description": "Reporte del dry-run previo (total_a_afectar, muestras, alertas) \u2014 auditor\u00eda de la decisi\u00f3n"
+    },
+    "notas": {
+      "type": "string"
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector del framework ('sistema' para migraciones globales admin-only). Aislamiento admin-only."
+    }
+  },
+  "required": [
+    "migration_type",
+    "entity_name",
+    "sector_id"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
