@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Search, Plus, ClipboardList, MapPin,
-  Zap, Wrench, TrendingUp,
+  Zap, Wrench, Clock, UserCheck, Loader, AlertCircle, HardHat, XCircle,
   Layers, History, Smartphone, LayoutGrid, Kanban, User, SlidersHorizontal, CheckCircle2, WifiOff
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -39,6 +39,8 @@ import { useWorkOrderRealtime } from '@/hooks/useWorkOrderRealtime';
 
 
 
+const GRID_VISIBLE_LIMIT = 60; // máximo de cards en grilla antes de "show more"
+
 const STATUS_LABELS = {
   pendiente: 'Pendiente',
   asignada: 'Asignada',
@@ -59,6 +61,7 @@ export default function WorkOrders() {
   const [historialOpen, setHistorialOpen] = useState(false);
   const [modoCampo, setModoCampo] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAllGrid, setShowAllGrid] = useState(false);
   const [advFilters, setAdvFilters] = useState({
     priority: '', type: '', assigned_to: '', jefe_sitio: '',
     date_from: '', date_to: '', overdue_only: false,
@@ -247,7 +250,10 @@ export default function WorkOrders() {
 
   const handleStatusChange = async (id, newStatus) => {
     if (!isOnline) { toast.info('Sin conexión — modo offline. No se puede mover la OT hasta reconectar.'); return; }
-    const order = visibleOrders.find(o => o.id === id);
+    // Leer del cache (consistencia con handleComplete) — evita depender de
+    // visibleOrders que se declara más abajo en el componente (TDZ-safe).
+    const cached = queryClient.getQueryData(['workorders-board'])?.orders || [];
+    const order = cached.find(o => o.id === id);
     if (!order || order.status === newStatus) return;
     const action = getTransitionAction(order.status, newStatus);
     if (!action) {
@@ -342,7 +348,7 @@ export default function WorkOrders() {
 
     return matchSearch && matchStatus && matchPriority && matchType && matchOperario && matchJefe && matchDateFrom && matchDateTo && matchOverdue;
     }).map(({ o }) => o);
-  }, [searchableOrders, search, statusTab, advFilters, resolveJefe, resolveCreator]);
+  }, [searchableOrders, search, statusTab, advFilters, resolveJefe, resolveCreator, employeeLookup]);
 
   const stats = useMemo(() => ({
     total: filtered.length,
@@ -355,10 +361,10 @@ export default function WorkOrders() {
     canceladas: filtered.filter(o => o.status === 'cancelada').length,
   }), [filtered]);
 
-  const container = {
+  const container = useMemo(() => ({
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: Math.min(0.05, 2 / Math.max(filtered.length, 1)) } }
-  };
+  }), [filtered.length]);
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
@@ -433,21 +439,21 @@ export default function WorkOrders() {
         {/* Stats */}
         <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
           {[
-            { label: 'Total', value: stats.total, color: 'from-slate-400' },
-            { label: 'Pendientes', value: stats.pendientes, color: 'from-yellow-500' },
-            { label: 'Asignadas', value: stats.asignadas, color: 'from-blue-500' },
-            { label: 'En Progreso', value: stats.en_progreso, color: 'from-purple-500' },
-            { label: 'Validación', value: stats.validacion, color: 'from-amber-400' },
-            { label: 'Obra', value: stats.obra, color: 'from-pink-400' },
-            { label: 'Completadas', value: stats.completadas, color: 'from-emerald-500' },
-            { label: 'Canceladas', value: stats.canceladas, color: 'from-red-500' },
+            { label: 'Total', value: stats.total, icon: ClipboardList, color: 'from-slate-400' },
+            { label: 'Pendientes', value: stats.pendientes, icon: Clock, color: 'from-yellow-500' },
+            { label: 'Asignadas', value: stats.asignadas, icon: UserCheck, color: 'from-blue-500' },
+            { label: 'En Progreso', value: stats.en_progreso, icon: Loader, color: 'from-purple-500' },
+            { label: 'Validación', value: stats.validacion, icon: AlertCircle, color: 'from-amber-400' },
+            { label: 'Obra', value: stats.obra, icon: HardHat, color: 'from-pink-400' },
+            { label: 'Completadas', value: stats.completadas, icon: CheckCircle2, color: 'from-emerald-500' },
+            { label: 'Canceladas', value: stats.canceladas, icon: XCircle, color: 'from-red-500' },
           ].map((stat, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border border-slate-700/50 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-slate-400 uppercase">{stat.label}</p>
                   <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${stat.color} to-transparent flex items-center justify-center`}>
-                    <TrendingUp className="h-4 w-4 text-white" />
+                    <stat.icon className="h-4 w-4 text-white" />
                   </div>
                 </div>
                 <p className="text-2xl font-bold text-white">{stat.value}</p>
@@ -526,8 +532,9 @@ export default function WorkOrders() {
       {!modoCampo && viewMode === 'grid' && (filtered.length === 0 && !isLoading ? (
         <EmptyState icon={ClipboardList} title="No hay órdenes" description="Creá una nueva orden de trabajo" actionLabel="Nueva OT" onAction={() => navigate('/crear-ot')} />
       ) : (
+        <>
         <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-          {filtered.map(order => (
+          {filtered.slice(0, showAllGrid ? filtered.length : GRID_VISIBLE_LIMIT).map(order => (
             <WorkOrderCard
               key={order.id}
               order={order}
@@ -539,6 +546,15 @@ export default function WorkOrders() {
             />
           ))}
         </motion.div>
+        {!showAllGrid && filtered.length > GRID_VISIBLE_LIMIT && (
+          <button
+            onClick={() => setShowAllGrid(true)}
+            className="w-full text-sm text-slate-400 hover:text-white py-3 border border-dashed border-slate-700 rounded-lg transition-colors"
+          >
+            + {filtered.length - GRID_VISIBLE_LIMIT} órdenes más...
+          </button>
+        )}
+        </>
       ))}
 
       <OTTemplateSelector

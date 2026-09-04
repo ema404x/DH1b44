@@ -215,6 +215,7 @@ export function otEsVisiblePara(ot: any, ctx: OtVisibilityContext): boolean {
 export async function getVisibleWorkOrders(
   sb: any,
   user: any,
+  options: { excludeArchived?: boolean } = {},
 ): Promise<VisibleWorkOrdersResult> {
   const ctx = await buildOtVisibilityContext(sb, user);
   if (!ctx) return { orders: [], total: 0, role: null, ctx: null };
@@ -224,7 +225,15 @@ export async function getVisibleWorkOrders(
   // la paginación vieja perdía registros). Orden -updated_date directo para
   // preservar el burbujeo de OTs recién tocadas (regla de oro: OT vieja
   // iniciada por QR bubbla al top).
-  const all = await fetchAll(sb, 'WorkOrder', { sector_id: ctx.sector }, '-updated_date');
+  //
+  // excludeArchived: el tablero activo nunca muestra OTs archivadas (se filtran
+  // en el frontend con !o.archivada). Excluirlas server-side reduce el payload
+  // transferido, especialmente tras el backfill de completed_date que hizo
+  // elegibles a 83+ OTs para archivo automático. $ne funciona en campos custom
+  // (archivada no es built-in) — verificado en fetchAllSector.ts.
+  const query: Record<string, any> = { sector_id: ctx.sector };
+  if (options.excludeArchived) query.archivada = { $ne: true };
+  const all = await fetchAll(sb, 'WorkOrder', query, '-updated_date');
 
   const orders = all.filter((ot: any) => otEsVisiblePara(ot, ctx));
   return {

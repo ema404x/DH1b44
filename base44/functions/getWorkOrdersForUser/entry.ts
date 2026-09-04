@@ -20,7 +20,10 @@ export default async function(req) {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { orders, total, role, ctx } = await getVisibleWorkOrders(base44.asServiceRole, user);
+    // excludeArchived: el tablero activo filtra !o.archivada en el frontend (línea
+    // 276 de WorkOrders.jsx). Excluirlas server-side reduce el payload — las OTs
+    // archivadas se visualizan desde el Historial, que tiene su propio data source.
+    const { orders, total, role, ctx } = await getVisibleWorkOrders(base44.asServiceRole, user, { excludeArchived: true });
 
     if (!ctx) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
 
