@@ -86,7 +86,7 @@ export default function MobileHeader() {
     >
       {isRoot ? (
         <div className="flex items-center h-11 px-2 z-10">
-          <span className="text-sm font-semibold text-foreground">DH1</span>
+          <span className="text-[15px] font-semibold tracking-[0.06em] text-foreground">DH1</span>
         </div>
       ) : (
         <button
@@ -95,12 +95,12 @@ export default function MobileHeader() {
           className="flex items-center gap-1.5 h-11 px-2 -ml-1 rounded-lg active:bg-muted transition-colors z-10"
         >
           <ArrowLeft className="h-5 w-5" />
-          <span className="text-sm font-medium">Atrás</span>
+          <span className="text-sm font-medium tracking-wide text-foreground/80">Atrás</span>
         </button>
       )}
 
       {!isRoot && (
-        <span className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-foreground truncate max-w-[36%] pointer-events-none">
+        <span className="absolute left-1/2 -translate-x-1/2 text-[15px] font-semibold tracking-[0.01em] text-foreground truncate max-w-[36%] pointer-events-none">
           {title}
         </span>
       )}

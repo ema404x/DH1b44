@@ -38,7 +38,7 @@ export default function MobileBottomNav({ onMore }) {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         aria-label="Navegación principal"
       >
-        <div className="flex items-stretch border-t border-border bg-card/95 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.25)]">
+        <div className="flex items-stretch border-t border-border/60 bg-card/95 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.25)]">
           {visibleItems.map((item) => {
             const active = isActive(item.path);
             return (
@@ -46,7 +46,7 @@ export default function MobileBottomNav({ onMore }) {
                 key={item.path}
                 to={item.path}
                 aria-current={active ? 'page' : undefined}
-                className="relative flex flex-1 flex-col items-center justify-center gap-1 py-2 min-h-[56px] select-none active:bg-muted/40 transition-colors"
+                className="relative flex flex-1 flex-col items-center justify-center gap-1.5 py-2.5 min-h-[56px] select-none active:bg-muted/40 transition-colors"
               >
                 <span className="relative flex h-9 w-16 items-center justify-center rounded-full">
                   {active && (
@@ -65,8 +65,8 @@ export default function MobileBottomNav({ onMore }) {
                 </span>
                 <span
                   className={cn(
-                    'text-[10px] leading-none transition-colors truncate max-w-full px-1',
-                    active ? 'text-primary font-medium' : 'text-muted-foreground'
+                    'text-[10px] leading-none tracking-wide transition-colors truncate max-w-full px-1',
+                    active ? 'text-primary font-semibold' : 'text-muted-foreground'
                   )}
                 >
                   {item.label}
@@ -79,12 +79,12 @@ export default function MobileBottomNav({ onMore }) {
           <button
             onClick={onMore}
             aria-label="Más módulos"
-            className="relative flex flex-1 flex-col items-center justify-center gap-1 py-2 min-h-[56px] select-none active:bg-muted/40 transition-colors"
+            className="relative flex flex-1 flex-col items-center justify-center gap-1.5 py-2.5 min-h-[56px] select-none active:bg-muted/40 transition-colors"
           >
             <span className="relative flex h-9 w-16 items-center justify-center rounded-full">
               <LayoutGrid className="h-5 w-5 text-muted-foreground" />
             </span>
-            <span className="text-[10px] leading-none text-muted-foreground">Más</span>
+            <span className="text-[10px] leading-none tracking-wide text-muted-foreground">Más</span>
           </button>
         </div>
       </nav>

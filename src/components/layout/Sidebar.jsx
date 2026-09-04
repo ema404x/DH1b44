@@ -273,12 +273,12 @@ export default function Sidebar({ open, onOpenChange }) {
         </div>
       </div>
 
-      <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-4 scrollbar-thin">
+      <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-5 scrollbar-thin">
         {mobileVisibleGroups.map((group) => (
           <div key={group.label}>
-            <div className="px-3 mb-1 mt-1 text-[9px] font-bold uppercase tracking-[0.14em] flex items-center gap-2 text-sidebar-foreground/60">
+            <div className="px-3 mb-1.5 mt-1 text-[9px] font-bold uppercase tracking-[0.16em] flex items-center gap-2 text-sidebar-foreground/60">
               <span className="flex-shrink-0">{group.label}</span>
-              <div className="flex-1 h-px bg-white/12" />
+              <div className="flex-1 h-px bg-border/40" />
               <span className="text-[8px] text-sidebar-foreground/40 tabular-nums shrink-0">{group.items.length}</span>
             </div>
             <div className="space-y-0.5">
