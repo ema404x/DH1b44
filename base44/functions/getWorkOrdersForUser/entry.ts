@@ -25,9 +25,13 @@ export default async function(req) {
     // includeArchived: el tablero (sin param) recibe solo activas + archived_count
     // para el header. El Historial pasa includeArchived:true → recibe todas las
     // visibles (activas + archivadas) para la pestaña Archivadas y su badge.
+    // scope='own': el Dashboard pide solo las OTs propias del usuario (ignora
+    // admin-view y linkage jefe) para que el feed y los KPIs reflejen "siempre
+    // del usuario actual" sin importar el rol.
     const includeArchived = body?.includeArchived === true;
+    const forceOwnOnly = body?.scope === 'own';
     const { orders, total, archived_count, role, ctx } = await getVisibleWorkOrders(
-      base44.asServiceRole, user, { excludeArchived: !includeArchived }
+      base44.asServiceRole, user, { excludeArchived: !includeArchived, forceOwnOnly }
     );
 
     if (!ctx) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });

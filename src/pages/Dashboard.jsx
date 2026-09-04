@@ -201,9 +201,17 @@ export default function Dashboard() {
   // porque el primer montaje refetcha si stale. Aplica idéntico a ambos sectores.
   const STALE_5MIN = 5 * 60 * 1000;
   const { data: projects = [] }  = useQuery({ queryKey: ['projects'],   queryFn: () => base44.entities.Project.list('-updated_date', 100),   staleTime: STALE_5MIN, enabled: canRead('Project') });
-  const { data: _allOrdersRaw = [] } = useQuery({ queryKey: ['workorders'], queryFn: () => base44.entities.WorkOrder.list('-updated_date', 150),  staleTime: STALE_5MIN, enabled: canRead('WorkOrder') });
-  // ['workorders'] se comparte con WorkOrders (getWorkOrdersForUser → shape {orders,...}). Normalizamos.
-  const allOrders = Array.isArray(_allOrdersRaw) ? _allOrdersRaw : (_allOrdersRaw?.orders || []);
+  // OTs propias del usuario actual (scope='own'): ignora admin-view y linkage
+  // jefe — incluso admins ven solo sus OTs (creador/asignado/jefe_sitio). Así
+  // el feed "Actividad reciente" y los KPIs de OT reflejan "siempre del usuario
+  // actual". Query key distinta de ['workorders'] para no pisar el cache de la
+  // página Órdenes (que scopea por visibilidad completa del rol).
+  const { data: _ownOrdersRaw = [] } = useQuery({
+    queryKey: ['workorders-dashboard-own'],
+    queryFn: async () => (await base44.functions.invoke('getWorkOrdersForUser', { scope: 'own' })).data?.orders || [],
+    staleTime: STALE_5MIN, enabled: canRead('WorkOrder'),
+  });
+  const allOrders = Array.isArray(_ownOrdersRaw) ? _ownOrdersRaw : (_ownOrdersRaw?.orders || []);
   const { data: clients = [] }   = useQuery({ queryKey: ['clients'],    queryFn: () => base44.entities.Client.list('-updated_date', 100),     staleTime: STALE_5MIN, enabled: canRead('Client') });
   const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),    staleTime: STALE_5MIN, enabled: canRead('Invoice') });
   const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),   staleTime: STALE_5MIN, enabled: canRead('Inventory') });
@@ -221,8 +229,8 @@ export default function Dashboard() {
   // KPIs agregados: staleTime 3min (más fresco que las listas) y sin
   // refetchInterval. Se refresca solo al montar si está stale + PullToRefresh.
   const { data: kpis, isLoading: kpisLoading } = useQuery({
-    queryKey: ['dashboard-metrics'],
-    queryFn: async () => (await base44.functions.invoke('getDashboardMetrics')).data,
+    queryKey: ['dashboard-metrics-own'],
+    queryFn: async () => (await base44.functions.invoke('getDashboardMetrics', { scope: 'own' })).data,
     staleTime: 3 * 60 * 1000, retry: 1,
     enabled: useBackendKpis,
   });

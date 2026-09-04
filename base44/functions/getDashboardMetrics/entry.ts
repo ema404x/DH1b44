@@ -90,6 +90,12 @@ export default async function (req) {
     const canRead = (moduleKey) =>
       user.role === 'admin' ? true : canReadModule(perms, moduleKey);
 
+    // scope='own': el Dashboard pide KPIs de OT propios del usuario (ignora
+    // admin-view y linkage jefe). Sólo afecta WorkOrder; los demás módulos
+    // (proyectos, clientes, materiales, facturación) siguen sector-scoped.
+    const body = await req.json().catch(() => ({}));
+    const forceOwnOnly = body?.scope === 'own';
+
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -105,7 +111,7 @@ export default async function (req) {
     const loadPromises = [];
     if (canRead('WorkOrder')) {
       loadKeys.push('workorders');
-      loadPromises.push(getVisibleWorkOrders(sb, user).then((r) => r.orders));
+      loadPromises.push(getVisibleWorkOrders(sb, user, { forceOwnOnly }).then((r) => r.orders));
     }
     if (canRead('Project')) {
       loadKeys.push('projects');

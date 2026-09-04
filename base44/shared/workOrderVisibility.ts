@@ -56,6 +56,13 @@ export interface OtVisibilityContext {
   isField: boolean;
   /** Linkage jefe de sitio (Tablet→Employee), sector-scoped. Null si no aplica. */
   jefe: { userId: string | null; email: string; name: string } | null;
+  /**
+   * Forzar scope "solo propias": ignora admin-view y el linkage jefe de campo.
+   * El caller ve estrictamente las OTs donde es creador, asignado o jefe_sitio.
+   * Usado por el Dashboard para mostrar la actividad del usuario actual sin
+   * importar el rol (incluso admins ven solo sus propias OTs).
+   */
+  forceOwnOnly?: boolean;
 }
 
 /** Resultado canónico de getVisibleWorkOrders. */
@@ -85,6 +92,7 @@ export interface VisibleWorkOrdersResult {
 export async function buildOtVisibilityContext(
   sb: any,
   user: any,
+  options: { forceOwnOnly?: boolean } = {},
 ): Promise<OtVisibilityContext | null> {
   const { sector, employee } = await resolveAndReconcileSector(sb, user);
   if (!sector) return null;
@@ -152,6 +160,7 @@ export async function buildOtVisibilityContext(
     isAdminView,
     isField,
     jefe,
+    forceOwnOnly: options.forceOwnOnly === true,
   };
 }
 
@@ -171,8 +180,9 @@ export function otEsVisiblePara(ot: any, ctx: OtVisibilityContext): boolean {
   //  sector_id al sector escuela. Ahora se exige sector_id explícito.)
   if (!ot.sector_id || ot.sector_id !== ctx.sector) return false;
 
-  // a. Admin-view: todo el sector.
-  if (ctx.isAdminView) return true;
+  // a. Admin-view: todo el sector. Se salta cuando forceOwnOnly=true (Dashboard
+  //    "siempre del usuario actual"): incluso admins ven solo sus propias OTs.
+  if (ctx.isAdminView && !ctx.forceOwnOnly) return true;
 
   const myName = norm(ctx.employeeName);
   const otName = norm(ot.assigned_name);
@@ -190,8 +200,10 @@ export function otEsVisiblePara(ot: any, ctx: OtVisibilityContext): boolean {
   if (propia) return true;
 
   // b. Linkage jefe (sólo roles de campo): OTs creadas por su jefe, o donde
-  // el jefe es responsable por email/nombre.
-  if (ctx.isField && ctx.jefe) {
+  // el jefe es responsable por email/nombre. Se salta en scope "solo propias":
+  // el usuario ve estrictamente sus OTs (creador/asignado/jefe_sitio), no las
+  // derivadas de su linkage de jefe.
+  if (ctx.isField && ctx.jefe && !ctx.forceOwnOnly) {
     return (
       (!!ctx.jefe.userId && !!ot.created_by_id && ot.created_by_id === ctx.jefe.userId) ||
       (!!ctx.jefe.email && !!ot.jefe_sitio_email &&
@@ -216,9 +228,9 @@ export function otEsVisiblePara(ot: any, ctx: OtVisibilityContext): boolean {
 export async function getVisibleWorkOrders(
   sb: any,
   user: any,
-  options: { excludeArchived?: boolean } = {},
+  options: { excludeArchived?: boolean; forceOwnOnly?: boolean } = {},
 ): Promise<VisibleWorkOrdersResult> {
-  const ctx = await buildOtVisibilityContext(sb, user);
+  const ctx = await buildOtVisibilityContext(sb, user, { forceOwnOnly: options.forceOwnOnly });
   if (!ctx) return { orders: [], total: 0, role: null, ctx: null };
 
   // fetchAll trae TODAS las OTs del sector (activas + archivadas) en una sola
