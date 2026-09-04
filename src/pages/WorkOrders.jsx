@@ -127,7 +127,10 @@ export default function WorkOrders() {
   const { data, isLoading } = useQuery({
     queryKey: ['workorders-board'],
     queryFn: async () => {
-      const res = await base44.functions.invoke('getWorkOrdersForUser', {});
+      // scope='own': cada usuario ve solo sus OTs (creador/asignado/jefe_sitio),
+      // incluso admins. Mismo predicado que el Dashboard — sin filtrar aquí por
+      // roles de gestión, el backend ya aísla por propiedad.
+      const res = await base44.functions.invoke('getWorkOrdersForUser', { scope: 'own' });
       return res.data; // { orders, total, role, ctx }
     },
     // staleTime 30s: al volver de otra página dentro de 30s no refetchea → el
