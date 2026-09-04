@@ -62,6 +62,7 @@ export interface OtVisibilityContext {
 export interface VisibleWorkOrdersResult {
   orders: any[];
   total: number;
+  archived_count: number;
   role: string;
   ctx: OtVisibilityContext | null;
 }
@@ -220,25 +221,22 @@ export async function getVisibleWorkOrders(
   const ctx = await buildOtVisibilityContext(sb, user);
   if (!ctx) return { orders: [], total: 0, role: null, ctx: null };
 
-  // fetchAll trae TODAS las OTs del sector en una sola llamada (sin cursor,
-  // sin saltos — el SDK no soporta operadores sobre campos built-in, así que
-  // la paginación vieja perdía registros). Orden -updated_date directo para
-  // preservar el burbujeo de OTs recién tocadas (regla de oro: OT vieja
-  // iniciada por QR bubbla al top).
-  //
-  // excludeArchived: el tablero activo nunca muestra OTs archivadas (se filtran
-  // en el frontend con !o.archivada). Excluirlas server-side reduce el payload
-  // transferido, especialmente tras el backfill de completed_date que hizo
-  // elegibles a 83+ OTs para archivo automático. $ne funciona en campos custom
-  // (archivada no es built-in) — verificado en fetchAllSector.ts.
-  const query: Record<string, any> = { sector_id: ctx.sector };
-  if (options.excludeArchived) query.archivada = { $ne: true };
-  const all = await fetchAll(sb, 'WorkOrder', query, '-updated_date');
+  // fetchAll trae TODAS las OTs del sector (activas + archivadas) en una sola
+  // llamada. El predicado otEsVisiblePara se aplica UNA vez sobre el set
+  // completo — el caller decide si quiere solo activas (excludeArchived) o
+  // todas. El archived_count sale gratis porque ya tenemos el set en memoria.
+  const all = await fetchAll(sb, 'WorkOrder', { sector_id: ctx.sector }, '-updated_date');
 
-  const orders = all.filter((ot: any) => otEsVisiblePara(ot, ctx));
+  // Split en memoria post-visibilidad: activas y archivadas, ambas ya filtradas
+  // por otEsVisiblePara (defense-in-depth — el predicado es la última barrera).
+  const allVisible = all.filter((ot: any) => otEsVisiblePara(ot, ctx));
+  const archivadas = allVisible.filter((o: any) => o.archivada);
+  const activas = allVisible.filter((o: any) => !o.archivada);
+
   return {
-    orders,
-    total: orders.length,
+    orders: options.excludeArchived ? activas : allVisible,
+    total: (options.excludeArchived ? activas : allVisible).length,
+    archived_count: archivadas.length,
     role: ctx.isAdminView ? 'admin' : ctx.employeeRole || 'user',
     ctx,
   };

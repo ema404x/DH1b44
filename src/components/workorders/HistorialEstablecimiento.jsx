@@ -58,7 +58,7 @@ export default function HistorialEstablecimiento({ open, onOpenChange, onOpenOrd
   const { data: visData, isLoading } = useQuery({
     queryKey: ['workorders-visible-historial'],
     queryFn: async () => {
-      const res = await base44.functions.invoke('getWorkOrdersForUser', {});
+      const res = await base44.functions.invoke('getWorkOrdersForUser', { includeArchived: true });
       return res.data;
     },
     enabled: open,

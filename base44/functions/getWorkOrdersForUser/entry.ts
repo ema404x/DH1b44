@@ -20,17 +20,21 @@ export default async function(req) {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // excludeArchived: el tablero activo filtra !o.archivada en el frontend (línea
-    // 276 de WorkOrders.jsx). Excluirlas server-side reduce el payload — las OTs
-    // archivadas se visualizan desde el Historial, que tiene su propio data source.
-    const { orders, total, role, ctx } = await getVisibleWorkOrders(base44.asServiceRole, user, { excludeArchived: true });
+    const body = await req.json().catch(() => ({}));
+
+    // includeArchived: el tablero (sin param) recibe solo activas + archived_count
+    // para el header. El Historial pasa includeArchived:true → recibe todas las
+    // visibles (activas + archivadas) para la pestaña Archivadas y su badge.
+    const includeArchived = body?.includeArchived === true;
+    const { orders, total, archived_count, role, ctx } = await getVisibleWorkOrders(
+      base44.asServiceRole, user, { excludeArchived: !includeArchived }
+    );
 
     if (!ctx) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
 
-    // ctx: contexto de visibilidad del caller (su identidad + linkage jefe).
-    // Se expone al frontend para filtrar eventos realtime (otEsVisiblePara)
-    // sin ir al backend por cada evento. Es data del propio usuario — sin leak.
-    return Response.json({ orders, total, role, ctx });
+    // archived_count va siempre (incluso cuando excludeArchived=true) para que el
+    // header del tablero muestre "X activas · Y archivadas" sin un fetch extra.
+    return Response.json({ orders, total, archived_count, role, ctx });
   } catch (error) {
     return Response.json({ error: error.message, stack: error.stack }, { status: 500 });
   }

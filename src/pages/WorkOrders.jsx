@@ -283,7 +283,10 @@ export default function WorkOrders() {
   // OTs archivadas (auto-archivo 30 días tras completada) — visibles en
   // Historial. Se muestran en el header para que el total no se perciba como
   // pérdida: "44 activas · 55 archivadas (Historial)".
-  const archivedCount = orders.length - visibleOrders.length;
+  // archived_count viene del backend (getWorkOrdersForUser siempre lo retorna).
+  // Antes se calculaba como orders.length - visibleOrders.length, pero con
+  // excludeArchived server-side orders ya no incluye archivadas → era siempre 0.
+  const archivedCount = data?.archived_count || 0;
 
   // Pre-normaliza los campos buscables UNA vez por cambio de visibleOrders (no por
   // cada tecla). NFD + strip de acentos sobre los campos de texto era el costo hot
