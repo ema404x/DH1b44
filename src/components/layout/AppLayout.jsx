@@ -22,6 +22,7 @@ import { useSmartCache } from '@/hooks/useSmartCache';
 import { useAppUsageTracker } from '@/hooks/useAppUsageTracker';
 import { useLoadTelemetry } from '@/hooks/useLoadTelemetry';
 import PageErrorBoundary from '@/components/shared/PageErrorBoundary';
+import { isMobileOptimized } from '@/lib/mobileModuleConfig';
 
 // Estable entre renders — no se recrea nunca
 const onSyncCallback = (count) =>
@@ -43,6 +44,10 @@ export default function AppLayout() {
   useAppUsageTracker(currentUser);
   const location = useLocation();
   const navigationType = useNavigationType();
+
+  // Módulos desktop-only desactivan slide transition y pull-to-refresh en mobile
+  // para evitar jank en pantallas chicas con layouts pesados.
+  const isDesktopOnlyRoute = !isMobileOptimized(location.pathname);
   // Telemetría de carga — 100% aditiva, mide tiempo de carga por ruta. No afecta lógica.
   useLoadTelemetry(location.pathname);
   const [activeEmergency, setActiveEmergency] = useState(null);
@@ -111,23 +116,29 @@ export default function AppLayout() {
         </header>
         {/* Page content — slide transitions + pull-to-refresh */}
         <main ref={mainRef} onScroll={handleScroll} className="main-scroll flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-6 pb-24 lg:pb-6" style={{ background: 'transparent', scrollBehavior: 'smooth' }}>
-          <PullToRefresh onRefresh={handleRefresh}>
-            <AnimatePresence mode="wait" custom={direction} initial={false}>
-              <motion.div
-                key={location.pathname}
-                custom={direction}
-                variants={slideVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={{ duration: 0.2, ease: [0.4, 0.0, 0.2, 1] }}
-              >
-                <PageErrorBoundary>
-                  <Outlet />
-                </PageErrorBoundary>
-              </motion.div>
-            </AnimatePresence>
-          </PullToRefresh>
+          {isDesktopOnlyRoute ? (
+            <PageErrorBoundary>
+              <Outlet />
+            </PageErrorBoundary>
+          ) : (
+            <PullToRefresh onRefresh={handleRefresh}>
+              <AnimatePresence mode="wait" custom={direction} initial={false}>
+                <motion.div
+                  key={location.pathname}
+                  custom={direction}
+                  variants={slideVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{ duration: 0.2, ease: [0.4, 0.0, 0.2, 1] }}
+                >
+                  <PageErrorBoundary>
+                    <Outlet />
+                  </PageErrorBoundary>
+                </motion.div>
+              </AnimatePresence>
+            </PullToRefresh>
+          )}
         </main>
       </div>
       <MobileBottomNav onMore={handleMoreMobile} />

@@ -1,41 +1,37 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, RefreshCw, FolderKanban, LayoutGrid, HardHat } from 'lucide-react';
+import { LayoutGrid } from 'lucide-react';
 import { motion, MotionConfig } from 'framer-motion';
-import { useAuth } from '@/lib/AuthContext';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { cn } from '@/lib/utils';
 import { hasModulePermission } from '@/lib/roles';
+import { getMobileRole, getRolePrimaries } from '@/lib/mobileModuleConfig';
 
-// Destinos primarios que siempre viven en la barra inferior (mobile-first, Material 3).
-// El resto de módulos queda accesible vía el botón "Más" que abre el drawer.
-const PRIMARY = [
-  { label: 'Inicio', icon: LayoutDashboard, path: '/', module: 'Dashboard' },
-  // Pantalla principal del operario/jefe de sitio — visible solo para no-admins.
-  { label: 'Mis Órdenes', icon: HardHat, path: '/mis-ots', module: 'MisOrdenes', nonAdmin: true },
-  { label: 'Órdenes', icon: ClipboardList, path: '/ordenes', module: 'WorkOrder' },
-  { label: 'Rutinas', icon: RefreshCw, path: '/rutinas', module: 'Rutinas' },
-  { label: 'Proyectos', icon: FolderKanban, path: '/proyectos', module: 'Project' },
-];
+// Destinos primarios resueltos dinámicamente según el rol del usuario
+// (operario / gerente / admin). El resto de módulos queda accesible vía el
+// botón "Más" que abre el drawer reorganizado en 3 secciones.
 
 export default function MobileBottomNav({ onMore }) {
   const location = useLocation();
-  const { user, userPermissions } = useAuth();
+  const { currentUser, isSuperAdmin, userPermissions, employeeRole } = useCurrentUser();
 
   const isActive = (path) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
+  const mobileRole = getMobileRole(currentUser, employeeRole);
+
   const allowed = (item) => {
-    // nonAdmin oculta el item a admins (usan el módulo admin completo),
+    // nonAdmin oculta el item a admins puros (usan el módulo admin completo),
     // pero para no-admins sigue sujeto al permiso del módulo.
-    if (item.nonAdmin && user?.role === 'admin') return false;
-    if (user?.role === 'admin') return true;
+    if (item.nonAdmin && mobileRole === 'admin') return false;
+    if (isSuperAdmin) return true;
     if (!userPermissions) return item.path === '/' || !!item.nonAdmin;
     if (!item.module) return true;
     return hasModulePermission(userPermissions[item.module], 'read', item.module);
   };
 
   // Máx 4 destinos + "Más" para no comprimir en pantallas chicas.
-  const items = PRIMARY.filter(allowed).slice(0, 4);
+  const items = getRolePrimaries(mobileRole).filter(allowed).slice(0, 4);
 
   return (
     <MotionConfig reducedMotion="user">

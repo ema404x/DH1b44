@@ -3,13 +3,14 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, ChevronDown, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet, HardHat, Building2
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet, HardHat, Building2, Monitor
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { useForoNotificaciones } from '@/hooks/useForoNotificaciones';
 import { useAprobacionPendientes } from '@/hooks/useAprobacionPendientes';
 import { hasModulePermission } from '@/lib/roles';
+import { getMobileSection } from '@/lib/mobileModuleConfig';
 
 const navGroups = [
   {
@@ -187,6 +188,8 @@ export default function Sidebar({ open, onOpenChange }) {
     } catch {}
     return new Set(navGroups.map(g => g.label));
   });
+  // Sección "Administración" del drawer mobile — colapsable, default expandida.
+  const [mobileAdminCollapsed, setMobileAdminCollapsed] = useState(false);
 
   const { hasNewMessages, resetNotification } = useForoNotificaciones();
   const { pendientesAprobacion } = useAprobacionPendientes();
@@ -244,6 +247,124 @@ export default function Sidebar({ open, onOpenChange }) {
   }, [user?.role, userPermissions]);
 
   const handleCloseMobile = useCallback(() => setMobileOpen(false), [setMobileOpen]);
+
+  // Drawer mobile reorganizado en 3 secciones: Operativos / Administración / Desktop.
+  // Se construye desde los mismos visibleGroups (mismos permisos) pero reagrupando
+  // por getMobileSection. Desktop-only van al final con ícono Monitor.
+  const mobileBuckets = useMemo(() => {
+    const all = visibleGroups.flatMap(g => g.items);
+    const buckets = { operativos: [], administracion: [], desktop: [] };
+    all.forEach(item => {
+      buckets[getMobileSection(item.path)].push(item);
+    });
+    // Desktop-only: reemplazar ícono por Monitor para señalizar en el drawer.
+    buckets.desktop = buckets.desktop.map(item => ({ ...item, icon: Monitor }));
+    return buckets;
+  }, [visibleGroups]);
+
+  // Render del drawer mobile — 3 secciones reorganizadas.
+  const mobileDrawerContent = (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-white/8">
+        <div className="relative flex-shrink-0 h-10">
+          <img
+            src="https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/7a2959dd1_image.png"
+            alt="DH1 Software"
+            className="object-contain mix-blend-screen transition-all duration-300 relative z-10 h-10"
+            style={{ filter: 'drop-shadow(0 0 6px rgba(0,180,255,0.7)) drop-shadow(0 0 14px rgba(0,220,130,0.45))' }}
+          />
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-sm leading-tight tracking-wide"
+            style={{ color: '#e8f4ff', animation: 'glowPulse 2.8s ease-in-out infinite' }}>
+            DH1 Software
+          </p>
+          <p className="text-sidebar-foreground/40 text-[10px] tracking-widest uppercase">Platform</p>
+        </div>
+      </div>
+
+      <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-4 scrollbar-thin">
+        {/* Operativos */}
+        {mobileBuckets.operativos.length > 0 && (
+          <div>
+            <div className="px-3 mb-1 mt-1 text-[9px] font-bold uppercase tracking-[0.14em] flex items-center gap-2 text-sidebar-foreground/60">
+              <span className="flex-shrink-0">Operativos</span>
+              <div className="flex-1 h-px bg-white/12" />
+              <span className="text-[8px] text-sidebar-foreground/40 tabular-nums shrink-0">{mobileBuckets.operativos.length}</span>
+            </div>
+            <div className="space-y-0.5">
+              {mobileBuckets.operativos.map(item => (
+                <NavItem
+                  key={item.path}
+                  item={item}
+                  collapsed={false}
+                  active={isActive(item.path)}
+                  onClick={handleCloseMobile}
+                  hasNewMessages={item.path === '/foro' ? hasNewMessages : false}
+                  pendientesAprobacion={pendientesAprobacion}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Administración (colapsable) */}
+        {mobileBuckets.administracion.length > 0 && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setMobileAdminCollapsed(c => !c)}
+              aria-expanded={!mobileAdminCollapsed}
+              className="w-full px-3 mb-1 mt-1 text-[9px] font-bold uppercase tracking-[0.14em] flex items-center gap-2 text-sidebar-foreground/60 hover:text-sidebar-foreground/90"
+            >
+              <ChevronDown className={cn("h-3 w-3 flex-shrink-0 transition-transform duration-200", mobileAdminCollapsed && "-rotate-90")} />
+              <span className="flex-shrink-0">Administración</span>
+              <div className="flex-1 h-px bg-white/12" />
+              <span className="text-[8px] text-sidebar-foreground/40 tabular-nums shrink-0">{mobileBuckets.administracion.length}</span>
+            </button>
+            <div className={cn("space-y-0.5 overflow-hidden transition-all duration-200", mobileAdminCollapsed ? "max-h-0 opacity-0" : "max-h-[400px] opacity-100")}>
+              {mobileBuckets.administracion.map(item => (
+                <NavItem
+                  key={item.path}
+                  item={item}
+                  collapsed={false}
+                  active={isActive(item.path)}
+                  onClick={handleCloseMobile}
+                  hasNewMessages={false}
+                  pendientesAprobacion={pendientesAprobacion}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Optimizado para escritorio */}
+        {mobileBuckets.desktop.length > 0 && (
+          <div>
+            <div className="px-3 mb-1 mt-1 text-[9px] font-bold uppercase tracking-[0.14em] flex items-center gap-2 text-sidebar-foreground/45">
+              <Monitor className="h-3 w-3 flex-shrink-0" />
+              <span className="flex-shrink-0">Optimizado para escritorio</span>
+              <div className="flex-1 h-px bg-white/8" />
+            </div>
+            <div className="space-y-0.5">
+              {mobileBuckets.desktop.map(item => (
+                <NavItem
+                  key={item.path}
+                  item={item}
+                  collapsed={false}
+                  active={isActive(item.path)}
+                  onClick={handleCloseMobile}
+                  hasNewMessages={false}
+                  pendientesAprobacion={pendientesAprobacion}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </nav>
+    </div>
+  );
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -355,11 +476,11 @@ export default function Sidebar({ open, onOpenChange }) {
           <div className="absolute left-0 top-0 bottom-0 w-64 shadow-2xl" style={{ background: 'linear-gradient(180deg, #0a1628 0%, #0f1e34 55%, #091422 100%)' }}>
             <button
               onClick={handleCloseMobile}
-              className="absolute top-4 right-3 text-sidebar-foreground/50 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors"
+              className="absolute top-4 right-3 text-sidebar-foreground/50 hover:text-white p-1 rounded-md hover:bg-white/10 transition-colors z-10"
             >
               <X className="h-4 w-4" />
             </button>
-            {sidebarContent}
+            {mobileDrawerContent}
           </div>
         </div>
       )}
