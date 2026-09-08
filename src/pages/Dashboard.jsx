@@ -3,14 +3,11 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import {
   FolderKanban, ClipboardList, Users, DollarSign, TrendingUp, TrendingDown,
-  AlertTriangle, CheckCircle2, Wrench, ArrowRight, Zap, Package, BarChart3,
-  Activity, FileCheck, Calendar, MapPin, User, Clock, Sparkles, ChevronRight,
-  Shield, Target, Plus, ListChecks, FileText
+  AlertTriangle, Wrench, ArrowRight, Zap, Package, BarChart3,
+  Activity, FileCheck, MapPin, Sparkles, ChevronRight,
+  Shield, Target
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import RevenueChart from '@/components/dashboard/RevenueChart';
@@ -31,7 +28,6 @@ import { esOtVencida } from '@/lib/otVencimiento';
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
 const HERO_IMG = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/1b31ee69b_generated_206f514f.jpg';
-const INFRA_IMG = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/54e70bdec_generated_9bcb3098.jpg';
 
 const panel = "rounded-2xl border border-border bg-card shadow-[0_13px_25px_rgba(15,23,42,0.2)] p-4 lg:p-5";
 
@@ -44,10 +40,10 @@ const STATUS_COLORS = {
 };
 
 const PRIORITY_TAGS = {
-  urgente: 'bg-amber-500/15 text-amber-300',
-  alta:    'bg-orange-500/15 text-orange-300',
-  media:   'bg-cyan-500/15 text-cyan-300',
-  baja:    'bg-slate-500/15 text-slate-400',
+  urgente: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  alta:    'bg-orange-500/15 text-orange-300 border-orange-500/30',
+  media:   'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+  baja:    'bg-slate-500/15 text-slate-400 border-slate-500/30',
 };
 
 const KPI_TOP = {
@@ -91,7 +87,7 @@ const KpiCard = React.memo(function KpiCard({ title, value, subtitle, icon: Icon
       </div>
     </div>
   );
-  return href ? <Link to={href} className="block h-full">{inner}</Link> : inner;
+  return href ? <Link to={href} className="block h-full focus-visible:outline-2 focus-visible:outline-amber-500 focus-visible:[outline-offset:3px]">{inner}</Link> : inner;
 });
 
 function KpiCardSkeleton() {
@@ -166,7 +162,7 @@ function ActivityFeed({ orders }) {
 const QuickActionCard = React.memo(function QuickActionCard({ icon: Icon, label, desc, href, color }) {
   return (
     <Link to={href} className="block focus-visible:outline-2 focus-visible:outline-cyan-500 focus-visible:[outline-offset:2px]">
-      <div className="acero-quick-item flex items-center gap-3 p-3 rounded-xl border border-border bg-[hsl(215,25%,22%)] hover:bg-[hsl(215,25%,30%)] hover:shadow-[0_6px_14px_rgba(15,23,42,0.22)] transition-all duration-150 cursor-pointer group h-full">
+      <div className="acero-quick-item flex items-center gap-3 p-3 rounded-xl border border-border bg-[hsl(215,25%,22%)] cursor-pointer group h-full">
         <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0", color)}>
           <Icon className="h-4 w-4" />
         </div>
