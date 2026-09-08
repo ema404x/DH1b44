@@ -5,13 +5,15 @@ import { Button } from '@/components/ui/button';
 import {
   DollarSign, BarChart3, FileCheck, TrendingUp,
   Wallet, Clock, CheckCircle2, AlertCircle,
-  ArrowUpRight, ArrowDownRight, Activity, Layers, PieChart, Calendar
+  ArrowUpRight, ArrowDownRight, Activity, Layers, PieChart, Calendar,
+  RefreshCw
 } from 'lucide-react';
 import { parseISO, subDays, subYears, startOfYear } from 'date-fns';
 import CertificacionObrasPanel from '@/components/invoices/CertificacionObrasPanel';
 import DashboardFinanciero from '@/components/finanzas/DashboardFinanciero';
 import ReportesFacturacion from '@/components/invoices/ReportesFacturacion';
 import RentabilidadProyectos from '@/components/finanzas/RentabilidadProyectos';
+import AbonosFinancieros from '@/components/finanzas/AbonosFinancieros';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -71,6 +73,7 @@ function HeroKpi({ label, value, sub, icon: Icon, color, border, bg, trend, tren
 
 const TABS = [
   { key: 'dashboard',    label: 'Dashboard',    icon: Activity  },
+  { key: 'abonos',      label: 'Abonos',       icon: RefreshCw },
   { key: 'rentabilidad', label: 'Rentabilidad', icon: TrendingUp },
   { key: 'reportes',     label: 'Reportes',     icon: BarChart3  },
   { key: 'certificacion',label: 'Certificación',icon: FileCheck  },
@@ -84,6 +87,8 @@ export default function Invoices() {
   const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],  queryFn: () => base44.entities.Invoice.list('-created_date'),    staleTime: STALE });
   const { data: projects  = [] } = useQuery({ queryKey: ['projects'],  queryFn: () => base44.entities.Project.list('-updated_date', 300), staleTime: STALE });
   const { data: obras     = [] } = useQuery({ queryKey: ['obras-certificacion'], queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 1000), staleTime: STALE });
+  const { data: abonos    = [] } = useQuery({ queryKey: ['abonos-maestro'], queryFn: () => base44.entities.AbonoMaestro.list('-created_date', 500), staleTime: STALE });
+  const { data: certificados = [] } = useQuery({ queryKey: ['certificados'], queryFn: () => base44.entities.Certificado.list('-created_date', 2000), staleTime: STALE });
 
   const { curr: fInvoices, prev: prevInvoices } = useMemo(() => filtrarPorPeriodo(invoices, periodo), [invoices, periodo]);
 
@@ -209,6 +214,7 @@ export default function Invoices() {
       {/* ── Content ──────────────────────────────────────────────────── */}
       <div className="page-enter" key={activeTab}>
         {activeTab === 'dashboard'    && <DashboardFinanciero periodo={periodo} />}
+        {activeTab === 'abonos'       && <AbonosFinancieros abonos={abonos} certificados={certificados} />}
         {activeTab === 'rentabilidad' && <RentabilidadProyectos projects={projects} invoices={invoices} />}
         {activeTab === 'reportes'     && <ReportesFacturacion />}
         {activeTab === 'certificacion'&& <CertificacionObrasPanel />}
