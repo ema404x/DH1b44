@@ -31,9 +31,9 @@ export default function DashboardFilters({ filters, onChange, jefes = [] }) {
   const reset = () => onChange({ dateRange: 'all', jefeSitio: '', priority: '' });
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-slate-800/40 backdrop-blur-xl px-3 py-2.5">
+    <div className="flex items-center gap-2 overflow-x-auto lg:flex-wrap rounded-xl border border-white/8 bg-slate-800/40 backdrop-blur-xl px-3 py-2 lg:py-2.5">
       {/* Icono + label */}
-      <div className="flex items-center gap-1.5 text-slate-400 text-xs font-semibold mr-1">
+      <div className="flex items-center gap-1.5 text-slate-400 text-xs font-semibold mr-1 flex-shrink-0">
         <Filter className="h-3.5 w-3.5" />
         Filtrar
         {activeCount > 0 && (
@@ -44,13 +44,13 @@ export default function DashboardFilters({ filters, onChange, jefes = [] }) {
       </div>
 
       {/* Fecha */}
-      <div className="flex items-center gap-1 rounded-lg border border-white/10 p-0.5 bg-white/3">
+      <div className="flex items-center gap-1 rounded-lg border border-white/10 p-0.5 bg-white/3 flex-shrink-0">
         <CalendarDays className="h-3.5 w-3.5 text-slate-500 ml-1.5" />
         {DATE_PRESETS.map(p => (
           <button
             key={p.value}
             onClick={() => set('dateRange', p.value)}
-            className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
+            className={`h-9 px-2 rounded-md text-[11px] font-medium transition-colors flex items-center ${
               filters.dateRange === p.value
                 ? 'bg-primary text-primary-foreground'
                 : 'text-slate-400 hover:text-white'
@@ -63,12 +63,12 @@ export default function DashboardFilters({ filters, onChange, jefes = [] }) {
 
       {/* Jefe de sitio */}
       {jefes.length > 0 && (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <User className="h-3.5 w-3.5 text-slate-500" />
           <select
             value={filters.jefeSitio}
             onChange={e => set('jefeSitio', e.target.value)}
-            className="h-7 rounded-lg border border-white/10 bg-white/5 text-[11px] text-slate-300 px-2 focus:outline-none focus:border-primary/50"
+            className="h-11 rounded-lg border border-white/10 bg-white/5 text-[11px] text-slate-300 px-2 focus:outline-none focus:border-primary/50"
           >
             <option value="">Todos los jefes</option>
             {jefes.map(j => <option key={j} value={j}>{j}</option>)}
@@ -77,13 +77,13 @@ export default function DashboardFilters({ filters, onChange, jefes = [] }) {
       )}
 
       {/* Prioridad */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-shrink-0">
         <AlertTriangle className="h-3.5 w-3.5 text-slate-500" />
         {PRIORITY_OPTIONS.map(p => (
           <button
             key={p.value}
             onClick={() => set('priority', filters.priority === p.value ? '' : p.value)}
-            className={`px-2 py-0.5 rounded-md text-[11px] font-medium border transition-all ${
+            className={`h-9 px-2 rounded-md text-[11px] font-medium border transition-all flex items-center ${
               filters.priority === p.value ? p.color : 'border-transparent text-slate-500 hover:text-white'
             }`}
           >
@@ -96,7 +96,7 @@ export default function DashboardFilters({ filters, onChange, jefes = [] }) {
       {activeCount > 0 && (
         <button
           onClick={reset}
-          className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-red-400 transition-colors ml-auto"
+          className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-red-400 transition-colors ml-auto flex-shrink-0"
         >
           <X className="h-3.5 w-3.5" /> Limpiar
         </button>

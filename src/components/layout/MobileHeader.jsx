@@ -100,7 +100,7 @@ export default function MobileHeader() {
       )}
 
       {!isRoot && (
-        <span className="absolute left-1/2 -translate-x-1/2 text-[15px] font-semibold tracking-[0.01em] text-foreground truncate max-w-[36%] pointer-events-none">
+        <span className="absolute left-1/2 -translate-x-1/2 text-[15px] font-semibold tracking-[0.01em] text-foreground truncate max-w-[45%] pointer-events-none">
           {title}
         </span>
       )}

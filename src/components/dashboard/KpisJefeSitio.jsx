@@ -1,32 +1,11 @@
 import React, { useMemo } from 'react';
-import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { TrendingUp, AlertTriangle, CheckCircle2, Clock, User } from 'lucide-react';
 import { isPast, parseISO, differenceInDays } from 'date-fns';
 
-export default function KpisJefeSitio({ filterJefe = '', filterCutoff = null }) {
-  const { data: pendientes = [] } = useQuery({
-    queryKey: ['pendientes-kpis'],
-    queryFn: () => base44.entities.Pendiente.list('-created_date', 500),
-    staleTime: 1000 * 60 * 5,
-  });
-
-  const { data: _ordersRaw = [] } = useQuery({
-    queryKey: ['workorders'],
-    queryFn: () => base44.entities.WorkOrder.list('-updated_date', 300),
-    staleTime: 1000 * 60 * 5,
-  });
-  // ['workorders'] puede hidratarse como objeto {orders,...} desde el cache persistido.
-  const orders = Array.isArray(_ordersRaw) ? _ordersRaw : (_ordersRaw?.orders || []);
-
-  const { data: employees = [] } = useQuery({
-    queryKey: ['employees'],
-    queryFn: () => base44.entities.Employee.list(),
-    staleTime: 1000 * 60 * 5,
-  });
+export default function KpisJefeSitio({ filterJefe = '', filterCutoff = null, orders = [], pendientes = [], employees = [] }) {
 
   // Solo los empleados que son jefes de sitio
   const jefesSitio = useMemo(() => {

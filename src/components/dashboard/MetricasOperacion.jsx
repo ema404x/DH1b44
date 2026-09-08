@@ -84,10 +84,10 @@ export default function MetricasOperacion({ orders, projects, materials, assets,
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Radar */}
+          {/* Salud Operativa — radar en desktop, barras compactas en móvil */}
           <div>
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Salud Operativa</p>
-            <div className="h-48">
+            <div className="hidden md:block h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={radarData} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
                   <PolarGrid stroke="hsl(var(--border))" />
@@ -95,6 +95,19 @@ export default function MetricasOperacion({ orders, projects, materials, assets,
                   <Radar dataKey="value" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} strokeWidth={2} />
                 </RadarChart>
               </ResponsiveContainer>
+            </div>
+            <div className="md:hidden space-y-2 pt-1">
+              {radarData.map((d, i) => (
+                <div key={i}>
+                  <div className="flex justify-between text-[11px] mb-0.5">
+                    <span className="text-muted-foreground">{d.metric}</span>
+                    <span className="font-bold text-foreground tabular-nums">{d.value}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${d.value}%` }} />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

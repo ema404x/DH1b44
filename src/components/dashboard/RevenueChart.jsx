@@ -29,7 +29,7 @@ export default function RevenueChart({ invoices }) {
         <CardTitle className="text-base font-semibold">Facturación últimos 6 meses</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-64">
+        <div className="h-56 sm:h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthlyData} barGap={4}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -44,8 +44,8 @@ export default function RevenueChart({ invoices }) {
                 }}
                 formatter={(value) => [`$${value.toLocaleString()}`, '']}
               />
-              <Bar dataKey="facturado" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Facturado" />
-              <Bar dataKey="cobrado" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} name="Cobrado" />
+              <Bar dataKey="facturado" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Facturado" maxBarSize={48} />
+              <Bar dataKey="cobrado" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} name="Cobrado" maxBarSize={48} />
             </BarChart>
           </ResponsiveContainer>
         </div>

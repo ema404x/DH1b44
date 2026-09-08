@@ -60,7 +60,7 @@ export default function OTsPendientesPanel({ orders }) {
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Pie por estado */}
           <div>
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Por Estado</p>

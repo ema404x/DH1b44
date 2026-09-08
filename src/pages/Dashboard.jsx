@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   FolderKanban, ClipboardList, Users, DollarSign, TrendingUp, TrendingDown,
   AlertTriangle, CheckCircle2, Wrench, ArrowRight, Zap, Package, BarChart3,
@@ -20,19 +20,17 @@ import MetricasOperacion from '@/components/dashboard/MetricasOperacion';
 import AlertasBanner from '@/components/dashboard/AlertasBanner';
 import EmergenciasWidget from '@/components/dashboard/EmergenciasWidget';
 import KpisJefeSitio from '@/components/dashboard/KpisJefeSitio';
-import AuroraEffect from '@/components/dashboard/AuroraEffect';
 import DashboardFilters from '@/components/dashboard/DashboardFilters';
 import SectionHeader from '@/components/dashboard/SectionHeader';
 import CountUp from '@/components/dashboard/CountUp';
 import { format, isPast, parseISO, startOfMonth, subMonths, formatDistanceToNow, subDays } from 'date-fns';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import PullToRefresh from '@/components/shared/PullToRefresh';
 import { es } from 'date-fns/locale';
 import { esOtVencida } from '@/lib/otVencimiento';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
-const panel = "rounded-2xl border border-border bg-card shadow-sm p-6";
+const panel = "rounded-2xl border border-border bg-card shadow-sm p-4 lg:p-6";
 
 const STATUS_COLORS = {
   pendiente:   { dot: 'bg-yellow-400', text: 'text-yellow-400' },
@@ -63,9 +61,9 @@ const KpiCard = React.memo(function KpiCard({ title, value, subtitle, icon: Icon
   const cfg = KPI_COLORS[color] || KPI_COLORS.blue;
   const inner = (
     <div className="h-full group">
-      <div className={cn("relative overflow-hidden rounded-2xl border border-border bg-card p-6 h-full transition-all hover:shadow-md hover:-translate-y-0.5 duration-200 border-t-[3px]", cfg.top)}>
-        <div className="flex items-start justify-between mb-4">
-          <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", cfg.icon)}>
+      <div className={cn("relative overflow-hidden rounded-2xl border border-border bg-card p-4 lg:p-6 h-full transition-all hover:shadow-md hover:-translate-y-0.5 duration-200 border-t-[3px]", cfg.top)}>
+        <div className="flex items-start justify-between mb-3 lg:mb-4">
+          <div className={cn("h-9 w-9 lg:h-10 lg:w-10 rounded-xl flex items-center justify-center", cfg.icon)}>
             <Icon className="h-5 w-5" />
           </div>
           {trend !== undefined && (
@@ -82,7 +80,7 @@ const KpiCard = React.memo(function KpiCard({ title, value, subtitle, icon: Icon
           )}
         </div>
         <div>
-          <p className="text-3xl font-bold text-foreground tabular-nums tracking-tight leading-none"><CountUp value={value} /></p>
+          <p className="text-2xl lg:text-3xl font-bold text-foreground tabular-nums tracking-tight leading-none"><CountUp value={value} /></p>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-2">{title}</p>
           {subtitle && <p className="text-xs text-muted-foreground/70 mt-1">{subtitle}</p>}
         </div>
@@ -94,9 +92,9 @@ const KpiCard = React.memo(function KpiCard({ title, value, subtitle, icon: Icon
 
 function KpiCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm p-6 h-full">
+    <div className="rounded-2xl border border-border bg-card shadow-sm p-4 lg:p-6 h-full">
       <div className="flex items-start justify-between mb-4">
-        <div className="h-10 w-10 rounded-xl skeleton" />
+        <div className="h-9 w-9 lg:h-10 lg:w-10 rounded-xl skeleton" />
       </div>
       <div className="h-8 w-24 skeleton mb-2" />
       <div className="h-3 w-28 skeleton" />
@@ -183,8 +181,6 @@ const QuickActionCard = React.memo(function QuickActionCard({ icon: Icon, label,
 
 export default function Dashboard() {
   const { isAdmin, filterByUser, userPermissions, user, displayName } = useCurrentUser();
-  const queryClient = useQueryClient();
-  const handleRefresh = useCallback(() => queryClient.invalidateQueries(), [queryClient]);
   const [dashFilters, setDashFilters] = React.useState({ dateRange: 'all', jefeSitio: '', priority: '' });
 
   const canRead = useCallback((moduleKey) => {
@@ -337,8 +333,7 @@ export default function Dashboard() {
   const firstName = (displayName || '').split(' ')[0] || '';
 
   return (
-    <PullToRefresh onRefresh={handleRefresh}>
-    <div className="min-h-screen bg-background space-y-6 pb-10 page-enter">
+    <div className="min-h-screen bg-background space-y-6 pb-4 lg:pb-10 page-enter">
       {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1">
         <div>
@@ -535,7 +530,7 @@ export default function Dashboard() {
       {/* ── GESTIÓN DE SITIOS ── */}
       <div>
         <SectionHeader icon={Shield} title="Gestión de sitios" subtitle="Indicadores por jefe de sitio" />
-        <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} />
+        <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} orders={allUserOrders} pendientes={pendientes} employees={employees} />
       </div>
 
       {/* ── MÉTRICAS DE OPERACIÓN ── */}
@@ -550,6 +545,5 @@ export default function Dashboard() {
         />
       </div>
     </div>
-    </PullToRefresh>
   );
 }
