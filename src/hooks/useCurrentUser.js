@@ -53,9 +53,13 @@ export function useCurrentUser() {
     // Aislar por sector_id — un admin en sector BAPRO no debe ver registros del sector escuela.
     // data.sector_id es el campo CANÓNICO que lee la RLS ({{user.data.sector_id}}).
     // El top-level sector_id es legacy y puede quedar desincronizado — nunca priorizarlo.
-    const userSector = currentUser?.data?.sector_id || currentUser?.sector_id || employeeSector || 'escuela';
+    // Fail-closed: sin sector resuelto → lista vacía. NUNCA asignar 'escuela'
+    // por default (bug histórico: usuarios BAPRO sin sector_id en plataforma
+    // eran asignados a escuela y veían/filtraban datos cruzados).
+    const userSector = currentUser?.data?.sector_id || currentUser?.sector_id || employeeSector || null;
+    if (!userSector) return [];
     return list.filter(item => {
-      const itemSector = item.sector_id || 'escuela';
+      const itemSector = item.sector_id || null;
       return itemSector === userSector;
     });
   }

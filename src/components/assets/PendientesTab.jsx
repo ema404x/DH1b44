@@ -68,7 +68,7 @@ export default function PendientesTab() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const qc = useQueryClient();
-  const { isAdmin, filterByUser } = useCurrentUser();
+  const { isAdmin } = useCurrentUser();
   const { allowed: canCreate } = usePermission('Asset', 'create');
   const { allowed: canEdit } = usePermission('Asset', 'update');
   const { allowed: permCanDelete } = usePermission('Asset', 'delete');
@@ -152,10 +152,9 @@ export default function PendientesTab() {
   };
 
   // La visibilidad la define el backend (getPendientesForUser respeta admin_view
-  // + establecimientos asignados). filterByUser solo re-aplica sector.
-  const visiblePendientes = useMemo(() =>
-    filterByUser(pendientes)
-  , [pendientes, filterByUser]);
+  // + establecimientos asignados). No re-aplicar filterByUser: era redundante y
+  // rompía si el sector del cliente estaba desfasado (state drift).
+  const visiblePendientes = useMemo(() => pendientes, [pendientes]);
 
   // Stats per commune (for tab badges)
   const statsByComuna = useMemo(() => {

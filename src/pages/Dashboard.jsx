@@ -20,7 +20,7 @@ import KpisJefeSitio from '@/components/dashboard/KpisJefeSitio';
 import DashboardFilters from '@/components/dashboard/DashboardFilters';
 import SectionHeader from '@/components/dashboard/SectionHeader';
 import CountUp from '@/components/dashboard/CountUp';
-import { format, isPast, parseISO, startOfMonth, subMonths, formatDistanceToNow, subDays } from 'date-fns';
+import { format, parseISO, startOfMonth, formatDistanceToNow, subDays } from 'date-fns';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { es } from 'date-fns/locale';
 import { esOtVencida } from '@/lib/otVencimiento';
@@ -177,7 +177,7 @@ const QuickActionCard = React.memo(function QuickActionCard({ icon: Icon, label,
 });
 
 export default function Dashboard() {
-  const { isAdmin, filterByUser, userPermissions, user, displayName } = useCurrentUser();
+  const { userPermissions, user, displayName } = useCurrentUser();
   const [dashFilters, setDashFilters] = React.useState({ dateRange: 'all', jefeSitio: '', priority: '' });
 
   const canRead = useCallback((moduleKey) => {
@@ -186,45 +186,26 @@ export default function Dashboard() {
     return userPermissions[moduleKey]?.read === true;
   }, [user, userPermissions]);
 
-  const STALE_5MIN = 5 * 60 * 1000;
-  const { data: projects = [] }  = useQuery({ queryKey: ['projects'],   queryFn: () => base44.entities.Project.list('-updated_date', 100),   staleTime: STALE_5MIN, enabled: canRead('Project') });
-  const { data: _ownOrdersRaw = [] } = useQuery({
-    queryKey: ['workorders-dashboard-own'],
-    queryFn: async () => (await base44.functions.invoke('getWorkOrdersForUser', { scope: 'own' })).data?.orders || [],
-    staleTime: STALE_5MIN, enabled: canRead('WorkOrder'),
-  });
-  const allOrders = Array.isArray(_ownOrdersRaw) ? _ownOrdersRaw : (_ownOrdersRaw?.orders || []);
-  const { data: clients = [] }   = useQuery({ queryKey: ['clients'],    queryFn: () => base44.entities.Client.list('-updated_date', 100),     staleTime: STALE_5MIN, enabled: canRead('Client') });
-  const { data: invoices = [] }  = useQuery({ queryKey: ['invoices'],   queryFn: () => base44.entities.Invoice.list('-updated_date', 100),    staleTime: STALE_5MIN, enabled: canRead('Invoice') });
-  const { data: materials = [] } = useQuery({ queryKey: ['materials'],  queryFn: () => base44.entities.Material.list('-updated_date', 100),   staleTime: STALE_5MIN, enabled: canRead('Inventory') });
-  const { data: assets = [] }    = useQuery({ queryKey: ['assets'],     queryFn: () => base44.entities.Asset.list('-updated_date', 100),      staleTime: STALE_5MIN, enabled: canRead('Asset') });
-  const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: async () => (await base44.functions.invoke('getPendientesForUser')).data.pendientes || [], staleTime: STALE_5MIN, enabled: canRead('Pendientes') });
-  const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 80),    staleTime: STALE_5MIN, enabled: canRead('Employee') });
-
-  const useBackendKpis = canRead('WorkOrder');
-  const { data: kpis, isLoading: kpisLoading } = useQuery({
+  // Fuente única de verdad: getDashboardMetrics trae TODOS los arrays
+  // (fetchAll sin cap) + conteos pre-calculados. Elimina las 7 queries
+  // cliente .list(100) que tenían cap de 100 y la doble fuente con kpiVal.
+  const STALE_3MIN = 3 * 60 * 1000;
+  const { data: dash, isLoading: dashLoading } = useQuery({
     queryKey: ['dashboard-metrics-own'],
     queryFn: async () => (await base44.functions.invoke('getDashboardMetrics', { scope: 'own' })).data,
-    staleTime: 3 * 60 * 1000, retry: 1,
-    enabled: useBackendKpis,
+    staleTime: STALE_3MIN, retry: 1,
   });
-  const B = (useBackendKpis && kpis) ? kpis : null;
-  const kpiVal = (b, c) => (B != null && b != null ? b : c);
 
-  const pendientes = useMemo(() =>
-    filterByUser(allPendientes)
-  , [allPendientes, filterByUser]);
-
-  const allUserOrders = useMemo(() =>
-    filterByUser(allOrders, ['assigned_name', 'assigned_to', 'jefe_sitio', 'jefe_sitio_email'])
-  , [allOrders, filterByUser]);
-
-  const pendientesKpis = useMemo(() => {
-    const activos = pendientes.filter(p => ['pendiente', 'asignado', 'en_progreso'].includes(p.estado));
-    const resueltos = pendientes.filter(p => p.estado === 'resuelto');
-    const urgentes = pendientes.filter(p => p.prioridad === 'urgente' && p.estado !== 'resuelto');
-    return { activos: activos.length, resueltos: resueltos.length, urgentes: urgentes.length };
-  }, [pendientes]);
+  // Arrays completos del payload del backend (fetchAll sin cap de 100).
+  const allOrders    = dash?.orders || [];
+  const projects     = dash?.projects || [];
+  const clients      = dash?.clients || [];
+  const invoices     = dash?.invoices || [];
+  const materials    = dash?.materials || [];
+  const assets       = dash?.assets || [];
+  const employees    = dash?.employees || [];
+  const pendientes   = dash?.pendientes || [];
+  const kpis         = dash; // conteos pre-calculados del backend
 
   const filterCutoff = useMemo(() => {
     if (dashFilters.dateRange === '7d')  return subDays(new Date(), 7);
@@ -234,7 +215,7 @@ export default function Dashboard() {
   }, [dashFilters.dateRange]);
 
   const orders = useMemo(() => {
-    let result = allUserOrders;
+    let result = allOrders;
     if (filterCutoff) {
       result = result.filter(o => {
         const d = o.updated_date || o.created_date;
@@ -248,7 +229,7 @@ export default function Dashboard() {
       result = result.filter(o => o.priority === dashFilters.priority);
     }
     return result;
-  }, [allUserOrders, filterCutoff, dashFilters.jefeSitio, dashFilters.priority]);
+  }, [allOrders, filterCutoff, dashFilters.jefeSitio, dashFilters.priority]);
 
   const filteredProjects = useMemo(() => {
     if (!filterCutoff) return projects;
@@ -266,38 +247,23 @@ export default function Dashboard() {
     return [...new Set(names)].sort();
   }, [employees]);
 
+  // KPIs OT-dependientes: computados sobre `orders` (filtrado por dashFilters).
+  // Los no-filtrables (proyectos, clientes, materiales, activos, finanzas,
+  // pendientes SAP) vienen pre-calculados en `kpis` desde el backend.
   const metrics = useMemo(() => {
     const thisMonth = startOfMonth(new Date());
-    const lastMonth = startOfMonth(subMonths(new Date(), 1));
 
-    const activeProjects   = filteredProjects.filter(p => p.status === 'en_progreso').length;
-    const pendingOrders    = orders.filter(o => ['pendiente', 'asignada'].includes(o.status)).length;
-    const inProgressOrders = orders.filter(o => o.status === 'en_progreso').length;
-    const overdueOrders    = orders.filter(o => esOtVencida(o)).length;
-    const activeClients    = clients.filter(c => c.status === 'activo').length;
-    const activeEmployees  = employees.filter(e => e.status === 'activo').length;
-
-    const revenueThisMonth = invoices.filter(i => i.status === 'pagada' && i.payment_date && parseISO(i.payment_date) >= thisMonth).reduce((s, i) => s + (i.total || 0), 0);
-    const revenueLastMonth = invoices.filter(i => i.status === 'pagada' && i.payment_date && parseISO(i.payment_date) >= lastMonth && parseISO(i.payment_date) < thisMonth).reduce((s, i) => s + (i.total || 0), 0);
-    const revenueTrend     = revenueLastMonth > 0 ? Math.round(((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100) : 0;
-    const pendingInvoices  = invoices.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0);
-
-    const lowStockItems  = materials.filter(m => m.stock <= m.min_stock && m.min_stock > 0);
-    const overdueAssets  = assets.filter(a => { try { return a.next_maintenance && isPast(parseISO(a.next_maintenance)); } catch { return false; } });
+    const pendingOrders      = orders.filter(o => ['pendiente', 'asignada'].includes(o.status)).length;
+    const inProgressOrders   = orders.filter(o => o.status === 'en_progreso').length;
+    const overdueOrders      = orders.filter(o => esOtVencida(o)).length;
     const completedThisMonth = orders.filter(o => o.completed_date && parseISO(o.completed_date) >= thisMonth && o.status === 'completada').length;
-    const validOrders     = orders.filter(o => o.status !== 'cancelada');
-    const efficiency     = validOrders.length > 0 ? Math.round((orders.filter(o => o.status === 'completada').length / validOrders.length) * 100) : 0;
-    const urgentOrders   = orders.filter(o => ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'].includes(o.status) && ['urgente', 'alta'].includes(o.priority));
-    const recentProjects = filteredProjects.filter(p => p.status === 'en_progreso').slice(0, 5);
-    const hasAlerts      = overdueOrders > 0 || lowStockItems.length > 0 || overdueAssets.length > 0;
+    const validOrders        = orders.filter(o => o.status !== 'cancelada');
+    const efficiency         = validOrders.length > 0 ? Math.round((orders.filter(o => o.status === 'completada').length / validOrders.length) * 100) : 0;
+    const urgentOrders       = orders.filter(o => ['pendiente', 'asignada', 'en_progreso', 'obra', 'pendiente_validacion'].includes(o.status) && ['urgente', 'alta'].includes(o.priority));
+    const recentProjects     = filteredProjects.filter(p => p.status === 'en_progreso').slice(0, 5);
 
-    return {
-      activeProjects, pendingOrders, inProgressOrders, overdueOrders, activeClients, activeEmployees,
-      revenueThisMonth, revenueTrend, pendingInvoices,
-      lowStockItems, overdueAssets, completedThisMonth, efficiency,
-      recentProjects, urgentOrders, hasAlerts,
-    };
-  }, [filteredProjects, orders, clients, invoices, materials, assets, employees]);
+    return { pendingOrders, inProgressOrders, overdueOrders, completedThisMonth, efficiency, urgentOrders, recentProjects };
+  }, [filteredProjects, orders]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
@@ -316,8 +282,8 @@ export default function Dashboard() {
             {greeting}{firstName ? `, ${firstName}` : ''}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {canRead('WorkOrder') && <>{kpiVal(kpis?.pendingOrders, metrics.pendingOrders)} OTs pendientes · {kpiVal(kpis?.inProgressOrders, metrics.inProgressOrders)} en progreso</>}
-            {canRead('WorkOrder') && kpiVal(kpis?.overdueOrders, metrics.overdueOrders) > 0 && <span className="text-amber-400 font-semibold"> · ⚠ {kpiVal(kpis?.overdueOrders, metrics.overdueOrders)} vencidas</span>}
+            {canRead('WorkOrder') && <>{metrics.pendingOrders} OTs pendientes · {metrics.inProgressOrders} en progreso</>}
+            {canRead('WorkOrder') && metrics.overdueOrders > 0 && <span className="text-amber-400 font-semibold"> · ⚠ {metrics.overdueOrders} vencidas</span>}
           </p>
           {canRead('WorkOrder') && (
             <div className="flex items-center gap-2.5 mt-5">
@@ -344,9 +310,9 @@ export default function Dashboard() {
 
       {/* ── CRITICAL ALERTS ── */}
       {(() => {
-        const _overdue = kpiVal(kpis?.overdueOrders, metrics.overdueOrders);
-        const _lowStock = kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length);
-        const _overdueAssets = kpiVal(kpis?.overdueAssets, metrics.overdueAssets.length);
+        const _overdue = metrics.overdueOrders;
+        const _lowStock = kpis?.lowStockItems ?? 0;
+        const _overdueAssets = kpis?.overdueAssets ?? 0;
         if (!(_overdue > 0 || _lowStock > 0 || _overdueAssets > 0)) return null;
         return (
           <div className="flex flex-wrap gap-2">
@@ -393,24 +359,24 @@ export default function Dashboard() {
       {/* ── INDICADORES (KPI GRID) ── */}
       <div className="acero-rise" style={{ animationDelay: '0.16s' }}>
         <SectionHeader title="Indicadores" subtitle="Resumen general del período" />
-        {kpisLoading ? (
+        {dashLoading ? (
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => <KpiCardSkeleton key={i} />)}
           </div>
         ) : (
         <>
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="OTs Pendientes"   value={kpiVal(kpis?.pendingOrders, metrics.pendingOrders)}          subtitle={`${kpiVal(kpis?.completedThisMonth, metrics.completedThisMonth)} completadas este mes`}  icon={ClipboardList} color="amber"  alert={kpiVal(kpis?.overdueOrders, metrics.overdueOrders) > 0 ? kpiVal(kpis?.overdueOrders, metrics.overdueOrders) : undefined} />}
-          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="En Progreso"      value={kpiVal(kpis?.inProgressOrders, metrics.inProgressOrders)}        subtitle={`${kpiVal(kpis?.efficiency, metrics.efficiency)}% de eficiencia total`}          icon={Activity}      color="cyan" />}
-          {canRead('Project')    && <KpiCard href="/proyectos"   title="Proyectos"        value={kpiVal(kpis?.activeProjects, metrics.activeProjects)}         subtitle={`${kpiVal(kpis?.totalProjects, projects.length)} en total`}                          icon={FolderKanban}  color="cyan"   />}
-          {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos del Mes" value={fmt(kpiVal(kpis?.revenueThisMonth, metrics.revenueThisMonth))} subtitle={`${fmt(kpiVal(kpis?.pendingInvoices, metrics.pendingInvoices))} por cobrar`}         icon={DollarSign}    color="amber"  trend={kpiVal(kpis?.revenueTrend, metrics.revenueTrend)} />}
+          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="OTs Pendientes"   value={metrics.pendingOrders}          subtitle={`${metrics.completedThisMonth} completadas este mes`}  icon={ClipboardList} color="amber"  alert={metrics.overdueOrders > 0 ? metrics.overdueOrders : undefined} />}
+          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="En Progreso"      value={metrics.inProgressOrders}        subtitle={`${metrics.efficiency}% de eficiencia total`}          icon={Activity}      color="cyan" />}
+          {canRead('Project')    && <KpiCard href="/proyectos"   title="Proyectos"        value={kpis?.activeProjects ?? 0}         subtitle={`${kpis?.totalProjects ?? projects.length} en total`}                          icon={FolderKanban}  color="cyan"   />}
+          {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos del Mes" value={fmt(kpis?.revenueThisMonth ?? 0)} subtitle={`${fmt(kpis?.pendingInvoices ?? 0)} por cobrar`}         icon={DollarSign}    color="amber"  trend={kpis?.revenueTrend ?? 0} />}
         </div>
         <div className="h-4" />
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={kpiVal(kpis?.activeClients, metrics.activeClients)}            subtitle={`${kpiVal(kpis?.totalClients, clients.length)} en total`}                        icon={Users}         color="cyan" />}
-          {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={kpiVal(kpis?.urgentOrders, metrics.urgentOrders.length)}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={kpiVal(kpis?.urgentOrders, metrics.urgentOrders.length) > 0 ? 'red' : 'green'} />}
-          {canRead('Pendientes') && <KpiCard href="/activos"    title="Pendientes SAP"  value={kpiVal(kpis?.pendientesActivos, pendientesKpis.activos)} subtitle={`${kpiVal(kpis?.pendientesResueltos, pendientesKpis.resueltos)} resueltos`} icon={Wrench} color="amber" alert={kpiVal(kpis?.pendientesUrgentes, pendientesKpis.urgentes) > 0 ? kpiVal(kpis?.pendientesUrgentes, pendientesKpis.urgentes) : undefined} />}
-          {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={kpiVal(kpis?.totalMaterials, materials.length)}                  subtitle={`${kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length)} bajo mínimo`}      icon={Package}       color={kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length) > 0 ? 'red' : 'amber'} />}
+          {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={kpis?.activeClients ?? 0}            subtitle={`${kpis?.totalClients ?? clients.length} en total`}                        icon={Users}         color="cyan" />}
+          {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={metrics.urgentOrders.length}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={metrics.urgentOrders.length > 0 ? 'red' : 'green'} />}
+          {canRead('Pendientes') && <KpiCard href="/activos"    title="Pendientes SAP"  value={kpis?.pendientesActivos ?? 0} subtitle={`${kpis?.pendientesResueltos ?? 0} resueltos`} icon={Wrench} color="amber" alert={(kpis?.pendientesUrgentes ?? 0) > 0 ? (kpis?.pendientesUrgentes ?? 0) : undefined} />}
+          {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={kpis?.totalMaterials ?? materials.length}                  subtitle={`${kpis?.lowStockItems ?? 0} bajo mínimo`}      icon={Package}       color={(kpis?.lowStockItems ?? 0) > 0 ? 'red' : 'amber'} />}
         </div>
         </>
         )}
@@ -503,7 +469,7 @@ export default function Dashboard() {
       {/* ── GESTIÓN DE SITIOS ── */}
       <div className="acero-rise" style={{ animationDelay: '0.32s' }}>
         <SectionHeader icon={Shield} title="Gestión de sitios" subtitle="Indicadores por jefe de sitio" />
-        <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} orders={allUserOrders} pendientes={pendientes} employees={employees} />
+        <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} orders={allOrders} pendientes={pendientes} employees={employees} />
       </div>
 
       {/* ── MÉTRICAS DE OPERACIÓN ── */}

@@ -123,7 +123,7 @@ export default async function (req) {
     }
     if (canRead('Employee')) {
       loadKeys.push('employees');
-      loadPromises.push(fetchAll(sb, 'Employee', { ...sec, status: 'activo' }));
+      loadPromises.push(fetchAll(sb, 'Employee', sec));
     }
     if (canRead('Invoice')) {
       loadKeys.push('invoices');
@@ -135,7 +135,7 @@ export default async function (req) {
     }
     if (canRead('Asset')) {
       loadKeys.push('assets');
-      loadPromises.push(fetchAll(sb, 'Asset', { ...sec, next_maintenance: { $lt: now.toISOString() } }));
+      loadPromises.push(fetchAll(sb, 'Asset', sec));
     }
     if (canRead('Pendientes')) {
       loadKeys.push('pendientes');
@@ -186,7 +186,7 @@ export default async function (req) {
     // ── Employee ──
     let activeEmployees = null;
     if (loaded.employees) {
-      activeEmployees = loaded.employees.length;
+      activeEmployees = loaded.employees.filter((e) => e.status === 'activo').length;
     }
 
     // ── Invoice ──
@@ -212,7 +212,7 @@ export default async function (req) {
     // ── Asset ──
     let overdueAssets = null;
     if (loaded.assets) {
-      overdueAssets = loaded.assets.length;
+      overdueAssets = loaded.assets.filter((a) => a.next_maintenance && new Date(a.next_maintenance) < now).length;
     }
 
     // ── Pendientes ──
@@ -221,6 +221,7 @@ export default async function (req) {
     // + los de sus establecimientos asignados. Sin ficha de empleado (super-admin
     // puro) → admin_view=true → todo el sector.
     let pendientesActivos = null, pendientesResueltos = null, pendientesUrgentes = null;
+    let visiblePendientes = null;
     if (loaded.pendientes) {
       const allPends = loaded.pendientes;
       const pendAdminView = await resolveAdminView(sb, employee, 'Pendientes');
@@ -237,6 +238,7 @@ export default async function (req) {
           (p.sitio && establecimientos.has(norm(p.sitio)))
         );
       }
+      visiblePendientes = mine;
       pendientesActivos = mine.filter((p) => ['pendiente', 'asignado', 'en_progreso'].includes(p.estado)).length;
       pendientesResueltos = mine.filter((p) => p.estado === 'resuelto').length;
       pendientesUrgentes = mine.filter((p) => p.prioridad === 'urgente' && p.estado !== 'resuelto').length;
@@ -251,6 +253,16 @@ export default async function (req) {
       revenueThisMonth, revenueLastMonth, revenueTrend, pendingInvoices,
       lowStockItems, totalMaterials, overdueAssets,
       pendientesActivos, pendientesResueltos, pendientesUrgentes,
+      // Arrays completos (fetchAll sin cap) para que el Dashboard consuma
+      // una sola fuente de verdad — elimina las 7 queries cliente .list(100).
+      orders: loaded.workorders || null,
+      projects: loaded.projects || null,
+      clients: loaded.clients || null,
+      invoices: loaded.invoices || null,
+      materials: loaded.materials || null,
+      assets: loaded.assets || null,
+      employees: loaded.employees || null,
+      pendientes: visiblePendientes,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

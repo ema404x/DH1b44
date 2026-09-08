@@ -103,7 +103,7 @@ function InspeccionCard({ insp, onOpen, onDelete }) {
 
 // ── Componente principal ───────────────────────────────────────────────────
 export default function InspeccionColegioPage() {
-  const { filterByUser, displayName } = useCurrentUser();
+  const { displayName } = useCurrentUser();
   const queryClient = useQueryClient();
 
   const [vista, setVista] = useState('lista');
@@ -131,9 +131,9 @@ export default function InspeccionColegioPage() {
     staleTime: 0,
   });
   // La visibilidad la define el backend (getInspeccionesForUser respeta admin_view
-  // del rol de empleado + establecimientos asignados). filterByUser solo re-aplica
-  // sector (no-op de ownership).
-  const inspecciones = filterByUser(rawInspecciones);
+  // del rol de empleado + establecimientos asignados). No re-aplicar filterByUser:
+  // era redundante y rompía si el sector del cliente estaba desfasado.
+  const inspecciones = rawInspecciones;
 
   const { data: locations = [] } = useQuery({
     queryKey: ['locationData'],
