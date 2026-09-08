@@ -27,7 +27,7 @@ import { esOtVencida } from '@/lib/otVencimiento';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
-const HERO_IMG = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/1b31ee69b_generated_206f514f.jpg';
+const HERO_IMG = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/ba6e014cf_generated_image.png';
 
 const panel = "rounded-2xl border border-border bg-card shadow-[0_13px_25px_rgba(15,23,42,0.2)] p-4 lg:p-5";
 
