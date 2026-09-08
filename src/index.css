@@ -7,74 +7,74 @@
 @layer base {
   :root {
     --font-inter: 'Inter', sans-serif;
-    --background: 215 30% 10%;
-    --foreground: 215 10% 92%;
-    --card: 215 28% 14%;
-    --card-foreground: 215 10% 92%;
-    --popover: 215 28% 14%;
-    --popover-foreground: 215 10% 92%;
-    --primary: 213 90% 55%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 215 25% 20%;
-    --secondary-foreground: 215 10% 85%;
-    --muted: 215 25% 18%;
-    --muted-foreground: 215 10% 55%;
-    --accent: 215 25% 20%;
-    --accent-foreground: 215 10% 90%;
-    --destructive: 0 72% 51%;
+    --background: 217 33% 17%;
+    --foreground: 214 32% 91%;
+    --card: 215 25% 27%;
+    --card-foreground: 214 32% 91%;
+    --popover: 215 25% 22%;
+    --popover-foreground: 214 32% 91%;
+    --primary: 189 90% 43%;
+    --primary-foreground: 190 78% 15%;
+    --secondary: 215 25% 27%;
+    --secondary-foreground: 214 32% 91%;
+    --muted: 215 20% 25%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 215 25% 30%;
+    --accent-foreground: 214 32% 91%;
+    --destructive: 351 96% 71%;
     --destructive-foreground: 0 0% 100%;
-    --border: 215 25% 22%;
-    --input: 215 25% 22%;
-    --ring: 213 90% 55%;
-    --chart-1: 213 90% 55%;
-    --chart-2: 173 55% 45%;
+    --border: 215 16% 35%;
+    --input: 215 16% 35%;
+    --ring: 189 90% 43%;
+    --chart-1: 189 90% 43%;
+    --chart-2: 187 92% 70%;
     --chart-3: 142 68% 44%;
-    --chart-4: 43 74% 62%;
-    --chart-5: 0 72% 51%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 351 96% 71%;
     --radius: 0.625rem;
-    --sidebar-background: 220 50% 9%;
+    --sidebar-background: 224 71% 12%;
     --sidebar-foreground: 213 18% 75%;
-    --sidebar-primary: 213 90% 58%;
+    --sidebar-primary: 189 90% 43%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 42% 15%;
     --sidebar-accent-foreground: 213 15% 92%;
     --sidebar-border: 220 35% 18%;
-    --sidebar-ring: 213 90% 50%;
+    --sidebar-ring: 189 90% 43%;
   }
 
   .dark {
-    --background: 215 30% 8%;
-    --foreground: 215 10% 95%;
-    --card: 215 30% 11%;
-    --card-foreground: 215 10% 95%;
-    --popover: 215 30% 11%;
-    --popover-foreground: 215 10% 95%;
-    --primary: 213 94% 55%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 215 25% 17%;
-    --secondary-foreground: 215 10% 90%;
-    --muted: 215 25% 15%;
-    --muted-foreground: 215 10% 55%;
-    --accent: 215 25% 17%;
-    --accent-foreground: 215 10% 90%;
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 215 25% 19%;
-    --input: 215 25% 19%;
-    --ring: 213 94% 55%;
-    --chart-1: 213 94% 55%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 142 70% 45%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 0 84% 60%;
-    --sidebar-background: 215 45% 7%;
+    --background: 217 33% 15%;
+    --foreground: 214 32% 91%;
+    --card: 215 25% 25%;
+    --card-foreground: 214 32% 91%;
+    --popover: 215 25% 20%;
+    --popover-foreground: 214 32% 91%;
+    --primary: 189 90% 43%;
+    --primary-foreground: 190 78% 15%;
+    --secondary: 215 25% 25%;
+    --secondary-foreground: 214 32% 91%;
+    --muted: 215 20% 23%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 215 25% 28%;
+    --accent-foreground: 214 32% 91%;
+    --destructive: 351 96% 71%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 16% 33%;
+    --input: 215 16% 33%;
+    --ring: 189 90% 43%;
+    --chart-1: 189 90% 43%;
+    --chart-2: 187 92% 70%;
+    --chart-3: 142 68% 44%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 351 96% 71%;
+    --sidebar-background: 224 71% 10%;
     --sidebar-foreground: 215 15% 75%;
-    --sidebar-primary: 213 94% 55%;
+    --sidebar-primary: 189 90% 43%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 215 40% 13%;
     --sidebar-accent-foreground: 215 15% 90%;
     --sidebar-border: 215 35% 16%;
-    --sidebar-ring: 213 94% 55%;
+    --sidebar-ring: 189 90% 43%;
   }
 }
 
@@ -271,3 +271,53 @@
     border-radius: 6px;
   }
 }
+
+/* ═══ Acero Design System ═══ */
+@keyframes aceroRise {
+  from { opacity: 0; transform: translateY(13px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes aceroDrift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -5px, 0); }
+}
+
+.acero-hero-overlay {
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.58) 47%, rgba(15, 23, 42, 0.18));
+}
+
+.acero-image-panel-overlay {
+  background: linear-gradient(90deg, rgba(30, 41, 59, 0.98), rgba(30, 41, 59, 0.57), rgba(30, 41, 59, 0.25));
+}
+
+.acero-rise { animation: aceroRise 0.55s cubic-bezier(0.2, 0.75, 0.25, 1) both; }
+.acero-drift { animation: aceroDrift 7s ease-in-out infinite; }
+
+.acero-kpi {
+  transition: box-shadow 0.18s, background 0.18s;
+}
+.acero-kpi:hover {
+  background: hsl(215 25% 32%);
+  box-shadow: 0 17px 31px rgba(15, 23, 42, 0.3);
+}
+.acero-kpi:active {
+  background: hsl(215 25% 25%);
+}
+
+.acero-quick-item {
+  transition: background 0.18s, box-shadow 0.18s, color 0.18s;
+}
+.acero-quick-item:hover {
+  background: hsl(215 25% 30%);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.22);
+}
+.acero-quick-item:active {
+  background: hsl(var(--background));
+}
+
+.acero-section-link {
+  transition: color 0.18s;
+}
+.acero-section-link:hover { color: hsl(38 92% 50%); }
+.acero-section-link:active { color: hsl(187 92% 70%); }

@@ -5,7 +5,7 @@ import {
   FolderKanban, ClipboardList, Users, DollarSign, TrendingUp, TrendingDown,
   AlertTriangle, CheckCircle2, Wrench, ArrowRight, Zap, Package, BarChart3,
   Activity, FileCheck, Calendar, MapPin, User, Clock, Sparkles, ChevronRight,
-  Shield, Target
+  Shield, Target, Plus, ListChecks, FileText
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,60 +30,64 @@ import { esOtVencida } from '@/lib/otVencimiento';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
-const panel = "rounded-2xl border border-border bg-card shadow-sm p-4 lg:p-6";
+const HERO_IMG = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/1b31ee69b_generated_206f514f.jpg';
+const INFRA_IMG = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/54e70bdec_generated_9bcb3098.jpg';
+
+const panel = "rounded-2xl border border-border bg-card shadow-[0_13px_25px_rgba(15,23,42,0.2)] p-4 lg:p-5";
 
 const STATUS_COLORS = {
-  pendiente:   { dot: 'bg-yellow-400', text: 'text-yellow-400' },
-  asignada:    { dot: 'bg-blue-400',   text: 'text-blue-400' },
-  en_progreso: { dot: 'bg-purple-400', text: 'text-purple-400' },
-  completada:  { dot: 'bg-emerald-400',text: 'text-emerald-400' },
-  cancelada:   { dot: 'bg-red-400',    text: 'text-red-400' },
+  pendiente:   { dot: 'bg-amber-400', text: 'text-amber-400', ring: 'shadow-[0_0_0_4px_rgba(245,158,11,0.12)]' },
+  asignada:    { dot: 'bg-cyan-400',  text: 'text-cyan-400', ring: 'shadow-[0_0_0_4px_rgba(34,211,238,0.12)]' },
+  en_progreso: { dot: 'bg-cyan-400',  text: 'text-cyan-400', ring: 'shadow-[0_0_0_4px_rgba(34,211,238,0.12)]' },
+  completada:  { dot: 'bg-emerald-400', text: 'text-emerald-400', ring: 'shadow-[0_0_0_4px_rgba(52,211,153,0.12)]' },
+  cancelada:   { dot: 'bg-red-400',   text: 'text-red-400', ring: 'shadow-[0_0_0_4px_rgba(239,68,68,0.12)]' },
 };
 
-const PRIORITY_COLORS = {
-  urgente: 'bg-red-500/20 text-red-300 border-red-500/30',
-  alta:    'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  media:   'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  baja:    'bg-slate-500/20 text-slate-400 border-slate-500/30',
+const PRIORITY_TAGS = {
+  urgente: 'bg-amber-500/15 text-amber-300',
+  alta:    'bg-orange-500/15 text-orange-300',
+  media:   'bg-cyan-500/15 text-cyan-300',
+  baja:    'bg-slate-500/15 text-slate-400',
 };
 
-const KPI_COLORS = {
-  blue:    { icon: 'bg-blue-500/15 text-blue-300',      top: 'border-t-blue-400' },
-  amber:   { icon: 'bg-amber-500/15 text-amber-300',    top: 'border-t-amber-400' },
-  green:   { icon: 'bg-emerald-500/15 text-emerald-300', top: 'border-t-emerald-400' },
-  purple:  { icon: 'bg-purple-500/15 text-purple-300',  top: 'border-t-purple-400' },
-  red:     { icon: 'bg-red-500/15 text-red-300',        top: 'border-t-red-400' },
-  gold:    { icon: 'bg-amber-500/15 text-amber-300',    top: 'border-t-amber-400' },
-  primary: { icon: 'bg-primary/15 text-primary',         top: 'border-t-primary' },
+const KPI_TOP = {
+  cyan:    { top: 'border-t-cyan-500',   icon: 'text-cyan-400' },
+  amber:   { top: 'border-t-amber-500',  icon: 'text-amber-400' },
+  red:     { top: 'border-t-red-400',    icon: 'text-red-400' },
+  green:   { top: 'border-t-emerald-500',icon: 'text-emerald-400' },
+  gold:    { top: 'border-t-amber-500',  icon: 'text-amber-400' },
+  primary: { top: 'border-t-primary',     icon: 'text-primary' },
 };
 
-const KpiCard = React.memo(function KpiCard({ title, value, subtitle, icon: Icon, color = 'blue', trend, href, alert }) {
-  const cfg = KPI_COLORS[color] || KPI_COLORS.blue;
+const KpiCard = React.memo(function KpiCard({ title, value, subtitle, icon: Icon, color = 'cyan', trend, href, alert }) {
+  const cfg = KPI_TOP[color] || KPI_TOP.cyan;
   const inner = (
-    <div className="h-full group">
-      <div className={cn("relative overflow-hidden rounded-2xl border border-border bg-card p-4 lg:p-6 h-full transition-all hover:shadow-md hover:-translate-y-0.5 duration-200 border-t-[3px]", cfg.top)}>
-        <div className="flex items-start justify-between mb-3 lg:mb-4">
-          <div className={cn("h-9 w-9 lg:h-10 lg:w-10 rounded-xl flex items-center justify-center", cfg.icon)}>
-            <Icon className="h-5 w-5" />
-          </div>
-          {trend !== undefined && (
-            <span className={cn("flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border tabular-nums",
-              trend >= 0 ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' : 'bg-red-500/15 text-red-300 border-red-500/25')}>
-              {trend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {Math.abs(trend)}%
-            </span>
-          )}
-          {alert && (
-            <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-300 border border-red-500/30 tabular-nums">
-              <AlertTriangle className="h-3 w-3" /> {alert}
-            </span>
-          )}
+    <div className={cn(
+      "acero-kpi relative overflow-hidden rounded-2xl border border-border bg-card p-4 lg:p-5 h-full border-t-[3px] shadow-[0_13px_25px_rgba(15,23,42,0.2)]",
+      "focus-visible:outline-2 focus-visible:outline-amber-500 focus-visible:[outline-offset:3px]",
+      cfg.top
+    )}>
+      <div className="flex items-start justify-between mb-3 lg:mb-4">
+        <div className={cn("h-9 w-9 lg:h-10 lg:w-10 rounded-xl flex items-center justify-center bg-primary/10", cfg.icon)}>
+          <Icon className="h-5 w-5" />
         </div>
-        <div>
-          <p className="text-2xl lg:text-3xl font-bold text-foreground tabular-nums tracking-tight leading-none"><CountUp value={value} /></p>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-2">{title}</p>
-          {subtitle && <p className="text-xs text-muted-foreground/70 mt-1">{subtitle}</p>}
-        </div>
+        {trend !== undefined && (
+          <span className={cn("flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border tabular-nums",
+            trend >= 0 ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' : 'bg-red-500/15 text-red-300 border-red-500/25')}>
+            {trend >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+            {Math.abs(trend)}%
+          </span>
+        )}
+        {alert && (
+          <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-300 border border-red-500/30 tabular-nums">
+            <AlertTriangle className="h-3 w-3" /> {alert}
+          </span>
+        )}
+      </div>
+      <div>
+        <p className="text-2xl lg:text-3xl font-bold text-foreground tabular-nums tracking-tight leading-none"><CountUp value={value} /></p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-2">{title}</p>
+        {subtitle && <p className="text-xs text-muted-foreground/70 mt-1">{subtitle}</p>}
       </div>
     </div>
   );
@@ -92,7 +96,7 @@ const KpiCard = React.memo(function KpiCard({ title, value, subtitle, icon: Icon
 
 function KpiCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm p-4 lg:p-6 h-full">
+    <div className="rounded-2xl border border-border bg-card shadow-[0_13px_25px_rgba(15,23,42,0.2)] p-4 lg:p-6 h-full border-t-[3px] border-t-border">
       <div className="flex items-start justify-between mb-4">
         <div className="h-9 w-9 lg:h-10 lg:w-10 rounded-xl skeleton" />
       </div>
@@ -102,17 +106,14 @@ function KpiCardSkeleton() {
   );
 }
 
-// Item de actividad memoizado: evita re-renderizar las 6 filas cuando el
-// Dashboard re-renderiza por cambios en filtros u otros paneles. Las props
-// (o, isLast) son estables entre renders si `orders` no cambió.
 const ActivityFeedItem = React.memo(function ActivityFeedItem({ o, isLast }) {
   const sc = STATUS_COLORS[o.status] || STATUS_COLORS.pendiente;
-  const pc = PRIORITY_COLORS[o.priority] || PRIORITY_COLORS.media;
+  const pc = PRIORITY_TAGS[o.priority] || PRIORITY_TAGS.media;
   const date = o.updated_date || o.created_date;
   return (
     <div className={cn("flex items-start gap-3 py-3", !isLast && "border-b border-border")}>
       <div className="mt-1 flex-shrink-0 flex flex-col items-center gap-1">
-        <div className={cn("h-2 w-2 rounded-full", sc.dot)} />
+        <div className={cn("h-2 w-2 rounded-full", sc.dot, sc.ring)} />
         {!isLast && <div className="w-px flex-1 bg-border h-full min-h-[1rem]" />}
       </div>
       <div className="flex-1 min-w-0">
@@ -164,8 +165,8 @@ function ActivityFeed({ orders }) {
 
 const QuickActionCard = React.memo(function QuickActionCard({ icon: Icon, label, desc, href, color }) {
   return (
-    <Link to={href}>
-      <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/40 hover:bg-muted hover:-translate-y-0.5 transition-all duration-150 cursor-pointer group h-full">
+    <Link to={href} className="block focus-visible:outline-2 focus-visible:outline-cyan-500 focus-visible:[outline-offset:2px]">
+      <div className="acero-quick-item flex items-center gap-3 p-3 rounded-xl border border-border bg-[hsl(215,25%,22%)] hover:bg-[hsl(215,25%,30%)] hover:shadow-[0_6px_14px_rgba(15,23,42,0.22)] transition-all duration-150 cursor-pointer group h-full">
         <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0", color)}>
           <Icon className="h-4 w-4" />
         </div>
@@ -189,19 +190,8 @@ export default function Dashboard() {
     return userPermissions[moduleKey]?.read === true;
   }, [user, userPermissions]);
 
-  // ── OPTIMIZACIÓN DE CARGA (cache + frontend) ──
-  // staleTime 5min para todas las queries de respaldo + sin refetchInterval:
-  // el único refetch automático es al volver a la pestaña si pasó staleTime,
-  // más PullToRefresh manual. Elimina los refetch cada 60-120s en background
-  // que re-pedían datos perpetuamente. La frescura percibida es la misma
-  // porque el primer montaje refetcha si stale. Aplica idéntico a ambos sectores.
   const STALE_5MIN = 5 * 60 * 1000;
   const { data: projects = [] }  = useQuery({ queryKey: ['projects'],   queryFn: () => base44.entities.Project.list('-updated_date', 100),   staleTime: STALE_5MIN, enabled: canRead('Project') });
-  // OTs propias del usuario actual (scope='own'): ignora admin-view y linkage
-  // jefe — incluso admins ven solo sus OTs (creador/asignado/jefe_sitio). Así
-  // el feed "Actividad reciente" y los KPIs de OT reflejan "siempre del usuario
-  // actual". Query key distinta de ['workorders'] para no pisar el cache de la
-  // página Órdenes (que scopea por visibilidad completa del rol).
   const { data: _ownOrdersRaw = [] } = useQuery({
     queryKey: ['workorders-dashboard-own'],
     queryFn: async () => (await base44.functions.invoke('getWorkOrdersForUser', { scope: 'own' })).data?.orders || [],
@@ -215,15 +205,7 @@ export default function Dashboard() {
   const { data: allPendientes = [] } = useQuery({ queryKey: ['pendientes'], queryFn: async () => (await base44.functions.invoke('getPendientesForUser')).data.pendientes || [], staleTime: STALE_5MIN, enabled: canRead('Pendientes') });
   const { data: employees = [] } = useQuery({ queryKey: ['employees'],  queryFn: () => base44.entities.Employee.list('-updated_date', 80),    staleTime: STALE_5MIN, enabled: canRead('Employee') });
 
-  // KPIs agregados en backend sobre el TOTAL que el usuario puede ver (sin
-  // truncar). Regla de oro: backend-first. El backend scopea por sector para
-  // super-admins y por usuario (created_by_id ∪ jefe_sitio_email) para jefes —
-  // espejo del RLS. Así los contadores de OT no dependen del .list(150)
-  // client-side (que subreportaba y, al persistirse en IndexedDB, mostraba
-  // cifras viejas hasta el refetch → "hay que recargar varias veces").
   const useBackendKpis = canRead('WorkOrder');
-  // KPIs agregados: staleTime 3min (más fresco que las listas) y sin
-  // refetchInterval. Se refresca solo al montar si está stale + PullToRefresh.
   const { data: kpis, isLoading: kpisLoading } = useQuery({
     queryKey: ['dashboard-metrics-own'],
     queryFn: async () => (await base44.functions.invoke('getDashboardMetrics', { scope: 'own' })).data,
@@ -233,8 +215,6 @@ export default function Dashboard() {
   const B = (useBackendKpis && kpis) ? kpis : null;
   const kpiVal = (b, c) => (B != null && b != null ? b : c);
 
-  // Pendientes filtrados: admin ve todos, jefe de sitio solo los suyos
-  // filterByUser prioriza employeeName (ficha de empleado) sobre full_name de plataforma
   const pendientes = useMemo(() =>
     filterByUser(allPendientes)
   , [allPendientes, filterByUser]);
@@ -243,7 +223,6 @@ export default function Dashboard() {
     filterByUser(allOrders, ['assigned_name', 'assigned_to', 'jefe_sitio', 'jefe_sitio_email'])
   , [allOrders, filterByUser]);
 
-  // KPIs de pendientes memoizados (evita recalcular 4 filters por render)
   const pendientesKpis = useMemo(() => {
     const activos = pendientes.filter(p => ['pendiente', 'asignado', 'en_progreso'].includes(p.estado));
     const resueltos = pendientes.filter(p => p.estado === 'resuelto');
@@ -251,7 +230,6 @@ export default function Dashboard() {
     return { activos: activos.length, resueltos: resueltos.length, urgentes: urgentes.length };
   }, [pendientes]);
 
-  // Fecha de corte según el rango seleccionado
   const filterCutoff = useMemo(() => {
     if (dashFilters.dateRange === '7d')  return subDays(new Date(), 7);
     if (dashFilters.dateRange === '30d') return subDays(new Date(), 30);
@@ -259,7 +237,6 @@ export default function Dashboard() {
     return null;
   }, [dashFilters.dateRange]);
 
-  // Aplicar filtros globales sobre órdenes de trabajo
   const orders = useMemo(() => {
     let result = allUserOrders;
     if (filterCutoff) {
@@ -277,7 +254,6 @@ export default function Dashboard() {
     return result;
   }, [allUserOrders, filterCutoff, dashFilters.jefeSitio, dashFilters.priority]);
 
-  // Proyectos filtrados por rango de fecha
   const filteredProjects = useMemo(() => {
     if (!filterCutoff) return projects;
     return projects.filter(p => {
@@ -286,7 +262,6 @@ export default function Dashboard() {
     });
   }, [projects, filterCutoff]);
 
-  // Lista de jefes de sitio para el selector (tomada de employees con rol jefe)
   const jefesOptions = useMemo(() => {
     const names = employees
       .filter(e => e.role && e.role.toLowerCase().includes('jefe'))
@@ -333,37 +308,37 @@ export default function Dashboard() {
   const firstName = (displayName || '').split(' ')[0] || '';
 
   return (
-    <div className="min-h-screen bg-background space-y-6 pb-4 lg:pb-10 page-enter">
-      {/* ── HEADER ── */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1">
-        <div>
-          <p className="text-muted-foreground text-sm flex items-center gap-1.5 mb-1">
-            <Calendar className="h-3.5 w-3.5" />
-            {format(new Date(), "EEEE d 'de' MMMM, yyyy", { locale: es })}
-          </p>
-          <h1 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
+    <div className="min-h-screen bg-background space-y-7 pb-4 lg:pb-10 acero-rise">
+      {/* ── HERO ── */}
+      <section className="relative min-h-[220px] lg:min-h-[252px] border border-border rounded-2xl overflow-hidden bg-card mb-2 shadow-[0_18px_35px_rgba(15,23,42,0.25)]">
+        <img src={HERO_IMG} alt="" className="absolute inset-0 w-full h-full object-cover opacity-50" />
+        <div className="absolute inset-0 acero-hero-overlay" />
+        <div className="absolute w-60 h-60 rounded-full right-[8%] -top-32 bg-primary/15 blur-sm acero-drift" />
+        <div className="relative z-10 p-6 lg:p-9 w-full sm:w-3/5">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary mb-3.5">Dashboard</p>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground tracking-tight leading-tight mb-3">
             {greeting}{firstName ? `, ${firstName}` : ''}
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <p className="text-sm text-muted-foreground">
             {canRead('WorkOrder') && <>{kpiVal(kpis?.pendingOrders, metrics.pendingOrders)} OTs pendientes · {kpiVal(kpis?.inProgressOrders, metrics.inProgressOrders)} en progreso</>}
-            {canRead('WorkOrder') && kpiVal(kpis?.overdueOrders, metrics.overdueOrders) > 0 && <span className="text-red-400 font-semibold"> · ⚠ {kpiVal(kpis?.overdueOrders, metrics.overdueOrders)} vencidas</span>}
+            {canRead('WorkOrder') && kpiVal(kpis?.overdueOrders, metrics.overdueOrders) > 0 && <span className="text-amber-400 font-semibold"> · ⚠ {kpiVal(kpis?.overdueOrders, metrics.overdueOrders)} vencidas</span>}
           </p>
+          {canRead('WorkOrder') && (
+            <div className="flex items-center gap-2.5 mt-5">
+              <Link to="/crear-ot">
+                <Button size="sm" className="gap-1.5 bg-primary hover:bg-cyan-300 text-primary-foreground border-primary font-bold shadow-sm">
+                  <Zap className="h-3.5 w-3.5" /> Crear OT
+                </Button>
+              </Link>
+              <Link to="/ordenes">
+                <Button size="sm" variant="outline" className="gap-1.5 font-bold border-border bg-secondary/60 hover:bg-secondary text-foreground">
+                  <ClipboardList className="h-3.5 w-3.5" /> Ver OTs
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
-        {canRead('WorkOrder') && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Link to="/crear-ot">
-              <Button size="sm" className="gap-1.5 bg-amber-500 hover:bg-amber-400 text-amber-950 border-0 shadow-sm">
-                <Zap className="h-3.5 w-3.5" /> Crear OT
-              </Button>
-            </Link>
-            <Link to="/ordenes">
-              <Button size="sm" variant="outline" className="gap-1.5">
-                <ClipboardList className="h-3.5 w-3.5" /> Ver OTs
-              </Button>
-            </Link>
-          </div>
-        )}
-      </div>
+      </section>
 
       {/* ── ALERTAS ── */}
       <AlertasBanner />
@@ -380,7 +355,7 @@ export default function Dashboard() {
         return (
           <div className="flex flex-wrap gap-2">
             {_overdue > 0 && canRead('WorkOrder') && (
-              <Link to="/ordenes" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/25 text-red-300 text-sm hover:bg-red-500/25 transition-all">
+              <Link to="/ordenes" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/25 text-amber-300 text-sm hover:bg-amber-500/25 transition-all">
                 <AlertTriangle className="h-3.5 w-3.5" /> {_overdue} OT{_overdue > 1 ? 's' : ''} vencida{_overdue > 1 ? 's' : ''}
               </Link>
             )}
@@ -390,7 +365,7 @@ export default function Dashboard() {
               </Link>
             )}
             {_overdueAssets > 0 && canRead('Asset') && (
-              <Link to="/activos" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-500/15 border border-orange-500/25 text-orange-300 text-sm hover:bg-orange-500/25 transition-all">
+              <Link to="/activos" className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/15 border border-red-500/25 text-red-300 text-sm hover:bg-red-500/25 transition-all">
                 <Wrench className="h-3.5 w-3.5" /> {_overdueAssets} mantenimiento{_overdueAssets > 1 ? 's' : ''} vencido{_overdueAssets > 1 ? 's' : ''}
               </Link>
             )}
@@ -401,16 +376,16 @@ export default function Dashboard() {
       {/* ── ACCESOS RÁPIDOS ── */}
       {(() => {
         const actions = [
-          canRead('WorkOrder')         && { href: '/crear-ot',           icon: Zap,          label: 'Crear OT',     desc: 'Orden rápida',    color: 'bg-emerald-500/15 text-emerald-300' },
-          canRead('WorkOrder')         && { href: '/ordenes',            icon: ClipboardList, label: 'OTs',          desc: 'Gestionar',       color: 'bg-amber-500/15 text-amber-300' },
-          canRead('InspeccionColegio') && { href: '/inspeccion-colegio', icon: Target,        label: 'Inspección',   desc: 'Recorrido colegio', color: 'bg-blue-500/15 text-blue-300' },
-          canRead('Asset')             && { href: '/activos',            icon: Wrench,        label: 'Pendientes',   desc: 'Gestión SAP',     color: 'bg-purple-500/15 text-purple-300' },
-          canRead('Certificado')       && { href: '/certificados',       icon: FileCheck,     label: 'Certificados', desc: 'Emitir',          color: 'bg-teal-500/15 text-teal-300' },
-          canRead('Reportes')          && { href: '/reportes',           icon: BarChart3,     label: 'Reportes',     desc: 'Ver métricas',    color: 'bg-pink-500/15 text-pink-300' },
+          canRead('WorkOrder')         && { href: '/crear-ot',           icon: Zap,          label: 'Crear OT',     desc: 'Orden rápida',    color: 'bg-cyan-500/15 text-cyan-300' },
+          canRead('WorkOrder')         && { href: '/ordenes',            icon: ClipboardList, label: 'OTs',          desc: 'Gestionar',       color: 'bg-cyan-500/15 text-cyan-300' },
+          canRead('InspeccionColegio') && { href: '/inspeccion-colegio', icon: Target,        label: 'Inspección',   desc: 'Recorrido colegio', color: 'bg-cyan-500/15 text-cyan-300' },
+          canRead('Asset')             && { href: '/activos',            icon: Wrench,        label: 'Pendientes',   desc: 'Gestión SAP',     color: 'bg-cyan-500/15 text-cyan-300' },
+          canRead('Certificado')       && { href: '/certificados',       icon: FileCheck,     label: 'Certificados', desc: 'Emitir',          color: 'bg-cyan-500/15 text-cyan-300' },
+          canRead('Reportes')          && { href: '/reportes',           icon: BarChart3,     label: 'Reportes',     desc: 'Ver métricas',    color: 'bg-cyan-500/15 text-cyan-300' },
         ].filter(Boolean);
         if (actions.length === 0) return null;
         return (
-          <div className={panel}>
+          <div className={cn(panel, "acero-rise")} style={{ animationDelay: '0.08s' }}>
             <SectionHeader icon={Sparkles} title="Accesos rápidos" subtitle="Tareas frecuentes" />
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {actions.map((a, i) => <QuickActionCard key={i} {...a} />)}
@@ -420,7 +395,7 @@ export default function Dashboard() {
       })()}
 
       {/* ── INDICADORES (KPI GRID) ── */}
-      <div>
+      <div className="acero-rise" style={{ animationDelay: '0.16s' }}>
         <SectionHeader title="Indicadores" subtitle="Resumen general del período" />
         {kpisLoading ? (
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
@@ -430,16 +405,16 @@ export default function Dashboard() {
         <>
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="OTs Pendientes"   value={kpiVal(kpis?.pendingOrders, metrics.pendingOrders)}          subtitle={`${kpiVal(kpis?.completedThisMonth, metrics.completedThisMonth)} completadas este mes`}  icon={ClipboardList} color="amber"  alert={kpiVal(kpis?.overdueOrders, metrics.overdueOrders) > 0 ? kpiVal(kpis?.overdueOrders, metrics.overdueOrders) : undefined} />}
-          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="En Progreso"      value={kpiVal(kpis?.inProgressOrders, metrics.inProgressOrders)}        subtitle={`${kpiVal(kpis?.efficiency, metrics.efficiency)}% de eficiencia total`}          icon={Activity}      color="blue" />}
-          {canRead('Project')    && <KpiCard href="/proyectos"   title="Proyectos"        value={kpiVal(kpis?.activeProjects, metrics.activeProjects)}         subtitle={`${kpiVal(kpis?.totalProjects, projects.length)} en total`}                          icon={FolderKanban}  color="blue"   />}
-          {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos del Mes" value={fmt(kpiVal(kpis?.revenueThisMonth, metrics.revenueThisMonth))} subtitle={`${fmt(kpiVal(kpis?.pendingInvoices, metrics.pendingInvoices))} por cobrar`}         icon={DollarSign}    color="gold"  trend={kpiVal(kpis?.revenueTrend, metrics.revenueTrend)} />}
+          {canRead('WorkOrder')  && <KpiCard href="/ordenes"     title="En Progreso"      value={kpiVal(kpis?.inProgressOrders, metrics.inProgressOrders)}        subtitle={`${kpiVal(kpis?.efficiency, metrics.efficiency)}% de eficiencia total`}          icon={Activity}      color="cyan" />}
+          {canRead('Project')    && <KpiCard href="/proyectos"   title="Proyectos"        value={kpiVal(kpis?.activeProjects, metrics.activeProjects)}         subtitle={`${kpiVal(kpis?.totalProjects, projects.length)} en total`}                          icon={FolderKanban}  color="cyan"   />}
+          {canRead('Invoice')    && <KpiCard href="/facturacion" title="Ingresos del Mes" value={fmt(kpiVal(kpis?.revenueThisMonth, metrics.revenueThisMonth))} subtitle={`${fmt(kpiVal(kpis?.pendingInvoices, metrics.pendingInvoices))} por cobrar`}         icon={DollarSign}    color="amber"  trend={kpiVal(kpis?.revenueTrend, metrics.revenueTrend)} />}
         </div>
         <div className="h-4" />
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={kpiVal(kpis?.activeClients, metrics.activeClients)}            subtitle={`${kpiVal(kpis?.totalClients, clients.length)} en total`}                        icon={Users}         color="blue" />}
+          {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={kpiVal(kpis?.activeClients, metrics.activeClients)}            subtitle={`${kpiVal(kpis?.totalClients, clients.length)} en total`}                        icon={Users}         color="cyan" />}
           {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={kpiVal(kpis?.urgentOrders, metrics.urgentOrders.length)}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={kpiVal(kpis?.urgentOrders, metrics.urgentOrders.length) > 0 ? 'red' : 'green'} />}
           {canRead('Pendientes') && <KpiCard href="/activos"    title="Pendientes SAP"  value={kpiVal(kpis?.pendientesActivos, pendientesKpis.activos)} subtitle={`${kpiVal(kpis?.pendientesResueltos, pendientesKpis.resueltos)} resueltos`} icon={Wrench} color="amber" alert={kpiVal(kpis?.pendientesUrgentes, pendientesKpis.urgentes) > 0 ? kpiVal(kpis?.pendientesUrgentes, pendientesKpis.urgentes) : undefined} />}
-          {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={kpiVal(kpis?.totalMaterials, materials.length)}                  subtitle={`${kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length)} bajo mínimo`}      icon={Package}       color={kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length) > 0 ? 'red' : 'gold'} />}
+          {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={kpiVal(kpis?.totalMaterials, materials.length)}                  subtitle={`${kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length)} bajo mínimo`}      icon={Package}       color={kpiVal(kpis?.lowStockItems, metrics.lowStockItems.length) > 0 ? 'red' : 'amber'} />}
         </div>
         </>
         )}
@@ -447,7 +422,7 @@ export default function Dashboard() {
 
       {/* ── OPERACIÓN ── */}
       {canRead('WorkOrder') && (
-        <div>
+        <div className="acero-rise" style={{ animationDelay: '0.24s' }}>
           <SectionHeader icon={ClipboardList} title="Operación" subtitle="Órdenes de trabajo y actividad reciente"
             action={<Link to="/ordenes"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver todas <ArrowRight className="h-3 w-3" /></Button></Link>} />
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -472,7 +447,7 @@ export default function Dashboard() {
 
       {/* ── FINANZAS Y CERTIFICACIÓN ── */}
       {(canRead('Invoice') || canRead('Certificado')) && (
-        <div>
+        <div className="acero-rise" style={{ animationDelay: '0.32s' }}>
           <SectionHeader icon={DollarSign} title="Finanzas y certificación" subtitle="Ingresos y certificados del período"
             action={<Link to="/facturacion"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button></Link>} />
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -488,7 +463,7 @@ export default function Dashboard() {
 
       {/* ── INFRAESTRUCTURA ── */}
       {(canRead('Emergencias') || canRead('Project')) && (
-        <div>
+        <div className="acero-rise" style={{ animationDelay: '0.32s' }}>
           <SectionHeader icon={Wrench} title="Infraestructura" subtitle="Emergencias y proyectos en curso"
             action={canRead('Project') ? <Link to="/proyectos"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button></Link> : null} />
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -515,7 +490,9 @@ export default function Dashboard() {
                           <p className="text-sm font-medium text-foreground truncate flex-1">{p.name}</p>
                           <span className="text-xs font-bold text-primary flex-shrink-0 tabular-nums">{p.progress || 0}%</span>
                         </div>
-                        <Progress value={p.progress || 0} className="h-1.5" />
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-primary to-cyan-300" style={{ width: `${p.progress || 0}%` }} />
+                        </div>
                         {p.client_name && <p className="text-[10px] text-muted-foreground">{p.client_name}</p>}
                       </div>
                     ))}
@@ -528,13 +505,13 @@ export default function Dashboard() {
       )}
 
       {/* ── GESTIÓN DE SITIOS ── */}
-      <div>
+      <div className="acero-rise" style={{ animationDelay: '0.32s' }}>
         <SectionHeader icon={Shield} title="Gestión de sitios" subtitle="Indicadores por jefe de sitio" />
         <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} orders={allUserOrders} pendientes={pendientes} employees={employees} />
       </div>
 
       {/* ── MÉTRICAS DE OPERACIÓN ── */}
-      <div>
+      <div className="acero-rise" style={{ animationDelay: '0.32s' }}>
         <SectionHeader icon={BarChart3} title="Métricas de operación" subtitle="Vista global de recursos y equipos" />
         <MetricasOperacion
           orders={orders}
