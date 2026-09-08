@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { isJefeSitioRole } from '@/lib/roles';
+import { compressImage } from '@/lib/compressImage';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -247,6 +248,11 @@ export default function CrearOT() {
   const { data: employees = [] } = useQuery({
     queryKey: ['employees-ot-assign'],
     queryFn: () => base44.entities.Employee.list('full_name', 500),
+    // Diferir hasta el paso 2 (Detalle): el usuario escribe título/descripción
+    // ~20-60s, dando tiempo a resolver antes del botón Crear (paso 3) que usa
+    // resolveResponsable. Si fuera step >= 3, una carga lenta dejaría
+    // assigned_to/jefe_sitio_email vacíos → el jefe no vería la OT por RLS.
+    enabled: step >= 2,
     staleTime: 300000,
   });
   // Operarios del sector vía backend (getOperariosSector): fuente canónica para
@@ -259,6 +265,7 @@ export default function CrearOT() {
       const res = await base44.functions.invoke('getOperariosSector');
       return res.data?.operarios || [];
     },
+    enabled: step >= 2,
     staleTime: 600_000,
     retry: false,
   });
@@ -455,13 +462,15 @@ export default function CrearOT() {
     recognitionRef.current?.stop();
   };
 
-  // Fotos
+  // Fotos — compresión client-side pre-upload (anti-crash RAM en mobile).
+  // Procesamiento secuencial: nunca dos bitmaps full-res simultáneos en RAM.
   const handlePhotos = async (files) => {
     if (!files?.length) return;
     setUploadingPhoto(true);
     for (const file of Array.from(files)) {
       try {
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        const compressed = await compressImage(file);
+        const { file_url } = await base44.integrations.Core.UploadFile({ file: compressed });
         setPhotos(prev => [...prev, file_url]);
       } catch {
         toast.error(`Error subiendo ${file.name}`);
