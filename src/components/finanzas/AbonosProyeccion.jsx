@@ -15,7 +15,7 @@ export default function AbonosProyeccion({ abonos }) {
       const diasVenc = diasHasta(a.fecha_fin_validez);
       const montoPendiente = montoMensual * Math.max(0, mesesFaltan);
       return { a, montoMensual, mesesFaltan, diasVenc, montoPendiente };
-    }).filter((r) => r.montoFaltan !== 0 || r.montoPendiente > 0 || r.a.estado === 'activo');
+    }).filter((r) => r.mesesFaltan > 0 || r.montoPendiente > 0);
 
     const _totalPendiente = rows.reduce((s, r) => s + r.montoPendiente, 0);
     const _totalRecurrente = rows.reduce((s, r) => s + r.montoMensual, 0);
