@@ -1,0 +1,37 @@
+{
+  "name": "Notificar anuncio de foro a sector",
+  "description": "Al crear un hilo tipo 'anuncio' en el foro, lanza una ForoNotificacion (tipo 'anuncio') a cada usuario del mismo sector del autor (excluyendo al autor). Sector-scoped, idempotente, backend-side.",
+  "trigger": {
+    "condition": "${ (.trigger.data.tipo == \"anuncio\") }",
+    "config": {
+      "trigger_type": "entity",
+      "events": [
+        "create"
+      ],
+      "entity_name": "ForoHilo"
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "notificar_anuncio_de_foro_a_sector",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "notificarAnuncioForo",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "notificarAnuncioForo"
+  }
+}

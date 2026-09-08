@@ -1,0 +1,44 @@
+{
+  "name": "Procesamiento Diario de Rutinas",
+  "description": "Genera nuevas OrdenRutina para RutinaEdificio activas cuya proxima_ejecucion lleg\u00f3, respeta estacionalidad y marca como vencidas las \u00f3rdenes fuera de plazo.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 10 * * *",
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "procesamiento_diario_de_rutinas",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "procesarRutinas",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "procesarRutinas"
+  }
+}
