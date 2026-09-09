@@ -103,7 +103,7 @@ function InspeccionCard({ insp, onOpen, onDelete }) {
 
 // ── Componente principal ───────────────────────────────────────────────────
 export default function InspeccionColegioPage() {
-  const { displayName } = useCurrentUser();
+  const { displayName, currentUser, employeeSector } = useCurrentUser();
   const queryClient = useQueryClient();
 
   const [vista, setVista] = useState('lista');
@@ -182,7 +182,7 @@ export default function InspeccionColegioPage() {
   const handleDragEnd = () => {
     setDragSeccion(null);
     if (inspeccionActiva) {
-      base44.entities.InspeccionColegio.update(inspeccionActiva.id, { secciones: inspeccionActiva.secciones });
+      flushSave(inspeccionActiva.id, inspeccionActiva.secciones);
     }
   };
 
@@ -191,11 +191,9 @@ export default function InspeccionColegioPage() {
     const nombre = nuevaSeccionNombre.trim();
     if (!nombre) return;
     const nueva = { id: `sec_custom_${Date.now()}`, nombre, transcripcion: '', notas_libres: '', fotos: [], completada: false };
-    setInspeccionActiva(prev => {
-      const secciones = [...prev.secciones, nueva];
-      base44.entities.InspeccionColegio.update(prev.id, { secciones });
-      return { ...prev, secciones };
-    });
+    const secciones = [...(inspeccionActiva?.secciones || []), nueva];
+    setInspeccionActiva(prev => ({ ...prev, secciones }));
+    flushSave(inspeccionActiva.id, secciones);
     setNuevaSeccionNombre('');
   };
 
@@ -216,13 +214,24 @@ export default function InspeccionColegioPage() {
       return matchQ && matchE;
     }), [inspecciones, busqueda, filtroEstado]);
 
-  // Guardar con debounce
+  // Guardar con debounce. flushSave es la ÚNICA función que escribe al backend;
+  // toma el id y las secciones como argumentos explícitos para no depender de
+  // closures stale ni del estado local (que puede haber sido pisado por una
+  // reapertura con cache stale).
   const flushSave = useCallback(async (id, secciones) => {
+    if (!id) return;
     setGuardando(true);
-    try { await base44.entities.InspeccionColegio.update(id, { secciones }); }
-    catch { toast.error('Error al guardar'); }
-    finally { setGuardando(false); }
-  }, []);
+    try {
+      await base44.entities.InspeccionColegio.update(id, { secciones });
+      // Invalidar el cache para que la lista y futuras aperturas lean datos frescos.
+      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+    } catch (err) {
+      console.error('[flushSave] error:', err);
+      toast.error('Error al guardar la sección');
+    } finally {
+      setGuardando(false);
+    }
+  }, [queryClient]);
 
   const handleSeccionChange = useCallback((seccionId, cambios) => {
     setInspeccionActiva(prev => {
@@ -241,17 +250,64 @@ export default function InspeccionColegioPage() {
     });
   }, [flushSave]);
 
-  // Flush al desmontar
+  // Flush síncrono: limpia el timer y guarda inmediatamente el pendiente.
+  // Usado por handleVolverALista y el cleanup de unmount.
+  const flushPendingNow = useCallback(async () => {
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    const pending = pendingSaveRef.current;
+    pendingSaveRef.current = null;
+    if (pending) await flushSave(pending.id, pending.secciones);
+  }, [flushSave]);
+
+  // Flush al desmontar (cambio de ruta) — fire and forget, el backend lo recibe.
   useEffect(() => () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    if (pendingSaveRef.current)
-      base44.entities.InspeccionColegio.update(pendingSaveRef.current.id, { secciones: pendingSaveRef.current.secciones });
+    const pending = pendingSaveRef.current;
+    if (pending) {
+      pendingSaveRef.current = null;
+      base44.entities.InspeccionColegio.update(pending.id, { secciones: pending.secciones })
+        .catch(e => console.error('[unmount flush] error:', e));
+    }
   }, []);
 
   const stopPolling = () => {
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
   };
   useEffect(() => () => stopPolling(), []);
+
+  // Resolver el sector_id del usuario para estampar en el create. NO depender
+  // del workflow async de stamp — la RLS de update exige sector_id desde el
+  // instante cero, y el workflow tarda 1-2s en estampar, causando 403s en las
+  // primeras ediciones (race condition que pierde todo el relevamiento).
+  const resolvedSector = currentUser?.data?.sector_id || employeeSector || null;
+
+  // Volver a la lista: flushea el save pendiente, invalida el cache (para que
+  // la lista muestre datos frescos) y limpia el estado activo. Evita que el
+  // usuario vea datos stale y que una reapertura pise datos guardados.
+  const handleVolverALista = useCallback(async () => {
+    await flushPendingNow();
+    queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+    setInspeccionActiva(null);
+    setMostrarInforme(false);
+    setVista('lista');
+  }, [flushPendingNow, queryClient]);
+
+  // Abrir una inspección: trae dato FRESCO del backend en lugar de usar el
+  // objeto del cache stale. Previene pisar el estado local con datos viejos
+  // y sobrescribir ediciones guardadas.
+  const handleAbrirInspeccion = useCallback(async (insp) => {
+    await flushPendingNow();
+    try {
+      const fresca = await base44.entities.InspeccionColegio.get(insp.id);
+      setInspeccionActiva(fresca || insp);
+      setMostrarInforme(Boolean(fresca?.informe_generado));
+      setVista('editar');
+    } catch {
+      setInspeccionActiva(insp);
+      setMostrarInforme(Boolean(insp.informe_generado));
+      setVista('editar');
+    }
+  }, [flushPendingNow]);
 
   const handleCrearNueva = async () => {
     if (!formNueva.establecimiento) return toast.error('Ingresá el establecimiento');
@@ -261,11 +317,15 @@ export default function InspeccionColegioPage() {
         ...formNueva,
         titulo: formNueva.titulo || `Inspección ${formNueva.establecimiento} — ${format(new Date(), 'dd/MM/yyyy')}`,
         jefe_sitio: displayName || 'Inspector',
+        // Estampar sector_id en el create — elimina la race condition de RLS.
+        ...(resolvedSector ? { sector_id: resolvedSector } : {}),
         estado: 'en_progreso',
         secciones: buildSecciones(),
       });
       queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
-      setInspeccionActiva(nueva);
+      // Asegurar que el sector_id esté en el objeto local (el backend puede
+      // no devolverlo si el workflow aún no estampó, pero lo forzamos acá).
+      setInspeccionActiva({ ...nueva, sector_id: nueva.sector_id || resolvedSector });
       setMostrarInforme(false);
       setVista('editar');
     } catch { toast.error('Error al crear la inspección'); }
@@ -279,7 +339,7 @@ export default function InspeccionColegioPage() {
   };
 
   const handleGenerarInforme = async () => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    await flushPendingNow();
     const seccionesActuales = inspeccionActiva.secciones;
     const inspeccionId = inspeccionActiva.id;
 
@@ -457,7 +517,7 @@ export default function InspeccionColegioPage() {
             <InspeccionCard
               key={insp.id}
               insp={insp}
-              onOpen={i => { setInspeccionActiva(i); setMostrarInforme(Boolean(i.informe_generado)); setVista('editar'); }}
+              onOpen={handleAbrirInspeccion}
               onDelete={handleEliminar}
             />
           ))}
@@ -471,7 +531,7 @@ export default function InspeccionColegioPage() {
     <div className="max-w-xl mx-auto space-y-4 pb-6">
       <div className="flex items-center gap-3">
         <button
-          onClick={() => setVista('lista')}
+          onClick={handleVolverALista}
           className="h-9 w-9 rounded-xl border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -583,7 +643,7 @@ export default function InspeccionColegioPage() {
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border -mx-4 px-4 py-3 sm:static sm:bg-transparent sm:border-0 sm:mx-0 sm:px-0 sm:py-0">
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => setVista('lista')}
+              onClick={handleVolverALista}
               className="h-9 w-9 rounded-xl border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
