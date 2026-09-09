@@ -133,7 +133,7 @@ export default function InspeccionColegioPage() {
   const { data: moduleData, isLoading } = useQuery({
     queryKey: ['inspeccion-module-data'],
     queryFn: async () => (await base44.functions.invoke('getInspeccionModuleData')).data,
-    staleTime: 0,
+    staleTime: 60_000,
   });
 
   const inspecciones = moduleData?.inspecciones || [];
@@ -218,8 +218,6 @@ export default function InspeccionColegioPage() {
     setGuardando(true);
     try {
       await base44.entities.InspeccionColegio.update(id, { secciones });
-      // Invalidar el cache para que la lista y futuras aperturas lean datos frescos.
-      queryClient.invalidateQueries({ queryKey: ['inspeccion-module-data'] });
     } catch (err) {
       console.error('[flushSave] error:', err);
       toast.error('Error al guardar la sección');

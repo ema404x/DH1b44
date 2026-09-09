@@ -4,6 +4,9 @@ import { fetchAll } from '../../shared/fetchAllSector.ts';
 import { resolveAdminView, resolveEstablecimientosDeJefe, norm } from '../../shared/visibilityResolver.ts';
 
 /**
+ * @deprecated Usar getInspeccionModuleData en su lugar — devuelve inspecciones
+ * + establecimientos + direcciones en una sola respuesta consolidada.
+ *
  * Devuelve las inspecciones de colegio que el usuario actual puede ver.
  * ÚNICA fuente de verdad de visibilidad para el módulo Inspección.
  *

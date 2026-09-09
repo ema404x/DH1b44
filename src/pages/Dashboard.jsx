@@ -199,7 +199,6 @@ export default function Dashboard() {
   // Arrays completos del payload del backend (fetchAll sin cap de 100).
   const allOrders    = dash?.orders || [];
   const projects     = dash?.projects || [];
-  const clients      = dash?.clients || [];
   const invoices     = dash?.invoices || [];
   const materials    = dash?.materials || [];
   const assets       = dash?.assets || [];
@@ -373,7 +372,7 @@ export default function Dashboard() {
         </div>
         <div className="h-4" />
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={kpis?.activeClients ?? 0}            subtitle={`${kpis?.totalClients ?? clients.length} en total`}                        icon={Users}         color="cyan" />}
+          {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={kpis?.activeClients ?? 0}            subtitle={`${kpis?.totalClients ?? 0} en total`}                        icon={Users}         color="cyan" />}
           {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={metrics.urgentOrders.length}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={metrics.urgentOrders.length > 0 ? 'red' : 'green'} />}
           {canRead('Pendientes') && <KpiCard href="/activos"    title="Pendientes SAP"  value={kpis?.pendientesActivos ?? 0} subtitle={`${kpis?.pendientesResueltos ?? 0} resueltos`} icon={Wrench} color="amber" alert={(kpis?.pendientesUrgentes ?? 0) > 0 ? (kpis?.pendientesUrgentes ?? 0) : undefined} />}
           {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={kpis?.totalMaterials ?? materials.length}                  subtitle={`${kpis?.lowStockItems ?? 0} bajo mínimo`}      icon={Package}       color={(kpis?.lowStockItems ?? 0) > 0 ? 'red' : 'amber'} />}

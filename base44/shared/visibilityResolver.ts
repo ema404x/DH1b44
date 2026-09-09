@@ -40,7 +40,7 @@ interface RoleCache {
 let _roleCache: RoleCache | null = null;
 const ROLE_CACHE_TTL = 60_000;
 
-async function loadRolePermissions(sb: any): Promise<any[]> {
+export async function loadRolePermissions(sb: any): Promise<any[]> {
   const now = Date.now();
   if (_roleCache && now - _roleCache.ts < ROLE_CACHE_TTL) return _roleCache.rps;
   try {

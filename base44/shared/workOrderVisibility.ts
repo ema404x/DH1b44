@@ -56,6 +56,8 @@ export interface OtVisibilityContext {
   isField: boolean;
   /** Linkage jefe de sitio (Tablet→Employee), sector-scoped. Null si no aplica. */
   jefe: { userId: string | null; email: string; name: string } | null;
+  /** Ficha Employee del caller — para reuse en callers que ya resolvieron identidad. */
+  employee: any | null;
   /**
    * Forzar scope "solo propias": ignora admin-view y el linkage jefe de campo.
    * El caller ve estrictamente las OTs donde es creador, asignado o jefe_sitio.
@@ -118,7 +120,9 @@ export async function buildOtVisibilityContext(
   // Sector-scoped (aislamiento entre sectores): un jefe de otro sector no
   // se linkea. Si no hay linkage, no se suma nada (comportamiento previo).
   let jefe: OtVisibilityContext['jefe'] = null;
-  if (isField && employeeName) {
+  // forceOwnOnly saltea el linkage jefe: ctx.jefe nunca se usa cuando
+  // forceOwnOnly=true (el predicado lo ignora). Ahorra 2 queries para el Dashboard.
+  if (!options.forceOwnOnly && isField && employeeName) {
     try {
       let jefeNameStr = '';
       const tablets = await sb.entities.Tablet.filter({
@@ -160,6 +164,7 @@ export async function buildOtVisibilityContext(
     isAdminView,
     isField,
     jefe,
+    employee,
     forceOwnOnly: options.forceOwnOnly === true,
   };
 }

@@ -1,31 +1,33 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { esOtVencida } from '../../shared/otVencimiento.ts';
-import { resolveAndReconcileSector } from '../../shared/callerIdentity.ts';
 import { fetchAll } from '../../shared/fetchAllSector.ts';
 import { round2 } from '../../shared/round2.ts';
-import { resolveAdminView, resolveEstablecimientosDeJefe, norm } from '../../shared/visibilityResolver.ts';
-import { getVisibleWorkOrders } from '../../shared/workOrderVisibility.ts';
+import { resolveAdminView, loadRolePermissions, norm } from '../../shared/visibilityResolver.ts';
+import { buildOtVisibilityContext, otEsVisiblePara } from '../../shared/workOrderVisibility.ts';
 
 /**
  * KPIs del Dashboard computados sobre el TOTAL que el usuario puede ver (sin
  * truncar). Regla de oro: backend-first, fuente única de visibilidad.
  *
- * Visibilidad de OT: delegada a getVisibleWorkOrders (workOrderVisibility.ts),
- * el MISMO predicado que usan la página Órdenes y el Portal Operario. Así los
- * contadores del Dashboard son idénticos a los de las otras vistas — sin
- * lógica de scope duplicada (antes había computeIsSuperAdmin + userScopeQueries
- * + mergeDedupe que omitía assigned_to/nombre/linkage y generaba discrepancias).
+ * Visibilidad de OT: delegada a buildOtVisibilityContext + otEsVisiblePara
+ * (workOrderVisibility.ts), el MISMO predicado que usan la página Órdenes y el
+ * Portal Operario. Así los contadores del Dashboard son idénticos a los de las
+ * otras vistas.
  *
- * Performance: antes ~17 fetchAll (6 sobre WorkOrder solo). Ahora 8 fetchAll
- * totales — uno por módulo — disparados en un único Promise.all, con los KPIs
- * computados en memoria sobre el array ya cargado. WorkOrder pasó de 6 recorridos
- * paginados a 1.
+ * Performance: buildOtVisibilityContext resuelve sector + employee + admin_view
+ * + linkage en UNA pasada. WorkOrder se carga con fetchAll y se filtra con
+ * otEsVisiblePara usando el ctx ya resuelto — sin re-resolver identidad.
+ * Direccion se carga en el Promise.all principal y estabsSet se computa inline
+ * desde arrays ya cargados — sin re-llamar resolveEstablecimientosDeJefe.
+ * RolePermission se lee del cache de 60s (loadRolePermissions) ya poblado por
+ * resolveAdminView dentro de buildOtVisibilityContext.
  *
  * Reglas innegociables:
  *  - Fail closed en sector: si el usuario no tiene sector_id → 403.
  *  - Permisos: cada grupo de métricas se gatea por el permiso de lectura del
- *    módulo correspondiente (espejo de usePermission/roles.js). Si no aplica,
- *    se devuelve null.
+ *    módulo correspondiente. Si no aplica, se devuelve null.
+ *  - Payload: clients se omite (solo conteos en kpis). Todos los demás arrays
+ *    se mantienen completos porque los componentes del Dashboard los consumen.
  */
 
 const normalizeRole = (r) =>
@@ -36,10 +38,6 @@ const ADMIN_LEVEL_ROLES = ['admin', 'gerente', 'gerencia', 'administrativo', 'ge
 
 function isFieldRole(r) { return FIELD_ROLES.includes(normalizeRole(r)); }
 function isAdminLevelRole(r) { return ADMIN_LEVEL_ROLES.includes(normalizeRole(r)); }
-// Espejo exacto de useCurrentUser.isSuperAdmin. Se devuelve en la respuesta para
-// que el frontend no deba recalcularlo (algunos componentes lo consumen del
-// payload del Dashboard). NO se usa para scope de OT — eso lo resuelve
-// getVisibleWorkOrders via admin_view del rol del empleado.
 function computeIsSuperAdmin(platformRole, employeeRole) {
   if ((platformRole === 'admin' && !isFieldRole(employeeRole)) ||
       platformRole === 'gerente' ||
@@ -66,21 +64,35 @@ export default async function (req) {
 
     const sb = base44.asServiceRole;
 
-    // Resolución CANÓNICA del sector: ficha Employee primero, reconciliando
-    // user.data.sector_id si está desfasado (igual que getWorkOrdersForUser).
-    const { sector: callerSector, employee } = await resolveAndReconcileSector(sb, user);
-    if (!callerSector) {
+    // scope='own': el Dashboard pide KPIs de OT propios del usuario (ignora
+    // admin-view y linkage jefe). Sólo afecta WorkOrder; los demás módulos
+    // (proyectos, clientes, materiales, facturación) siguen sector-scoped.
+    const body = await req.json().catch(() => ({}));
+    const forceOwnOnly = body?.scope === 'own';
+
+    // ── Resolución CANÓNICA en una sola pasada ──
+    // buildOtVisibilityContext resuelve: sector (Employee → reconciliación
+    // best-effort), admin_view (RolePermission cacheado), linkage jefe
+    // (salteado si forceOwnOnly). Devuelve ctx con TODO — employee, sector,
+    // isAdminView. Elimina la llamada duplicada a resolveAndReconcileSector.
+    const ctx = await buildOtVisibilityContext(sb, user, { forceOwnOnly });
+    if (!ctx) {
       return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
     }
 
-    // ── Resolver permisos + rol de empleado (espejo del frontend) ──
+    const callerSector = ctx.sector;
+    const employee = ctx.employee;
+
+    // ── Resolver permisos del rol del empleado (cacheado) ──
+    // loadRolePermissions usa el cache de 60s ya poblado por resolveAdminView
+    // ('WorkOrder') dentro de buildOtVisibilityContext. Sin raw list duplicado.
     let perms = {};
     let employeeRole = null;
     if (user.role !== 'admin') {
       employeeRole = employee?.role || user.role || '';
       if (employeeRole) {
         try {
-          const allRps = await sb.entities.RolePermission.list('created_date', 500);
+          const allRps = await loadRolePermissions(sb);
           const rp = allRps.find((r) => normalizeRole(r.role_name) === normalizeRole(employeeRole));
           if (rp?.permissions) perms = rp.permissions;
         } catch {}
@@ -90,12 +102,6 @@ export default async function (req) {
     const canRead = (moduleKey) =>
       user.role === 'admin' ? true : canReadModule(perms, moduleKey);
 
-    // scope='own': el Dashboard pide KPIs de OT propios del usuario (ignora
-    // admin-view y linkage jefe). Sólo afecta WorkOrder; los demás módulos
-    // (proyectos, clientes, materiales, facturación) siguen sector-scoped.
-    const body = await req.json().catch(() => ({}));
-    const forceOwnOnly = body?.scope === 'own';
-
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -103,15 +109,17 @@ export default async function (req) {
     const sec = { sector_id: callerSector };
 
     // ── Disparar TODAS las cargas de datos en paralelo ──
-    // Un fetchAll por módulo; KPIs se computan en memoria sobre el array ya
-    // cargado. getVisibleWorkOrders es la fuente única de OTs visibles (mismo
-    // predicado que Órdenes/Portal) — un solo recorrido paginado de WorkOrder
-    // reemplaza los 6 que había antes.
+    // WorkOrder se carga con fetchAll y se filtra con otEsVisiblePara usando el
+    // ctx ya resuelto — sin re-llamar a buildOtVisibilityContext (antes
+    // getVisibleWorkOrders lo hacía internamente, duplicando Employee + linkage).
     const loadKeys = [];
     const loadPromises = [];
     if (canRead('WorkOrder')) {
       loadKeys.push('workorders');
-      loadPromises.push(getVisibleWorkOrders(sb, user, { forceOwnOnly }).then((r) => r.orders));
+      loadPromises.push(
+        fetchAll(sb, 'WorkOrder', { sector_id: callerSector }, '-updated_date')
+          .then((arr) => arr.filter((o) => otEsVisiblePara(o, ctx)))
+      );
     }
     if (canRead('Project')) {
       loadKeys.push('projects');
@@ -140,6 +148,15 @@ export default async function (req) {
     if (canRead('Pendientes')) {
       loadKeys.push('pendientes');
       loadPromises.push(fetchAll(sb, 'Pendiente', sec));
+      // Direccion para estabsSet inline (evita re-fetch en resolveEstablecimientosDeJefe)
+      loadKeys.push('direcciones');
+      loadPromises.push(fetchAll(sb, 'Direccion', sec));
+      // Si Asset no se cargó arriba (canRead('Asset')=false), cargarlo acá
+      // para que estabsSet tenga los sedes/locations del jefe.
+      if (!loadKeys.includes('assets')) {
+        loadKeys.push('assets');
+        loadPromises.push(fetchAll(sb, 'Asset', sec));
+      }
     }
 
     const loadedValues = await Promise.all(loadPromises);
@@ -176,7 +193,7 @@ export default async function (req) {
       activeProjects = loaded.projects.filter((p) => p.status === 'en_progreso').length;
     }
 
-    // ── Client ──
+    // ── Client (solo conteos — el array no se envía al cliente) ──
     let activeClients = null, totalClients = null;
     if (loaded.clients) {
       totalClients = loaded.clients.length;
@@ -220,6 +237,10 @@ export default async function (req) {
     // isSuperAdmin. Un gerente sin admin_view para Pendientes ve solo los propios
     // + los de sus establecimientos asignados. Sin ficha de empleado (super-admin
     // puro) → admin_view=true → todo el sector.
+    //
+    // estabsSet se computa INLINE desde loaded.direcciones + loaded.assets (ya
+    // cargados en Promise.all) — sin re-llamar resolveEstablecimientosDeJefe
+    // (que re-fetchaba Direccion+Asset duplicados). Misma lógica matchJefe.
     let pendientesActivos = null, pendientesResueltos = null, pendientesUrgentes = null;
     let visiblePendientes = null;
     if (loaded.pendientes) {
@@ -229,13 +250,35 @@ export default async function (req) {
       if (pendAdminView) {
         mine = allPends;
       } else {
-        const establecimientos = await resolveEstablecimientosDeJefe(sb, callerSector, employee?.full_name || user.full_name || '');
+        // estabsSet inline — misma lógica que resolveEstablecimientosDeJefe
+        // pero reutilizando los arrays ya cargados (sin fetch duplicado).
+        const jefeName = employee?.full_name || user.full_name || '';
+        const targetName = norm(jefeName);
         const uEmail = (user.email || '').toLowerCase().trim();
+        const targetEmail = norm(uEmail);
+        const matchJefeInline = (jefeStr) => {
+          if (!jefeStr) return false;
+          const n = norm(jefeStr);
+          if (targetName && n === targetName) return true;
+          if (targetEmail && n === targetEmail) return true;
+          return false;
+        };
+        const estabsSet = new Set();
+        (loaded.direcciones || []).forEach((d) => {
+          if (matchJefeInline(d.jefe_sitio) && d.direccion) estabsSet.add(norm(d.direccion));
+        });
+        (loaded.assets || []).forEach((a) => {
+          if (matchJefeInline(a.jefe_sitio)) {
+            if (a.sede) estabsSet.add(norm(a.sede));
+            if (a.location) estabsSet.add(norm(a.location));
+          }
+        });
+
         mine = allPends.filter((p) =>
           (p.created_by_id && p.created_by_id === user.id) ||
           (p.jefe_sitio_email && p.jefe_sitio_email.toLowerCase().trim() === uEmail) ||
-          (p.establecimiento && establecimientos.has(norm(p.establecimiento))) ||
-          (p.sitio && establecimientos.has(norm(p.sitio)))
+          (p.establecimiento && estabsSet.has(norm(p.establecimiento))) ||
+          (p.sitio && estabsSet.has(norm(p.sitio)))
         );
       }
       visiblePendientes = mine;
@@ -249,15 +292,16 @@ export default async function (req) {
       isSuperAdmin,
       activeProjects, totalProjects,
       pendingOrders, inProgressOrders, overdueOrders, completedThisMonth, urgentOrders, efficiency,
-      activeClients, totalClients, activeEmployees,
+      activeClients, totalClients,
+      activeEmployees,
       revenueThisMonth, revenueLastMonth, revenueTrend, pendingInvoices,
       lowStockItems, totalMaterials, overdueAssets,
       pendientesActivos, pendientesResueltos, pendientesUrgentes,
       // Arrays completos (fetchAll sin cap) para que el Dashboard consuma
-      // una sola fuente de verdad — elimina las 7 queries cliente .list(100).
+      // una sola fuente de verdad. clients se omite (solo conteos en kpis)
+      // porque ningún componente del Dashboard lo usa más allá del conteo.
       orders: loaded.workorders || null,
       projects: loaded.projects || null,
-      clients: loaded.clients || null,
       invoices: loaded.invoices || null,
       materials: loaded.materials || null,
       assets: loaded.assets || null,

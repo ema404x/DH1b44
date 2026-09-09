@@ -30,20 +30,25 @@ export async function resolveCallerSectorCanonical(
   const userEmail = (user?.email || '').toLowerCase().trim();
   let employee: any | null = null;
 
+  // Parallelizar ambas queries (email + user_id) en lugar de secuenciales.
+  // Prioridad: email primero, fallback por user_id. Ahorra 1 round-trip.
+  const [byEmail, byUid] = await Promise.all([
+    userEmail
+      ? sb.entities.Employee.filter({ email: userEmail }).catch(() => [])
+      : Promise.resolve([]),
+    user?.id
+      ? sb.entities.Employee.filter({ user_id: user.id }).catch(() => [])
+      : Promise.resolve([]),
+  ]);
+
   if (userEmail) {
-    try {
-      const byEmail = await sb.entities.Employee.filter({ email: userEmail });
-      employee =
-        (byEmail || []).find(
-          (e: any) => (e?.email || '').toLowerCase().trim() === userEmail,
-        ) || null;
-    } catch {}
+    employee =
+      (byEmail || []).find(
+        (e: any) => (e?.email || '').toLowerCase().trim() === userEmail,
+      ) || null;
   }
   if (!employee && user?.id) {
-    try {
-      const byUid = await sb.entities.Employee.filter({ user_id: user.id });
-      employee = byUid && byUid.length > 0 ? byUid[0] : null;
-    } catch {}
+    employee = byUid && byUid.length > 0 ? byUid[0] : null;
   }
 
   const sector =
