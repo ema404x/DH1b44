@@ -72,8 +72,24 @@ class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   componentDidMount() {
-    // La app cargó sana tras un reload → limpiamos el flag anti-loop.
-    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    // Limpieza DELAYED del flag anti-loop. El import lazy de una página
+    // (ej. Employees.jsx) falla 1–2s DESPUÉS de montar el ErrorBoundary
+    // (cuando Suspense intenta resolver el chunk). Si limpiáramos el flag
+    // inmediatamente, siempre estaría limpio cuando componentDidCatch lo
+    // verifique → recarga infinita → el navegador la frena → usuario
+    // trabado en la pantalla de error para siempre.
+    //
+    // Con 5s de delay:
+    //  • Si la app carga sana → a los 5s el flag se limpia (listo para futuros errores).
+    //  • Si el import falla en ese lapso → el flag sigue seteado → no hay auto-recarga
+    //    → se muestra la pantalla de error con el botón de recuperación manual.
+    this._cleanupTimer = setTimeout(() => {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    }, 5000);
+  }
+
+  componentWillUnmount() {
+    if (this._cleanupTimer) clearTimeout(this._cleanupTimer);
   }
   componentDidCatch(error) {
     // Auto-recargar en errores de "chunk stale" — pasan cuando se redeploya la app
@@ -96,7 +112,17 @@ class ErrorBoundary extends React.Component {
             <div className="text-5xl">⚠️</div>
             <h1 className="text-xl font-bold">Ocurrió un error</h1>
             <p className="text-sm text-muted-foreground">{this.state.error?.message || 'Error inesperado'}</p>
-            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium">
+            <button
+              onClick={() => {
+                // Limpieza explícita del flag anti-loop + cache-busting.
+                // El query param ?t=timestamp fuerza al navegador a pedir
+                // módulos frescos (bypassa chunks stale cacheados por el
+                // dev server tras un redeploy).
+                sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+                window.location.href = window.location.pathname + '?t=' + Date.now();
+              }}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium"
+            >
               Recargar página
             </button>
           </div>
