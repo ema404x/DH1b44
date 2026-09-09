@@ -1,12 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { resolveAndReconcileSector } from '../../shared/callerIdentity.ts';
 import { fetchAll } from '../../shared/fetchAllSector.ts';
-import {
-  resolveAdminView,
-  resolveEstablecimientosDeJefe,
-  resolveEstablecimientosLocationData,
-  norm,
-} from '../../shared/visibilityResolver.ts';
+import { resolveAdminView, norm } from '../../shared/visibilityResolver.ts';
 
 /**
  * Devuelve TODO lo que el módulo de Inspección de Colegios necesita en una
@@ -22,6 +17,11 @@ import {
  *   todas las direcciones del sector.
  * - Sin admin_view: inspecciones visibles (created_by + jefe_sitio + estabs
  *   asignados) + solo los establecimientos donde es jefe asignado.
+ *
+ * OPTIMIZACIÓN: 4 fetchAll en paralelo (InspeccionColegio, Direccion,
+ * LocationData, Asset) — sin duplicados. El set de establecimientos asignados
+ * se calcula inline a partir de los arrays ya fetched, evitando las llamadas
+ * recursivas a resolveEstablecimientosDeJefe que re-fetchaban Direccion+Asset.
  */
 export default async function(req) {
   try {
@@ -36,30 +36,64 @@ export default async function(req) {
     const userId = user.id;
     const displayName = employee?.full_name || user.full_name || '';
     const employeeEmail = employee?.email || user.email || '';
+    const targetName = norm(displayName);
+    const targetEmail = employeeEmail ? norm(employeeEmail) : '';
 
-    // FetchAll de inspecciones + direcciones en paralelo (role cache hit en
-    // resolveAdminView si ya se cargó en este cold-start).
-    const [allInspecciones, direcciones] = await Promise.all([
+    // 4 fetchAll en paralelo — sin duplicados. RolePermission cache hit en
+    // resolveAdminView si ya se cargó en este cold-start.
+    const [allInspecciones, direcciones, allLocations, allAssets] = await Promise.all([
       fetchAll(sb, 'InspeccionColegio', { sector_id: sector }),
       fetchAll(sb, 'Direccion', { sector_id: sector }),
+      fetchAll(sb, 'LocationData', { sector_id: sector }),
+      fetchAll(sb, 'Asset', { sector_id: sector }),
     ]);
 
     const adminView = await resolveAdminView(sb, employee, 'InspeccionColegio');
 
-    // Establecimientos (LocationData) visibles para el caller.
-    const establecimientos = await resolveEstablecimientosLocationData(
-      sb, sector, displayName, employeeEmail, adminView,
-    );
+    // Predicado de matcheo de jefe (nombre o email normalizado).
+    const matchJefe = (jefeStr: string | null | undefined): boolean => {
+      if (!jefeStr) return false;
+      const n = norm(jefeStr);
+      if (targetName && n === targetName) return true;
+      if (targetEmail && n === targetEmail) return true;
+      return false;
+    };
 
-    // Filtrar inspecciones visibles.
-    let inspecciones;
+    // Set de establecimientos asignados al jefe (cruce contra Direccion +
+    // Asset ya fetched). Para admin no hace falta — ve todo el sector.
+    let establecimientos: any[];
+    let inspecciones: any[];
+
     if (adminView) {
-      inspecciones = allInspecciones;
+      establecimientos = allLocations || [];
+      inspecciones = allInspecciones || [];
     } else {
-      const estabsSet = await resolveEstablecimientosDeJefe(sb, sector, displayName, employeeEmail || undefined);
-      inspecciones = (allInspecciones || []).filter(r =>
+      // Calcular estabsSet una sola vez a partir de los arrays ya fetched.
+      const estabsSet = new Set<string>();
+      (direcciones || []).forEach((d: any) => {
+        if (matchJefe(d.jefe_sitio) && d.direccion) estabsSet.add(norm(d.direccion));
+      });
+      (allAssets || []).forEach((a: any) => {
+        if (matchJefe(a.jefe_sitio)) {
+          if (a.sede) estabsSet.add(norm(a.sede));
+          if (a.location) estabsSet.add(norm(a.location));
+        }
+      });
+
+      // LocationData visibles: jefe_sitio asignado (name/email) o
+      // establecimiento en el set de direcciones asignadas.
+      establecimientos = (allLocations || []).filter((l: any) => {
+        const jefeStr = l.jefe_sitio ? norm(l.jefe_sitio) : '';
+        if (targetName && jefeStr === targetName) return true;
+        if (targetEmail && jefeStr === targetEmail) return true;
+        if (l.establecimiento && estabsSet.has(norm(l.establecimiento))) return true;
+        return false;
+      });
+
+      // Inspecciones visibles: creadas + jefe_sitio por nombre + establecimiento asignado.
+      inspecciones = (allInspecciones || []).filter((r: any) =>
         (r.created_by_id && r.created_by_id === userId) ||
-        (r.jefe_sitio && norm(r.jefe_sitio) === norm(displayName)) ||
+        (r.jefe_sitio && norm(r.jefe_sitio) === targetName) ||
         (r.establecimiento && estabsSet.has(norm(r.establecimiento)))
       );
     }
