@@ -125,26 +125,21 @@ export default function InspeccionColegioPage() {
   const pendingSaveRef = useRef(null);
   const pollingRef = useRef(null);
 
-  const { data: rawInspecciones = [], isLoading } = useQuery({
-    queryKey: ['inspecciones'],
-    queryFn: async () => (await base44.functions.invoke('getInspeccionesForUser')).data.inspecciones || [],
+  // Fuente ÚNICA de verdad: el backend reconcilia sector, resuelve admin_view
+  // (con cache interno de RolePermission), y devuelve inspecciones +
+  // establecimientos + direcciones en una sola respuesta. Elimina la race
+  // condition donde LocationData.list (RLS del cliente) devolvía vacío porque
+  // user.data.sector_id aún no había sido reconciliado.
+  const { data: moduleData, isLoading } = useQuery({
+    queryKey: ['inspeccion-module-data'],
+    queryFn: async () => (await base44.functions.invoke('getInspeccionModuleData')).data,
     staleTime: 0,
   });
-  // La visibilidad la define el backend (getInspeccionesForUser respeta admin_view
-  // del rol de empleado + establecimientos asignados). No re-aplicar filterByUser:
-  // era redundante y rompía si el sector del cliente estaba desfasado.
-  const inspecciones = rawInspecciones;
 
-  const { data: locations = [] } = useQuery({
-    queryKey: ['locationData'],
-    queryFn: () => base44.entities.LocationData.list('-created_date', 500),
-    staleTime: 5 * 60 * 1000,
-  });
-  const { data: direccionesData = [] } = useQuery({
-    queryKey: ['direcciones'],
-    queryFn: () => base44.entities.Direccion.list('-created_date', 500),
-    staleTime: 5 * 60 * 1000,
-  });
+  const inspecciones = moduleData?.inspecciones || [];
+  const locations = moduleData?.establecimientos || [];
+  const direccionesData = moduleData?.direcciones || [];
+  const sinColegiosAsignados = !isLoading && locations.length === 0 && !moduleData?.admin_view;
 
   const direccionMap = useMemo(() => {
     const m = {}; direccionesData.forEach(d => { m[d.id] = d.direccion; }); return m;
@@ -224,7 +219,7 @@ export default function InspeccionColegioPage() {
     try {
       await base44.entities.InspeccionColegio.update(id, { secciones });
       // Invalidar el cache para que la lista y futuras aperturas lean datos frescos.
-      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+      queryClient.invalidateQueries({ queryKey: ['inspeccion-module-data'] });
     } catch (err) {
       console.error('[flushSave] error:', err);
       toast.error('Error al guardar la sección');
@@ -286,7 +281,7 @@ export default function InspeccionColegioPage() {
   // usuario vea datos stale y que una reapertura pise datos guardados.
   const handleVolverALista = useCallback(async () => {
     await flushPendingNow();
-    queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+    queryClient.invalidateQueries({ queryKey: ['inspeccion-module-data'] });
     setInspeccionActiva(null);
     setMostrarInforme(false);
     setVista('lista');
@@ -322,7 +317,7 @@ export default function InspeccionColegioPage() {
         estado: 'en_progreso',
         secciones: buildSecciones(),
       });
-      queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+      queryClient.invalidateQueries({ queryKey: ['inspeccion-module-data'] });
       // Asegurar que el sector_id esté en el objeto local (el backend puede
       // no devolverlo si el workflow aún no estampó, pero lo forzamos acá).
       setInspeccionActiva({ ...nueva, sector_id: nueva.sector_id || resolvedSector });
@@ -335,7 +330,7 @@ export default function InspeccionColegioPage() {
   const handleEliminar = async (id) => {
     if (!confirm('¿Eliminar esta inspección?')) return;
     await base44.entities.InspeccionColegio.delete(id);
-    queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+    queryClient.invalidateQueries({ queryKey: ['inspeccion-module-data'] });
   };
 
   const handleGenerarInforme = async () => {
@@ -369,7 +364,7 @@ export default function InspeccionColegioPage() {
             informe_generado: fresca.informe_generado,
             estado: 'completado',
           }));
-          queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+          queryClient.invalidateQueries({ queryKey: ['inspeccion-module-data'] });
           toast.success('Informe generado correctamente');
         } else if (intentos >= MAX_INTENTOS) {
           stopPolling();
@@ -390,7 +385,7 @@ export default function InspeccionColegioPage() {
           setInspeccionActiva(prev => ({
             ...prev, secciones: seccionesActuales, informe_generado: informe, estado: 'completado',
           }));
-          queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+          queryClient.invalidateQueries({ queryKey: ['inspeccion-module-data'] });
           toast.success('Informe generado correctamente');
         }
       })
@@ -557,6 +552,12 @@ export default function InspeccionColegioPage() {
               className="h-11 text-base"
             />
             <datalist id="establecimientos-list">{establecimientos.map(e => <option key={e} value={e} />)}</datalist>
+            {sinColegiosAsignados && (
+              <p className="text-xs text-amber-400 mt-1.5 flex items-center gap-1.5">
+                <AlertTriangle className="h-3 w-3" />
+                No tenés colegios asignados. Contactá a tu superior o escribí el nombre manualmente.
+              </p>
+            )}
           </div>
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Dirección</label>

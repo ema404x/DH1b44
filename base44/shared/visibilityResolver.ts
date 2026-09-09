@@ -29,6 +29,29 @@ export function norm(s: string | null | undefined): string {
   return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
+// ── Cache de RolePermission (module-scoped, TTL 60s) ──────────────────────
+// Evita releer TODOS los RolePermission en cada llamada del mismo cold-start.
+// El cache es por worker instance — se resetea entre cold-starts pero dentro
+// del mismo cold-start atiende múltiples llamadas sin tocar la base.
+interface RoleCache {
+  rps: any[];
+  ts: number;
+}
+let _roleCache: RoleCache | null = null;
+const ROLE_CACHE_TTL = 60_000;
+
+async function loadRolePermissions(sb: any): Promise<any[]> {
+  const now = Date.now();
+  if (_roleCache && now - _roleCache.ts < ROLE_CACHE_TTL) return _roleCache.rps;
+  try {
+    const rps = await sb.entities.RolePermission.list("created_date", 500);
+    _roleCache = { rps: rps || [], ts: now };
+    return _roleCache.rps;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Resuelve si el caller tiene visibilidad total (admin_view) para un módulo.
  *
@@ -49,7 +72,7 @@ export async function resolveAdminView(
   // Sin ficha de empleado → super-admin puro → visibilidad total.
   if (!employee || !employee.role) return true;
   try {
-    const allRps = await sb.entities.RolePermission.list("created_date", 500);
+    const allRps = await loadRolePermissions(sb);
     const rp = allRps.find((r: any) => norm(r.role_name) === norm(employee.role));
     return rp?.permissions?.[moduleKey]?.admin_view === true;
   } catch {
@@ -60,38 +83,95 @@ export async function resolveAdminView(
 /**
  * Resuelve el set de establecimientos/direcciones asignados a un jefe de sitio
  * dentro de un sector, para ampliar la visibilidad propia (sin admin_view).
- * Cruza por nombre normalizado contra:
- *   - Direccion.jefe_sitio  → Direccion.direccion
- *   - Asset.jefe_sitio      → Asset.sede + Asset.location
+ *
+ * Matcheo dual (name + email):
+ *   - Nombre normalizado: norm(Direccion.jefe_sitio) === norm(jefeName)
+ *   - Email: si el Employee tiene email, matchea contra el email vinculado.
+ *     Esto cierra el bug de nombres truncados en LocationData ("JUAN CARLOS"
+ *     no matcheaba "Juan Carlos Lambertini") — el email es la clave canónica.
+ *
  * Devuelve un Set de strings normalizados para matcheo inclusivo.
  */
 export async function resolveEstablecimientosDeJefe(
   sb: any,
   sectorId: string,
   jefeName: string,
+  jefeEmail?: string,
 ): Promise<Set<string>> {
   const set = new Set<string>();
-  if (!jefeName) return set;
-  const target = norm(jefeName);
-  if (!target || !sectorId) return set;
+  if (!sectorId) return set;
+  const targetName = norm(jefeName);
+  const targetEmail = jefeEmail ? norm(jefeEmail) : "";
+  if (!targetName && !targetEmail) return set;
+
   try {
     const [dirs, assets] = await Promise.all([
       fetchAll(sb, "Direccion", { sector_id: sectorId }),
       fetchAll(sb, "Asset", { sector_id: sectorId }),
     ]);
+
+    // Mapa de nombre_normalizado → email (para matcheo cruzado por email).
+    // Si el jefe_sitio en Direccion/Asset es el email del Employee, matchear directo.
+    const matchJefe = (jefeStr: string | null | undefined): boolean => {
+      if (!jefeStr) return false;
+      const n = norm(jefeStr);
+      if (targetName && n === targetName) return true;
+      if (targetEmail && n === targetEmail) return true;
+      return false;
+    };
+
     (dirs || []).forEach((d: any) => {
-      if (d.jefe_sitio && norm(d.jefe_sitio) === target && d.direccion) {
+      if (matchJefe(d.jefe_sitio) && d.direccion) {
         set.add(norm(d.direccion));
       }
     });
     (assets || []).forEach((a: any) => {
-      if (a.jefe_sitio && norm(a.jefe_sitio) === target) {
+      if (matchJefe(a.jefe_sitio)) {
         if (a.sede) set.add(norm(a.sede));
         if (a.location) set.add(norm(a.location));
       }
     });
   } catch {}
   return set;
+}
+
+/**
+ * Resuelve la lista de LocationData (establecimientos) visibles para un jefe.
+ * Con admin_view → todos los del sector. Sin admin_view → solo los
+ * establecimientos donde es jefe asignado (cruce por nombre + email).
+ *
+ * Devuelve el array de LocationData completo (no solo nombres) para que el
+ * cliente tenga direccion_id, comuna, etc. sin un segundo fetch.
+ */
+export async function resolveEstablecimientosLocationData(
+  sb: any,
+  sectorId: string,
+  jefeName: string,
+  jefeEmail: string | null,
+  adminView: boolean,
+): Promise<any[]> {
+  if (!sectorId) return [];
+  try {
+    const allLocs = await fetchAll(sb, "LocationData", { sector_id: sectorId });
+    if (adminView) return allLocs;
+
+    // Sin admin_view: filtrar por jefe_sitio asignado.
+    const estabsSet = await resolveEstablecimientosDeJefe(sb, sectorId, jefeName, jefeEmail || undefined);
+    const targetName = norm(jefeName);
+    const targetEmail = jefeEmail ? norm(jefeEmail) : "";
+
+    return allLocs.filter((l: any) => {
+      // Match por jefe_sitio en LocationData (nombre o email)
+      const jefeStr = l.jefe_sitio ? norm(l.jefe_sitio) : "";
+      if (targetName && jefeStr === targetName) return true;
+      if (targetEmail && jefeStr === targetEmail) return true;
+      // Match por establecimiento en el set de direcciones asignadas
+      if (l.establecimiento && estabsSet.has(norm(l.establecimiento))) return true;
+      return false;
+    });
+  } catch {
+    return [];
+  }
 }
 
 /**
