@@ -75,6 +75,11 @@ Deno.serve(async (req) => {
       // un sector distinto (stale, p.ej. quedó en 'escuela' pero la ficha es 'bapro'),
       // reconciliar al sector de la ficha. Esto repara el estado cross-sector
       // sin necesidad de cambiarSectorActivo manual.
+      //
+      // Patrón limpio: `sector_id` como parámetro top-level — el SDK del service
+      // role lo almacena dentro del blob `data` del User (que es lo que lee la
+      // RLS: {{user.data.sector_id}}). NUNCA pasar `data: { sector_id }` porque
+      // crea `data.data.sector_id` (doble anidamiento, bug histórico).
       const currentUserSector = user.data?.sector_id ?? null;
       if (empSector && empSector !== currentUserSector) {
         userUpdate.sector_id = empSector;
@@ -176,8 +181,10 @@ Deno.serve(async (req) => {
     if (emp.full_name && (platformNameIsEmail || platformNameDiffers)) {
       userUpdate.full_name = emp.full_name;
     }
+    // Mismo patrón limpio que la rama anterior — sector_id top-level.
+    // Dispara si el sector está ausente (falsy) o difiere de la ficha.
     const currentUserSector = user.data?.sector_id ?? null;
-    if (!currentUserSector && empSector) {
+    if (empSector && empSector !== currentUserSector) {
       userUpdate.sector_id = empSector;
     }
     if (Object.keys(userUpdate).length > 0) {

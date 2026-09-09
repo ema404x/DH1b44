@@ -59,19 +59,25 @@ export async function resolveCallerSectorCanonical(
 // Best-effort: alinea user.data.sector_id con la ficha Employee. No interrumpe
 // si la escritura falla. Así RLS y otros lectores quedan en el sector correcto
 // sin pedir re-login.
+//
+// GUARD: dispara incluso cuando `data.sector_id` está AUSENTE (falsy) — el bug
+// histórico era `if (platformSector && ...)` que nunca disparaba cuando el
+// campo faltaba, dejando al usuario bloqueado por RLS para siempre. Ahora
+// comparamos directamente contra `employee.sector_id` (fuente canónica).
+//
+// ESCRITURA: patrón limpio — `sector_id` como parámetro top-level. El SDK del
+// service role lo almacena dentro del blob `data` del User. NUNCA pasar
+// `data: { sector_id }` porque crea `data.data.sector_id` (doble anidamiento).
 export async function reconcileUserSector(
   sb: any,
   user: any,
   employee: any | null,
 ): Promise<void> {
   if (!employee?.sector_id || !user?.id) return;
-  const platformSector = user?.data?.sector_id || user?.sector_id;
-  if (platformSector && platformSector !== employee.sector_id) {
+  const platformSector = user?.data?.sector_id ?? user?.sector_id ?? null;
+  if (platformSector !== employee.sector_id) {
     try {
-      await sb.entities.User.update(user.id, {
-        sector_id: employee.sector_id,
-        data: { ...(user?.data || {}), sector_id: employee.sector_id },
-      });
+      await sb.entities.User.update(user.id, { sector_id: employee.sector_id });
     } catch {}
   }
 }

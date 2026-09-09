@@ -57,16 +57,17 @@ Deno.serve(async (req) => {
     }
 
     // ── Fijar sector_base solo la primera vez (preserva el sector de origen) ──
-    // Escribe a data.sector_id / data.sector_base — la RLS lee {{user.data.sector_id}}.
-    // Escribir solo al campo plano (sector_id) NO lo ve la RLS.
+    // La RLS lee {{user.data.sector_id}}. El SDK del service role almacena los
+    // parámetros top-level del payload dentro del blob `data` del User.
+    // PASAR `data: { sector_id }` crea `data.data.sector_id` (doble anidamiento)
+    // — bug histórico. Patrón limpio: solo parámetros top-level.
     const sectorBaseActual = user.data?.sector_base ?? null;
     const sectorIdActual = user.data?.sector_id ?? user.sector_id ?? null;
-    // Sincronizar AMBOS campos: data.sector_id (canónico, lo lee la RLS) Y el top-level
-    // sector_id (legacy, aún leído por algunos lectores frontend). Mantenerlos
-    // consistentes evita que un sector stale top-level oculte datos del sector real.
-    const updatePayload = { sector_id: sector_destino, data: { sector_id: sector_destino } };
+
+    const updatePayload = { sector_id: sector_destino } as any;
     if (!sectorBaseActual && sectorIdActual) {
-      updatePayload.data.sector_base = sectorIdActual;
+      // Preservar sector_base la primera vez — también como top-level.
+      updatePayload.sector_base = sectorIdActual;
     }
 
     await sb.entities.User.update(user.id, updatePayload);
@@ -96,7 +97,7 @@ Deno.serve(async (req) => {
     return Response.json({
       ok: true,
       sector_activo: sector_destino,
-      sector_base: updatePayload.data.sector_base || sectorBaseActual,
+      sector_base: updatePayload.sector_base || sectorBaseActual,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
