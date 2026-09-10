@@ -120,10 +120,15 @@ export default function InspeccionColegioPage() {
   });
   const [nuevaSeccionNombre, setNuevaSeccionNombre] = useState('');
   const [dragSeccion, setDragSeccion] = useState(null);
+  const [saveError, setSaveError] = useState(false);
+  const [saveRecovered, setSaveRecovered] = useState(false);
 
   const saveTimerRef = useRef(null);
   const pendingSaveRef = useRef(null);
   const pollingRef = useRef(null);
+  const retryStateRef = useRef({ attempts: 0, autoRetryTimer: null });
+  const recoveredTimerRef = useRef(null);
+  const saveErrorRef = useRef(false);
 
   // Fuente ÚNICA de verdad: el backend reconcilia sector, resuelve admin_view
   // (con cache interno de RolePermission), y devuelve inspecciones +
@@ -213,18 +218,70 @@ export default function InspeccionColegioPage() {
   // toma el id y las secciones como argumentos explícitos para no depender de
   // closures stale ni del estado local (que puede haber sido pisado por una
   // reapertura con cache stale).
+  // Guardado robusto: routa TODAS las escrituras por la función backend
+  // gestionarInspeccion (asServiceRole, bypass RLS). La RLS de update compara
+  // jefe_sitio === user.full_name con STRING EXACTO, pero la visibilidad (read)
+  // usa norm() (lowercase + sin acentos). Resultado: el usuario VE la inspección
+  // pero NO puede GUARDARLA → 403 silencioso → se pierde el relevamiento.
+  // Retry con backoff exponencial (1s, 2s, 4s, máx 3). 403 = sin retry (permiso).
+  // Tras agotar: indicador sutil (punto rojo) + auto-retry cada 30s en background.
   const flushSave = useCallback(async (id, secciones) => {
     if (!id) return;
-    setGuardando(true);
-    try {
-      await base44.entities.InspeccionColegio.update(id, { secciones });
-    } catch (err) {
-      console.error('[flushSave] error:', err);
-      toast.error('Error al guardar la sección');
-    } finally {
-      setGuardando(false);
+    if (retryStateRef.current.autoRetryTimer) {
+      clearTimeout(retryStateRef.current.autoRetryTimer);
+      retryStateRef.current.autoRetryTimer = null;
     }
-  }, [queryClient]);
+    setGuardando(true);
+
+    const attemptSave = async (attemptNum) => {
+      try {
+        await base44.functions.invoke('gestionarInspeccion', {
+          inspeccion_id: id,
+          accion: 'guardar_secciones',
+          secciones,
+        });
+        retryStateRef.current.attempts = 0;
+        if (saveErrorRef.current) {
+          saveErrorRef.current = false;
+          setSaveError(false);
+          setSaveRecovered(true);
+          if (recoveredTimerRef.current) clearTimeout(recoveredTimerRef.current);
+          recoveredTimerRef.current = setTimeout(() => setSaveRecovered(false), 2000);
+          toast.success('Cambios guardados correctamente');
+        }
+        setGuardando(false);
+      } catch (err) {
+        const status = err?.response?.status || err?.status;
+        if (status === 403) {
+          setGuardando(false);
+          if (!saveErrorRef.current) {
+            saveErrorRef.current = true;
+            setSaveError(true);
+            toast.error('No tenés permiso para editar esta inspección');
+          }
+          return;
+        }
+        if (attemptNum < 3) {
+          const delay = Math.pow(2, attemptNum) * 1000;
+          setTimeout(() => attemptSave(attemptNum + 1), delay);
+        } else {
+          setGuardando(false);
+          if (!saveErrorRef.current) {
+            saveErrorRef.current = true;
+            setSaveError(true);
+            toast.error('No se pudo guardar. Reintentando automáticamente...');
+          }
+          retryStateRef.current.autoRetryTimer = setTimeout(() => {
+            retryStateRef.current.attempts = 0;
+            flushSave(id, secciones);
+          }, 30000);
+        }
+      }
+    };
+
+    retryStateRef.current.attempts = 0;
+    await attemptSave(0);
+  }, []);
 
   const handleSeccionChange = useCallback((seccionId, cambios) => {
     setInspeccionActiva(prev => {
@@ -255,12 +312,46 @@ export default function InspeccionColegioPage() {
   // Flush al desmontar (cambio de ruta) — fire and forget, el backend lo recibe.
   useEffect(() => () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (retryStateRef.current.autoRetryTimer) clearTimeout(retryStateRef.current.autoRetryTimer);
+    if (recoveredTimerRef.current) clearTimeout(recoveredTimerRef.current);
     const pending = pendingSaveRef.current;
     if (pending) {
       pendingSaveRef.current = null;
-      base44.entities.InspeccionColegio.update(pending.id, { secciones: pending.secciones })
-        .catch(e => console.error('[unmount flush] error:', e));
+      base44.functions.invoke('gestionarInspeccion', {
+        inspeccion_id: pending.id,
+        accion: 'guardar_secciones',
+        secciones: pending.secciones,
+      }).catch(() => {
+        try {
+          sessionStorage.setItem(
+            `inspeccion_pending_${pending.id}`,
+            JSON.stringify({ secciones: pending.secciones, timestamp: Date.now() }),
+          );
+        } catch {}
+      });
     }
+  }, []);
+
+  // Recuperación de guardados pendientes al montar el módulo.
+  // Si un guardado fire-and-forget falló en el unmount anterior, el backup
+  // quedó en sessionStorage. Reintentar antes de cualquier otra acción.
+  useEffect(() => {
+    try {
+      const keys = Object.keys(sessionStorage).filter(k => k.startsWith('inspeccion_pending_'));
+      for (const key of keys) {
+        const raw = sessionStorage.getItem(key);
+        if (!raw) continue;
+        const { secciones } = JSON.parse(raw);
+        const id = key.replace('inspeccion_pending_', '');
+        base44.functions.invoke('gestionarInspeccion', {
+          inspeccion_id: id,
+          accion: 'guardar_secciones',
+          secciones,
+        }).then(() => {
+          sessionStorage.removeItem(key);
+        }).catch(() => {});
+      }
+    } catch {}
   }, []);
 
   const stopPolling = () => {
@@ -340,9 +431,18 @@ export default function InspeccionColegioPage() {
     setMostrarInforme(false);
     setInspeccionActiva(prev => ({ ...prev, informe_generado: null, estado: 'generando' }));
 
-    await base44.entities.InspeccionColegio.update(inspeccionId, {
-      estado: 'generando', secciones: seccionesActuales, informe_generado: '',
-    });
+    try {
+      await base44.functions.invoke('gestionarInspeccion', {
+        inspeccion_id: inspeccionId,
+        accion: 'set_generando',
+        secciones: seccionesActuales,
+      });
+    } catch {
+      setGenerando(false);
+      setInspeccionActiva(prev => ({ ...prev, informe_generado: null, estado: 'en_progreso' }));
+      toast.error('No se pudo iniciar la generación. Verificá permisos e intentá nuevamente.');
+      return;
+    }
 
     stopPolling();
     let intentos = 0;
@@ -351,7 +451,10 @@ export default function InspeccionColegioPage() {
     pollingRef.current = setInterval(async () => {
       intentos++;
       try {
-        const fresca = await base44.entities.InspeccionColegio.get(inspeccionId);
+        const fresca = (await base44.functions.invoke('gestionarInspeccion', {
+          inspeccion_id: inspeccionId,
+          accion: 'get',
+        })).data?.inspeccion;
         if (fresca?.informe_generado && fresca.informe_generado.length > 50) {
           stopPolling();
           setGenerando(false);
@@ -652,6 +755,15 @@ export default function InspeccionColegioPage() {
                 <p className="font-bold text-sm leading-tight truncate">
                   {inspeccionActiva.titulo || inspeccionActiva.establecimiento}
                 </p>
+                {saveError && (
+                  <span
+                    title="Hay cambios sin guardar. Reintentando automáticamente."
+                    className="h-2 w-2 rounded-full bg-red-500 animate-pulse shrink-0"
+                  />
+                )}
+                {saveRecovered && !saveError && (
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 transition-opacity duration-1000" />
+                )}
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${st.badge}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />{st.label}
                 </span>
