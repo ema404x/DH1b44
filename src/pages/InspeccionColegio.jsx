@@ -382,11 +382,16 @@ export default function InspeccionColegioPage() {
   const handleAbrirInspeccion = useCallback(async (insp) => {
     await flushPendingNow();
     try {
-      const fresca = await base44.entities.InspeccionColegio.get(insp.id);
+      const res = await base44.functions.invoke('gestionarInspeccion', {
+        inspeccion_id: insp.id,
+        accion: 'get',
+      });
+      const fresca = res?.data?.inspeccion;
       setInspeccionActiva(fresca || insp);
       setMostrarInforme(Boolean(fresca?.informe_generado));
       setVista('editar');
     } catch {
+      // Fallback al objeto del cache si el backend no responde
       setInspeccionActiva(insp);
       setMostrarInforme(Boolean(insp.informe_generado));
       setVista('editar');
@@ -418,8 +423,15 @@ export default function InspeccionColegioPage() {
 
   const handleEliminar = async (id) => {
     if (!confirm('¿Eliminar esta inspección?')) return;
-    await base44.entities.InspeccionColegio.delete(id);
-    queryClient.invalidateQueries({ queryKey: ['inspeccion-module-data'] });
+    try {
+      await base44.functions.invoke('gestionarInspeccion', {
+        inspeccion_id: id,
+        accion: 'eliminar',
+      });
+      queryClient.invalidateQueries({ queryKey: ['inspeccion-module-data'] });
+    } catch {
+      toast.error('No se pudo eliminar la inspección');
+    }
   };
 
   const handleGenerarInforme = async () => {

@@ -1,51 +1,115 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
+import { resolveAndReconcileSector } from '../../shared/callerIdentity.ts';
+import { fetchAll } from '../../shared/fetchAllSector.ts';
+import { resolveAdminView, norm } from '../../shared/visibilityResolver.ts';
 
 // Esta función hace TODO el trabajo en una sola llamada.
 // El frontend la llama sin await y hace polling a la DB cada 5s.
 // gemini_3_1_pro: soporta imágenes + contexto largo + más rápido que claude para outputs extensos.
+//
+// MIGRADO de Deno.serve + SDK 0.8.31 a export default + SDK 0.8.44.
+// Todas las lecturas/escrituras van por asServiceRole (bypass RLS) con el
+// MISMO ownership check que gestionarInspeccion. Cierra el bug donde el
+// usuario VE la inspección (getInspeccionModuleData trae todo por asServiceRole)
+// pero el backend no podía LEERLA para generar el informe (RLS de read con
+// string-exact matching bloqueaba) → 500 silencioso → "tiempo agotado".
 
-Deno.serve(async (req) => {
-  const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+export default async function(req) {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const sb = base44.asServiceRole;
 
-  const body = await req.json();
-  const { inspeccion_id } = body;
-  if (!inspeccion_id) return Response.json({ error: 'inspeccion_id requerido' }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    const { inspeccion_id } = body;
+    if (!inspeccion_id) return Response.json({ error: 'inspeccion_id requerido' }, { status: 400 });
 
-  const inspeccion = await base44.entities.InspeccionColegio.get(inspeccion_id);
-  if (!inspeccion) return Response.json({ error: 'No encontrado' }, { status: 404 });
+    // ── Resolver identidad canónica del caller ──
+    const { sector, employee } = await resolveAndReconcileSector(sb, user);
+    if (!sector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
 
-  const preciarioItems = await base44.entities.PrecarioMinisterio.filter({ activo: true }, 'categoria', 200);
+    const userId = user.id;
+    const displayName = employee?.full_name || user.full_name || '';
+    const employeeEmail = employee?.email || user.email || '';
+    const targetName = norm(displayName);
+    const targetEmail = employeeEmail ? norm(employeeEmail) : '';
 
-  const preciarioTexto = preciarioItems.length > 0
-    ? preciarioItems.slice(0, 100)
-        .map(p => `[${p.codigo}] ${p.descripcion} | ${p.unidad} | ${p.categoria}`)
-        .join('\n')
-    : 'Sin preciario cargado.';
+    // ── Fetch del registro via asServiceRole (bypass RLS de read) ──
+    const inspeccion = await sb.entities.InspeccionColegio.get(inspeccion_id);
+    if (!inspeccion) return Response.json({ error: 'No encontrado' }, { status: 404 });
 
-  const fechaFormateada = inspeccion.fecha_inspeccion
-    ? new Date(inspeccion.fecha_inspeccion + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
-    : new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+    // ── Guard de sector ──
+    if (inspeccion.sector_id !== sector) {
+      return Response.json({ error: 'No tenés permiso sobre esta inspección' }, { status: 403 });
+    }
 
-  const secciones = inspeccion.secciones || [];
-  const seccionesCompletadas = secciones.filter(s => s.completada);
-  const seccionesPendientes = secciones.filter(s => !s.completada).map(s => s.nombre);
-  const totalFotos = secciones.reduce((acc, s) => acc + (s.fotos?.length || 0), 0);
-  const allFotos = secciones.flatMap(s => s.fotos || []);
+    // ── Ownership check: MISMO predicado que gestionarInspeccion ──
+    const isCreator = inspeccion.created_by_id && inspeccion.created_by_id === userId;
+    const isJefeByName = inspeccion.jefe_sitio && targetName
+      && norm(inspeccion.jefe_sitio) === targetName;
+    const adminView = await resolveAdminView(sb, employee, 'InspeccionColegio');
 
-  const URGENCIA_MAP = { urgente: '🔴 URGENTE', importante: '🟠 IMPORTANTE', leve: '🟢 LEVE', sin_issues: '⚪ SIN PROBLEMAS' };
+    let isEstablecimientoAsignado = false;
+    if (!isCreator && !isJefeByName && !adminView && inspeccion.establecimiento) {
+      const [dirs, assets] = await Promise.all([
+        fetchAll(sb, 'Direccion', { sector_id: sector }),
+        fetchAll(sb, 'Asset', { sector_id: sector }),
+      ]);
+      const estabsSet = new Set();
+      const matchJefe = (jefeStr) => {
+        if (!jefeStr) return false;
+        const n = norm(jefeStr);
+        return (targetName && n === targetName) || (targetEmail && n === targetEmail);
+      };
+      (dirs || []).forEach((d) => {
+        if (matchJefe(d.jefe_sitio) && d.direccion) estabsSet.add(norm(d.direccion));
+      });
+      (assets || []).forEach((a) => {
+        if (matchJefe(a.jefe_sitio)) {
+          if (a.sede) estabsSet.add(norm(a.sede));
+          if (a.location) estabsSet.add(norm(a.location));
+        }
+      });
+      isEstablecimientoAsignado = estabsSet.has(norm(inspeccion.establecimiento));
+    }
 
-  const seccionesTexto = secciones.map(s => {
-    const partes = [];
-    if (s.urgencia) partes.push(`NIVEL DE URGENCIA (marcado por inspector): ${URGENCIA_MAP[s.urgencia] || s.urgencia}`);
-    if (s.transcripcion?.trim()) partes.push(`TRANSCRIPCIÓN:\n${s.transcripcion.trim()}`);
-    if (s.notas_libres?.trim()) partes.push(`NOTAS:\n${s.notas_libres.trim()}`);
-    partes.push(`Fotos: ${s.fotos?.length || 0} | Estado: ${s.completada ? '✓ COMPLETADA' : '⚠ PENDIENTE'}`);
-    return `=== ${s.nombre.toUpperCase()} ===\n${partes.join('\n\n') || 'Sin observaciones.'}`;
-  }).join('\n\n');
+    const hasOwnership = isCreator || isJefeByName || adminView || isEstablecimientoAsignado;
+    if (!hasOwnership) {
+      return Response.json({ error: 'No tenés permiso sobre esta inspección' }, { status: 403 });
+    }
 
-  const prompt = `Sos un ingeniero senior del GCBA especializado en inspección de establecimientos educativos. Redactá un INFORME TÉCNICO DE INSPECCIÓN EDILICIA profesional y completo.
+    // ── Fetch del preciario via asServiceRole (bypass RLS) ──
+    const preciarioItems = await sb.entities.PrecarioMinisterio.filter({ activo: true }, 'categoria', 200);
+
+    const preciarioTexto = preciarioItems.length > 0
+      ? preciarioItems.slice(0, 100)
+          .map(p => `[${p.codigo}] ${p.descripcion} | ${p.unidad} | ${p.categoria}`)
+          .join('\n')
+      : 'Sin preciario cargado.';
+
+    const fechaFormateada = inspeccion.fecha_inspeccion
+      ? new Date(inspeccion.fecha_inspeccion + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+      : new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const secciones = inspeccion.secciones || [];
+    const seccionesCompletadas = secciones.filter(s => s.completada);
+    const seccionesPendientes = secciones.filter(s => !s.completada).map(s => s.nombre);
+    const totalFotos = secciones.reduce((acc, s) => acc + (s.fotos?.length || 0), 0);
+    const allFotos = secciones.flatMap(s => s.fotos || []);
+
+    const URGENCIA_MAP = { urgente: '🔴 URGENTE', importante: '🟠 IMPORTANTE', leve: '🟢 LEVE', sin_issues: '⚪ SIN PROBLEMAS' };
+
+    const seccionesTexto = secciones.map(s => {
+      const partes = [];
+      if (s.urgencia) partes.push(`NIVEL DE URGENCIA (marcado por inspector): ${URGENCIA_MAP[s.urgencia] || s.urgencia}`);
+      if (s.transcripcion?.trim()) partes.push(`TRANSCRIPCIÓN:\n${s.transcripcion.trim()}`);
+      if (s.notas_libres?.trim()) partes.push(`NOTAS:\n${s.notas_libres.trim()}`);
+      partes.push(`Fotos: ${s.fotos?.length || 0} | Estado: ${s.completada ? '✓ COMPLETADA' : '⚠ PENDIENTE'}`);
+      return `=== ${s.nombre.toUpperCase()} ===\n${partes.join('\n\n') || 'Sin observaciones.'}`;
+    }).join('\n\n');
+
+    const prompt = `Sos un ingeniero senior del GCBA especializado en inspección de establecimientos educativos. Redactá un INFORME TÉCNICO DE INSPECCIÓN EDILICIA profesional y completo.
 
 DATOS:
 - Establecimiento: ${inspeccion.establecimiento}
@@ -105,24 +169,30 @@ Solo problemas URGENTES e IMPORTANTES. Plazo: Inmediato/7 días/30 días.
 
 REGLAS: Sé específico con números de locales y sectores. Incluí TODOS los ítems mencionados en las transcripciones. Lenguaje técnico formal. Sin frases vagas.`;
 
-  try {
     const result = await base44.integrations.Core.InvokeLLM({
       prompt,
       model: 'gemini_3_1_pro',
       file_urls: allFotos.length > 0 ? allFotos.slice(0, 10) : undefined,
     });
 
-    await base44.asServiceRole.entities.InspeccionColegio.update(inspeccion_id, {
+    await sb.entities.InspeccionColegio.update(inspeccion_id, {
       informe_generado: result,
       estado: 'completado',
     });
 
     return Response.json({ status: 'done', informe: result });
-  } catch (err) {
-    await base44.asServiceRole.entities.InspeccionColegio.update(inspeccion_id, {
-      estado: 'en_progreso',
-      informe_generado: '',
-    }).catch(() => {});
-    return Response.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    // Revertir estado en caso de error (best-effort)
+    try {
+      const base44 = createClientFromRequest(req);
+      const body = await req.clone().json().catch(() => ({}));
+      if (body.inspeccion_id) {
+        await base44.asServiceRole.entities.InspeccionColegio.update(body.inspeccion_id, {
+          estado: 'en_progreso',
+          informe_generado: '',
+        });
+      }
+    } catch {}
+    return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}

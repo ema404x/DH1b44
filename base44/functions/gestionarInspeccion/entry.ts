@@ -137,8 +137,15 @@ export default async function(req) {
 
       case 'get': {
         // Retornar el registro completo (bypass RLS de read).
-        // Usado por el polling de generación de informe.
+        // Usado por el polling de generación de informe y por handleAbrirInspeccion.
         return Response.json({ inspeccion });
+      }
+
+      case 'eliminar': {
+        // Eliminar la inspección (bypass RLS de delete).
+        // El ownership check ya se ejecutó arriba (hasOwnership).
+        await sb.entities.InspeccionColegio.delete(inspeccion_id);
+        return Response.json({ ok: true });
       }
 
       case 'set_estado': {
