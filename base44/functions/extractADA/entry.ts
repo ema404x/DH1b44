@@ -44,6 +44,7 @@ const SCHEMA_BASE = {
     plazo_entrega: { type: "string" },
     monto_contratado: { type: "number" },
     monto_obra_contratada: { type: "number" },
+    total_con_iva: { type: "number" },
     porcentaje_avance: { type: "number" },
     condiciones_pago: { type: "string" },
     subtotal_documento: { type: "number" },
@@ -90,7 +91,9 @@ ENCABEZADO (extraé lo que figure, dejá vacío lo que no):
 - mes_periodo (YYYY-MM), fecha_inicio (YYYY-MM-DD)
 - plazo_obra, plazo_entrega, condiciones_pago
 - monto_contratado, monto_obra_contratada, porcentaje_avance (0-100)
-- subtotal_documento = el número TOTAL FINAL literal del documento (no parciales)
+- subtotal_documento = el SUBTOTAL NETO del documento, SIN IVA (el monto ANTES de sumar IVA, NO el "Total" con IVA)
+- total_con_iva = el TOTAL con IVA del documento (el monto final que SÍ incluye IVA), opcional si figura
+- monto_contratado y monto_obra_contratada = siempre NETOS (sin IVA), nunca el total con IVA
 
 ÍTEMS — regla crítica:
 ⚠️ Extraé SOLO ítems individuales de trabajo (renglón + descripción + unidad + cantidad + precio unitario).
@@ -122,6 +125,7 @@ Devolvé SOLO JSON válido.`;
   result.subtotal = calculated;
   result._validation = {
     subtotal_documento: docTotal || null,
+    total_con_iva: result.total_con_iva || null,
     subtotal_calculado: calculated,
     coincide: !discrepancy,
     diferencia: docTotal ? Math.abs(calculated - docTotal) : null,

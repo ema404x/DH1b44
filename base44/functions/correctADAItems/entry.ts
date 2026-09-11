@@ -38,8 +38,8 @@ Deno.serve(async (req) => {
 
 ${directionMsg}
 
-Total final correcto según el documento: ${docTotal}
-La suma de (cantidad × importe_unitario) de todos los ítems corregidos debe ser exactamente ${docTotal} (tolerancia ±0.5%).
+Subtotal neto (sin IVA) correcto según el documento: ${docTotal}
+La suma de (cantidad × importe_unitario) de todos los ítems corregidos debe ser exactamente ${docTotal} (tolerancia ±0.5%). Este es el subtotal NETO sin IVA, no el total con IVA.
 
 Reglas:
 - Ítem REAL: tiene renglón propio, descripción de tarea específica, unidad de medida, cantidad y precio unitario.
