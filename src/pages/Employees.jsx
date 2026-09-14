@@ -179,12 +179,6 @@ export default function Employees() {
     [employees, users, rolePermissions]
   );
 
-  // Callbacks estabilizados para que React.memo(EmployeeCard) sea efectiva.
-  // Sin useCallback, cada render crea referencias nuevas → la memo se invalida.
-  const handleEdit = useCallback((emp) => { setEditing(emp); setDialogOpen(true); }, []);
-  const handleDelete = useCallback((id) => deleteMutation.mutate(id), [deleteMutation]);
-  const handleRelink = useCallback((emp) => relinkMutation.mutate(emp), [relinkMutation]);
-
   // Re-vincular vía backend premium (revincularEmpleado):
   //  - lookup server-side del usuario de plataforma por email (sin tope 500)
   //  - si hay match: vincula + sincroniza nombre/sector/rol
@@ -291,6 +285,15 @@ export default function Employees() {
     mutationFn: (id) => base44.entities.Employee.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] })
   });
+
+  // Callbacks estabilizados para que React.memo(EmployeeCard) sea efectiva.
+  // Sin useCallback, cada render crea referencias nuevas → la memo se invalida.
+  // Van DESPUÉS de las mutaciones que referencian — sino ReferenceError (TDZ):
+  // const declarations no se inicializan hasta su línea, y el dependency array
+  // [deleteMutation] se evalúa inmediatamente al ejecutarse useCallback.
+  const handleEdit = useCallback((emp) => { setEditing(emp); setDialogOpen(true); }, []);
+  const handleDelete = useCallback((id) => deleteMutation.mutate(id), [deleteMutation]);
+  const handleRelink = useCallback((emp) => relinkMutation.mutate(emp), [relinkMutation]);
 
   const filtered = employees.filter(e => {
     const matchSearch = !search || e.full_name?.toLowerCase().includes(search.toLowerCase());
