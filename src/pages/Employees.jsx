@@ -48,6 +48,20 @@ const comunaColors = {
   '10A': 'bg-orange-500/20 text-orange-300',
 };
 
+// Variants de animación estáticas — viven en module scope para que
+// React.memo(EmployeeCard) reciba una referencia estable de `item`.
+// Si se declaran dentro del componente, cada render crea un objeto nuevo
+// → la shallow compare de memo falla → todas las tarjetas se re-renderizan.
+const MOTION_CONTAINER = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.05 } }
+};
+
+const MOTION_ITEM = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 }
+};
+
 const employeeFields = [
   { key: 'sector_id', label: 'Sector', type: 'select', required: true },
   { key: 'full_name', label: 'Nombre Completo', required: true },
@@ -292,8 +306,12 @@ export default function Employees() {
   // const declarations no se inicializan hasta su línea, y el dependency array
   // [deleteMutation] se evalúa inmediatamente al ejecutarse useCallback.
   const handleEdit = useCallback((emp) => { setEditing(emp); setDialogOpen(true); }, []);
-  const handleDelete = useCallback((id) => deleteMutation.mutate(id), [deleteMutation]);
-  const handleRelink = useCallback((emp) => relinkMutation.mutate(emp), [relinkMutation]);
+  // Deps sobre `.mutate` (no sobre el objeto mutation): en React Query v5
+  // useMutation() devuelve un contenedor nuevo cada render (isPending, data,
+  // error…), pero la función `mutate` interna es estable. Depender del
+  // contenedor recrearía el callback en cada render y rompería React.memo.
+  const handleDelete = useCallback((id) => deleteMutation.mutate(id), [deleteMutation.mutate]);
+  const handleRelink = useCallback((emp) => relinkMutation.mutate(emp), [relinkMutation.mutate]);
 
   const filtered = employees.filter(e => {
     const matchSearch = !search || e.full_name?.toLowerCase().includes(search.toLowerCase());
@@ -303,16 +321,6 @@ export default function Employees() {
   });
 
   const getInitials = (name) => name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
-
-  const container = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.05 } }
-  };
-
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 space-y-6">
@@ -349,14 +357,14 @@ export default function Employees() {
         </div>
 
         {/* Stats */}
-        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <motion.div variants={MOTION_CONTAINER} initial="hidden" animate="show" className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: 'Total', value: stats.total, icon: Users, color: 'from-blue-500' },
             { label: 'Activos', value: stats.activos, icon: Zap, color: 'from-emerald-500' },
             { label: 'Jefes de Sitio', value: stats.jefesSitio, icon: Building2, color: 'from-violet-500' },
             { label: 'Con Problemas', value: employeesWithIssues.length, icon: AlertTriangle, color: 'from-red-500' },
           ].map((stat, i) => (
-            <motion.div key={i} variants={item}>
+            <motion.div key={i} variants={MOTION_ITEM}>
               <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur border border-slate-700/50 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-slate-400 uppercase">{stat.label}</p>
@@ -432,7 +440,7 @@ export default function Employees() {
       {filtered.length === 0 && !isLoading ? (
         <EmptyState icon={UserCog} title="No hay empleados" description="Agregá tu primer empleado" actionLabel="Nuevo Empleado" onAction={() => { setEditing(null); setDialogOpen(true); }} />
       ) : (
-        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <motion.div variants={MOTION_CONTAINER} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(emp => (
             <EmployeeCard
               key={emp.id}
@@ -442,7 +450,7 @@ export default function Employees() {
               roleLabel={getRoleLabel(emp.role)}
               roleBadgeClass={getRoleBadgeClass(emp.role)}
               sectorLabel={getSectorLabel(emp.sector_id)}
-              item={item}
+              item={MOTION_ITEM}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onQR={setQrEmployee}
