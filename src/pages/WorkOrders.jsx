@@ -384,6 +384,20 @@ export default function WorkOrders() {
   const filtered = useMemo(() => {
     const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const q = norm(search);
+    // Convierte ISO datetime (UTC) a YYYY-MM-DD en la zona horaria local del
+    // navegador (America/Buenos_Aires para el usuario). created_date se guarda
+    // en UTC; cortar con split('T') tomaría el día UTC, desfasando OTs creadas
+    // tarde (23hs AR = 02hs UTC del día siguiente). new Date() + getters
+    // locales (getFullYear/getMonth/getDate) respetan el huso del navegador.
+    const toLocalDateStr = (isoStr) => {
+      if (!isoStr) return '';
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return '';
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
     return searchableOrders.filter(({ o, fields }) => {
       const creador = norm(resolveCreator(o.created_by_id, ''));
     const matchSearch = !q || 
@@ -427,9 +441,8 @@ export default function WorkOrders() {
       return false;
     })();
     // Filtro por fecha de creación (created_date) — siempre tiene valor, a
-    // diferencia de scheduled_date que está vacío en la mayoría de las OTs.
-    const dateOnly = (d) => d ? (d.includes('T') ? d.split('T')[0] : d) : '';
-    const cd = dateOnly(o.created_date);
+    // diferencia de scheduled_date que estaba vacío en la mayoría de las OTs.
+    const cd = toLocalDateStr(o.created_date);
     const matchDateFrom = !advFilters.date_from || cd >= advFilters.date_from;
     const matchDateTo = !advFilters.date_to || cd <= advFilters.date_to;
     const matchOverdue = !advFilters.overdue_only || esOtVencida(o);
