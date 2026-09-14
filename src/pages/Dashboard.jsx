@@ -24,8 +24,15 @@ import { format, parseISO, startOfMonth, formatDistanceToNow, subDays } from 'da
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { es } from 'date-fns/locale';
 import { esOtVencida } from '@/lib/otVencimiento';
+import { fetchAllList } from '@/lib/fetchAllList';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
+
+// Normalización case-insensitive + accent-insensitive para matching de alias.
+// Usada por el filtro de Jefe de Sitio (jefeAliasSet + comparador en orders).
+// Mismo criterio que WorkOrders.jsx / AdvancedFilters.
+const normCI = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 const HERO_IMG = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/ba6e014cf_generated_image.png';
 
@@ -177,7 +184,7 @@ const QuickActionCard = React.memo(function QuickActionCard({ icon: Icon, label,
 });
 
 export default function Dashboard() {
-  const { userPermissions, user, displayName } = useCurrentUser();
+  const { userPermissions, user, displayName, isAdmin } = useCurrentUser();
   const [dashFilters, setDashFilters] = React.useState({ dateRange: 'all', jefeSitio: '', priority: '' });
 
   const canRead = useCallback((moduleKey) => {
@@ -186,18 +193,38 @@ export default function Dashboard() {
     return userPermissions[moduleKey]?.read === true;
   }, [user, userPermissions]);
 
+  // Scope dinámico — mismo criterio que WorkOrders.jsx:
+  //  - Gerente/Admin: scope=undefined → ve TODAS las OTs del sector
+  //  - Jefe de sitio / operario: scope='own' → solo sus propias OTs
+  // Así los totales del Dashboard coinciden con los de Órdenes de Trabajo.
+  const isGerente = isAdmin || user?.role === 'gerente';
+  const dashScope = isGerente ? undefined : 'own';
+
   // Fuente única de verdad: getDashboardMetrics trae TODOS los arrays
   // (fetchAll sin cap) + conteos pre-calculados. Elimina las 7 queries
   // cliente .list(100) que tenían cap de 100 y la doble fuente con kpiVal.
+  // queryKey incluye el scope para que el cache no sirva datos de scope
+  // equivocado al cambiar de rol (gerente vs jefe de sitio).
   const STALE_3MIN = 3 * 60 * 1000;
   const { data: dash, isLoading: dashLoading } = useQuery({
-    queryKey: ['dashboard-metrics-own'],
-    queryFn: async () => (await base44.functions.invoke('getDashboardMetrics', { scope: 'own' })).data,
+    queryKey: ['dashboard-metrics', dashScope],
+    queryFn: async () => (await base44.functions.invoke('getDashboardMetrics', { scope: dashScope })).data,
     staleTime: STALE_3MIN, retry: 1,
   });
 
+  // Direcciones — fuente canónica de jefes de sitio (igual que WorkOrders).
+  // Se usa para resolver el jefe_sitio de OTs que no lo tienen poblado,
+  // y para construir el alias set del filtro de Jefe de Sitio.
+  const { data: direcciones = [] } = useQuery({
+    queryKey: ['direcciones-jefes'],
+    queryFn: () => fetchAllList('Direccion', '-created_date'),
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Arrays completos del payload del backend (fetchAll sin cap de 100).
-  const allOrders    = dash?.orders || [];
+  // allOrders excluye archivadas — igual que visibleOrders en WorkOrders.
+  // Las archivadas son 'completada' y no deben inflar efficiency/completadas.
+  const allOrders    = (dash?.orders || []).filter(o => !o.archivada);
   const projects     = dash?.projects || [];
   const invoices     = dash?.invoices || [];
   const materials    = dash?.materials || [];
@@ -205,6 +232,88 @@ export default function Dashboard() {
   const employees    = dash?.employees || [];
   const pendientes   = dash?.pendientes || [];
   const kpis         = dash; // conteos pre-calculados del backend
+
+  // ── Normalización y lookups para el filtro de Jefe de Sitio ──
+  // Mismo patrón que WorkOrders.jsx: resolver el nombre canónico del dropdown
+  // (Employee.full_name) a variantes denormalizadas de jefe_sitio en OTs,
+  // cruzando Employee.email/user_id contra OTs + Direccion.jefe_sitio.
+
+  // Lookup: nombre normalizado → { email, user_id }
+  const employeeLookup = useMemo(() => {
+    const map = {};
+    const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ');
+    employees.forEach(e => {
+      if (e.full_name) {
+        map[norm(e.full_name)] = { email: (e.email || '').toLowerCase().trim(), user_id: e.user_id || '' };
+      }
+    });
+    return { map, norm };
+  }, [employees]);
+
+  // Mapa normalizado: dirección → jefe_sitio (para resolveJefe)
+  const addrToJefe = useMemo(() => {
+    const map = {};
+    const norm = (s) => (s || '').toUpperCase().trim().replace(/\s+/g, ' ').replace(/,\s*CABA\s*$/, '').replace(/,\s*$/, '').trim();
+    direcciones.forEach(d => {
+      if (d.direccion && d.jefe_sitio) {
+        map[norm(d.direccion)] = d.jefe_sitio.trim();
+      }
+    });
+    return { map, norm };
+  }, [direcciones]);
+
+  // Resuelve el jefe_sitio de una OT: directo si lo tiene, sino por cruce
+  // de dirección contra Direccion. Suffix match direccional (prefiere el addr
+  // más específico) — mismo algoritmo que WorkOrders.jsx.
+  const resolveJefe = useMemo(() => (o) => {
+    if (o.jefe_sitio) return o.jefe_sitio;
+    const { map, norm } = addrToJefe;
+    const locNorm = norm(o.location);
+    if (!locNorm) return null;
+    if (map[locNorm]) return map[locNorm];
+    if (locNorm.length >= 10) {
+      let bestAddr = null;
+      let bestLen = 0;
+      for (const addr of Object.keys(map)) {
+        if (addr.length >= 10 && locNorm.startsWith(addr + ',') && addr.length > bestLen) {
+          bestAddr = addr;
+          bestLen = addr.length;
+        }
+      }
+      if (bestAddr) return map[bestAddr];
+    }
+    return null;
+  }, [addrToJefe]);
+
+  // Alias set del jefe seleccionado: recopila variantes denormalizadas de
+  // jefe_sitio (de OTs + resolveJefe + Direccion) que pertenecen al mismo
+  // empleado, vinculados vía jefe_sitio_email o created_by_id. Así, OTs que
+  // solo tienen el texto denormalizado matchean si comparten un alias con
+  // una OT probadamente del jefe. Cierra el descalce dropdown(canónico) vs
+  // comparador(denormalizado) — mismo principio que WorkOrders.jsx.
+  const jefeAliasSet = useMemo(() => {
+    if (!dashFilters.jefeSitio) return null;
+    const { map: empMap, norm: normEmp } = employeeLookup;
+    const selectedInfo = empMap[normEmp(dashFilters.jefeSitio)];
+    if (!selectedInfo) return { aliases: new Set([normCI(dashFilters.jefeSitio)]), selectedInfo: null };
+    const aliases = new Set();
+    aliases.add(normCI(dashFilters.jefeSitio));
+    allOrders.forEach(o => {
+      const linked = (selectedInfo.email && (o.jefe_sitio_email || '').toLowerCase().trim() === selectedInfo.email)
+                  || (selectedInfo.user_id && o.created_by_id === selectedInfo.user_id);
+      if (!linked) return;
+      if (o.jefe_sitio) aliases.add(normCI(o.jefe_sitio));
+      const resolved = resolveJefe(o);
+      if (resolved) aliases.add(normCI(resolved));
+    });
+    direcciones.forEach(d => {
+      if (!d.jefe_sitio) return;
+      const matchByName = normEmp(d.jefe_sitio) === normEmp(dashFilters.jefeSitio);
+      const matchByEmail = selectedInfo.email && d.jefe_sitio.toLowerCase().trim() === selectedInfo.email;
+      if (matchByName || matchByEmail) aliases.add(normCI(d.jefe_sitio));
+    });
+    return { aliases, selectedInfo };
+  }, [dashFilters.jefeSitio, employeeLookup, allOrders, resolveJefe, direcciones]);
 
   const filterCutoff = useMemo(() => {
     if (dashFilters.dateRange === '7d')  return subDays(new Date(), 7);
@@ -222,13 +331,27 @@ export default function Dashboard() {
       });
     }
     if (dashFilters.jefeSitio) {
-      result = result.filter(o => o.assigned_name === dashFilters.jefeSitio);
+      // Alias-based matching contra o.jefe_sitio (no o.assigned_name).
+      // La OT matchea si su jefe_sitio o resolveJefe normaliza a cualquier
+      // alias del set, o si coincide directamente por email/created_by_id.
+      // Mismo principio que WorkOrders.jsx — cierra el descalce
+      // dropdown(canónico) vs comparador(denormalizado).
+      result = result.filter(o => {
+        if (!jefeAliasSet) return false;
+        const { aliases, selectedInfo } = jefeAliasSet;
+        if (o.jefe_sitio && aliases.has(normCI(o.jefe_sitio))) return true;
+        if (selectedInfo?.email && (o.jefe_sitio_email || '').toLowerCase().trim() === selectedInfo.email) return true;
+        if (selectedInfo?.user_id && o.created_by_id === selectedInfo.user_id) return true;
+        const resolved = resolveJefe(o);
+        if (resolved && aliases.has(normCI(resolved))) return true;
+        return false;
+      });
     }
     if (dashFilters.priority) {
       result = result.filter(o => o.priority === dashFilters.priority);
     }
     return result;
-  }, [allOrders, filterCutoff, dashFilters.jefeSitio, dashFilters.priority]);
+  }, [allOrders, filterCutoff, dashFilters.jefeSitio, dashFilters.priority, jefeAliasSet, resolveJefe]);
 
   const filteredProjects = useMemo(() => {
     if (!filterCutoff) return projects;
@@ -238,13 +361,36 @@ export default function Dashboard() {
     });
   }, [projects, filterCutoff]);
 
+  // jefesOptions: fusión de 3 fuentes con dedup canónico — igual que
+  // AdvancedFilters. Empleados con rol 'jefe' (fuente canónica), direcciones
+  // y OTs. Garantiza que el dropdown esté completo aunque un jefe no tenga
+  // OTs visibles o no tenga ficha de Employee.
   const jefesOptions = useMemo(() => {
-    const names = employees
-      .filter(e => e.role && e.role.toLowerCase().includes('jefe'))
-      .map(e => e.full_name)
-      .filter(Boolean);
-    return [...new Set(names)].sort();
-  }, [employees]);
+    const display = (s) => s.trim().replace(/\s+/g, ' ');
+    const set = new Map();
+    // 1. Empleados con rol jefe de sitio — fuente canónica (prioridad de display)
+    employees.forEach(e => {
+      if (e.full_name && e.role && e.role.toLowerCase().includes('jefe')) {
+        const key = normCI(e.full_name);
+        if (!set.has(key)) set.set(key, display(e.full_name));
+      }
+    });
+    // 2. Desde Direccion
+    direcciones.forEach(d => {
+      if (d.jefe_sitio) {
+        const key = normCI(d.jefe_sitio);
+        if (!set.has(key)) set.set(key, display(d.jefe_sitio));
+      }
+    });
+    // 3. Desde las OTs
+    allOrders.forEach(o => {
+      if (o.jefe_sitio) {
+        const key = normCI(o.jefe_sitio);
+        if (!set.has(key)) set.set(key, display(o.jefe_sitio));
+      }
+    });
+    return Array.from(set.values()).sort((a, b) => a.localeCompare(b, 'es'));
+  }, [employees, direcciones, allOrders]);
 
   // KPIs OT-dependientes: computados sobre `orders` (filtrado por dashFilters).
   // Los no-filtrables (proyectos, clientes, materiales, activos, finanzas,
