@@ -14,7 +14,22 @@ export function usePWA() {
       setIsInstalled(true);
     }
 
-    // Registrar Service Worker
+    // DEV: desregistrar SWs stale y limpiar caches.
+    // Un SW de un deploy anterior (con sw.js que hacía SWR de /node_modules/.vite)
+    // puede quedar vivo en el navegador, sirviendo chunks de React desincronizados
+    // → React es null → "Cannot read properties of null (reading 'useState')".
+    // En DEV nunca registramos SW; además purgamos cualquier SW/caches heredado.
+    if (import.meta.env.DEV) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          regs.forEach((r) => r.unregister());
+        });
+        caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+      }
+      return;
+    }
+
+    // Registrar Service Worker (solo producción)
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js', { scope: '/' })
