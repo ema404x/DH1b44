@@ -321,17 +321,20 @@ export default async function (req) {
       })
       .filter((d) => d.total > 0);
 
-    const pjMap = new Map();
+    const pjMap = new Map(); // normKey -> { label, total, resueltos, vencidos, allCaps }
     filteredPendientes.forEach((p) => {
-      const j = p.jefe_sitio || 'Sin asignar';
-      if (!pjMap.has(j)) pjMap.set(j, { total: 0, resueltos: 0, vencidos: 0 });
-      const d = pjMap.get(j);
+      const raw = p.jefe_sitio || 'Sin asignar';
+      const k = norm(raw);
+      const isAllCaps = raw === raw.toUpperCase() && /[A-Z]/.test(raw);
+      if (!pjMap.has(k)) pjMap.set(k, { label: raw, allCaps: isAllCaps, total: 0, resueltos: 0, vencidos: 0 });
+      const d = pjMap.get(k);
+      if (d.allCaps && !isAllCaps) { d.label = raw; d.allCaps = false; }
       d.total++;
       if (p.estado === 'resuelto') d.resueltos++;
       if (!['resuelto', 'cancelado'].includes(p.estado) && p.fecha_limite && new Date(p.fecha_limite) < hoy) d.vencidos++;
     });
     const pendPorJefe = [...pjMap.entries()]
-      .map(([jefe, d]) => ({ jefe, ...d, eficiencia: d.total > 0 ? Math.round((d.resueltos / d.total) * 100) : 0 }))
+      .map(([, d]) => ({ jefe: d.label, total: d.total, resueltos: d.resueltos, vencidos: d.vencidos, eficiencia: d.total > 0 ? Math.round((d.resueltos / d.total) * 100) : 0 }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 8);
 
