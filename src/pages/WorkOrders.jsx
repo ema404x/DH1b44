@@ -310,6 +310,32 @@ export default function WorkOrders() {
     }));
   }, [visibleOrders]);
 
+  // Alias set del jefe seleccionado: recopila los valores denormalizados de
+  // jefe_sitio (de OTs + resolveJefe) que pertenecen al mismo empleado, vinculados
+  // vía jefe_sitio_email o created_by_id. Así, OTs que solo tienen el texto
+  // denormalizado (sin email/user_id) matchean si comparten un alias con una OT
+  // probadamente del jefe. Cierra el descalce dropdown(canónico) vs
+  // comparador(denormalizado) — mismo principio que getReportesGerenciales.
+  const jefeAliasSet = useMemo(() => {
+    if (!advFilters.jefe_sitio) return null;
+    const { map: empMap, norm: normEmp } = employeeLookup;
+    const selectedInfo = empMap[normEmp(advFilters.jefe_sitio)];
+    const normCI = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (!selectedInfo) return { aliases: new Set([normCI(advFilters.jefe_sitio)]), selectedInfo: null };
+    const aliases = new Set();
+    aliases.add(normCI(advFilters.jefe_sitio));
+    visibleOrders.forEach(o => {
+      const linked = (selectedInfo.email && (o.jefe_sitio_email || '').toLowerCase().trim() === selectedInfo.email)
+                  || (selectedInfo.user_id && o.created_by_id === selectedInfo.user_id);
+      if (!linked) return;
+      if (o.jefe_sitio) aliases.add(normCI(o.jefe_sitio));
+      const resolved = resolveJefe(o);
+      if (resolved) aliases.add(normCI(resolved));
+    });
+    return { aliases, selectedInfo };
+  }, [advFilters.jefe_sitio, employeeLookup, visibleOrders, resolveJefe]);
+
   const filtered = useMemo(() => {
     const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const q = norm(search);
@@ -338,19 +364,20 @@ export default function WorkOrders() {
       return false;
     })();
 
-    // Jefe de sitio: verifica jefe_sitio, jefe_sitio_email, created_by_id, y resolveJefe
-    const selectedJefeInfo = advFilters.jefe_sitio ? empMap[normEmp(advFilters.jefe_sitio)] : null;
+    // Jefe de sitio: alias-based matching — el jefe seleccionado (label canónico)
+    // se resuelve a un set de alias denormalizados recopilados de OTs probadamente
+    // suyas (vía jefe_sitio_email/created_by_id). La OT matchea si su jefe_sitio o
+    // resolveJefe normaliza a cualquier alias del set, o si coincide directamente
+    // por email/created_by_id. Cierra el descalce dropdown(canónico) vs
+    // comparador(denormalizado) sin migrar datos.
     const matchJefe = !advFilters.jefe_sitio || (() => {
-      const filterVal = normCI(advFilters.jefe_sitio);
-      // 1. jefe_sitio directo (name match)
-      if (o.jefe_sitio && normCI(o.jefe_sitio) === filterVal) return true;
-      // 2. jefe_sitio_email match contra el email del jefe seleccionado
-      if (selectedJefeInfo?.email && (o.jefe_sitio_email || '').toLowerCase().trim() === selectedJefeInfo.email) return true;
-      // 3. created_by_id match contra el user_id del jefe seleccionado
-      if (selectedJefeInfo?.user_id && o.created_by_id === selectedJefeInfo.user_id) return true;
-      // 4. resolveJefe como fallback
+      if (!jefeAliasSet) return false;
+      const { aliases, selectedInfo } = jefeAliasSet;
+      if (o.jefe_sitio && aliases.has(normCI(o.jefe_sitio))) return true;
+      if (selectedInfo?.email && (o.jefe_sitio_email || '').toLowerCase().trim() === selectedInfo.email) return true;
+      if (selectedInfo?.user_id && o.created_by_id === selectedInfo.user_id) return true;
       const resolved = resolveJefe(o);
-      if (resolved && normCI(resolved) === filterVal) return true;
+      if (resolved && aliases.has(normCI(resolved))) return true;
       return false;
     })();
     const matchDateFrom = !advFilters.date_from || (o.scheduled_date && o.scheduled_date >= advFilters.date_from);
@@ -359,7 +386,7 @@ export default function WorkOrders() {
 
     return matchSearch && matchStatus && matchPriority && matchType && matchOperario && matchJefe && matchDateFrom && matchDateTo && matchOverdue;
     }).map(({ o }) => o);
-  }, [searchableOrders, search, statusTab, advFilters, resolveJefe, resolveCreator, employeeLookup]);
+  }, [searchableOrders, search, statusTab, advFilters, resolveJefe, resolveCreator, employeeLookup, jefeAliasSet]);
 
   const stats = useMemo(() => ({
     total: filtered.length,
