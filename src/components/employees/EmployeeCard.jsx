@@ -65,7 +65,7 @@ const sectorBadgeColors = {
   escuela: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
 };
 
-export default function EmployeeCard({
+function EmployeeCard({
   emp, canEdit, canDelete, roleLabel, roleBadgeClass, sectorLabel, item, users, rolePermissions, onEdit, onDelete, onQR, onRelink, isRelinking, onSign
 }) {
   const linkStatus = getLinkStatus(emp, users, rolePermissions);
@@ -192,3 +192,5 @@ export default function EmployeeCard({
     </motion.div>
   );
 }
+
+export default React.memo(EmployeeCard);

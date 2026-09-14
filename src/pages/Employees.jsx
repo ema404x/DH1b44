@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -178,6 +178,12 @@ export default function Employees() {
     employees.filter(e => getLinkStatus(e).level === 'error'),
     [employees, users, rolePermissions]
   );
+
+  // Callbacks estabilizados para que React.memo(EmployeeCard) sea efectiva.
+  // Sin useCallback, cada render crea referencias nuevas → la memo se invalida.
+  const handleEdit = useCallback((emp) => { setEditing(emp); setDialogOpen(true); }, []);
+  const handleDelete = useCallback((id) => deleteMutation.mutate(id), [deleteMutation]);
+  const handleRelink = useCallback((emp) => relinkMutation.mutate(emp), [relinkMutation]);
 
   // Re-vincular vía backend premium (revincularEmpleado):
   //  - lookup server-side del usuario de plataforma por email (sin tope 500)
@@ -434,11 +440,11 @@ export default function Employees() {
               roleBadgeClass={getRoleBadgeClass(emp.role)}
               sectorLabel={getSectorLabel(emp.sector_id)}
               item={item}
-              onEdit={(emp) => { setEditing(emp); setDialogOpen(true); }}
-              onDelete={(id) => deleteMutation.mutate(id)}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
               onQR={setQrEmployee}
               onSign={setSignEmp}
-              onRelink={(emp) => relinkMutation.mutate(emp)}
+              onRelink={handleRelink}
               isRelinking={relinkMutation.isPending}
               users={users}
               rolePermissions={rolePermissions}
