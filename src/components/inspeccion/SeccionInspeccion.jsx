@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { base44 } from '@/api/base44Client';
 import { cn } from '@/lib/utils';
+import { compressImage } from '@/lib/compressImage';
 
 const URGENCIA_OPTIONS = [
   { value: 'urgente',    label: 'Urgente',      color: 'bg-red-900/50 text-red-300 border-red-700/60',     dot: 'bg-red-400',     emoji: '🔴' },
@@ -103,8 +104,9 @@ export default function SeccionInspeccion({ seccion, onChange }) {
     if (!files.length) return;
     setSubiendoFotos(true);
     try {
+      const compressed = await Promise.all(files.map(f => compressImage(f)));
       const urls = await Promise.all(
-        files.map(f => base44.integrations.Core.UploadFile({ file: f }).then(r => r.file_url))
+        compressed.map(f => base44.integrations.Core.UploadFile({ file: f }).then(r => r.file_url))
       );
       onChange({ fotos: [...(seccion.fotos || []), ...urls] });
     } finally {
