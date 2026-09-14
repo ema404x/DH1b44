@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { resolveOtPermissions, explicitOrLegacy } from "../../shared/otPermissions.ts";
+import { normalizeRole } from "../../shared/roles.ts";
 
 // Elimina una OT de forma robusta, sin depender del RLS directo sobre
 // user.data.sector_id (que falla con 403 cuando el sector de plataforma queda
@@ -46,7 +47,10 @@ export default async function(req) {
 
     // Permiso de borrado: RolePermission.WorkOrder.delete con fallback al legacy
     // (admin + sector | gerente + bapro). Sin bypass por rol de plataforma.
-    const empRole = P.employee?.role || '';
+    // Normalizar el rol antes de comparar — cierra el bug donde un rol guardado
+    // como 'Admin' o 'GERENTE' (no-minúsculas) fallaba el fallback legacy y
+    // denegaba el borrado aunque el caller fuera admin/gerente legítimo.
+    const empRole = normalizeRole(P.employee?.role || '');
     const legacyDelete = empRole === 'admin' || (empRole === 'gerente' && ot.sector_id === 'bapro');
     const canDelete = P.superAdmin || explicitOrLegacy(P.perms, 'delete', legacyDelete);
     if (!canDelete) {

@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { diasVencimientoOt } from '../../shared/otVencimiento.ts';
+import { fetchAll } from '../../shared/fetchAllSector.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -32,15 +33,43 @@ Deno.serve(async (req) => {
     const necesitaPendientes = tiposActivos.has('pendiente_vencido');
     const necesitaWOs        = tiposActivos.has('ot_vencida');
 
-    // Pre-cargar solo datos esenciales (limitar por tamaño)
-    const [logsNoLeidos, logsHoy, assets, materials, pendientesVencidos, workOrders] = await Promise.all([
+    // Pre-cargar logs (cross-sector — AlertaLog no se aísla por sector acá)
+    const [logsNoLeidos, logsHoy] = await Promise.all([
       sb.entities.AlertaLog.filter({ leida: false }, '-fecha_alerta', 100).catch(() => []),
       sb.entities.AlertaLog.filter({ fecha_alerta: { $gte: new Date(Date.now() - 86400000).toISOString() } }, '-fecha_alerta', 200).catch(() => []),
-      necesitaAssets    ? sb.entities.Asset.filter({}, '-updated_date', 300).catch(() => [])                         : Promise.resolve([]),
-      necesitaMaterials  ? sb.entities.Material.filter({}, '-updated_date', 300).catch(() => [])                      : Promise.resolve([]),
-      necesitaPendientes ? sb.entities.Pendiente.filter({ estado: 'pendiente' }, '-fecha_limite', 200).catch(() => [])                : Promise.resolve([]),
-      necesitaWOs        ? sb.entities.WorkOrder.filter({ status: 'en_progreso' }, '-updated_date', 300).catch(() => []) : Promise.resolve([]),
     ]);
+
+    // ── Cargar datos de entidades POR SECTOR (fetchAll = sin truncamiento) ──
+    // ANTES: filter({}, ..., 300) cargaba TODOS los sectores con un tope de 300.
+    // Si un sector llenaba el tope, el otro quedaba silenciado (nunca recibía
+    // alertas). Ahora cargamos por sector con fetchAll (tope 5000 por sector),
+    // garantizando completitud para ambos sectores.
+    //
+    // Los registros sin sector_id (huérfanos por bug de import/stamp) NO se
+    // cargan — el filter { sector_id: sector } los excluye naturalmente,
+    // eliminando la duplicación cross-sector y los emails cruzados.
+    const sectoresAProcesar = [...new Set(
+      configs.map(c => c.sector_id || callerSector).filter(Boolean)
+    )];
+    const sectorData = {};
+    await Promise.all(sectoresAProcesar.map(async (sector) => {
+      const fetches = {};
+      if (necesitaAssets) fetches.assets = fetchAll(sb, 'Asset', { sector_id: sector }, '-updated_date');
+      if (necesitaMaterials) fetches.materials = fetchAll(sb, 'Material', { sector_id: sector }, '-updated_date');
+      if (necesitaPendientes) fetches.pendientes = fetchAll(sb, 'Pendiente', { sector_id: sector, estado: 'pendiente' }, '-fecha_limite');
+      if (necesitaWOs) fetches.wos = fetchAll(sb, 'WorkOrder', { sector_id: sector, status: 'en_progreso' }, '-updated_date');
+      const keys = Object.keys(fetches);
+      const results = await Promise.all(Object.values(fetches));
+      sectorData[sector] = {};
+      keys.forEach((k, i) => { sectorData[sector][k] = results[i]; });
+    }));
+
+    // Mergear arrays de todos los sectores (para cleanup de logs — verifica
+    // existencia cross-sector, no por sector individual).
+    const allAssets = sectoresAProcesar.flatMap(s => sectorData[s]?.assets || []);
+    const allMaterials = sectoresAProcesar.flatMap(s => sectorData[s]?.materials || []);
+    const allPendientes = sectoresAProcesar.flatMap(s => sectorData[s]?.pendientes || []);
+    const allWOs = sectoresAProcesar.flatMap(s => sectorData[s]?.wos || []);
 
     // Índice de logs de hoy para lookup O(1)
     const logsHoyFiltrados = logsHoy.filter(l => l.fecha_alerta?.startsWith(hoy));
@@ -54,10 +83,10 @@ Deno.serve(async (req) => {
       const extraFetches = [];
 
       for (const tipo of tiposEnLogs) {
-        if (tipo === 'Asset' && necesitaAssets)       { extraSets['Asset']     = new Set(assets.map(e => e.id)); continue; }
-        if (tipo === 'Material' && necesitaMaterials)  { extraSets['Material']  = new Set(materials.map(e => e.id)); continue; }
-        if (tipo === 'WorkOrder' && necesitaWOs)       { extraSets['WorkOrder'] = new Set(workOrders.map(e => e.id)); continue; }
-        if (tipo === 'Pendiente' && necesitaPendientes){ extraSets['Pendiente'] = new Set(pendientesVencidos.map(e => e.id)); continue; }
+        if (tipo === 'Asset' && necesitaAssets)       { extraSets['Asset']     = new Set(allAssets.map(e => e.id)); continue; }
+        if (tipo === 'Material' && necesitaMaterials)  { extraSets['Material']  = new Set(allMaterials.map(e => e.id)); continue; }
+        if (tipo === 'WorkOrder' && necesitaWOs)       { extraSets['WorkOrder'] = new Set(allWOs.map(e => e.id)); continue; }
+        if (tipo === 'Pendiente' && necesitaPendientes){ extraSets['Pendiente'] = new Set(allPendientes.map(e => e.id)); continue; }
         extraFetches.push(
           sb.entities[tipo]?.list('-created_date', 1000).catch(() => []).then(rows => {
             extraSets[tipo] = new Set(rows.map(r => r.id));
@@ -105,10 +134,14 @@ Deno.serve(async (req) => {
         resumen.push({ config: cfg.nombre, tipo: cfg.tipo, alertas: 0, notificadas: 0, nivel_minimo: cfg.nivel_minimo_notificar || 'critical', skipped: 'config sin sector_id (fail-closed)' });
         continue;
       }
-      const scopedAssets    = cfgSector ? assets.filter(a => !a.sector_id || a.sector_id === cfgSector) : assets;
-      const scopedMaterials  = cfgSector ? materials.filter(m => !m.sector_id || m.sector_id === cfgSector) : materials;
-      const scopedPendientes = cfgSector ? pendientesVencidos.filter(p => !p.sector_id || p.sector_id === cfgSector) : pendientesVencidos;
-      const scopedWOs        = cfgSector ? workOrders.filter(w => !w.sector_id || w.sector_id === cfgSector) : workOrders;
+      // Datos ya cargados por sector (fetchAll sin truncamiento). No hace
+      // falta re-filtrar: el filter { sector_id: sector } en la carga ya
+      // excluye registros de otros sectores y huérfanos sin sector_id.
+      const sd = sectorData[cfgSector] || {};
+      const scopedAssets    = sd.assets || [];
+      const scopedMaterials  = sd.materials || [];
+      const scopedPendientes = sd.pendientes || [];
+      const scopedWOs        = sd.wos || [];
       const alertasGeneradas = [];
       const alertasParaNotificar = [];
 
