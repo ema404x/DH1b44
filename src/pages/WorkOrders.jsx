@@ -206,12 +206,21 @@ export default function WorkOrders() {
     if (!locNorm) return null;
     // Match exacto tras normalización
     if (map[locNorm]) return map[locNorm];
-    // Match por contenido — solo para ubicaciones con longitud razonable (≥10 chars)
-    // para evitar falsos positivos como "SUM" matcheando cualquier dirección que contenga "SUM"
+    // Suffix match direccional: la OT location puede extender la dirección con
+    // un sufijo (", localidad, ..."), pero NUNCA al revés. Esto elimina la
+    // ambigüedad del includes() bidireccional que podía atribuir la misma OT a
+    // jefes distintos según el orden de iteración. Se prefiere el addr más largo
+    // (más específico) para no matchear una calle corta cuando hay una precisa.
     if (locNorm.length >= 10) {
+      let bestAddr = null;
+      let bestLen = 0;
       for (const addr of Object.keys(map)) {
-        if (addr.length >= 10 && (locNorm.includes(addr) || addr.includes(locNorm))) return map[addr];
+        if (addr.length >= 10 && locNorm.startsWith(addr + ',') && addr.length > bestLen) {
+          bestAddr = addr;
+          bestLen = addr.length;
+        }
       }
+      if (bestAddr) return map[bestAddr];
     }
     return null;
   }, [addrToJefe]);
@@ -306,9 +315,10 @@ export default function WorkOrders() {
       fields: [
         norm(o.title), norm(o.location), norm(o.location_qr_name), norm(o.project_name),
         norm(o.asset_name), norm(o.assigned_name), norm(o.code), norm(o.jefe_sitio),
+        norm(resolveJefe(o)),
       ],
     }));
-  }, [visibleOrders]);
+  }, [visibleOrders, resolveJefe]);
 
   // Alias set del jefe seleccionado: recopila los valores denormalizados de
   // jefe_sitio (de OTs + resolveJefe) que pertenecen al mismo empleado, vinculados
@@ -325,6 +335,8 @@ export default function WorkOrders() {
     if (!selectedInfo) return { aliases: new Set([normCI(advFilters.jefe_sitio)]), selectedInfo: null };
     const aliases = new Set();
     aliases.add(normCI(advFilters.jefe_sitio));
+    // Seeding desde OTs: recopila variantes denormalizadas de OTs probadamente
+    // del jefe (vía jefe_sitio_email o created_by_id).
     visibleOrders.forEach(o => {
       const linked = (selectedInfo.email && (o.jefe_sitio_email || '').toLowerCase().trim() === selectedInfo.email)
                   || (selectedInfo.user_id && o.created_by_id === selectedInfo.user_id);
@@ -333,8 +345,41 @@ export default function WorkOrders() {
       const resolved = resolveJefe(o);
       if (resolved) aliases.add(normCI(resolved));
     });
+    // Seeding desde Direccion: si el jefe matchea (por nombre normalizado o
+    // email) con un Direccion.jefe_sitio, agregar ese texto como alias. Da
+    // una segunda fuente independiente de las OTs — cubre el caso donde 0 OTs
+    // tienen linkage electrónico (jefe_sitio_email vacío en 82% de las escolares).
+    direcciones.forEach(d => {
+      if (!d.jefe_sitio) return;
+      const matchByName = normEmp(d.jefe_sitio) === normEmp(advFilters.jefe_sitio);
+      const matchByEmail = selectedInfo.email && d.jefe_sitio.toLowerCase().trim() === selectedInfo.email;
+      if (matchByName || matchByEmail) aliases.add(normCI(d.jefe_sitio));
+    });
     return { aliases, selectedInfo };
-  }, [advFilters.jefe_sitio, employeeLookup, visibleOrders, resolveJefe]);
+  }, [advFilters.jefe_sitio, employeeLookup, visibleOrders, resolveJefe, direcciones]);
+
+  // Alias set del operario seleccionado — análogo al de jefe_sitio. Resuelve
+  // el nombre canónico (Employee.full_name) a variantes denormalizadas de
+  // assigned_name cruzando Employee.email/user_id contra OTs. Cierra el mismo
+  // descalce dropdown(canónico) vs comparador(denormalizado) del Bug 2.
+  const operarioAliasSet = useMemo(() => {
+    if (!advFilters.assigned_to) return null;
+    const { map: empMap, norm: normEmp } = employeeLookup;
+    const selectedInfo = empMap[normEmp(advFilters.assigned_to)];
+    const normCI = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (!selectedInfo) return { aliases: new Set([normCI(advFilters.assigned_to)]), selectedInfo: null };
+    const aliases = new Set();
+    aliases.add(normCI(advFilters.assigned_to));
+    visibleOrders.forEach(o => {
+      const linked = (selectedInfo.email && (o.assigned_to || '').toLowerCase().trim() === selectedInfo.email)
+                  || (selectedInfo.user_id && o.assigned_to === selectedInfo.user_id)
+                  || (selectedInfo.user_id && o.created_by_id === selectedInfo.user_id);
+      if (!linked) return;
+      if (o.assigned_name) aliases.add(normCI(o.assigned_name));
+    });
+    return { aliases, selectedInfo };
+  }, [advFilters.assigned_to, employeeLookup, visibleOrders]);
 
   const filtered = useMemo(() => {
     const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -352,15 +397,16 @@ export default function WorkOrders() {
     const normCI = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    // Operario: verifica assigned_name y assigned_to (puede ser email)
-    const { map: empMap, norm: normEmp } = employeeLookup;
+    // Operario: alias-based matching — mismo principio que jefe_sitio. La OT
+    // matchea si su assigned_name está en el alias set, o si coincide
+    // directamente por email/user_id.
     const matchOperario = !advFilters.assigned_to || (() => {
-      const filterVal = normCI(advFilters.assigned_to);
-      if (normCI(o.assigned_name) === filterVal) return true;
-      if (normCI(o.assigned_to) === filterVal) return true;
-      // Si assigned_to es un email, matchear contra el email del empleado seleccionado
-      const empInfo = empMap[normEmp(advFilters.assigned_to)];
-      if (empInfo?.email && (o.assigned_to || '').toLowerCase().trim() === empInfo.email) return true;
+      if (!operarioAliasSet) return false;
+      const { aliases, selectedInfo } = operarioAliasSet;
+      if (o.assigned_name && aliases.has(normCI(o.assigned_name))) return true;
+      if (selectedInfo?.email && (o.assigned_to || '').toLowerCase().trim() === selectedInfo.email) return true;
+      if (selectedInfo?.user_id && o.assigned_to === selectedInfo.user_id) return true;
+      if (selectedInfo?.user_id && o.created_by_id === selectedInfo.user_id) return true;
       return false;
     })();
 
@@ -386,7 +432,7 @@ export default function WorkOrders() {
 
     return matchSearch && matchStatus && matchPriority && matchType && matchOperario && matchJefe && matchDateFrom && matchDateTo && matchOverdue;
     }).map(({ o }) => o);
-  }, [searchableOrders, search, statusTab, advFilters, resolveJefe, resolveCreator, employeeLookup, jefeAliasSet]);
+  }, [searchableOrders, search, statusTab, advFilters, resolveJefe, resolveCreator, employeeLookup, jefeAliasSet, operarioAliasSet]);
 
   const stats = useMemo(() => ({
     total: filtered.length,
@@ -510,6 +556,7 @@ export default function WorkOrders() {
             onReset={() => setAdvFilters({ priority: '', type: '', assigned_to: '', jefe_sitio: '', date_from: '', date_to: '', overdue_only: false })}
             orders={visibleOrders}
             direcciones={direcciones}
+            employees={employees}
           />
         </motion.div>
       )}

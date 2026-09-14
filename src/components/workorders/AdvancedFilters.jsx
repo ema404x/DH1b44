@@ -23,7 +23,7 @@ const TIPOS = [
   { value: 'emergencia', label: 'Emergencia' },
 ];
 
-export default function AdvancedFilters({ filters, onChange, onReset, orders, direcciones: propDirecciones }) {
+export default function AdvancedFilters({ filters, onChange, onReset, orders, direcciones: propDirecciones, employees: propEmployees }) {
   const { priority, type, assigned_to, jefe_sitio, date_from, date_to, overdue_only } = filters;
 
   // Consultar TODOS los jefes de sitio desde la entidad Direccion,
@@ -38,12 +38,10 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
   });
   const direcciones = propDirecciones || queriedDirecciones;
 
-  // Empleados — fuente completa de jefes de sitio y operarios
-  const { data: employees = [] } = useQuery({
-    queryKey: ['employees-filter'],
-    queryFn: () => base44.entities.Employee.list('-updated_date', 500),
-    staleTime: 5 * 60 * 1000,
-  });
+  // Empleados — recibidos como prop del padre (fetchAllList paginado, sin cap 500).
+  // Antes se hacía un fetch propio con tope 500 → dropdowns incompletos y request
+  // duplicado. Ahora se reutiliza el mismo set paginado del padre.
+  const employees = propEmployees || [];
 
   // Normalización accent-insensitive: lowercase + sin diacríticos + whitespace normalizado
   const normKey = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase()
@@ -189,7 +187,7 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
 
         {/* Fecha desde */}
         <div>
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 block">Fecha desde</label>
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 block">Fecha prog. desde</label>
           <Input
             type="date"
             value={date_from}
@@ -200,7 +198,7 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
 
         {/* Fecha hasta */}
         <div>
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 block">Fecha hasta</label>
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 block">Fecha prog. hasta</label>
           <Input
             type="date"
             value={date_to}
