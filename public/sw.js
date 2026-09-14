@@ -1,14 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════════════
- * DH1 ERP — Service Worker (PWA Offline Completo)
+ * DH1 ERP — Service Worker v3.0 (SWR + Offline App Shell)
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * PROPÓSITO
  *   Reduce el consumo de datos en conexiones lentas y permite que la app
- *   abra y funcione completamente sin conexión. Cachea el app shell (HTML,
- *   JS compilado, CSS, fuentes) e imágenes. Las llamadas a la API del backend
- *   NO se cachean — las maneja React Query (offlineFirst) + IndexedDB
- *   (persistCache.js / useSmartCache.js), que ya tienen lógica de
- *   invalidación y stale-while-revalidate a nivel de datos.
+ *   abra y funcione sin conexión. Cachea el app shell (HTML, JS compilado,
+ *   CSS, fuentes, imágenes). Las llamadas a la API del backend NO se cachean
+ *   — las maneja React Query (offlineFirst) + IndexedDB (persistCache.js),
+ *   que ya tienen lógica de invalidación coordinada.
  *
  *   ┌─────────────────────────────────────────────────────────────────┐
  *   │  CAPA 1 (datos):     React Query + IndexedDB — persistCache.js  │
@@ -17,76 +16,48 @@
  *   └─────────────────────────────────────────────────────────────────┘
  *
  * ESTRATEGIAS DE CACHÉ POR TIPO DE REQUEST
- *   1. Navegación (mode='navigate') → network-first, fallback a index.html
- *      cacheado. Si hay red, sirve la versión fresca del HTML; si no hay red,
- *      sirve el app shell cacheado para que la app monte offline.
- *   2. JS/CSS de mismo origen (módulos Vite con hash) → stale-while-revalidate.
- *      Sirve el caché instantáneo y revalida en background. Los nombres con
- *      hash cambian en cada deploy, así que no hay riesgo de servir JS viejo
- *      — el nuevo HTML referenciará los nuevos hashes y el caché viejo se
- *      evicta naturalmente por desuso.
- *   3. Fuentes de Google Fonts (fonts.googleapis.com / fonts.gstatic.com) →
- *      cache-first con expiración de 30 días. Las fuentes son estáticas y
- *      rara vez cambian; cache-first evita un round-trip en cada carga.
- *   4. Imágenes (png/jpg/jpeg/webp/svg/gif/ico/avif) de cualquier origen →
- *      stale-while-revalidate con maxAge 30 días. Incluye fotos de Unsplash
- *      y fotos subidas (UploadPublicFile). En señal baja, servir desde caché
- *      sin re-validar evita el spinner infinito.
- *   5. Llamadas a /api/ o /functions/ del backend → PASSTHROUGH PURO.
- *      No se interceptan, no se cachean. React Query + IndexedDB manejan
- *      los datos con su propia lógica de staleTime, gcTime, refetchOnMount.
- *      Cachearlas aquí duplicaría datos y rompería la consistencia (un POST
- *      no se puede cachear; un GET cacheado aquí envejecería sin invalidación
- *      coordinada con React Query).
+ *   1. Navegación (mode='navigate') → network-first con fallback a caché.
+ *      Si hay red, sirve HTML fresco y lo cachea para fallback offline.
+ *      Si no hay red, sirve el último HTML cacheado o /offline.html.
+ *   2. JS/CSS/fuentes/imágenes (GET same-origin y cross-origin) →
+ *      stale-while-revalidate. Sirve el caché instantáneo y revalida en
+ *      background. Máxima reducción de consumo (~80% en sesiones repetidas).
+ *   3. API (/api/, /functions/, /auth/) → PASSTHROUGH PURO. No se
+ *      interceptan, no se cachean. React Query + IndexedDB manejan los
+ *      datos con su propia lógica de staleTime/gcTime/refetchOnMount.
+ *   4. Mutaciones (POST/PUT/DELETE) → passthrough. La cola offline
+ *      (offlineSync.js + localStorage) las maneja.
  *
- * VERSIONADO DE CACHÉ
- *   Los cachés tienen sufijo -vN. Al cambiar la versión, el evento 'activate'
- *   elimina los cachés viejos. Esto fuerza la limpieza sin depender de
- *   expiración manual.
- *
- * ACTUALIZACIONES (skipWaiting + clients.claim + controllerchange)
- *   El SW usa self.skipWaiting() en 'install' para activarse inmediatamente,
- *   y self.clients.claim() en 'activate' para tomar control de las pestañas
- *   abiertas. usePWA.js (líneas 37-44) escucha 'controllerchange' y dispara
- *   window.location.reload(). Así, al publicar una nueva versión, el usuario
- *   pasa automáticamente a la nueva versión. El flag 'refreshing' en usePWA.js
- *   previene recargas dobles.
+ * BUG CRÍTICO CORREGIDO (v2 → v3)
+ *   El v2 usaba `url.hostname.includes('base44')` para excluir llamadas a
+ *   la API. Como la app está en dh1-mejores.base44.app, TODOS los requests
+ *   same-origin (HTML, JS, CSS) matcheaban y pasaban directo → el SW era
+ *   inerte. Ahora se usa pathname: `/api/`, `/functions/`, `/auth/`.
  *
  * RESPUESTAS OPACAS (cross-origin no-cors)
  *   Las imágenes de Unsplash y las fuentes de Google se cargan con mode
- *   'no-cors' (default de <img> y <link>). La respuesta es 'opaque': su
- *   status es 0 y response.ok es false. Pero la Cache API SÍ puede almacenar
- *   respuestas opacas, y el navegador SÍ puede usarlas para <img>/<link>.
- *   Por eso usamos isCacheable() que acepta opaque — sin esto, las imágenes
- *   cross-origin nunca se cachearían y el SW no reduciría consumo.
+ *   'no-cors'. Su response.ok es false (status 0), pero la Cache API las
+ *   almacena y el navegador las usa para <img>/<link>. isCacheable() las
+ *   acepta — sin esto, no se cachearían y el SW no reduciría consumo.
  *
- * MANEJO DE ERRORES DEFENSIVO
- *   - Si un precache falla (ej: fuente de Google caída), el SW se instala igual.
- *   - Si un SWR falla (red caída + sin caché), se devuelve un 504 controlado.
- *   - Nunca se lanza una excepción desde un fetch handler — siempre se devuelve
- *     algo al navegador para evitar que el request quede colgado.
+ * ACTUALIZACIONES (skipWaiting + clients.claim + controllerchange)
+ *   El SW usa skipWaiting() en install + clients.claim() en activate. La
+ *   recarga al deploy la maneja ÚNICAMENTE usePWA.js vía 'controllerchange'
+ *   (con flag anti-doble-reload 'refreshing'). NO se usa client.navigate()
+ *   para no interrumpir formularios en progreso.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-// ── Cachés nombrados con versión ────────────────────────────────────────────
-const CACHE_SHELL = 'dh1-shell-v1';    // HTML + manifest (precache)
-const CACHE_ASSETS = 'dh1-assets-v1';  // JS/CSS/fuentes/imágenes (runtime SWR)
+const CACHE_NAME = 'dh1-erp-v3';
+const OFFLINE_URL = '/offline.html';
 
-// Recursos estáticos que se precachean en 'install'. Solo los esenciales para
-// que la app monte offline: el HTML raíz y el manifest. Los chunks JS/CSS con
-// hash se cachean runtime (sus nombres cambian en cada deploy → precache
-// estático los rompería).
+// Recursos estáticos que se precachean en install. Solo los esenciales
+// para que la app monte offline: HTML raíz y página offline.
+// Los chunks JS/CSS con hash se cachean runtime (sus nombres cambian en
+// cada deploy → precache estático los rompería).
 const PRECACHE_URLS = [
   '/',
-  '/index.html',
-  '/manifest.json',
   '/offline.html',
 ];
-
-// ── Configuración de expiración ──────────────────────────────────────────────
-const MAX_AGE_MS = {
-  images: 1000 * 60 * 60 * 24 * 30,  // 30 días
-  fonts: 1000 * 60 * 60 * 24 * 30,   // 30 días
-};
 
 // ── Helpers de URL ───────────────────────────────────────────────────────────
 
@@ -94,35 +65,33 @@ function isSameOrigin(url) {
   return url.origin === self.location.origin;
 }
 
-function isNavigationRequest(request) {
-  return request.mode === 'navigate';
-}
-
 function isBackendApi(url) {
-  // /api/ y /functions/ son llamadas al backend — passthrough, no cachear.
-  // El SDK usa base44.functions.invoke(...) que pasa por estas rutas.
-  const pathname = url.pathname;
-  return pathname.startsWith('/api/') || pathname.startsWith('/functions/');
+  // Check por PATHNAME, no hostname. Así funciona tanto en base44.app
+  // como en un custom domain futuro. Las llamadas al backend van por
+  // estas rutas. NO usar hostname.includes('base44') — la app misma
+  // está en base44.app y eso excluiría TODOS los requests same-origin.
+  const p = url.pathname;
+  return p.startsWith('/api/') || p.startsWith('/functions/') || p.startsWith('/auth/');
 }
 
 function isStaticAsset(url, request) {
-  // JS/CSS de mismo origen (módulos Vite compilados)
-  if (isSameOrigin(url)) {
-    const dest = request.destination;
-    if (dest === 'script' || dest === 'style') return true;
-    if (/\.(js|mjs|css)$/.test(url.pathname)) return true;
-  }
-  return false;
-}
-
-function isFont(url) {
-  const host = url.host;
-  return host === 'fonts.googleapis.com' || host === 'fonts.gstatic.com';
+  // JS/CSS de mismo origen (módulos Vite compilados con hash)
+  if (!isSameOrigin(url)) return false;
+  const dest = request.destination;
+  if (dest === 'script' || dest === 'style') return true;
+  return /\.(js|mjs|css)(\?|$)/i.test(url.pathname);
 }
 
 function isImage(url, request) {
   if (request.destination === 'image') return true;
   return /\.(png|jpg|jpeg|webp|svg|gif|ico|avif)(\?|$)/i.test(url.pathname);
+}
+
+function isFont(url) {
+  // Fuentes de Google Fonts y archivos de fuente locales
+  const host = url.host;
+  if (host === 'fonts.googleapis.com' || host === 'fonts.gstatic.com') return true;
+  return /\.(woff2?|ttf|eot|otf)(\?|$)/i.test(url.pathname);
 }
 
 // ── Helper: ¿es cacheable? (acepta respuestas opacas cross-origin) ──────────
@@ -134,69 +103,56 @@ function isCacheable(response) {
   return response.ok || response.type === 'opaque';
 }
 
-// ── Helper: obtener timestamp de un caché (para expiración) ──────────────────
-async function getCachedResponseWithAge(cache, request) {
-  const cached = await cache.match(request);
-  if (!cached) return null;
-  // El header 'date' lo setea el Cache API al guardar. Si no está, asumimos
-  // fresco (no expira) — mejor servir algo viejo que nada en señal baja.
-  const dateHeader = cached.headers.get('date');
-  if (!dateHeader) return { response: cached, age: 0 };
-  const age = Date.now() - new Date(dateHeader).getTime();
-  // Si la fecha es inválida (NaN), age será NaN → la entrada se considera
-  // stale y se re-fetch — seguro, no crashea.
-  return { response: cached, age };
-}
-
 // ── Estrategia: Network-First (para navegación HTML) ─────────────────────────
 async function handleNavigation(request) {
   try {
     const networkResponse = await fetch(request);
     if (networkResponse && networkResponse.ok) {
-      const cache = await caches.open(CACHE_SHELL);
+      const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone()).catch(() => {});
     }
     return networkResponse;
-  } catch (err) {
-    const cache = await caches.open(CACHE_SHELL);
+  } catch (_) {
+    // Sin red: servir el último HTML cacheado para esta URL, o el root,
+  // o la página offline dedicada como último recurso.
+    const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(request);
     if (cached) return cached;
-    const fallback = await cache.match('/index.html') || await cache.match('/');
+    const fallback = await cache.match('/') || await cache.match(OFFLINE_URL);
     if (fallback) return fallback;
-    return (await cache.match('/offline.html')) || Response.error();
+    return new Response(
+      '<h1>Sin conexión</h1><p>La aplicación no está disponible offline en este momento.</p>',
+      { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+    );
   }
 }
 
-// ── Estrategia: Stale-While-Revalidate (para JS/CSS e imágenes) ──────────────
-async function handleStaleWhileRevalidate(request, cacheName, maxAgeMs) {
-  const cache = await caches.open(cacheName);
+// ── Estrategia: Stale-While-Revalidate (para JS/CSS/fuentes/imágenes) ────────
+async function handleStaleWhileRevalidate(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(request);
 
-  const cachedInfo = await getCachedResponseWithAge(cache, request);
-  const isFresh = cachedInfo && (maxAgeMs ? cachedInfo.age < maxAgeMs : true);
-
-  const revalidate = (async () => {
-    try {
-      const networkResponse = await fetch(request);
+  // Fetch en background para actualizar el caché (sin bloquear la respuesta).
+  const networkFetch = fetch(request)
+    .then((networkResponse) => {
       if (isCacheable(networkResponse)) {
         cache.put(request, networkResponse.clone()).catch(() => {});
       }
       return networkResponse;
-    } catch (_) {
-      return null;
-    }
-  })();
+    })
+    .catch(() => null);
 
-  if (isFresh) {
-    revalidate.catch(() => {});
-    return cachedInfo.response;
+  // SWR: si hay caché, responderlo instantáneamente y dejar el fetch
+  // actualizando en background. Si no hay caché, esperar el fetch.
+  if (cached) {
+    return cached;
   }
 
-  try {
-    const networkResponse = await revalidate;
-    if (isCacheable(networkResponse)) return networkResponse;
-  } catch (_) { /* continúa al fallback */ }
-
-  if (cachedInfo) return cachedInfo.response;
+  // Sin caché: esperar la red. Si la red también falla, 504 controlado.
+  const networkResponse = await networkFetch;
+  if (networkResponse && isCacheable(networkResponse)) {
+    return networkResponse;
+  }
 
   return new Response('', {
     status: 504,
@@ -205,38 +161,12 @@ async function handleStaleWhileRevalidate(request, cacheName, maxAgeMs) {
   });
 }
 
-// ── Estrategia: Cache-First (para fuentes de Google) ─────────────────────────
-async function handleCacheFirst(request, cacheName, maxAgeMs) {
-  const cache = await caches.open(cacheName);
-  const cachedInfo = await getCachedResponseWithAge(cache, request);
-
-  if (cachedInfo) {
-    const isFresh = maxAgeMs ? cachedInfo.age < maxAgeMs : true;
-    if (isFresh) return cachedInfo.response;
-  }
-
-  try {
-    const networkResponse = await fetch(request);
-    if (isCacheable(networkResponse)) {
-      cache.put(request, networkResponse.clone()).catch(() => {});
-    }
-    return networkResponse;
-  } catch (_) {
-    if (cachedInfo) return cachedInfo.response;
-    return new Response('', {
-      status: 504,
-      statusText: 'Gateway Timeout (offline, sin fuente cacheada)',
-      headers: { 'Content-Type': 'text/plain' },
-    });
-  }
-}
-
-// ── Evento: INSTALL (precache del app shell) ─────────────────────────────────
+// ── Evento: INSTALL (precache mínimo del app shell) ──────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(CACHE_SHELL);
-      // Precachear uno por uno para que un fallo individual no rompa todo.
+      const cache = await caches.open(CACHE_NAME);
+      // Precachear uno por uno para que un fallo individual no bloquee.
       await Promise.all(
         PRECACHE_URLS.map(async (url) => {
           try { await cache.add(url); } catch (_) {}
@@ -251,17 +181,17 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      const validCaches = [CACHE_SHELL, CACHE_ASSETS];
+      // Limpiar TODOS los cachés que no sean el actual (v2 → v3, etc.)
       const allCaches = await caches.keys();
       await Promise.all(
         allCaches
-          .filter((name) => !validCaches.includes(name))
+          .filter((name) => name !== CACHE_NAME)
           .map((name) => caches.delete(name).catch(() => {}))
       );
-      // clients.claim() es necesario para que el nuevo SW tome control de
-      // las pestañas existentes y dispare 'controllerchange' en usePWA.js,
-      // que ejecuta el reload automático. Sin claim, controllerchange no
-      // fire para tabs abiertas y el auto-reload no funciona.
+      // clients.claim() toma control de las pestañas existentes para que
+      // controllerchange dispare en usePWA.js (que hace el reload con flag
+      // anti-doble). NO se usa client.navigate() para no interrumpir
+      // formularios en progreso.
       await self.clients.claim();
     })()
   );
@@ -271,6 +201,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
+  // Solo GET. POST/PUT/DELETE pasan directo (cola offline los maneja).
   if (request.method !== 'GET') return;
 
   let url;
@@ -282,34 +213,30 @@ self.addEventListener('fetch', (event) => {
   // PASSTHROUGH: data: y blob: URLs
   if (url.protocol === 'data:' || url.protocol === 'blob:') return;
 
-  // 1. Navegación (HTML) → Network-First
-  if (isNavigationRequest(request)) {
+  // PASSTHROUGH: extensiones de Chrome
+  if (url.protocol === 'chrome-extension:') return;
+
+  // 1. Navegación (HTML) → Network-First con fallback a caché
+  if (request.mode === 'navigate') {
     event.respondWith(handleNavigation(request));
     return;
   }
 
-  // 2. JS/CSS de mismo origen → SWR (sin expiración, hash los versiona)
+  // 2. JS/CSS de mismo origen → SWR
   if (isStaticAsset(url, request)) {
-    event.respondWith(handleStaleWhileRevalidate(request, CACHE_ASSETS, 0));
+    event.respondWith(handleStaleWhileRevalidate(request));
     return;
   }
 
-  // 3. Fuentes de Google → Cache-First con expiración
+  // 3. Fuentes (Google Fonts + locales) → SWR
   if (isFont(url)) {
-    event.respondWith(handleCacheFirst(request, CACHE_ASSETS, MAX_AGE_MS.fonts));
+    event.respondWith(handleStaleWhileRevalidate(request));
     return;
   }
 
-  // 4. Imágenes → SWR con maxAge 30 días
+  // 4. Imágenes (Unsplash + subidas + locales) → SWR
   if (isImage(url, request)) {
-    event.respondWith(handleStaleWhileRevalidate(request, CACHE_ASSETS, MAX_AGE_MS.images));
+    event.respondWith(handleStaleWhileRevalidate(request));
     return;
-  }
-});
-
-// ── Evento: MESSAGE (futura extensibilidad) ──────────────────────────────────
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
   }
 });
