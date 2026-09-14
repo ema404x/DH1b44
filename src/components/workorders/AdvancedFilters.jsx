@@ -187,7 +187,7 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
 
         {/* Fecha desde */}
         <div>
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 block">Fecha prog. desde</label>
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 block">Fecha creación desde</label>
           <Input
             type="date"
             value={date_from}
@@ -198,7 +198,7 @@ export default function AdvancedFilters({ filters, onChange, onReset, orders, di
 
         {/* Fecha hasta */}
         <div>
-          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 block">Fecha prog. hasta</label>
+          <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1 block">Fecha creación hasta</label>
           <Input
             type="date"
             value={date_to}

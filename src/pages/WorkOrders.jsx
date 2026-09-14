@@ -426,14 +426,12 @@ export default function WorkOrders() {
       if (resolved && aliases.has(normCI(resolved))) return true;
       return false;
     })();
-    // OTs sin scheduled_date no se excluyen del filtro de fecha — solo se
-    // excluyen las que tienen fecha fuera del rango. Esto evita que la mayoría
-    // de las OTs (que no tienen fecha programada) desaparezcan al activar el filtro.
-    // dateOnly() normaliza a "YYYY-MM-DD" por si el backend devuelve datetime.
-    const dateOnly = (d) => d ? (d.includes('T') ? d.split('T')[0] : d) : null;
-    const sd = dateOnly(o.scheduled_date);
-    const matchDateFrom = !advFilters.date_from || !sd || sd >= advFilters.date_from;
-    const matchDateTo = !advFilters.date_to || !sd || sd <= advFilters.date_to;
+    // Filtro por fecha de creación (created_date) — siempre tiene valor, a
+    // diferencia de scheduled_date que está vacío en la mayoría de las OTs.
+    const dateOnly = (d) => d ? (d.includes('T') ? d.split('T')[0] : d) : '';
+    const cd = dateOnly(o.created_date);
+    const matchDateFrom = !advFilters.date_from || cd >= advFilters.date_from;
+    const matchDateTo = !advFilters.date_to || cd <= advFilters.date_to;
     const matchOverdue = !advFilters.overdue_only || esOtVencida(o);
 
     return matchSearch && matchStatus && matchPriority && matchType && matchOperario && matchJefe && matchDateFrom && matchDateTo && matchOverdue;
