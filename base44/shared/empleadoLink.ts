@@ -36,6 +36,19 @@ export async function resolveCallerSector(base44, user): Promise<string | null> 
     const r2 = await sb.entities.Employee.filter({ user_id: user.id }).catch(() => []);
     callerEmp = r2?.[0] || null;
   }
+
+  // FALLBACK case-insensitive: mismismo de mayúsculas/minúsculas en el email
+  // almacenado. Fetch amplio + match normalizado — mismo patrón que
+  // vincularEmpleado. Solo se activa cuando los filtros rápidos fallaron.
+  if (!callerEmp && userEmail) {
+    try {
+      const allFallback = await sb.entities.Employee.list('-created_date', 2000);
+      callerEmp = (allFallback || []).find(
+        (e: any) => (e?.email || '').toLowerCase().trim() === userEmail,
+      ) || null;
+    } catch {}
+  }
+
   return callerEmp?.sector_id || user?.data?.sector_id || user?.sector_id || null;
 }
 
