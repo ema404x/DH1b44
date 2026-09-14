@@ -219,42 +219,51 @@ export default async function (req) {
 
     // ── Eficiencia por técnico (excluye jefes de sitio) ──
     const jefeNamesLower = new Set(filtros.jefes.map(norm));
-    const efMap = new Map();
+    const efMap = new Map(); // normKey -> { label, total, completadas }
     filteredOrders.forEach((o) => {
       if (!o.assigned_name || jefeNamesLower.has(norm(o.assigned_name))) return;
-      if (!efMap.has(o.assigned_name)) efMap.set(o.assigned_name, { total: 0, completadas: 0 });
-      const e = efMap.get(o.assigned_name);
+      const k = norm(o.assigned_name);
+      const isAllCaps = o.assigned_name === o.assigned_name.toUpperCase() && /[A-Z]/.test(o.assigned_name);
+      if (!efMap.has(k)) efMap.set(k, { label: o.assigned_name, allCaps: isAllCaps, total: 0, completadas: 0 });
+      const e = efMap.get(k);
+      if (e.allCaps && !isAllCaps) { e.label = o.assigned_name; e.allCaps = false; }
       e.total++;
       if (o.status === 'completada') e.completadas++;
     });
     const eficienciaPorTecnico = [...efMap.entries()]
-      .map(([name, d]) => ({ name, total: d.total, completadas: d.completadas, eficiencia: d.total > 0 ? Math.round((d.completadas / d.total) * 100) : 0 }))
+      .map(([, d]) => ({ name: d.label, total: d.total, completadas: d.completadas, eficiencia: d.total > 0 ? Math.round((d.completadas / d.total) * 100) : 0 }))
       .sort((a, b) => b.eficiencia - a.eficiencia)
       .slice(0, 8);
 
     // ── Costos por proyecto ──
-    const cpMap = new Map();
+    const cpMap = new Map(); // normKey -> { label, costo, allCaps }
     filteredOrders.forEach((o) => {
       if (!o.project_name) return;
+      const k = norm(o.project_name);
       const c = (o.materials_used || []).reduce((s, m) => s + (m.quantity || 0) * (m.unit_cost || 0), 0);
-      cpMap.set(o.project_name, (cpMap.get(o.project_name) || 0) + c);
+      const isAllCaps = o.project_name === o.project_name.toUpperCase() && /[A-Z]/.test(o.project_name);
+      if (!cpMap.has(k)) cpMap.set(k, { label: o.project_name, allCaps: isAllCaps, costo: 0 });
+      const e = cpMap.get(k);
+      if (e.allCaps && !isAllCaps) { e.label = o.project_name; e.allCaps = false; }
+      e.costo += c;
     });
     const costosPorProyecto = [...cpMap.entries()]
-      .map(([name, costo]) => ({ name, costo: round2(costo) }))
+      .map(([, d]) => ({ name: d.label, costo: round2(d.costo) }))
       .sort((a, b) => b.costo - a.costo)
       .slice(0, 6);
 
     // ── Plantel de empleados (OTs sobre filteredOrders) ──
-    const empOts = new Map();
+    const empOts = new Map(); // normKey -> { ots, completadas }
     filteredOrders.forEach((o) => {
       if (!o.assigned_name) return;
-      if (!empOts.has(o.assigned_name)) empOts.set(o.assigned_name, { ots: 0, completadas: 0 });
-      const e = empOts.get(o.assigned_name);
+      const k = norm(o.assigned_name);
+      if (!empOts.has(k)) empOts.set(k, { ots: 0, completadas: 0 });
+      const e = empOts.get(k);
       e.ots++;
       if (o.status === 'completada') e.completadas++;
     });
     const empleados = employees.map((e) => {
-      const d = empOts.get(e.full_name) || { ots: 0, completadas: 0 };
+      const d = empOts.get(norm(e.full_name)) || { ots: 0, completadas: 0 };
       return { id: e.id, full_name: e.full_name, status: e.status, specialty: e.specialty, role: e.role, ots: d.ots, completadas: d.completadas };
     });
 
@@ -328,9 +337,9 @@ export default async function (req) {
 
     const pendPorComuna = (filtros.comunas.length ? filtros.comunas : ['8A', '8B', '10A']).map((c) => ({
       comuna: c,
-      total: filteredPendientes.filter((p) => p.comuna === c).length,
-      resueltos: filteredPendientes.filter((p) => p.comuna === c && p.estado === 'resuelto').length,
-      activos: filteredPendientes.filter((p) => p.comuna === c && !['resuelto', 'cancelado'].includes(p.estado)).length,
+      total: filteredPendientes.filter((p) => eqNorm(p.comuna, c)).length,
+      resueltos: filteredPendientes.filter((p) => eqNorm(p.comuna, c) && p.estado === 'resuelto').length,
+      activos: filteredPendientes.filter((p) => eqNorm(p.comuna, c) && !['resuelto', 'cancelado'].includes(p.estado)).length,
     })).filter((d) => d.total > 0);
 
     // ── Slim exports para PDF (solo lo necesario) ──
