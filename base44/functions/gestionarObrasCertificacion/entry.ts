@@ -3,10 +3,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 /**
  * Gestión de ObraCertificacion con matching tolerante de nombres.
  *
- * El RLS de la entidad compara jefe_sitio/inspector contra user.full_name con
- * match exacto, pero los datos vienen de SAP en formato "APELLIDO, Nombre"
- * mientras que user.full_name puede estar en otro formato o sin sincronizar.
- * Esta función usa service-role + matching tolerante para resolver el mismatch.
+ * Permisos regidos por RolePermission (Control de Acceso) en lugar de
+ * roles hardcodeados. Cualquier rol con create/update/delete habilitado
+ * en RolePermission[CertificacionObras] puede operar.
  */
 Deno.serve(async (req) => {
   try {
@@ -26,13 +25,6 @@ Deno.serve(async (req) => {
     const { action } = body;
 
     // ── Normalización de nombres para matching tolerante ──
-    // Convierte cualquier nombre en una key canónica:
-    //   "APARICIO, Nolberto"  → "aparicionolberto"
-    //   "Nolberto Aparicio"   → "aparicionolberto"
-    //   "LAROCCA, Cynthia"    → "cynthialarocca"
-    //   "Cynthia La Rocca"    → "cynthialarocca"
-    // Maneja: mayúsculas, acentos, comas, guiones, espacios múltiples,
-    // apellidos compuestos, y orden de palabras.
     const nameKey = (s) => {
       if (!s) return '';
       return s
@@ -56,16 +48,36 @@ Deno.serve(async (req) => {
       emp = allEmps.find(e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim());
     }
 
-    const ADMIN_ROLES = ['administrativo', 'admin', 'gerente', 'gerencia'];
-    const empRole = (emp?.role || '').toLowerCase().trim();
-    const isSuperAdmin = user.role === 'admin' || ADMIN_ROLES.includes(empRole);
+    // Platform admin tiene acceso total
+    const isPlatformAdmin = user.role === 'admin';
+
+    // ── Resolver permisos desde RolePermission (Control de Acceso) ──
+    let rolePerms = null;
+    if (emp?.role) {
+      let roleCandidates = await sb.entities.RolePermission.filter({ role_name: emp.role }).catch(() => []);
+      if (!roleCandidates || roleCandidates.length === 0) {
+        roleCandidates = await sb.entities.RolePermission.list('-created_date', 500).catch(() => []);
+      }
+      rolePerms = roleCandidates.find(
+        rp => rp.role_name?.toLowerCase().trim() === emp.role.toLowerCase().trim()
+      ) || null;
+    }
+
+    const MODULE = 'CertificacionObras';
+    const hasPermission = (actionName) => {
+      if (isPlatformAdmin) return true;
+      const perms = rolePerms?.permissions?.[MODULE];
+      return !!(perms && perms[actionName] === true);
+    };
+
+    // admin_view = ver todas las obras del sector (ignora filtro de propietario)
+    const canViewAll = isPlatformAdmin || hasPermission('admin_view');
 
     // Verifica si un registro es accesible para el usuario actual
     const canAccess = (obra) => {
-      if (isSuperAdmin) return true;
+      if (canViewAll) return true;
       if (!obra) return false;
       if (obra.created_by_id === user.id) return true;
-      // Solo usar el empleado vinculado (admin-controlled), nunca user.full_name (user-controlled)
       if (!emp || emp.user_id !== user.id) return false;
       const empKey = nameKey(emp.full_name);
       const jefeKey = nameKey(obra.jefe_sitio);
@@ -76,9 +88,8 @@ Deno.serve(async (req) => {
 
     // ── LIST ──
     if (action === 'list') {
-      // Filtrar por sector del usuario — aisla datos entre sectores (fail closed)
       const all = await sb.entities.ObraCertificacion.filter({ sector_id: callerSector });
-      const obras = isSuperAdmin ? all : all.filter(canAccess);
+      const obras = canViewAll ? all : all.filter(canAccess);
       return Response.json({ obras });
     }
 
@@ -91,12 +102,15 @@ Deno.serve(async (req) => {
       const obra = existing[0];
       if (!obra) return Response.json({ error: 'Obra no encontrada' }, { status: 404 });
 
-      // Fail-closed: sector debe coincidir exactamente. Sin bypass por rol.
+      // Fail-closed: sector debe coincidir exactamente.
       if (obra.sector_id !== callerSector) {
         return Response.json({ error: 'Obra de otro sector. Cambiá de sector activo.' }, { status: 403 });
       }
-      if (obra.ciclo_archivado && !isSuperAdmin) {
+      if (obra.ciclo_archivado && !canViewAll) {
         return Response.json({ error: 'Obra archivada: solo administradores pueden modificarla' }, { status: 403 });
+      }
+      if (!hasPermission('update')) {
+        return Response.json({ error: 'No tenés permiso para editar obras' }, { status: 403 });
       }
       if (!canAccess(obra)) {
         return Response.json({ error: 'No tenés permiso para editar esta obra' }, { status: 403 });
@@ -106,26 +120,28 @@ Deno.serve(async (req) => {
       return Response.json({ obra: updated });
     }
 
-    // ── CREATE (solo administradores) ──
+    // ── CREATE ──
     if (action === 'create') {
-      if (!isSuperAdmin) {
-        return Response.json({ error: 'Solo administradores pueden crear obras' }, { status: 403 });
+      if (!hasPermission('create')) {
+        return Response.json({ error: 'No tenés permiso para crear obras' }, { status: 403 });
       }
-      const created = await sb.entities.ObraCertificacion.create(body.data);
+      // Estampar sector_id del caller — asegura visibilidad tras el create
+      const data = { ...body.data, sector_id: callerSector };
+      const created = await sb.entities.ObraCertificacion.create(data);
       return Response.json({ obra: created });
     }
 
-    // ── DELETE (solo administradores) ──
+    // ── DELETE ──
     if (action === 'delete') {
-      if (!isSuperAdmin) {
-        return Response.json({ error: 'Solo administradores pueden eliminar obras' }, { status: 403 });
+      if (!hasPermission('delete')) {
+        return Response.json({ error: 'No tenés permiso para eliminar obras' }, { status: 403 });
       }
       const { id } = body;
       if (!id) return Response.json({ error: 'id requerido' }, { status: 400 });
       const existing = await sb.entities.ObraCertificacion.filter({ id }).catch(() => []);
       const obra = existing[0];
       if (!obra) return Response.json({ error: 'Obra no encontrada' }, { status: 404 });
-      // Fail-closed: sector debe coincidir exactamente. Sin bypass por rol.
+      // Fail-closed: sector debe coincidir exactamente.
       if (obra.sector_id !== callerSector) {
         return Response.json({ error: 'Obra de otro sector. Cambiá de sector activo.' }, { status: 403 });
       }

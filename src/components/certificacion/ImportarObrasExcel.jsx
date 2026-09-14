@@ -298,16 +298,26 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
       const existing = key ? existingMap.get(key) : null;
       try {
         if (existing) {
-          await base44.functions.invoke('gestionarObrasCertificacion', {
+          const res = await base44.functions.invoke('gestionarObrasCertificacion', {
             action: 'update', id: existing.id, data: clean,
           });
-          updated++;
-          detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'ok', motivo: 'actualizada' });
+          if (res?.data?.error) {
+            failed++;
+            detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'failed', motivo: res.data.error });
+          } else {
+            updated++;
+            detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'ok', motivo: 'actualizada' });
+          }
         } else {
           const res = await base44.functions.invoke('gestionarObrasCertificacion', { action: 'create', data: clean });
-          if (key && res?.data?.obra?.id) existingMap.set(key, { id: res.data.obra.id });
-          created++;
-          detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'ok', motivo: 'creada' });
+          if (res?.data?.error || !res?.data?.obra) {
+            failed++;
+            detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'failed', motivo: res?.data?.error || 'No se pudo crear la obra' });
+          } else {
+            if (key && res.data.obra.id) existingMap.set(key, { id: res.data.obra.id });
+            created++;
+            detalles.push({ sheet: sheetName, row: rowIndex, titulo: clean.titulo, estado: 'ok', motivo: 'creada' });
+          }
         }
       } catch (err) {
         failed++;
