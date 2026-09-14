@@ -72,6 +72,19 @@ export async function resolveEmployee(sb: any, user: any): Promise<any | null> {
       .filter({ user_id: user.id }).catch(() => []);
     employee = byUid && byUid.length > 0 ? byUid[0] : null;
   }
+
+  // FALLBACK case-insensitive: si los filtros rápidos por email lowercased y
+  // user_id no encontraron la ficha (mismatch de mayúsculas/minúsculas o
+  // acentos en el email almacenado), fetch amplio + match normalizado.
+  // Cierra la escalada de privilegios: sin este fallback, un jefe_sitio sin
+  // ficha encontrada cae en `superAdmin: true` → acceso total injustificado.
+  if (!employee && userEmail) {
+    try {
+      const all = await sb.asServiceRole.entities.Employee.list('-created_date', 2000);
+      employee = (all || []).find((e: any) => norm(e?.email || '') === norm(userEmail)) || null;
+    } catch {}
+  }
+
   return employee;
 }
 

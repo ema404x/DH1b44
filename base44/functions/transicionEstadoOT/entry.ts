@@ -100,14 +100,17 @@ Deno.serve(async (req) => {
       const employee = P.employee;
 
       // Reconciliación best-effort: si la ficha tiene sector y difiere del
-      // usuario de plataforma, alinear data.sector_id. Idempotente.
+      // usuario de plataforma, alinear sector_id. Dispara incluso cuando
+      // platformSector es null (usuario sin sector estampado) — el guard
+      // anterior `platformSector &&` nunca disparaba en ese caso, dejando al
+      // usuario bloqueado por RLS para siempre. Patrón top-level (sin
+      // `data:{}` que causa double-nesting `data.data.sector_id`). Idempotente.
       try {
         if (employee?.sector_id) {
-          const platformSector = user.data?.sector_id || user.sector_id;
-          if (platformSector && platformSector !== employee.sector_id) {
+          const platformSector = user.data?.sector_id ?? user.sector_id ?? null;
+          if (platformSector !== employee.sector_id) {
             await base44.asServiceRole.entities.User.update(user.id, {
               sector_id: employee.sector_id,
-              data: { ...user.data, sector_id: employee.sector_id },
             });
           }
         }

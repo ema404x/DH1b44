@@ -129,7 +129,16 @@ export async function buildOtVisibilityContext(
         sector_id: sector,
         nombre: employeeName,
       });
-      const tablet = tablets.find((t: any) => norm(t.nombre) === norm(employeeName));
+      let tablet = tablets.find((t: any) => norm(t.nombre) === norm(employeeName));
+      // Fallback case-insensitive: si el filter por nombre exacto no matcheó
+      // (mismatch de mayúsculas/minúsculas), fetch amplio sector-scoped + find
+      // normalizado. Sino el operario no ve las OTs que su jefe le asignó.
+      if (!tablet && employeeName) {
+        try {
+          const allTablets = await sb.entities.Tablet.filter({ sector_id: sector }, '-created_date', 500);
+          tablet = allTablets.find((t: any) => norm(t.nombre) === norm(employeeName)) || null;
+        } catch {}
+      }
       if (tablet?.jefe_sitio) jefeNameStr = tablet.jefe_sitio;
       if (!jefeNameStr && employee?.assigned_jefe_sitio) {
         jefeNameStr = employee.assigned_jefe_sitio;
@@ -139,8 +148,17 @@ export async function buildOtVisibilityContext(
           sector_id: sector,
           full_name: jefeNameStr,
         });
-        const jefeEmp =
+        let jefeEmp =
           jefeEmps.find((e: any) => norm(e.full_name) === norm(jefeNameStr)) || null;
+        // Fallback case-insensitive: si el filter por full_name exacto no matcheó
+        // (mismatch de mayúsculas/minúsculas), fetch amplio sector-scoped + find
+        // normalizado.
+        if (!jefeEmp && jefeNameStr) {
+          try {
+            const allEmps = await sb.entities.Employee.filter({ sector_id: sector }, '-created_date', 500);
+            jefeEmp = allEmps.find((e: any) => norm(e.full_name) === norm(jefeNameStr)) || null;
+          } catch {}
+        }
         jefe = jefeEmp
           ? {
               userId: jefeEmp.user_id || null,

@@ -36,6 +36,15 @@ Deno.serve(async (req) => {
         const byEmail = await sb.entities.Employee.filter({ email: user.email }).catch(() => []);
         emp = byEmail.find(e => e.email?.toLowerCase().trim() === user.email.toLowerCase().trim());
       }
+      // 3) Fallback case-insensitive: si el filter exacto por email no matcheó
+      // (mismatch de mayúsculas/minúsculas en el email almacenado), fetch amplio
+      // + find normalizado. Sino el gerente no puede cambiar de sector.
+      if (!emp && user.email) {
+        try {
+          const all = await sb.entities.Employee.list('-created_date', 2000);
+          emp = (all || []).find(e => e.email?.toLowerCase().trim() === user.email.toLowerCase().trim()) || null;
+        } catch {}
+      }
       if (emp && normalizeRole(emp.role) === 'gerente_general') {
         puedeCambiar = true;
         // Auto-curación: estampar user_id si faltaba
