@@ -165,10 +165,17 @@ export default async function (req) {
       ...locations.map((l) => l.comuna),
       ...pendientes.map((p) => p.comuna),
     ]).sort(strSort);
+    // Opciones de jefe alineadas con el comparador del filtro (resolveJefeOT).
+    // Antes se incluía Employee.full_name, que es un nombre canónico que no
+    // necesariamente coincide con el texto denormalizado de la OT/LocationData
+    // → el dropdown ofrecía un jefe que luego eqNorm no podía matchear → OTs
+    // excluidas ("menos de lo esperado"). Ahora las opciones salen de los
+    // mismos valores que el filtro compara, garantizando que toda opción tenga
+    // al menos una OT que coincide.
     const jefes = buildCanonical([
-      ...locations.map((l) => l.jefe_sitio),
+      ...orders.map((o) => resolveJefeOT(o)),
       ...pendientes.map((p) => p.jefe_sitio),
-      ...employees.filter((e) => e.role && norm(e.role).includes('jefe')).map((e) => e.full_name),
+      ...locations.map((l) => l.jefe_sitio),
     ]).sort(strSort);
     const tecnicos = buildCanonical([
       ...employees.filter((e) => !(e.role && norm(e.role).includes('jefe'))).map((e) => e.full_name),
