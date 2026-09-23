@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle2, XCircle, MessageSquare, Paperclip, TrendingUp, DollarSign, Calendar, User, Building2, CheckSquare, ArrowLeft, Clock, FileText, ChevronDown, ChevronUp, Download, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, MessageSquare, Paperclip, TrendingUp, DollarSign, Calendar, User, Building2, CheckSquare, ArrowLeft, Clock, FileText, ChevronDown, ChevronUp, Download, Loader2, PenTool } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -530,6 +530,42 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
         displayName={displayName}
         tipoCertificado={certificado?.tipo}
       />
+
+      {/* Firmantes de la cadena intermedia */}
+      {certificado?.cadena_firmas?.length > 0 && (
+        <Card className="border-blue-200 bg-blue-50/10">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <PenTool className="h-3.5 w-3.5 text-blue-500" /> Firmantes del certificado
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="space-y-2">
+              {certificado.cadena_firmas.map((f, i) => (
+                <div key={i} className="flex items-center gap-3 text-xs">
+                  <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${f.estado === 'firmado' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                    {i + 1}
+                  </div>
+                  {f.firma_url ? (
+                    <img src={f.firma_url} alt={`Firma de ${f.full_name}`} className="h-8 object-contain border rounded bg-white px-1 flex-shrink-0" />
+                  ) : (
+                    <div className="h-8 w-20 border border-dashed border-border rounded bg-white/50 flex-shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <span className="font-medium text-foreground">{f.firmado_por || f.full_name}</span>
+                    {f.fecha_firma ? (
+                      <span className="text-muted-foreground"> · {format(new Date(f.fecha_firma), "dd/MM/yy HH:mm", { locale: es })}</span>
+                    ) : (
+                      <span className="text-amber-500"> · Pendiente</span>
+                    )}
+                  </div>
+                  {f.estado === 'firmado' && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 ml-auto flex-shrink-0" />}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Historial */}
       {solicitud.historial?.length > 0 && (
