@@ -86,12 +86,58 @@ export default async function(req: Request): Promise<Response> {
         estado: nuevoEstado,
       });
 
+      // Si era el último firmante, el certificado ya transicionó a 'emitido'.
+      // Ahora sí crear la SolicitudCertificado para que llegue a la bandeja
+      // del gerente. Best-effort: si falla, la firma ya quedó aplicada —
+      // devolver solicitud_creada=false para que el frontend avise.
+      let solicitudCreada = true;
+      let solicitudError = null;
+      if (esUltimo) {
+        try {
+          const creadorEmail = (cert.creado_por_email || userEmail).toLowerCase().trim();
+          let creadorNombre = creadorEmail;
+          try {
+            const empCreador = (await sb.entities.Employee.filter({ email: creadorEmail }).catch(() => []))[0];
+            if (empCreador?.full_name) creadorNombre = empCreador.full_name;
+          } catch (_) { /* best-effort */ }
+
+          const numero = `CERT-${cert.id.slice(-6).toUpperCase()}`;
+          await sb.entities.SolicitudCertificado.create({
+            numero,
+            titulo: `Certificado N°${cert.numero} — ${cert.contratista || cert.emprendimiento || ''}`,
+            establecimiento: cert.emprendimiento || cert.obra_servicio || '',
+            jefe_sitio: creadorNombre,
+            jefe_sitio_email: creadorEmail,
+            descripcion_trabajo: cert.obra_servicio || '',
+            monto_solicitado: cert.subtotal || cert.monto_contratado || 0,
+            porcentaje_avance: cert.porcentaje_avance || 0,
+            periodo: cert.mes_periodo || '',
+            estado: 'enviada',
+            certificado_id: cert.id,
+            sector_id: cert.sector_id,
+            historial: [{
+              fecha: new Date().toISOString(),
+              estado: 'enviada',
+              usuario: user.full_name || userEmail,
+              comentario: 'Cadena de firmas completada — enviado automáticamente a aprobación gerencial',
+            }],
+          });
+        } catch (e) {
+          solicitudCreada = false;
+          solicitudError = e.message;
+        }
+      }
+
       return Response.json({
         success: true,
         estado: nuevoEstado,
-        mensaje: esUltimo
-          ? 'Certificado firmado y enviado a aprobación gerencial'
-          : `Firma aplicada. Pendiente ${cadena.length - idxActual - 1} firmante(s) más.`,
+        solicitud_creada: solicitudCreada,
+        solicitud_error: solicitudError,
+        mensaje: !esUltimo
+          ? `Firma aplicada. Pendiente ${cadena.length - idxActual - 1} firmante(s) más.`
+          : !solicitudCreada
+            ? 'Cadena completada, pero no se pudo enviar al gerente. Reintenta desde Aprobación de Certificados.'
+            : 'Cadena de firmas completada — certificado enviado a aprobación gerencial',
       });
     }
 

@@ -59,34 +59,41 @@ export default async function(req) {
     const certPayload = { ...rest, estado: estadoInicial, sector_id: callerSector, creado_por_email: userEmail, cadena_firmas: cadenaFirmas };
     const cert = await base44.asServiceRole.entities.Certificado.create(certPayload);
 
-    // 2) Crear la solicitud de aprobación (vinculada al nuevo cert)
+    // 2) Crear la solicitud de aprobación (vinculada al nuevo cert).
+    //    Solo si el certificado va directo al gerente (sin cadena de firmas).
+    //    Si tiene cadena, arranca en 'pendiente_firmas' y la solicitud se
+    //    crea recién cuando el último firmante completa la cadena
+    //    (firmarCertificadoIntermedio). Así el gerente no lo ve en su bandeja
+    //    hasta que la cadena esté completa.
     let solicitudCreada = true;
     let solicitudError = null;
-    try {
-      const numero = `CERT-${cert.id.slice(-6).toUpperCase()}`;
-      await base44.asServiceRole.entities.SolicitudCertificado.create({
-        numero,
-        titulo: `Certificado N°${cert.numero} — ${cert.contratista || cert.emprendimiento || ''}`,
-        establecimiento: cert.emprendimiento || cert.obra_servicio || '',
-        jefe_sitio: displayName,
-        jefe_sitio_email: userEmail,
-        descripcion_trabajo: cert.obra_servicio || '',
-        monto_solicitado: cert.subtotal || cert.monto_contratado || 0,
-        porcentaje_avance: cert.porcentaje_avance || 0,
-        periodo: cert.mes_periodo || '',
-        estado: 'enviada',
-        certificado_id: cert.id,
-        sector_id: callerSector,
-        historial: [{
-          fecha: new Date().toISOString(),
+    if (estadoInicial === 'emitido') {
+      try {
+        const numero = `CERT-${cert.id.slice(-6).toUpperCase()}`;
+        await base44.asServiceRole.entities.SolicitudCertificado.create({
+          numero,
+          titulo: `Certificado N°${cert.numero} — ${cert.contratista || cert.emprendimiento || ''}`,
+          establecimiento: cert.emprendimiento || cert.obra_servicio || '',
+          jefe_sitio: displayName,
+          jefe_sitio_email: userEmail,
+          descripcion_trabajo: cert.obra_servicio || '',
+          monto_solicitado: cert.subtotal || cert.monto_contratado || 0,
+          porcentaje_avance: cert.porcentaje_avance || 0,
+          periodo: cert.mes_periodo || '',
           estado: 'enviada',
-          usuario: displayName,
-          comentario: 'Certificado emitido — enviado automáticamente para aprobación',
-        }],
-      });
-    } catch (e) {
-      solicitudCreada = false;
-      solicitudError = e.message;
+          certificado_id: cert.id,
+          sector_id: callerSector,
+          historial: [{
+            fecha: new Date().toISOString(),
+            estado: 'enviada',
+            usuario: displayName,
+            comentario: 'Certificado emitido — enviado automáticamente para aprobación',
+          }],
+        });
+      } catch (e) {
+        solicitudCreada = false;
+        solicitudError = e.message;
+      }
     }
 
     // 3) Solo si el nuevo cert + solicitud OK, limpiar el borrador/aprobado previo
@@ -113,9 +120,11 @@ export default async function(req) {
       tipo: cert.tipo,
       solicitud_creada: solicitudCreada,
       solicitud_error: solicitudError,
-      mensaje: solicitudCreada
-        ? 'Certificado emitido y enviado a aprobación gerencial'
-        : 'Certificado emitido, pero no se pudo crear la solicitud de aprobación. Reintenta desde Aprobación de Certificados.',
+      mensaje: !solicitudCreada
+        ? 'Certificado emitido, pero no se pudo crear la solicitud de aprobación. Reintenta desde Aprobación de Certificados.'
+        : estadoInicial === 'pendiente_firmas'
+          ? 'Certificado enviado a firma intermedia. Llegará al gerente una vez completada la cadena de firmas.'
+          : 'Certificado emitido y enviado a aprobación gerencial',
     });
   } catch (error) {
     return Response.json({ error: error.message || 'Error al emitir el certificado' }, { status: 500 });
