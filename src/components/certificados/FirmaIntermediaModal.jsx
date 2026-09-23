@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, PenTool, Trash2, CheckCircle2, RefreshCw, XCircle, FileText, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
+import TipsFirmaPanel from './TipsFirmaPanel';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -17,6 +18,7 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
   const [redibujar, setRedibujar] = useState(false);
   const [mode, setMode] = useState('confirm'); // 'confirm' | 'rejecting'
   const [motivo, setMotivo] = useState('');
+  const [tipsOk, setTipsOk] = useState(false);
   const lastPos = useRef(null);
   const queryClient = useQueryClient();
 
@@ -33,7 +35,7 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
 
   // Reset al abrir
   useEffect(() => {
-    if (open) { setRedibujar(false); setMode('confirm'); setMotivo(''); }
+    if (open) { setRedibujar(false); setMode('confirm'); setMotivo(''); setTipsOk(false); }
   }, [open]);
 
   useEffect(() => {
@@ -233,6 +235,9 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
           </div>
         ) : (
           <>
+           {/* Checklist de tips antes de firmar */}
+           <TipsFirmaPanel tipoCertificado={cert.tipo} onAllChecked={setTipsOk} />
+
             {/* Firma */}
             {firmaGuardada && !redibujar ? (
               <div className="space-y-2">
@@ -301,7 +306,7 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
               </Button>
               <Button
                 onClick={handleFirmar}
-                disabled={uploading || (mostrarCanvas && !hasFirma)}
+                disabled={uploading || !tipsOk || (mostrarCanvas && !hasFirma)}
                 className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}

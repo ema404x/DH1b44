@@ -528,6 +528,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
         onFirmada={confirmarAprobacion}
         user={user}
         displayName={displayName}
+        tipoCertificado={certificado?.tipo}
       />
 
       {/* Historial */}

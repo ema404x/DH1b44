@@ -5,13 +5,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Loader2, PenTool, Trash2, CheckCircle2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import TipsFirmaPanel from './TipsFirmaPanel';
 
-export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, displayName }) {
+export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, displayName, tipoCertificado = 'obra' }) {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [hasFirma, setHasFirma] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [redibujar, setRedibujar] = useState(false);
+  const [tipsOk, setTipsOk] = useState(false);
   const lastPos = useRef(null);
 
   const { data: empleados = [], isLoading: loadingFirma } = useQuery({
@@ -127,6 +129,9 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, di
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Checklist de tips antes de firmar */}
+            <TipsFirmaPanel tipoCertificado={tipoCertificado} onAllChecked={setTipsOk} />
+
             {firmaGuardada && !redibujar ? (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Firma registrada</p>
@@ -195,7 +200,7 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, di
           <Button variant="outline" onClick={onClose} disabled={uploading}>Cancelar</Button>
           <Button
             onClick={handleConfirm}
-            disabled={uploading || loadingFirma || (mostrarCanvas && !hasFirma)}
+            disabled={uploading || loadingFirma || !tipsOk || (mostrarCanvas && !hasFirma)}
             className="gap-2 bg-primary"
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
