@@ -516,13 +516,32 @@ export async function exportCertificadoPDF(form) {
       }
     };
 
-    // Renderizar fila por fila. Cada fila se centra independientemente y
-    // avanza Y por BLOCK_H + GAP_Y. Así las firmas se acumulan prolijas
-    // hacia abajo sin superponerse, por más que haya 4, 5 o 6 firmas.
+    // Renderizar fila por fila con paginación dinámica. Cada fila se centra
+    // independientemente y avanza Y por BLOCK_H + GAP_Y. Antes de cada fila
+    // se verifica que entre en la página; si no, se agrega una nueva página
+    // con header + título de continuación. Así NUNCA se superponen, sin
+    // importar cuántos firmantes haya (3, 6, 9, 12+).
     for (let rowIdx = 0; rowIdx < rows; rowIdx++) {
       const start = rowIdx * MAX_PER_ROW;
       const rowFirmas = firmas.slice(start, start + MAX_PER_ROW);
       const rowDims = firmaDims.slice(start, start + MAX_PER_ROW);
+
+      // Paginación per-row: si la fila no entra en lo que queda de página,
+      // saltar a una nueva antes de renderizar. Esto garantiza que ningún
+      // bloque de firma pise el footer ni se superponga con la fila anterior.
+      if (y + BLOCK_H > SAFE_BOTTOM) {
+        drawFooter(pageNum, '??');
+        doc.addPage();
+        pageNum++;
+        drawPageHeader();
+        y = 26;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(100, 115, 140);
+        doc.text('FIRMAS Y APROBACIÓN (continuación)', W / 2, y, { align: 'center' });
+        y += 8;
+      }
+
       const rowW = rowFirmas.length * BLOCK_W + (rowFirmas.length - 1) * GAP_X;
       const startX = (W - rowW) / 2;
       for (let i = 0; i < rowFirmas.length; i++) {
