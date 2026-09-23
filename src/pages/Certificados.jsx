@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import FirmaJefeSitioModal from '@/components/certificados/FirmaJefeSitioModal';
 import FirmaIntermediaModal from '@/components/certificados/FirmaIntermediaModal';
+import AuditoriaFirmasModal from '@/components/certificados/AuditoriaFirmasModal';
 
 // view: 'list' | 'upload' | 'edit' | 'preview' | 'manual'
 export default function Certificados() {
@@ -30,6 +31,7 @@ export default function Certificados() {
   const [previewing, setPreviewing] = useState(null);
   const [pendingFirmaData, setPendingFirmaData] = useState(null); // datos del cert esperando firma jefe
   const [signingCert, setSigningCert] = useState(null); // cert pendiente de firma intermedia abierta
+  const [auditoriaCert, setAuditoriaCert] = useState(null); // cert abierto en panel de auditoría
   const queryClient = useQueryClient();
   const { user, displayName, isSuperAdmin, loading } = useCurrentUser();
 
@@ -150,6 +152,7 @@ export default function Certificados() {
   };
 
   const handleFirmaIntermedia = (cert) => setSigningCert(cert);
+  const handleAuditoria = (cert) => setAuditoriaCert(cert);
 
   const handleFirmaJefe = (firmaUrl) => {
     const dataConFirma = {
@@ -289,6 +292,13 @@ export default function Certificados() {
         displayName={displayName}
       />
 
+      {/* Modal de auditoría de firmas — timeline detallado de quién firmó y cuándo */}
+      <AuditoriaFirmasModal
+        open={!!auditoriaCert}
+        onClose={() => setAuditoriaCert(null)}
+        cert={auditoriaCert}
+      />
+
       {/* Modal de firma del jefe de sitio — solo para certificados de obra */}
       <FirmaJefeSitioModal
         open={!!pendingFirmaData}
@@ -361,6 +371,7 @@ export default function Certificados() {
             emptyLabel="No hay certificados de Abono Mensual"
             userEmail={user?.email}
             onFirmaIntermedia={handleFirmaIntermedia}
+            onAuditoria={handleAuditoria}
           />
           <GeneracionMasiva
             open={showMasiva}
@@ -379,6 +390,7 @@ export default function Certificados() {
             emptyLabel="No hay certificados de Obra"
             userEmail={user?.email}
             onFirmaIntermedia={handleFirmaIntermedia}
+            onAuditoria={handleAuditoria}
           />
         </TabsContent>
 
@@ -392,6 +404,7 @@ export default function Certificados() {
             emptyLabel="No hay certificados de Informe"
             userEmail={user?.email}
             onFirmaIntermedia={handleFirmaIntermedia}
+            onAuditoria={handleAuditoria}
           />
         </TabsContent>
 

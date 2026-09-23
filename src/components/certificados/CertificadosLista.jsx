@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Plus, Eye, Trash2, Loader2, CheckCircle2, Clock, PenTool } from 'lucide-react';
+import { FileText, Plus, Eye, Trash2, Loader2, CheckCircle2, Clock, PenTool, History } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
@@ -23,7 +23,7 @@ const tipoStyle = {
   informe:       { label: 'Informe',        color: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' },
 };
 
-export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete, emptyLabel, userEmail, onFirmaIntermedia }) {
+export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete, emptyLabel, userEmail, onFirmaIntermedia, onAuditoria }) {
   const isCurrentSigner = (c) => {
     if (c.estado !== 'pendiente_firmas' || !Array.isArray(c.cadena_firmas)) return false;
     const actual = c.cadena_firmas.find(f => f.estado === 'pendiente');
@@ -155,6 +155,11 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                     <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1" onClick={() => onEdit(c)}>
                       <Eye className="h-3.5 w-3.5" /> Ver
                     </Button>
+                    {onAuditoria && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-blue-400" onClick={() => onAuditoria(c)}>
+                        <History className="h-3.5 w-3.5" /> Auditoría
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 text-emerald-600"
                       onClick={() => handleDownloadPDF(c)}
                       disabled={exportingPDF === c.id}
@@ -189,11 +194,22 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                 {c.estado === 'aprobado' && c.firma_gerente_url && (
                   <img src={c.firma_gerente_url} alt="Firma" className="h-8 object-contain border border-border/50 rounded bg-muted/30 px-1" title={`Aprobado por ${c.aprobado_por || ''}`} />
                 )}
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  className="h-8 w-8" 
-                  onClick={() => onEdit(c)} 
+                {onAuditoria && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-blue-400 hover:text-blue-300"
+                    onClick={() => onAuditoria(c)}
+                    title="Auditoría de firmas"
+                  >
+                    <History className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  onClick={() => onEdit(c)}
                   title="Editar"
                 >
                   <Eye className="h-4 w-4" />
