@@ -16,6 +16,7 @@ import AbonoManualForm from '@/components/certificados/AbonoManualForm';
 import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import FirmaJefeSitioModal from '@/components/certificados/FirmaJefeSitioModal';
+import FirmaIntermediaModal from '@/components/certificados/FirmaIntermediaModal';
 
 // view: 'list' | 'upload' | 'edit' | 'preview' | 'manual'
 export default function Certificados() {
@@ -28,6 +29,7 @@ export default function Certificados() {
   const [editing, setEditing] = useState(null);
   const [previewing, setPreviewing] = useState(null);
   const [pendingFirmaData, setPendingFirmaData] = useState(null); // datos del cert esperando firma jefe
+  const [signingCert, setSigningCert] = useState(null); // cert pendiente de firma intermedia abierta
   const queryClient = useQueryClient();
   const { user, displayName, isSuperAdmin, loading } = useCurrentUser();
 
@@ -146,6 +148,8 @@ export default function Certificados() {
     }
     emitirMutation.mutate(formData);
   };
+
+  const handleFirmaIntermedia = (cert) => setSigningCert(cert);
 
   const handleFirmaJefe = (firmaUrl) => {
     const dataConFirma = {
@@ -276,6 +280,15 @@ export default function Certificados() {
 
   return (
     <div className="space-y-6">
+      {/* Modal de firma intermedia — para certs pendiente_firmas donde el usuario es el firmante actual */}
+      <FirmaIntermediaModal
+        open={!!signingCert}
+        onClose={() => setSigningCert(null)}
+        cert={signingCert}
+        user={user}
+        displayName={displayName}
+      />
+
       {/* Modal de firma del jefe de sitio — solo para certificados de obra */}
       <FirmaJefeSitioModal
         open={!!pendingFirmaData}
@@ -346,6 +359,8 @@ export default function Certificados() {
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
             emptyLabel="No hay certificados de Abono Mensual"
+            userEmail={user?.email}
+            onFirmaIntermedia={handleFirmaIntermedia}
           />
           <GeneracionMasiva
             open={showMasiva}
@@ -362,6 +377,8 @@ export default function Certificados() {
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
             emptyLabel="No hay certificados de Obra"
+            userEmail={user?.email}
+            onFirmaIntermedia={handleFirmaIntermedia}
           />
         </TabsContent>
 
@@ -373,6 +390,8 @@ export default function Certificados() {
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
             emptyLabel="No hay certificados de Informe"
+            userEmail={user?.email}
+            onFirmaIntermedia={handleFirmaIntermedia}
           />
         </TabsContent>
 

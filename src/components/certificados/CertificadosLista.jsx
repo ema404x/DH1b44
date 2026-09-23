@@ -11,9 +11,10 @@ import { toast } from 'sonner';
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
 const estadoStyle = {
-  borrador: { label: 'Borrador', cls: 'bg-slate-500/15 text-slate-300 border-slate-500/30' },
-  emitido:  { label: 'Emitido',  cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30' },
-  aprobado: { label: 'Aprobado', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  borrador:         { label: 'Borrador', cls: 'bg-slate-500/15 text-slate-300 border-slate-500/30' },
+  pendiente_firmas: { label: 'Pend. Firmas', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  emitido:          { label: 'Emitido',  cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30' },
+  aprobado:         { label: 'Aprobado', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
 };
 
 const tipoStyle = {
@@ -22,7 +23,19 @@ const tipoStyle = {
   informe:       { label: 'Informe',        color: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' },
 };
 
-export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete, emptyLabel }) {
+export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete, emptyLabel, userEmail, onFirmaIntermedia }) {
+  const isCurrentSigner = (c) => {
+    if (c.estado !== 'pendiente_firmas' || !Array.isArray(c.cadena_firmas)) return false;
+    const actual = c.cadena_firmas.find(f => f.estado === 'pendiente');
+    return actual && (actual.email || '').toLowerCase() === (userEmail || '').toLowerCase();
+  };
+
+  const firmaProgress = (c) => {
+    if (!Array.isArray(c.cadena_firmas)) return null;
+    const total = c.cadena_firmas.length;
+    const firmadas = c.cadena_firmas.filter(f => f.estado === 'firmado').length;
+    return { firmadas, total };
+  };
   const { resolve } = useResolveNames();
   const [exportingPDF, setExportingPDF] = useState(null);
   const [search, setSearch] = useState('');
@@ -104,6 +117,16 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                       <span>Aprobado por {resolve(c.aprobado_por)}</span>
                     </div>
                   )}
+                  {c.estado === 'pendiente_firmas' && (() => {
+                    const prog = firmaProgress(c);
+                    const teToca = isCurrentSigner(c);
+                    return (
+                      <div className={`flex items-center gap-1.5 text-xs mt-1 ${teToca ? 'text-amber-400' : 'text-muted-foreground'}`}>
+                        <PenTool className="h-3 w-3" />
+                        <span>{teToca ? 'Te toca firmar' : `Pendiente firma (${prog?.firmadas || 0}/${prog?.total || 0})`}</span>
+                      </div>
+                    );
+                  })()}
                   {c.estado === 'emitido' && c.tipo === 'obra' && !c.firma_jefe_sitio_url && (
                     <div className="flex items-center gap-1.5 text-xs text-amber-400 mt-1">
                       <PenTool className="h-3 w-3" />
@@ -124,6 +147,11 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
                   )}
                   {/* Mobile actions */}
                   <div className="flex gap-1 mt-2 sm:hidden">
+                    {isCurrentSigner(c) && (
+                      <Button size="sm" className="h-7 px-2 text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => onFirmaIntermedia(c)} disabled={exportingPDF === c.id}>
+                        <PenTool className="h-3.5 w-3.5" /> Firmar
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1" onClick={() => onEdit(c)}>
                       <Eye className="h-3.5 w-3.5" /> Ver
                     </Button>
@@ -149,6 +177,15 @@ export default function CertificadosLista({ certificados, isLoading, onNew, onEd
 
               {/* Desktop actions */}
               <div className="hidden sm:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity items-center">
+                {isCurrentSigner(c) && (
+                  <Button
+                    size="sm"
+                    className="h-8 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() => onFirmaIntermedia(c)}
+                  >
+                    <PenTool className="h-3.5 w-3.5" /> Firmar
+                  </Button>
+                )}
                 {c.estado === 'aprobado' && c.firma_gerente_url && (
                   <img src={c.firma_gerente_url} alt="Firma" className="h-8 object-contain border border-border/50 rounded bg-muted/30 px-1" title={`Aprobado por ${c.aprobado_por || ''}`} />
                 )}

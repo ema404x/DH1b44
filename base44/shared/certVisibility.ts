@@ -32,9 +32,11 @@
 export interface CertLike {
   id?: string;
   sector_id?: string;
+  estado?: string;
   created_by_id?: string;
   creado_por_email?: string;
   aprobado_por_email?: string;
+  cadena_firmas?: Array<{ email?: string; estado?: string }>;
 }
 
 export interface UserLike {
@@ -75,6 +77,14 @@ export function certVisibleToUser(
   if (userEmail && (cert.creado_por_email || '').toLowerCase() === userEmail) return true;
   // Aprobador.
   if (userEmail && (cert.aprobado_por_email || '').toLowerCase() === userEmail) return true;
+  // Firmante actual de una cadena de firmas (pendiente_firmas): el primer
+  // firmante con estado 'pendiente' debe poder ver el cert para firmarlo.
+  if (cert.estado === 'pendiente_firmas' && Array.isArray(cert.cadena_firmas)) {
+    const firmanteActual = cert.cadena_firmas.find(f => f.estado === 'pendiente');
+    if (firmanteActual && userEmail && (firmanteActual.email || '').toLowerCase().trim() === userEmail) {
+      return true;
+    }
+  }
   // Dueño real vía solicitud vinculada (jefe_sitio_email) — caso Gastón Massa:
   // certs de service-role cuyo creador real solo está en la solicitud.
   if (userEmail && solicitudesForCert.some(

@@ -40,8 +40,23 @@ export default async function(req) {
     //    queda en null — sin creado_por_email el creador perdería visibilidad RLS
     //    mientras el cert está 'emitido' (pendiente de aprobación gerencial),
     //    ya que aprobado_por_email solo se setea al aprobar.
-    const { id: _id, ...rest } = data;
-    const certPayload = { ...rest, estado: 'emitido', sector_id: callerSector, creado_por_email: userEmail };
+    const { id: _id, cadena_firmas: cadenaRaw, ...rest } = data;
+    // Cadena de firmas: si viene configurada, el cert arranca en
+    // 'pendiente_firmas' (espera firmas intermedias antes de llegar al
+    // gerente). Sin cadena → directo a 'emitido' como hoy.
+    const cadenaFirmas = Array.isArray(cadenaRaw)
+      ? cadenaRaw.filter(f => f && f.email).map(f => ({
+          user_id: f.user_id || null,
+          email: (f.email || '').toLowerCase().trim(),
+          full_name: f.full_name || '',
+          firma_url: null,
+          firmado_por: null,
+          fecha_firma: null,
+          estado: 'pendiente',
+        }))
+      : [];
+    const estadoInicial = cadenaFirmas.length > 0 ? 'pendiente_firmas' : 'emitido';
+    const certPayload = { ...rest, estado: estadoInicial, sector_id: callerSector, creado_por_email: userEmail, cadena_firmas: cadenaFirmas };
     const cert = await base44.asServiceRole.entities.Certificado.create(certPayload);
 
     // 2) Crear la solicitud de aprobación (vinculada al nuevo cert)

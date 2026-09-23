@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, PenTool, Trash2, CheckCircle2, RefreshCw, XCircle, FileText } from 'lucide-react';
+import { Loader2, PenTool, Trash2, CheckCircle2, RefreshCw, XCircle, FileText, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 

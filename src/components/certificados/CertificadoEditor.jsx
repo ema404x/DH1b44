@@ -10,6 +10,7 @@ import { base44 } from '@/api/base44Client';
 import HistorialAcumulados from './HistorialAcumulados';
 import ItemAcumulacionRow from './ItemAcumulacionRow';
 import { recalcItem, aplicarCantidadPu, aplicarPresenteUnidad, aplicarPresenteImporte, aplicarAnteriorUnidad, aplicarAnteriorImporte, matchAnteriorDesdeCert, calcularTotales } from './acumulacionUtils';
+import CadenaFirmasPanel from './CadenaFirmasPanel';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.round((n || 0) * 100) / 100);
 const parseMonto = (v) => {
@@ -107,6 +108,7 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
       subtotal: initialData?.subtotal || 0,
       _validation: initialData?._validation || null,
       ada_pdf_url: initialData?.ada_pdf_url || '',
+      cadena_firmas: initialData?.cadena_firmas || [],
       items,
     };
   });
@@ -540,6 +542,12 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
           </div>
         )}
       </div>
+
+      {/* Cadena de firmas — configurable antes de emitir */}
+      <CadenaFirmasPanel
+        value={form.cadena_firmas || []}
+        onChange={(cadena) => set('cadena_firmas', cadena)}
+      />
 
       {/* Totales */}
       <div className="bg-card rounded-lg border p-5 space-y-4">
