@@ -86,12 +86,19 @@ export async function exportCertificadoPDF(form) {
 
   const firmaGerenteUrl = form.firma_gerente_url || (form.estado === 'aprobado' ? FIRMA_RAUL_GARCIA_URL : null);
   const firmaJefeUrl = form.firma_jefe_sitio_url || null;
-  const [logoBase64, firmaGerenteBase64, firmaJefeBase64] = await Promise.all([
+  const [logoBase64, firmaGerenteBase64, firmaJefeBase64, ...cadenaBase64sRaw] = await Promise.all([
     loadImageAsBase64(MEJORES_LOGO_URL),
     firmaGerenteUrl ? loadImageAsBase64(firmaGerenteUrl) : Promise.resolve(null),
     firmaJefeUrl ? loadImageAsBase64(firmaJefeUrl) : Promise.resolve(null),
+    // Firmas intermedias de la cadena (solo las que ya firmaron, en orden)
+    ...((form.cadena_firmas || [])
+      .filter(f => f.estado === 'firmado' && f.firma_url)
+      .map(f => loadImageAsBase64(f.firma_url))),
   ]);
   const firmaBase64 = firmaGerenteBase64;
+  // Entradas de cadena_firmas que ya tienen firma aplicada (para metadata: nombre, fecha)
+  const cadenaFirmadas = (form.cadena_firmas || []).filter(f => f.estado === 'firmado' && f.firma_url);
+  const cadenaBase64s = cadenaBase64sRaw;
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const W = 297, H = 210, M = 10, C = W - M * 2;
@@ -376,21 +383,64 @@ export async function exportCertificadoPDF(form) {
   y += 18;
 
   // ── Bloque de firmas ──────────────────────────────────────────────────────
-  const hasFirmaJefe    = !!firmaJefeBase64;
-  const hasFirmaGerente = !!firmaBase64;
+  // Recolectar todas las firmas a renderizar, en orden: jefe → cadena → gerente.
+  // Cada entrada lleva su base64 + metadata. Así el layout no depende de 3
+  // bloques if separados y el wrap a múltiples filas es trivial.
+  const firmas = [];
+  if (firmaJefeBase64) {
+    const fechaJefe = form.fecha_firma_jefe
+      ? new Date(form.fecha_firma_jefe).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : null;
+    firmas.push({
+      base64: firmaJefeBase64,
+      nombre: form.firmado_por_jefe || 'Jefe de Sitio',
+      cargo: 'Jefe de Sitio',
+      cargo2: fechaJefe ? `Firmado: ${fechaJefe}` : null,
+      sello: '✓ Conforme',
+    });
+  }
+  for (let ci = 0; ci < cadenaFirmadas.length; ci++) {
+    const base64 = cadenaBase64s[ci];
+    if (!base64) continue;
+    const f = cadenaFirmadas[ci];
+    const fechaFirma = f.fecha_firma
+      ? new Date(f.fecha_firma).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : null;
+    firmas.push({
+      base64,
+      nombre: f.firmado_por || f.full_name || 'Firmante',
+      cargo: 'Firmante de cadena',
+      cargo2: fechaFirma ? `Firmado: ${fechaFirma}` : null,
+      sello: '✓ Conforme',
+    });
+  }
+  if (firmaBase64) {
+    const fechaGerente = form.fecha_aprobacion
+      ? new Date(form.fecha_aprobacion).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : null;
+    firmas.push({
+      base64: firmaBase64,
+      nombre: form.aprobado_por || 'Arq. Raúl García',
+      cargo: 'Gerente de Contratos',
+      cargo2: 'Mejores Hospitales S.A.',
+      sello: fechaGerente ? `✓ Aprobado: ${fechaGerente}` : '✓ Aprobado',
+    });
+  }
 
-  if (hasFirmaJefe || hasFirmaGerente) {
-    const BLOCK_W  = 90;
-    const IMG_H    = 34;
-    const TEXT_H   = 22;
-    const BLOCK_H  = IMG_H + TEXT_H;
-    const GAP      = 20;
+  if (firmas.length > 0) {
+    // Geometría: BLOCK_W=82 + GAP_X=12 → 3 por fila caben en C=277mm
+    // (3×82 + 2×12 = 270). Con 4+ firmas se wrappea a múltiples filas.
+    const BLOCK_W = 82;
+    const IMG_H   = 30;
+    const TEXT_H  = 20;
+    const BLOCK_H = IMG_H + TEXT_H;
+    const GAP_X   = 12;
+    const GAP_Y   = 10;
 
-    const count    = (hasFirmaJefe ? 1 : 0) + (hasFirmaGerente ? 1 : 0);
-    const totalW   = count * BLOCK_W + (count - 1) * GAP;
-    const startX   = (W - totalW) / 2;
+    const MAX_PER_ROW = Math.max(1, Math.floor((C + GAP_X) / (BLOCK_W + GAP_X)));
+    const rows = Math.ceil(firmas.length / MAX_PER_ROW);
+    const neededH = rows * BLOCK_H + (rows - 1) * GAP_Y + 24;
 
-    const neededH  = BLOCK_H + 18;
     if (y + neededH > SAFE_BOTTOM) {
       drawFooter(pageNum, '??');
       doc.addPage();
@@ -401,18 +451,8 @@ export async function exportCertificadoPDF(form) {
 
     y += 10;
 
-    // Pre-calcular dimensiones de cada firma para respetar aspect ratio
-    const _firmaDims = {};
-    let dimsIdx = 0;
-    if (hasFirmaJefe) {
-      const bx = startX + dimsIdx * (BLOCK_W + GAP);
-      _firmaDims[bx] = await getImageDimensions(firmaJefeBase64);
-      dimsIdx++;
-    }
-    if (hasFirmaGerente) {
-      const bx = startX + dimsIdx * (BLOCK_W + GAP);
-      _firmaDims[bx] = await getImageDimensions(firmaBase64);
-    }
+    // Pre-calcular dimensiones de cada imagen (aspect ratio) UNA vez.
+    const firmaDims = await Promise.all(firmas.map(f => getImageDimensions(f.base64)));
 
     // Línea separadora
     doc.setDrawColor(200, 212, 228);
@@ -426,15 +466,10 @@ export async function exportCertificadoPDF(form) {
     doc.text('FIRMAS Y APROBACIÓN', W / 2, y, { align: 'center' });
     y += 6;
 
-    const drawFirmaBloque = (base64, nombre, cargo, cargo2, sello, bx) => {
+    const drawFirmaBloque = (f, dims, bx) => {
       const by = y;
-
-      // Sin fondo ni borde — imagen directa
-      // Imagen de firma respetando aspect ratio
-      const imgPad = 0;
-      const maxW = BLOCK_W - imgPad * 2;
+      const maxW = BLOCK_W;
       const maxH = IMG_H;
-      const dims = _firmaDims[bx];
       let drawW = maxW, drawH = maxH;
       if (dims && dims.w && dims.h) {
         const ratio = dims.w / dims.h;
@@ -446,74 +481,57 @@ export async function exportCertificadoPDF(form) {
       }
       const imgX = bx + (BLOCK_W - drawW) / 2;
       const imgY = by + (maxH - drawH) / 2;
-      // Detectar formato real de la imagen desde el base64 header
-      const imgFmt = base64.startsWith('data:image/jpeg') || base64.startsWith('data:image/jpg') ? 'JPEG' : 'PNG';
-      doc.addImage(base64, imgFmt, imgX, imgY, drawW, drawH, undefined, 'NONE');
+      const imgFmt = f.base64.startsWith('data:image/jpeg') || f.base64.startsWith('data:image/jpg') ? 'JPEG' : 'PNG';
+      doc.addImage(f.base64, imgFmt, imgX, imgY, drawW, drawH, undefined, 'NONE');
 
       // Línea divisoria bajo la imagen
       const lineY = by + IMG_H;
       doc.setDrawColor(170, 188, 212);
       doc.setLineWidth(0.4);
-      doc.line(bx + 6, lineY, bx + BLOCK_W - 6, lineY);
+      doc.line(bx + 5, lineY, bx + BLOCK_W - 5, lineY);
 
       // Nombre
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(15, 28, 46);
-      doc.text(nombre, bx + BLOCK_W / 2, lineY + 5.5, { align: 'center', maxWidth: BLOCK_W - 4 });
+      doc.text(f.nombre, bx + BLOCK_W / 2, lineY + 5.5, { align: 'center', maxWidth: BLOCK_W - 4 });
 
       // Cargo 1
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6);
       doc.setTextColor(80, 95, 120);
-      doc.text(cargo, bx + BLOCK_W / 2, lineY + 10.5, { align: 'center', maxWidth: BLOCK_W - 4 });
+      doc.text(f.cargo, bx + BLOCK_W / 2, lineY + 10.5, { align: 'center', maxWidth: BLOCK_W - 4 });
 
       // Cargo 2
-      if (cargo2) {
-        doc.text(cargo2, bx + BLOCK_W / 2, lineY + 15, { align: 'center', maxWidth: BLOCK_W - 4 });
+      if (f.cargo2) {
+        doc.text(f.cargo2, bx + BLOCK_W / 2, lineY + 15, { align: 'center', maxWidth: BLOCK_W - 4 });
       }
 
       // Sello
-      if (sello) {
+      if (f.sello) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(5.5);
         doc.setTextColor(34, 120, 70);
-        doc.text(sello, bx + BLOCK_W / 2, by + BLOCK_H - 2.5, { align: 'center' });
+        doc.text(f.sello, bx + BLOCK_W / 2, by + BLOCK_H - 2.5, { align: 'center' });
       }
     };
 
-    let firmaIdx = 0;
-    if (hasFirmaJefe) {
-      const bx = startX + firmaIdx * (BLOCK_W + GAP);
-      const fechaJefe = form.fecha_firma_jefe
-        ? new Date(form.fecha_firma_jefe).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-        : null;
-      drawFirmaBloque(
-        firmaJefeBase64,
-        form.firmado_por_jefe || 'Jefe de Sitio',
-        'Jefe de Sitio',
-        fechaJefe ? `Firmado: ${fechaJefe}` : null,
-        '✓ Conforme',
-        bx
-      );
-      firmaIdx++;
+    // Renderizar fila por fila. Cada fila se centra independientemente y
+    // avanza Y por BLOCK_H + GAP_Y. Así las firmas se acumulan prolijas
+    // hacia abajo sin superponerse, por más que haya 4, 5 o 6 firmas.
+    for (let rowIdx = 0; rowIdx < rows; rowIdx++) {
+      const start = rowIdx * MAX_PER_ROW;
+      const rowFirmas = firmas.slice(start, start + MAX_PER_ROW);
+      const rowDims = firmaDims.slice(start, start + MAX_PER_ROW);
+      const rowW = rowFirmas.length * BLOCK_W + (rowFirmas.length - 1) * GAP_X;
+      const startX = (W - rowW) / 2;
+      for (let i = 0; i < rowFirmas.length; i++) {
+        const bx = startX + i * (BLOCK_W + GAP_X);
+        drawFirmaBloque(rowFirmas[i], rowDims[i], bx);
+      }
+      y += BLOCK_H + (rowIdx < rows - 1 ? GAP_Y : 0);
     }
-    if (hasFirmaGerente) {
-      const bx = startX + firmaIdx * (BLOCK_W + GAP);
-      const fechaGerente = form.fecha_aprobacion
-        ? new Date(form.fecha_aprobacion).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-        : null;
-      drawFirmaBloque(
-        firmaBase64,
-        form.aprobado_por || 'Arq. Raúl García',
-        'Gerente de Contratos',
-        'Mejores Hospitales S.A.',
-        fechaGerente ? `✓ Aprobado: ${fechaGerente}` : '✓ Aprobado',
-        bx
-      );
-    }
-
-    y += BLOCK_H + 6;
+    y += 6;
   }
 
   // Footers finales
