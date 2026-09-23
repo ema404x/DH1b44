@@ -116,6 +116,11 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
       if (res.data?.error) throw new Error(res.data.error);
 
       queryClient.invalidateQueries({ queryKey: ['certificados'] });
+      // Si se completó la cadena, refrescar la bandeja del gerente para que
+      // vea la nueva solicitud inmediatamente
+      if (res.data?.solicitud_creada) {
+        queryClient.invalidateQueries({ queryKey: ['solicitudes-cert'] });
+      }
       toast.success(res.data?.mensaje || 'Certificado firmado');
       onClose();
     } catch (err) {
