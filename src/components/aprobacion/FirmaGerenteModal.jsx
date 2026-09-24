@@ -36,15 +36,11 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user, disp
       }
       return [];
     },
-    enabled: !!user && open,
+    enabled: !!user && open && (!firmaUrlProp || redibujar),
   });
 
   const empleado = empleados[0];
-  // Prioridad: 1) prop displayName (nombre de ficha, ya resuelto por el padre)
-  //            2) full_name de la ficha de empleado cargada localmente
-  //            3) full_name de la plataforma como último recurso
   const nombreFirmante = displayNameProp || empleado?.full_name || user?.full_name || user?.email || 'Gerente';
-  // Prioridad: 1) firmaUrl del prop (AuthContext — sin race condition) 2) query local (fallback)
   const firmaGuardada = firmaUrlProp || empleado?.firma_url;
   const mostrarCanvas = !firmaGuardada || redibujar;
 
@@ -139,7 +135,7 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user, disp
         </DialogHeader>
 
         {/* Identidad del firmante */}
-        {!loadingFirma && (
+        {!(loadingFirma && !firmaUrlProp) && (
           <div className="flex items-center gap-3 bg-muted/40 border border-border rounded-lg px-4 py-3">
             <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
               <span className="text-sm font-bold text-primary">{nombreFirmante.charAt(0).toUpperCase()}</span>
@@ -151,7 +147,7 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user, disp
           </div>
         )}
 
-        {loadingFirma ? (
+        {loadingFirma && !firmaUrlProp ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
@@ -218,7 +214,7 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user, disp
           <Button variant="outline" onClick={onClose} disabled={uploading}>Cancelar</Button>
           <Button
             onClick={handleConfirm}
-            disabled={uploading || loadingFirma || (mostrarCanvas && !hasFirma)}
+            disabled={uploading || (loadingFirma && !firmaUrlProp) || (mostrarCanvas && !hasFirma)}
             className="gap-2"
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}

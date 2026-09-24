@@ -72,7 +72,16 @@ export const AuthProvider = ({ children }) => {
   //   2) Backend function vincularEmpleado (service role, bypassa RLS)
   //   3) Acceso mínimo al Dashboard — NUNCA bloquear a un usuario autenticado
   const linkEmployee = async (currentUser) => {
-    if (currentUser?.role === 'admin') return;
+    // Los admins siempre tienen acceso total a todos los módulos.
+    // PERO necesitan cargar su ficha de empleado (firma_url, nombre, sector)
+    // para que los modales de firma funcionen correctamente. Sin esto,
+    // employeeFirmaUrl queda null y el modal cae a una query local que puede
+    // fallar por RLS (Employee.read exige sector_id match, que puede estar
+    // stale si nunca se sincronizó).
+    if (currentUser?.role === 'admin') {
+      await loadAdminEmployeeMetadata(currentUser);
+      return;
+    }
 
     let loaded = false;
     let networkError = false;
@@ -102,18 +111,50 @@ export const AuthProvider = ({ children }) => {
         _employeeSector: currentUser?.data?.sector_id || currentUser?.sector_id || null,
         _minimalAccess: true,
       });
-      // vinculationFailed=true solo si hubo error de red → la UI ofrece reintentar.
-      // Si no hubo error de red, el usuario simplemente no tiene ficha → "Acceso denegado".
       setVinculationFailed(networkError);
       setHasEmployeeRecord(false);
-      // Reintento en background para recuperar permisos completos
       base44.functions.invoke('vincularEmpleado', {}).catch(() => {});
       return;
     }
 
     setVinculationFailed(false);
-    // Sincronizar metadatos en background (nombre, sector, rol de plataforma)
-    base44.functions.invoke('vincularEmpleado', {}).catch(() => {});
+  };
+
+  // Carga metadata del empleado para admins via backend function (bypassa RLS).
+  // NO aplica restricciones de RolePermission — los admins tienen acceso total.
+  const loadAdminEmployeeMetadata = async (currentUser) => {
+    try {
+      const result = await base44.functions.invoke('vincularEmpleado', {});
+      const data = result?.data || result;
+      if (data?.linked && data.fallback !== true) {
+        setHasEmployeeRecord(true);
+        // Sincronizar sector_id en el objeto user para que las queries
+        // dependientes de RLS funcionen correctamente.
+        if (data.employee_sector && data.employee_sector !== currentUser?.data?.sector_id) {
+          setUser(prev => ({
+            ...prev,
+            data: { ...(prev?.data || {}), sector_id: data.employee_sector },
+          }));
+        }
+        setUserPermissions({
+          _employeeRole: data.employee_role || null,
+          _employeeName: data.employee_name || null,
+          _employeeSector: data.employee_sector || null,
+          _employeeFirmaUrl: data.employee_firma_url || null,
+        });
+      } else {
+        setHasEmployeeRecord(false);
+        setUserPermissions({
+          _employeeSector: currentUser?.data?.sector_id || currentUser?.sector_id || null,
+        });
+      }
+    } catch (e) {
+      console.warn('[AuthContext] Admin metadata load failed:', e?.message);
+      setUserPermissions({
+        _employeeSector: currentUser?.data?.sector_id || currentUser?.sector_id || null,
+      });
+      setHasEmployeeRecord(null);
+    }
   };
 
   // Capa 1: Carga permisos desde Employee + RolePermission con el SDK
@@ -152,6 +193,14 @@ export const AuthProvider = ({ children }) => {
     }
 
     setHasEmployeeRecord(true);
+    // Sincronizar sector_id en el objeto user para que las queries
+    // dependientes de RLS (como la query local del modal de firma) funcionen.
+    if (emp.sector_id && emp.sector_id !== currentUser?.data?.sector_id) {
+      setUser(prev => ({
+        ...prev,
+        data: { ...(prev?.data || {}), sector_id: emp.sector_id },
+      }));
+    }
     setUserPermissions({
       ...perms,
       _employeeRole: emp.role || null,
@@ -167,11 +216,17 @@ export const AuthProvider = ({ children }) => {
     const result = await base44.functions.invoke('vincularEmpleado', {});
     const data = result?.data || result;
     if (!data || data.linked !== true) return false;
-    // Fallback = el backend no encontró ficha de empleado → no hay error de red,
-    // pero tampoco hay permisos reales. Retornar false para que Capa 3 asigne acceso mínimo.
     if (data.fallback === true) return false;
 
     setHasEmployeeRecord(true);
+    // Sincronizar sector_id en el objeto user para que las queries
+    // dependientes de RLS funcionen correctamente.
+    if (data.employee_sector) {
+      setUser(prev => ({
+        ...prev,
+        data: { ...(prev?.data || {}), sector_id: data.employee_sector },
+      }));
+    }
     setUserPermissions({
       ...(data.employee_permissions || {}),
       _employeeRole: data.employee_role || null,

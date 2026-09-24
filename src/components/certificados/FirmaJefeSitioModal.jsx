@@ -37,14 +37,11 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, di
       }
       return [];
     },
-    enabled: !!user && open,
+    enabled: !!user && open && (!firmaUrlProp || redibujar),
   });
 
   const empleado = empleados[0];
-  // Nombre a mostrar: prioridad al displayName del hook (nombre en ficha empleado), luego full_name de la ficha, luego plataforma
   const nombreFirmante = displayName || empleado?.full_name || user?.full_name || user?.email || 'Jefe de Sitio';
-  // Prioridad: 1) firmaUrl pasada por prop (ya cargada por AuthContext — sin race condition ni RLS)
-  //            2) firma_url de la consulta local del modal (fallback para admins o si el prop no está)
   const firmaGuardada = firmaUrlProp || empleado?.firma_url;
   const mostrarCanvas = !firmaGuardada || redibujar;
 
@@ -145,7 +142,7 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, di
           </div>
         </div>
 
-        {loadingFirma ? (
+        {loadingFirma && !firmaUrlProp ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
@@ -230,7 +227,7 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, di
           )}
           <Button
             onClick={handleConfirm}
-            disabled={uploading || loadingFirma || (mostrarCanvas && !hasFirma)}
+            disabled={uploading || (loadingFirma && !firmaUrlProp) || (mostrarCanvas && !hasFirma)}
             className="gap-2 bg-primary"
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}

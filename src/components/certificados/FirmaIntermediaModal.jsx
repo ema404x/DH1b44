@@ -47,12 +47,11 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
       }
       return [];
     },
-    enabled: !!user && open,
+    enabled: !!user && open && (!firmaUrlProp || redibujar),
   });
 
   const empleado = empleados[0];
   const nombreFirmante = displayName || empleado?.full_name || user?.full_name || user?.email || 'Firmante';
-  // Prioridad: 1) firmaUrl del prop (AuthContext — sin race condition) 2) query local (fallback)
   const firmaGuardada = firmaUrlProp || empleado?.firma_url;
   const mostrarCanvas = !firmaGuardada || redibujar;
 
@@ -240,7 +239,7 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
           </div>
         </div>
 
-        {loadingFirma ? (
+        {loadingFirma && !firmaUrlProp ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
