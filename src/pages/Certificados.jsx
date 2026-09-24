@@ -143,12 +143,8 @@ export default function Certificados() {
   };
 
   const handleEmitir = (formData) => {
-    // Para certificados de OBRA: pedir firma del jefe de sitio antes de emitir
-    if (formData.tipo === 'obra') {
-      setPendingFirmaData(formData);
-      return;
-    }
-    emitirMutation.mutate(formData);
+    // Siempre pedir firma del creador antes de emitir, sin importar el tipo
+    setPendingFirmaData(formData);
   };
 
   const handleFirmaIntermedia = (cert) => setSigningCert(cert);
