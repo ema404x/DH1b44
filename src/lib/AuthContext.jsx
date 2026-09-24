@@ -157,6 +157,7 @@ export const AuthProvider = ({ children }) => {
       _employeeRole: emp.role || null,
       _employeeName: emp.full_name || null,
       _employeeSector: emp.sector_id || null,
+      _employeeFirmaUrl: emp.firma_url || null,
     });
     return true;
   };
@@ -176,6 +177,7 @@ export const AuthProvider = ({ children }) => {
       _employeeRole: data.employee_role || null,
       _employeeName: data.employee_name || null,
       _employeeSector: data.employee_sector || null,
+      _employeeFirmaUrl: data.employee_firma_url || null,
     });
     return true;
   };

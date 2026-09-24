@@ -10,7 +10,7 @@ import TipsFirmaPanel from './TipsFirmaPanel';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
-export default function FirmaIntermediaModal({ open, onClose, cert, user, displayName }) {
+export default function FirmaIntermediaModal({ open, onClose, cert, user, displayName, firmaUrl: firmaUrlProp }) {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [hasFirma, setHasFirma] = useState(false);
@@ -52,7 +52,8 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
 
   const empleado = empleados[0];
   const nombreFirmante = displayName || empleado?.full_name || user?.full_name || user?.email || 'Firmante';
-  const firmaGuardada = empleado?.firma_url;
+  // Prioridad: 1) firmaUrl del prop (AuthContext — sin race condition) 2) query local (fallback)
+  const firmaGuardada = firmaUrlProp || empleado?.firma_url;
   const mostrarCanvas = !firmaGuardada || redibujar;
 
   // Reset al abrir

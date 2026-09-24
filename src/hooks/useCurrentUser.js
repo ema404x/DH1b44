@@ -25,6 +25,8 @@ export function useCurrentUser() {
   // devolver null para que getActiveSectorId/withActiveSector no estampen un
   // sector equivocado en silencio (bug histórico: empleados BAPRO creados en escuela).
   const employeeSector = userPermissions?._employeeSector || null;
+  // Firma digital guardada del empleado (para reutilizar al emitir certificados)
+  const employeeFirmaUrl = userPermissions?._employeeFirmaUrl || null;
   // Nombre a mostrar: nombre en ficha de empleado > nombre de plataforma
   const displayName = employeeName || currentUser?.full_name || currentUser?.email || 'Usuario';
 
@@ -86,6 +88,7 @@ export function useCurrentUser() {
     employeeRole,
     employeeName,
     employeeSector,
+    employeeFirmaUrl,
     displayName,
     loading,
     filterByUser,

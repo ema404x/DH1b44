@@ -33,7 +33,7 @@ export default function Certificados() {
   const [signingCert, setSigningCert] = useState(null); // cert pendiente de firma intermedia abierta
   const [auditoriaCert, setAuditoriaCert] = useState(null); // cert abierto en panel de auditoría
   const queryClient = useQueryClient();
-  const { user, displayName, isSuperAdmin, loading } = useCurrentUser();
+  const { user, displayName, isSuperAdmin, loading, employeeFirmaUrl } = useCurrentUser();
 
   // Visibilidad por propietario vía backend (getCertificadosForUser):
   // resuelve de forma robusta quién es el dueño de cada cert —incluyendo los
@@ -218,6 +218,7 @@ export default function Certificados() {
           onFirmado={handleFirmaJefe}
           user={user}
           displayName={displayName}
+          firmaUrl={employeeFirmaUrl}
         />
         <AbonoManualForm
           onSave={handleEmitir}
@@ -248,6 +249,7 @@ export default function Certificados() {
           onFirmado={handleFirmaJefe}
           user={user}
           displayName={displayName}
+          firmaUrl={employeeFirmaUrl}
         />
         <CertificadoEditor
           initialData={extracted}
@@ -272,6 +274,7 @@ export default function Certificados() {
           onFirmado={handleFirmaJefe}
           user={user}
           displayName={displayName}
+          firmaUrl={employeeFirmaUrl}
         />
         <CertificadoPreview
           form={previewing}
@@ -292,6 +295,7 @@ export default function Certificados() {
         cert={signingCert}
         user={user}
         displayName={displayName}
+        firmaUrl={employeeFirmaUrl}
       />
 
       {/* Modal de auditoría de firmas — timeline detallado de quién firmó y cuándo */}
@@ -308,6 +312,7 @@ export default function Certificados() {
         onFirmado={handleFirmaJefe}
         user={user}
         displayName={displayName}
+        firmaUrl={employeeFirmaUrl}
       />
 
       <PageHeader

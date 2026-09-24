@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, PenTool, Trash2, CheckCircle2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, displayName, tipoCertificado = 'obra' }) {
+export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, displayName, tipoCertificado = 'obra', firmaUrl: firmaUrlProp }) {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [hasFirma, setHasFirma] = useState(false);
@@ -43,7 +43,9 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, di
   const empleado = empleados[0];
   // Nombre a mostrar: prioridad al displayName del hook (nombre en ficha empleado), luego full_name de la ficha, luego plataforma
   const nombreFirmante = displayName || empleado?.full_name || user?.full_name || user?.email || 'Jefe de Sitio';
-  const firmaGuardada = empleado?.firma_url;
+  // Prioridad: 1) firmaUrl pasada por prop (ya cargada por AuthContext — sin race condition ni RLS)
+  //            2) firma_url de la consulta local del modal (fallback para admins o si el prop no está)
+  const firmaGuardada = firmaUrlProp || empleado?.firma_url;
   const mostrarCanvas = !firmaGuardada || redibujar;
 
   useEffect(() => {

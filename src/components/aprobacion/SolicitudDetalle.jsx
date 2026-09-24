@@ -21,7 +21,7 @@ const estadoConfig = {
   rechazada:   { label: 'Rechazada',    color: 'bg-red-100 text-red-700 border-red-300' },
 };
 
-export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, onSaved, displayName: displayNameProp }) {
+export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, onSaved, displayName: displayNameProp, firmaUrl: firmaUrlProp }) {
   const qc = useQueryClient();
   const [comentario, setComentario] = useState(solicitud.comentarios_admin || '');
   const [motivo, setMotivo] = useState('');
@@ -529,6 +529,7 @@ export default function SolicitudDetalle({ solicitud, isAdmin, user, onClose, on
         user={user}
         displayName={displayName}
         tipoCertificado={certificado?.tipo}
+        firmaUrl={firmaUrlProp}
       />
 
       {/* Firmantes de la cadena intermedia */}
