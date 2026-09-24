@@ -98,6 +98,8 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, di
       }
 
       onFirmado(firmaUrl);
+    } catch (err) {
+      toast.error('Error al guardar la firma: ' + (err?.message || 'Error desconocido'));
     } finally {
       setUploading(false);
     }

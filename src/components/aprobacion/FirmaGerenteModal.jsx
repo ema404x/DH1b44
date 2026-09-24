@@ -105,6 +105,8 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user, disp
       // Usar el nombre de la ficha de empleado (full_name en el módulo de Empleados)
       // Si no está vinculado como empleado, caer en full_name de plataforma como último recurso
       onFirmada(firmaUrl, nombreFirmante);
+    } catch (err) {
+      toast.error('Error al guardar la firma: ' + (err?.message || 'Error desconocido'));
     } finally {
       setUploading(false);
     }
