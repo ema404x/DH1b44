@@ -89,7 +89,7 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, di
         const canvas = canvasRef.current;
         const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
         const file = new File([blob], 'firma_jefe.png', { type: 'image/png' });
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
         firmaUrl = file_url;
 
         if (empleado?.id) {

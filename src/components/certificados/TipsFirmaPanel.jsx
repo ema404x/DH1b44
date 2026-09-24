@@ -27,7 +27,7 @@ export default function TipsFirmaPanel({ tipoCertificado, onAllChecked }) {
     return { total, checkedCount };
   }, [grupos, checked]);
 
-  const allChecked = total > 0 && checkedCount === total;
+  const allChecked = total === 0 || checkedCount === total;
 
   useEffect(() => {
     if (onAllChecked) onAllChecked(allChecked);

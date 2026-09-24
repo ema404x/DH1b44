@@ -93,7 +93,7 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user, disp
         const canvas = canvasRef.current;
         const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
         const file = new File([blob], 'firma_gerente.png', { type: 'image/png' });
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
         firmaUrl = file_url;
 
         // Guardar la nueva firma en el empleado para la próxima vez
