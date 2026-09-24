@@ -24,7 +24,7 @@ export default function EmployeeSignatureDialog({ emp, open, onOpenChange, onSav
   if (!emp) return null;
 
   const persistFile = async (file) => {
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    const { file_url } = await base44.integrations.Core.UploadPublicFile({ file });
     await base44.entities.Employee.update(emp.id, { firma_url: file_url });
     return file_url;
   };

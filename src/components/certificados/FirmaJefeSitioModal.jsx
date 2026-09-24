@@ -15,9 +15,29 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, di
   const lastPos = useRef(null);
 
   const { data: empleados = [], isLoading: loadingFirma } = useQuery({
-    queryKey: ['employee-firma-jefe', user?.email],
-    queryFn: () => base44.entities.Employee.filter({ email: user?.email }),
-    enabled: !!user?.email && open,
+    queryKey: ['employee-firma-jefe', user?.id, user?.email],
+    queryFn: async () => {
+      if (!user) return [];
+      // Estrategia robusta (igual que AuthContext.loadPermissionsDirectly):
+      // 1) user_id — más confiable (lo estampa el sistema al vincular)
+      // 2) email con match case-insensitive exacto
+      if (user.id) {
+        try {
+          const byUserId = await base44.entities.Employee.filter({ user_id: user.id });
+          if (byUserId.length > 0) return byUserId;
+        } catch (_) {}
+      }
+      if (user.email) {
+        try {
+          const byEmail = await base44.entities.Employee.filter({ email: user.email });
+          return byEmail.filter(
+            e => e.email?.toLowerCase().trim() === user.email.toLowerCase().trim()
+          );
+        } catch (_) {}
+      }
+      return [];
+    },
+    enabled: !!user && open,
   });
 
   const empleado = empleados[0];

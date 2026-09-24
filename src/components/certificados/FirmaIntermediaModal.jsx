@@ -28,9 +28,26 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
   const queryClient = useQueryClient();
 
   const { data: empleados = [], isLoading: loadingFirma } = useQuery({
-    queryKey: ['employee-firma-intermedia', user?.email],
-    queryFn: () => base44.entities.Employee.filter({ email: user?.email }),
-    enabled: !!user?.email && open,
+    queryKey: ['employee-firma-intermedia', user?.id, user?.email],
+    queryFn: async () => {
+      if (!user) return [];
+      if (user.id) {
+        try {
+          const byUserId = await base44.entities.Employee.filter({ user_id: user.id });
+          if (byUserId.length > 0) return byUserId;
+        } catch (_) {}
+      }
+      if (user.email) {
+        try {
+          const byEmail = await base44.entities.Employee.filter({ email: user.email });
+          return byEmail.filter(
+            e => e.email?.toLowerCase().trim() === user.email.toLowerCase().trim()
+          );
+        } catch (_) {}
+      }
+      return [];
+    },
+    enabled: !!user && open,
   });
 
   const empleado = empleados[0];
