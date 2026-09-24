@@ -15,6 +15,7 @@ import AbonoMaestroPanel from '@/components/certificados/AbonoMaestroPanel';
 import AbonoManualForm from '@/components/certificados/AbonoManualForm';
 import { toast } from 'sonner';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { usePermission } from '@/hooks/usePermission';
 import FirmaJefeSitioModal from '@/components/certificados/FirmaJefeSitioModal';
 import FirmaIntermediaModal from '@/components/certificados/FirmaIntermediaModal';
 import AuditoriaFirmasModal from '@/components/certificados/AuditoriaFirmasModal';
@@ -34,6 +35,7 @@ export default function Certificados() {
   const [auditoriaCert, setAuditoriaCert] = useState(null); // cert abierto en panel de auditoría
   const queryClient = useQueryClient();
   const { user, displayName, isSuperAdmin, loading, employeeFirmaUrl } = useCurrentUser();
+  const { allowed: canDeleteCert } = usePermission('Certificado', 'delete');
 
   // Visibilidad por propietario vía backend (getCertificadosForUser):
   // resuelve de forma robusta quién es el dueño de cada cert —incluyendo los
@@ -114,8 +116,19 @@ export default function Certificados() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Certificado.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['certificados'] }),
+    mutationFn: async (id) => {
+      const res = await base44.functions.invoke('eliminarCertificado', { certificado_id: id });
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['certificados'] });
+      queryClient.invalidateQueries({ queryKey: ['solicitudes-cert'] });
+      toast.success('Certificado eliminado correctamente');
+    },
+    onError: (error) => {
+      toast.error(error?.message || 'No se pudo eliminar el certificado');
+    },
   });
 
   const handleExtracted = (data) => {
@@ -375,6 +388,7 @@ export default function Certificados() {
             onNew={() => setView('upload')}
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
+            canDelete={canDeleteCert}
             emptyLabel="No hay certificados de Abono Mensual"
             userEmail={user?.email}
             onFirmaIntermedia={handleFirmaIntermedia}
@@ -394,6 +408,7 @@ export default function Certificados() {
             onNew={() => setView('upload')}
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
+            canDelete={canDeleteCert}
             emptyLabel="No hay certificados de Obra"
             userEmail={user?.email}
             onFirmaIntermedia={handleFirmaIntermedia}
@@ -408,6 +423,7 @@ export default function Certificados() {
             onNew={() => setView('upload')}
             onEdit={handleEdit}
             onDelete={(id) => deleteMutation.mutate(id)}
+            canDelete={canDeleteCert}
             emptyLabel="No hay certificados de Informe"
             userEmail={user?.email}
             onFirmaIntermedia={handleFirmaIntermedia}
