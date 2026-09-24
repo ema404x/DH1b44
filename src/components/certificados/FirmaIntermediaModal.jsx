@@ -19,6 +19,11 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
   const [mode, setMode] = useState('confirm'); // 'confirm' | 'rejecting'
   const [motivo, setMotivo] = useState('');
   const [tipsOk, setTipsOk] = useState(false);
+
+  // Los tips solo aplican cuando hay una cadena de firmas configurada.
+  // Sin cadena, el botón de firma no se bloquea por tips.
+  const tieneCadena = (cert?.cadena_firmas?.length || 0) > 0;
+  const tipsRequirementMet = !tieneCadena || tipsOk;
   const lastPos = useRef(null);
   const queryClient = useQueryClient();
 
@@ -240,8 +245,10 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
           </div>
         ) : (
           <>
-           {/* Checklist de tips antes de firmar */}
-           <TipsFirmaPanel tipoCertificado={cert.tipo} onAllChecked={setTipsOk} />
+            {/* Checklist de tips — solo cuando hay cadena de firmas configurada */}
+            {tieneCadena && (
+              <TipsFirmaPanel tipoCertificado={cert.tipo} onAllChecked={setTipsOk} />
+            )}
 
             {/* Firma */}
             {firmaGuardada && !redibujar ? (
@@ -311,7 +318,7 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
               </Button>
               <Button
                 onClick={handleFirmar}
-                disabled={uploading || !tipsOk || (mostrarCanvas && !hasFirma)}
+                disabled={uploading || !tipsRequirementMet || (mostrarCanvas && !hasFirma)}
                 className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
