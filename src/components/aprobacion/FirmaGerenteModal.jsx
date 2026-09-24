@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Loader2, PenTool, Trash2, CheckCircle2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import TipsFirmaPanel from '@/components/certificados/TipsFirmaPanel';
 
 export default function FirmaGerenteModal({ open, onClose, onFirmada, user, displayName: displayNameProp, tipoCertificado }) {
   const canvasRef = useRef(null);
@@ -13,7 +12,6 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user, disp
   const [hasFirma, setHasFirma] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [redibujar, setRedibujar] = useState(false);
-  const [tipsOk, setTipsOk] = useState(false);
   const lastPos = useRef(null);
 
   // Cargar firma guardada del empleado
@@ -140,9 +138,6 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user, disp
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Checklist de tips antes de firmar */}
-            <TipsFirmaPanel tipoCertificado={tipoCertificado} onAllChecked={setTipsOk} />
-
             {/* Firma guardada */}
             {firmaGuardada && !redibujar ? (
               <div className="space-y-3">
@@ -204,7 +199,7 @@ export default function FirmaGerenteModal({ open, onClose, onFirmada, user, disp
           <Button variant="outline" onClick={onClose} disabled={uploading}>Cancelar</Button>
           <Button
             onClick={handleConfirm}
-            disabled={uploading || loadingFirma || !tipsOk || (mostrarCanvas && !hasFirma)}
+            disabled={uploading || loadingFirma || (mostrarCanvas && !hasFirma)}
             className="gap-2"
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
