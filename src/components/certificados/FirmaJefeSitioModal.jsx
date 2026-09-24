@@ -195,6 +195,17 @@ export default function FirmaJefeSitioModal({ open, onClose, onFirmado, user, di
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose} disabled={uploading}>Cancelar</Button>
+          {/* Si el usuario no tiene firma guardada, permitir emitir sin firmar */}
+          {!firmaGuardada && (
+            <Button
+              variant="ghost"
+              onClick={() => onFirmado(null)}
+              disabled={uploading}
+              className="text-muted-foreground"
+            >
+              Emitir sin firma
+            </Button>
+          )}
           <Button
             onClick={handleConfirm}
             disabled={uploading || loadingFirma || (mostrarCanvas && !hasFirma)}

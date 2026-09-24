@@ -54,19 +54,6 @@ export default function Certificados() {
     refetchOnWindowFocus: true,
   });
 
-  // Ficha del empleado del usuario actual — para saber si tiene una firma
-  // guardada. Si la tiene, se le pide confirmar la firma al emitir. Si no,
-  // se emite sin bloquear (no tiene firma que aplicar).
-  const { data: miEmpleado } = useQuery({
-    queryKey: ['mi-empleado-firma', user?.email],
-    queryFn: async () => {
-      if (!user?.email) return null;
-      const results = await base44.entities.Employee.filter({ email: user.email });
-      return results[0] || null;
-    },
-    enabled: !!user?.email,
-  });
-
   // Guardar como borrador (crea o actualiza sin emitir)
   const draftMutation = useMutation({
     mutationFn: async (data) => {
@@ -156,25 +143,26 @@ export default function Certificados() {
   };
 
   const handleEmitir = (formData) => {
-    // Pedir firma del creador solo si tiene una firma cargada en su ficha.
-    // Si no tiene firma guardada, emitir sin bloquear.
-    if (miEmpleado?.firma_url) {
-      setPendingFirmaData(formData);
-      return;
-    }
-    emitirMutation.mutate(formData);
+    // Siempre pedir la firma del creador al emitir. El modal maneja ambos
+    // casos: si el usuario tiene una firma guardada la muestra (solo confirmar),
+    // y si no, ofrece dibujar una o emitir sin firma.
+    setPendingFirmaData(formData);
   };
 
   const handleFirmaIntermedia = (cert) => setSigningCert(cert);
   const handleAuditoria = (cert) => setAuditoriaCert(cert);
 
   const handleFirmaJefe = (firmaUrl) => {
-    const dataConFirma = {
-      ...pendingFirmaData,
-      firma_jefe_sitio_url: firmaUrl,
-      firmado_por_jefe: displayName,
-      fecha_firma_jefe: new Date().toISOString(),
-    };
+    // firmaUrl puede ser null si el usuario eligió "Emitir sin firma"
+    // (no tiene firma guardada ni quiere dibujar una)
+    const dataConFirma = firmaUrl
+      ? {
+          ...pendingFirmaData,
+          firma_jefe_sitio_url: firmaUrl,
+          firmado_por_jefe: displayName,
+          fecha_firma_jefe: new Date().toISOString(),
+        }
+      : pendingFirmaData;
     setPendingFirmaData(null);
     emitirMutation.mutate(dataConFirma);
   };
