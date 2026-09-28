@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import { loadImageAsBase64 } from './loadImage';
 import { calcularTotales } from '../components/certificados/acumulacionUtils';
 
 // Parsea montos con precisión: maneja strings "1.098.000", "1,5", números JS, etc.
@@ -40,58 +41,7 @@ function getImageDimensions(base64) {
   });
 }
 
-async function loadImageAsBase64(url) {
-  // Las firmas se suben via UploadPublicFile y la URL devuelve un formato
-  // https://base44.app/api/apps/.../files/... que REDIRIGE al CDN
-  // media.base44.com. El fetch directo puede fallar silenciosamente en el
-  // browser por CORS en la redirección, dejando la firma fuera del PDF sin
-  // ningún error visible. Doble estrategia: fetch → Image+canvas.
-  //
-  // Estrategia 1: fetch → blob → FileReader (rápido, funciona con CORS ok)
-  try {
-    const res = await fetch(url, { redirect: 'follow' });
-    if (res.ok) {
-      const blob = await res.blob();
-      if (blob.size > 0 && blob.type.startsWith('image/')) {
-        const dataUrl = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(blob);
-        });
-        if (dataUrl) return dataUrl;
-      }
-    }
-  } catch (_) { /* fallar al siguiente approach */ }
-
-  // Estrategia 2: <img crossOrigin="anonymous"> → canvas → toDataURL
-  // El browser maneja redirects y CORS del response final nativamente.
-  try {
-    return await new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth || 400;
-          canvas.height = img.naturalHeight || 160;
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/png'));
-        } catch (_) {
-          resolve(null);
-        }
-      };
-      img.onerror = () => resolve(null);
-      // Cache-bust por si la URL cambió entre sesiones
-      img.src = url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now();
-    });
-  } catch (_) {
-    return null;
-  }
-}
+// loadImageAsBase64 está en src/utils/loadImage.js (loader robusto compartido)
 
 export async function exportCertificadoPDF(form) {
   const allItems = form.items || [];

@@ -57,17 +57,10 @@ const TYPE_LABELS = {
 
 const LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
 
-async function toBase64(url) {
-  try {
-    const r = await fetch(url);
-    const b = await r.blob();
-    return new Promise(res => {
-      const fr = new FileReader();
-      fr.onloadend = () => res(fr.result);
-      fr.readAsDataURL(b);
-    });
-  } catch { return null; }
-}
+// toBase64 delega al loader robusto compartido (src/utils/loadImage.js).
+// Doble estrategia fetch → Image+canvas para URLs de UploadPublicFile que
+// redirigen al CDN y pueden fallar silenciosamente en el browser por CORS.
+import { loadImageAsBase64 as toBase64 } from './loadImage';
 
 async function loadChecklistPhotos(checklist = []) {
   const entries = checklist.filter(t => t.photo_url);
