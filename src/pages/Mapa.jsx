@@ -128,7 +128,7 @@ export default function Mapa() {
           variant="outline"
           className="gap-2"
           onClick={() => setExportQRsOpen(true)}
-          disabled={locLoading || !allQRs.length}
+          disabled={locLoading || !visibleQRs.length}
         >
           <Download className="h-4 w-4" />
           Exportar QRs a PDF

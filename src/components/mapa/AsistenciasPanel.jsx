@@ -226,13 +226,15 @@ export default function AsistenciasPanel({ locations = [] }) {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard icon={Clock} label="Total fichajes" value={stats.total} tone="slate" />
         <StatCard icon={LogIn} label="Jornadas abiertas" value={stats.abiertas} tone="blue" />
         <StatCard icon={LogOut} label="Jornadas cerradas" value={stats.cerradas} tone="emerald" />
+        <StatCard icon={Clock} label="Horas trabajadas" value={`${stats.horas}h ${stats.minutos}m`} tone="amber" />
+        <StatCard icon={CheckCircle2} label="Revisados" value={stats.revisados} tone="emerald" />
+        <StatCard icon={AlertTriangle} label="Incidencias" value={stats.incidencias} tone="red" />
         <StatCard icon={AlertTriangle} label={`Lejos del sitio (>${DISTANCE_THRESHOLD_M}m)`} value={stats.lejosSitio} tone="red" />
         <StatCard icon={MapPin} label="Sin GPS" value={stats.sinGps} tone="amber" />
-        <StatCard icon={Clock} label="Horas trabajadas" value={`${stats.horas}h ${stats.minutos}m`} tone="amber" />
       </div>
 
       {/* Table */}
