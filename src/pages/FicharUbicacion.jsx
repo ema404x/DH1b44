@@ -2,20 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   CheckCircle2, Clock, MapPin, Loader2, AlertTriangle,
-  LogIn, LogOut, Building2, User, PenLine
+  LogIn, LogOut, Building2, User, PenLine, RotateCcw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import SignaturePad from '@/components/fichar/SignaturePad';
 
 const COLOR_MAP = {
-  blue:   { bg: 'from-blue-600 to-blue-800',     icon: 'bg-blue-500/20 text-blue-200',  },
+  blue:   { bg: 'from-blue-600 to-blue-800',     icon: 'bg-blue-500/20 text-blue-200' },
   green:  { bg: 'from-emerald-600 to-emerald-800', icon: 'bg-emerald-500/20 text-emerald-200' },
   purple: { bg: 'from-purple-600 to-purple-800', icon: 'bg-purple-500/20 text-purple-200' },
   orange: { bg: 'from-orange-600 to-orange-800', icon: 'bg-orange-500/20 text-orange-200' },
   red:    { bg: 'from-red-600 to-red-800',       icon: 'bg-red-500/20 text-red-200' },
+  yellow: { bg: 'from-yellow-600 to-yellow-800', icon: 'bg-yellow-500/20 text-yellow-200' },
+  pink:   { bg: 'from-pink-600 to-pink-800',     icon: 'bg-pink-500/20 text-pink-200' },
 };
 
 export default function FicharUbicacion() {
@@ -30,17 +31,20 @@ export default function FicharUbicacion() {
 
   // Form state
   const [fullName, setFullName] = useState('');
-  const [eventType, setEventType] = useState('entrada');
   const [signatureData, setSignatureData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(null);
+  const [done, setDone] = useState(null); // { type, timestamp, jornada }
   const [now, setNow] = useState(new Date());
+  const [jornadaAbierta, setJornadaAbierta] = useState(null);
+  const [checkingJornada, setCheckingJornada] = useState(false);
 
+  // Live clock
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Load location
   useEffect(() => {
     if (!locationId) {
       setError('QR inválido. No se encontró la ubicación.');
@@ -50,8 +54,8 @@ export default function FicharUbicacion() {
 
     const init = async () => {
       try {
-        const res = await base44.functions.invoke('publicFichar', {
-          action: 'getLocationData',
+        const res = await base44.functions.invoke('fichajeUbicacion', {
+          action: 'getUbicacion',
           locationId,
         });
         const loc = res.data?.location;
@@ -66,7 +70,6 @@ export default function FicharUbicacion() {
           return;
         }
         setLocation(loc);
-        if (loc.event_type !== 'ambos') setEventType(loc.event_type);
       } catch (e) {
         setError('Error al cargar datos. Intentá de nuevo.');
       }
@@ -85,55 +88,130 @@ export default function FicharUbicacion() {
     }
   }, [locationId]);
 
-  const handleSubmit = async () => {
-    if (!fullName.trim()) return;
-    if (!signatureData) return;
-
-    setSubmitting(true);
-    const timestamp = new Date().toISOString();
-    const deviceInfo = navigator.userAgent.slice(0, 120);
-
-    // Upload signature
-    let signatureUrl = null;
-    try {
-      const blob = await (await fetch(signatureData)).blob();
-      const file = new File([blob], 'firma.png', { type: 'image/png' });
-      const uploaded = await base44.integrations.Core.UploadFile({ file });
-      signatureUrl = uploaded.file_url;
-    } catch { /* continúa sin firma subida */ }
-
-    let locationName = location.name;
-    if (gps) {
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${gps.lat}&lon=${gps.lng}&format=json`);
-        const data = await res.json();
-        locationName = `${location.name} · ${data.display_name?.split(',').slice(0, 2).join(', ') || ''}`;
-      } catch { locationName = `${location.name} · ${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}`; }
+  // Debounced check for open jornada when name changes
+  useEffect(() => {
+    if (!locationId || !fullName.trim() || fullName.trim().length < 3) {
+      setJornadaAbierta(null);
+      return;
     }
+    setCheckingJornada(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await base44.functions.invoke('fichajeUbicacion', {
+          action: 'getJornadaAbierta',
+          locationId,
+          operarioNombre: fullName.trim(),
+        });
+        setJornadaAbierta(res.data?.jornada || null);
+      } catch {
+        setJornadaAbierta(null);
+      }
+      setCheckingJornada(false);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [fullName, locationId]);
 
-    // Create attendance log + update scan count via backend (service role)
-    await base44.functions.invoke('publicFichar', {
-      action: 'createAttendance',
-      attendanceData: {
-        location_qr_id: location.id,
-        employee_name: fullName.trim(),
-        type: eventType,
-        timestamp,
+  // ── Signature pad ──────────────────────────────────────────────────────────
+  const canvasRef = useRef(null);
+  const [drawing, setDrawing] = useState(false);
+  const [hasStrokes, setHasStrokes] = useState(false);
+  const lastPos = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  }, [done]);
+
+  const getPos = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+  };
+
+  const startDraw = (e) => { e.preventDefault(); setDrawing(true); lastPos.current = getPos(e, canvasRef.current); };
+  const draw = (e) => {
+    e.preventDefault();
+    if (!drawing) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const pos = getPos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current.x, lastPos.current.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    lastPos.current = pos;
+    setHasStrokes(true);
+  };
+  const endDraw = (e) => { e.preventDefault(); setDrawing(false); lastPos.current = null; };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    setHasStrokes(false);
+    setSignatureData(null);
+  };
+
+  // ── Submit ──────────────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!fullName.trim() || !hasStrokes) return;
+    setSubmitting(true);
+
+    try {
+      // Extraer base64 puro del dataURL de la firma
+      const canvas = canvasRef.current;
+      const dataUrl = canvas.toDataURL('image/png');
+      const signatureBase64 = dataUrl.split(',')[1];
+
+      const action = jornadaAbierta ? 'registrarSalida' : 'registrarEntrada';
+
+      const res = await base44.functions.invoke('fichajeUbicacion', {
+        action,
+        locationId,
+        operarioNombre: fullName.trim(),
+        signatureBase64,
         latitude: gps?.lat || null,
         longitude: gps?.lng || null,
-        location_name: locationName,
-        device_info: deviceInfo,
-        signature_url: signatureUrl,
-        notes: `QR Ubicación: ${location.name}`,
-      },
-    });
+        deviceInfo: navigator.userAgent.slice(0, 120),
+      });
 
-    setDone({ type: eventType, timestamp, locationName });
-    setSubmitting(false);
+      if (res.data?.error) throw new Error(res.data.error);
+
+      setDone({
+        type: jornadaAbierta ? 'salida' : 'entrada',
+        timestamp: res.data?.jornada?.salida_timestamp || res.data?.jornada?.entrada_timestamp || new Date().toISOString(),
+        entradaTimestamp: res.data?.jornada?.entrada_timestamp,
+      });
+    } catch (err) {
+      setError(err?.message || 'No se pudo registrar el fichaje. Intentá de nuevo.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFullName('');
+    setJornadaAbierta(null);
+    setHasStrokes(false);
+    setSignatureData(null);
+    setDone(null);
+    setError('');
   };
 
   const colors = COLOR_MAP[location?.color || 'blue'] || COLOR_MAP.blue;
-  const canSubmit = fullName.trim().length > 2 && signatureData && !submitting;
+  const isSalida = !!jornadaAbierta;
+  const canSubmit = fullName.trim().length > 2 && hasStrokes && !submitting && !checkingJornada;
 
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -146,19 +224,20 @@ export default function FicharUbicacion() {
   );
 
   // ── Error ────────────────────────────────────────────────────────────────────
-  if (error) return (
+  if (error && !done) return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
       <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
         <div className="h-14 w-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="h-7 w-7 text-red-500" />
         </div>
-        <h2 className="font-bold text-lg mb-2">Punto no válido</h2>
-        <p className="text-muted-foreground text-sm">{error}</p>
+        <h2 className="font-bold text-lg mb-2">No se pudo registrar</h2>
+        <p className="text-muted-foreground text-sm mb-5">{error}</p>
+        <Button variant="outline" className="w-full" onClick={resetForm}>Intentar de nuevo</Button>
       </div>
     </div>
   );
 
-  // ── Done ─────────────────────────────────────────────────────────────────────
+  // ── Done ───────────────────────────────────────────────────────────────────
   if (done) return (
     <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${colors.bg} p-4`}>
       <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
@@ -166,26 +245,33 @@ export default function FicharUbicacion() {
           <div className={`h-20 w-20 rounded-full flex items-center justify-center mx-auto ${done.type === 'entrada' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
             {done.type === 'entrada'
               ? <LogIn className="h-10 w-10 text-emerald-600" />
-              : <LogOut className="h-10 w-10 text-blue-600" />
-            }
+              : <LogOut className="h-10 w-10 text-blue-600" />}
           </div>
           <div className="absolute bottom-0 right-1/2 translate-x-8 translate-y-1 h-7 w-7 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
             <CheckCircle2 className="h-4 w-4 text-white" />
           </div>
         </div>
-        <h2 className="font-bold text-2xl mb-1">¡Registro exitoso!</h2>
+        <h2 className="font-bold text-2xl mb-1">¡Fichaje exitoso!</h2>
         <p className="text-muted-foreground text-sm mb-5">
-          {done.type === 'entrada' ? 'Entrada' : 'Salida'} registrada para{' '}
+          {done.type === 'entrada' ? 'Entrada registrada para ' : 'Salida registrada para '}
           <strong className="text-foreground">{fullName}</strong>
         </p>
         <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-left space-y-2.5 text-sm mb-5">
           <div className="flex items-center gap-2 text-slate-600">
             <Clock className="h-4 w-4 text-slate-400 flex-shrink-0" />
-            <span>{format(new Date(done.timestamp), "EEEE d 'de' MMMM · HH:mm'hs'", { locale: es })}</span>
+            <span className="capitalize">
+              {done.type === 'entrada' ? 'Entrada' : 'Salida'}: {format(new Date(done.timestamp), "EEEE d 'de' MMMM · HH:mm'hs'", { locale: es })}
+            </span>
           </div>
+          {done.type === 'salida' && done.entradaTimestamp && (
+            <div className="flex items-center gap-2 text-slate-400 text-xs">
+              <LogIn className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="capitalize">Entrada: {format(new Date(done.entradaTimestamp), "HH:mm'hs' · d/M", { locale: es })}</span>
+            </div>
+          )}
           <div className="flex items-start gap-2 text-slate-600">
             <MapPin className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
-            <span className="text-xs leading-relaxed">{done.locationName}</span>
+            <span className="text-xs leading-relaxed">{location.name}{location.address ? ` · ${location.address}` : ''}</span>
           </div>
           {gps && (
             <div className="flex items-center gap-2 text-emerald-600 text-xs">
@@ -194,17 +280,7 @@ export default function FicharUbicacion() {
             </div>
           )}
         </div>
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => {
-            setFullName('');
-            setSignatureData(null);
-            setDone(null);
-          }}
-        >
-          Nuevo registro
-        </Button>
+        <Button variant="outline" className="w-full" onClick={resetForm}>Nuevo fichaje</Button>
         <p className="text-xs text-muted-foreground mt-3">Podés cerrar esta ventana.</p>
       </div>
     </div>
@@ -246,31 +322,16 @@ export default function FicharUbicacion() {
             />
           </div>
 
-          {/* Tipo de evento */}
-          {location.event_type === 'ambos' ? (
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Tipo</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setEventType('entrada')}
-                  className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${eventType === 'entrada' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
-                >
-                  <LogIn className="h-4 w-4" /> Entrada
-                </button>
-                <button
-                  onClick={() => setEventType('salida')}
-                  className={`py-3 rounded-xl border-2 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${eventType === 'salida' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
-                >
-                  <LogOut className="h-4 w-4" /> Salida
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className={`py-3 rounded-xl text-sm font-semibold text-center ${eventType === 'entrada' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
-              {eventType === 'entrada'
-                ? <span className="flex items-center justify-center gap-2"><LogIn className="h-4 w-4" />Solo Entrada</span>
-                : <span className="flex items-center justify-center gap-2"><LogOut className="h-4 w-4" />Solo Salida</span>
-              }
+          {/* Estado detectado */}
+          {fullName.trim().length >= 3 && (
+            <div className={`py-3 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 ${isSalida ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>
+              {checkingJornada ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Verificando...</>
+              ) : isSalida ? (
+                <><LogOut className="h-4 w-4" /> Vas a registrar tu SALIDA</>
+              ) : (
+                <><LogIn className="h-4 w-4" /> Vas a registrar tu ENTRADA</>
+              )}
             </div>
           )}
 
@@ -286,23 +347,54 @@ export default function FicharUbicacion() {
           </div>
 
           {/* Firma */}
-          <SignaturePad onSign={setSignatureData} signed={!!signatureData} />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+                <PenLine className="h-3.5 w-3.5" /> Firma digital
+              </p>
+              {hasStrokes && (
+                <button onClick={clearSignature} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600">
+                  <RotateCcw className="h-3 w-3" /> Borrar
+                </button>
+              )}
+            </div>
+            <div className="relative border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-slate-50" style={{ touchAction: 'none' }}>
+              <canvas
+                ref={canvasRef}
+                width={400}
+                height={160}
+                className="w-full block cursor-crosshair"
+                onMouseDown={startDraw}
+                onMouseMove={draw}
+                onMouseUp={endDraw}
+                onMouseLeave={endDraw}
+                onTouchStart={startDraw}
+                onTouchMove={draw}
+                onTouchEnd={endDraw}
+              />
+              {!hasStrokes && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <p className="text-slate-300 text-sm">Dibujá tu firma aquí</p>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Submit */}
           <Button
-            className={`w-full h-12 text-base font-bold gap-2 ${eventType === 'entrada' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'} disabled:opacity-40`}
+            className={`w-full h-12 text-base font-bold gap-2 ${isSalida ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'} disabled:opacity-40`}
             onClick={handleSubmit}
             disabled={!canSubmit}
           >
             {submitting
               ? <Loader2 className="h-5 w-5 animate-spin" />
-              : eventType === 'entrada'
-                ? <><LogIn className="h-5 w-5" />Registrar Entrada</>
-                : <><LogOut className="h-5 w-5" />Registrar Salida</>
+              : isSalida
+                ? <><LogOut className="h-5 w-5" />Registrar Salida</>
+                : <><LogIn className="h-5 w-5" />Registrar Entrada</>
             }
           </Button>
 
-          {(!fullName.trim() || fullName.trim().length <= 2 || !signatureData) && (
+          {(!fullName.trim() || fullName.trim().length <= 2 || !hasStrokes) && (
             <p className="text-center text-xs text-slate-400">
               {!fullName.trim() || fullName.trim().length <= 2
                 ? 'Ingresá tu nombre completo para continuar'

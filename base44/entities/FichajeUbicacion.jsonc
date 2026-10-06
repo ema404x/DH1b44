@@ -1,0 +1,104 @@
+{
+  "name": "FichajeUbicacion",
+  "type": "object",
+  "properties": {
+    "location_qr_id": {
+      "type": "string",
+      "description": "FK a LocationQR. Identifica la ubicaci\u00f3n donde se fich\u00f3."
+    },
+    "location_name": {
+      "type": "string",
+      "description": "Nombre de la ubicaci\u00f3n (denormalizado para reportes sin join)."
+    },
+    "operario_nombre": {
+      "type": "string",
+      "description": "Nombre y apellido ingresado manualmente por el operario en el momento del fichaje."
+    },
+    "entrada_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora exacta de entrada."
+    },
+    "entrada_signature_url": {
+      "type": "string",
+      "description": "URL de la firma digital capturada en la entrada."
+    },
+    "entrada_latitude": {
+      "type": "number",
+      "description": "Latitud GPS al momento de la entrada (opcional)."
+    },
+    "entrada_longitude": {
+      "type": "number",
+      "description": "Longitud GPS al momento de la entrada (opcional)."
+    },
+    "salida_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora exacta de salida. Null mientras la jornada est\u00e1 abierta."
+    },
+    "salida_signature_url": {
+      "type": "string",
+      "description": "URL de la firma digital capturada en la salida."
+    },
+    "salida_latitude": {
+      "type": "number",
+      "description": "Latitud GPS al momento de la salida (opcional)."
+    },
+    "salida_longitude": {
+      "type": "number",
+      "description": "Longitud GPS al momento de la salida (opcional)."
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "abierta",
+        "cerrada"
+      ],
+      "default": "abierta",
+      "description": "abierta = entrada registrada sin salida; cerrada = jornada completa con salida."
+    },
+    "device_info": {
+      "type": "string",
+      "description": "Info del dispositivo desde el que se fich\u00f3 (user agent)."
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector de la ubicaci\u00f3n (heredado de LocationQR). A\u00edsla los fichajes entre sectores."
+    }
+  },
+  "required": [
+    "location_qr_id",
+    "operario_nombre",
+    "entrada_timestamp",
+    "estado"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

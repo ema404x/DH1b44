@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { base44 } from '@/api/base44Client';
-import { Download, Copy, Check, ClipboardList, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Download, Copy, Check, ClipboardList, Clock, CheckCircle2, AlertCircle, Loader2, LogIn } from 'lucide-react';
 
 /**
  * Deriva la URL base de la app desde el pathname actual.
@@ -33,8 +33,11 @@ export default function LocationQRModal({ open, onClose, location }) {
   const [qrReady, setQrReady] = useState(false);
   const [workOrders, setWorkOrders] = useState([]);
   const [isLoadingOTs, setIsLoadingOTs] = useState(false);
+  const [qrMode, setQrMode] = useState('ot'); // 'ot' | 'fichaje'
 
-  const qrValue = location ? `${window.location.origin}${getAppBaseUrl()}/portal-operario?loc=${location.id}` : '';
+  const qrValueOt = location ? `${window.location.origin}${getAppBaseUrl()}/portal-operario?loc=${location.id}` : '';
+  const qrValueFichaje = location ? `${window.location.origin}${getAppBaseUrl()}/fichar-ubicacion?loc=${location.id}` : '';
+  const qrValue = qrMode === 'ot' ? qrValueOt : qrValueFichaje;
 
   // Cargar OTs de la ubicación via backend (service role, sin RLS)
   useEffect(() => {
@@ -98,6 +101,22 @@ export default function LocationQRModal({ open, onClose, location }) {
           </DialogTitle>
         </DialogHeader>
 
+        {/* Mode toggle */}
+        <div className="grid grid-cols-2 gap-1 p-1 bg-muted/40 rounded-lg">
+          <button
+            onClick={() => setQrMode('ot')}
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-semibold transition-all ${qrMode === 'ot' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            <ClipboardList className="h-3.5 w-3.5" /> Órdenes de Trabajo
+          </button>
+          <button
+            onClick={() => setQrMode('fichaje')}
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-md text-xs font-semibold transition-all ${qrMode === 'fichaje' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            <LogIn className="h-3.5 w-3.5" /> Fichaje
+          </button>
+        </div>
+
         {/* QR code section */}
         <div className="flex flex-col items-center gap-3 py-1">
           <div className="bg-white border-2 border-border rounded-2xl p-4 shadow-sm flex flex-col items-center gap-2">
@@ -124,7 +143,8 @@ export default function LocationQRModal({ open, onClose, location }) {
           </div>
         </div>
 
-        {/* OTs list section */}
+        {/* OTs list section — solo en modo OT */}
+        {qrMode === 'ot' && (
         <div className="border-t border-border pt-3">
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-semibold flex items-center gap-1.5">
