@@ -317,6 +317,12 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       setRechazoOpen(true);
       return;
     }
+    if (accion === 'cancelar') {
+      if (!window.confirm('¿Está seguro de que desea cancelar esta OT? Esta acción no se puede deshacer.')) {
+        setStateActionLoading(false);
+        return;
+      }
+    }
     try {
       const extraData = {};
       if (accion === 'asignar' && data.assigned_name) {

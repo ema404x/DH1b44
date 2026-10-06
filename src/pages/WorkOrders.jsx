@@ -278,6 +278,12 @@ export default function WorkOrders() {
       queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
       return;
     }
+    if (action === 'cancelar') {
+      if (!window.confirm('¿Está seguro de que desea cancelar esta OT? Esta acción no se puede deshacer.')) {
+        queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
+        return;
+      }
+    }
     try {
       // Toda transición de estado pasa por la máquina (transicionEstadoOT) —
       // preserva permisos, validaciones y efectos secundarios (GPS, fechas, validador).
