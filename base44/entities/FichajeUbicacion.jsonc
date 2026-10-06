@@ -84,6 +84,10 @@
       "format": "date-time",
       "description": "Fecha y hora del \u00faltimo cambio de estado administrativo."
     },
+    "jefe_sitio_email": {
+      "type": "string",
+      "description": "Email del jefe de sitio de la ubicaci\u00f3n (denormalizado de LocationQR al crear el fichaje). Permite que el jefe vea los fichajes de sus ubicaciones v\u00eda RLS."
+    },
     "device_info": {
       "type": "string",
       "description": "Info del dispositivo desde el que se fich\u00f3 (user agent)."
@@ -121,6 +125,9 @@
               "user_condition": {
                 "role": "gerente"
               }
+            },
+            {
+              "data.jefe_sitio_email": "{{user.email}}"
             }
           ]
         }
@@ -142,6 +149,9 @@
               "user_condition": {
                 "role": "gerente"
               }
+            },
+            {
+              "data.jefe_sitio_email": "{{user.email}}"
             }
           ]
         }
