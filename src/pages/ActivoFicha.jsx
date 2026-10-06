@@ -10,6 +10,7 @@ import { differenceInDays } from 'date-fns';
 import AssetFormDialog from '@/components/assets/AssetFormDialog';
 import AssetJerarquia from '@/components/assets/ficha/AssetJerarquia';
 import AssetTimeline from '@/components/assets/ficha/AssetTimeline';
+import AssetOTs from '@/components/assets/ficha/AssetOTs';
 import AssetDocumentos from '@/components/assets/ficha/AssetDocumentos';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { fmtCurrency } from '@/lib/format';
@@ -98,6 +99,7 @@ export default function ActivoFicha() {
         <div className="lg:col-span-2 space-y-5">
           <AssetJerarquia asset={asset} />
           <AssetTimeline assetId={asset.id} assetName={asset.name} />
+          <AssetOTs assetId={asset.id} assetName={asset.name} />
           <AssetDocumentos asset={asset} />
         </div>
         <div className="space-y-5">

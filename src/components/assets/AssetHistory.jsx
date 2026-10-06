@@ -12,11 +12,20 @@ const statusColors = {
 };
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
-export default function AssetHistory({ assetName }) {
+export default function AssetHistory({ assetName, assetId }) {
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['workorders_asset', assetName],
-    queryFn: () => base44.entities.WorkOrder.filter({ asset_name: assetName }),
-    enabled: !!assetName,
+    queryKey: ['workorders_asset', assetId || assetName],
+    queryFn: async () => {
+      if (assetId) {
+        const res = await base44.entities.WorkOrder.filter(
+          { $or: [{ asset_id: assetId }, { asset_name: assetName }] },
+          { sort: '-created_date', limit: 200 }
+        );
+        return res.items || [];
+      }
+      return base44.entities.WorkOrder.filter({ asset_name: assetName });
+    },
+    enabled: !!assetName || !!assetId,
   });
 
   const totalCost = orders.reduce((s, o) => {

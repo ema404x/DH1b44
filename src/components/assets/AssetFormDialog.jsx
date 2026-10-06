@@ -163,7 +163,7 @@ export default function AssetFormDialog({ open, onOpenChange, editing, sedes, as
           </TabsContent>
           {editing && (
             <TabsContent value="historial" className="flex-1 overflow-y-auto mt-3 px-1">
-              <AssetHistory assetName={editing.name} />
+              <AssetHistory assetName={editing.name} assetId={editing.id} />
             </TabsContent>
           )}
         </Tabs>

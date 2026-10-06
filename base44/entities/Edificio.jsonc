@@ -22,6 +22,10 @@
       "type": "string",
       "description": "Nombre del jefe de sitio responsable"
     },
+    "jefe_sitio_email": {
+      "type": "string",
+      "description": "Email del jefe de sitio responsable. Usado por RLS para que el jefe vea \u00fanicamente sus edificios y los activos asociados."
+    },
     "location_id": {
       "type": "string",
       "description": "ID de la LocationData de origen"
@@ -45,7 +49,31 @@
       }
     },
     "read": {
-      "data.sector_id": "{{user.data.sector_id}}"
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
+              "data.jefe_sitio": "{{user.full_name}}"
+            },
+            {
+              "data.jefe_sitio_email": "{{user.email}}"
+            }
+          ]
+        }
+      ]
     },
     "update": {
       "$and": [
