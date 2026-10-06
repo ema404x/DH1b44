@@ -54,7 +54,7 @@ export default function Assets() {
         </div>
         <div>
           <h1 className="text-xl font-bold">Activos</h1>
-          <p className="text-sm text-muted-foreground">Catálogo de bienes físicos · Import/export · Revisión BAPRO</p>
+          <p className="text-sm text-muted-foreground">Catálogo de bienes físicos · Import/export · Revisión</p>
         </div>
       </div>
 
