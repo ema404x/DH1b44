@@ -95,7 +95,7 @@ export default function RevisionBaproPanel({ sedes }) {
         <CardContent className="pt-4 pb-4 space-y-4">
           <div className="flex items-center gap-2">
             <Link2 className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Generar link de revisión para BAPRO</h3>
+            <h3 className="text-sm font-semibold">Generar link de revisión</h3>
           </div>
           <p className="text-xs text-muted-foreground -mt-2">
             El banco recibe un link sin login. Ve los activos en solo lectura y marca un "visto" por activo o por sede.
