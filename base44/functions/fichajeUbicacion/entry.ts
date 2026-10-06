@@ -9,6 +9,8 @@ export default async function(req) {
 
     // Normalizar nombre: lowercase + sin acentos + trimmed
     const normalize = (s) => (s || '').toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    // Normalizar DNI: solo dígitos
+    const normalizeDni = (s) => (s || '').replace(/\D/g, '');
 
     // ── Obtener datos de la ubicación (público, sin auth) ──────────────────────
     if (action === 'getUbicacion') {
@@ -29,33 +31,47 @@ export default async function(req) {
       });
     }
 
-    // ── Verificar si hay jornada abierta para un nombre + ubicación ───────────
+    // ── Verificar si hay jornada abierta para un nombre/DNI + ubicación ─────────
     // Permite a la UI mostrar "Registrar Salida" en lugar de "Registrar Entrada".
     if (action === 'getJornadaAbierta') {
-      const { locationId, operarioNombre } = body;
-      if (!locationId || !operarioNombre?.trim()) {
+      const { locationId, operarioNombre, dni } = body;
+      if (!locationId || (!operarioNombre?.trim() && !dni?.trim())) {
         return Response.json({ jornada: null });
       }
-      const nameNorm = normalize(operarioNombre);
       const open = await sb.entities.FichajeUbicacion.filter({
         location_qr_id: locationId,
         estado: 'abierta',
       }).catch(() => []);
-      const match = open.find(j => normalize(j.operario_nombre) === nameNorm);
+
+      const dniNorm = normalizeDni(dni);
+      const nameNorm = normalize(operarioNombre);
+
+      // Priorizar match por DNI (más confiable); fallback a nombre
+      let match = null;
+      if (dniNorm) {
+        match = open.find(j => normalizeDni(j.dni) === dniNorm);
+      }
+      if (!match && nameNorm) {
+        match = open.find(j => normalize(j.operario_nombre) === nameNorm);
+      }
       return Response.json({ jornada: match || null });
     }
 
-    // ── Registrar entrada ────────────────────────────────────────────────────
+    // ── Registrar entrada ──────────────────────────────────────────────────────
     if (action === 'registrarEntrada') {
-      const { locationId, operarioNombre, signatureBase64, latitude, longitude } = body;
+      const { locationId, operarioNombre, dni, signatureBase64, latitude, longitude } = body;
       if (!locationId || !operarioNombre?.trim()) {
         return Response.json({ error: 'Nombre y ubicación son requeridos' }, { status: 400 });
+      }
+      if (!dni?.trim() || normalizeDni(dni).length < 7) {
+        return Response.json({ error: 'El DNI es obligatorio (mínimo 7 dígitos)' }, { status: 400 });
       }
       if (!signatureBase64) {
         return Response.json({ error: 'La firma es obligatoria' }, { status: 400 });
       }
 
       const nameNorm = normalize(operarioNombre);
+      const dniNorm = normalizeDni(dni);
 
       // Validar ubicación
       const locResults = await sb.entities.LocationQR.filter({ id: locationId }).catch(() => []);
@@ -70,7 +86,14 @@ export default async function(req) {
         location_qr_id: locationId,
         estado: 'abierta',
       }).catch(() => []);
-      const existing = open.find(j => normalize(j.operario_nombre) === nameNorm);
+
+      let existing = null;
+      if (dniNorm) {
+        existing = open.find(j => normalizeDni(j.dni) === dniNorm);
+      }
+      if (!existing) {
+        existing = open.find(j => normalize(j.operario_nombre) === nameNorm);
+      }
       if (existing) {
         return Response.json({
           error: 'Ya tenés una entrada abierta en esta ubicación. Registrá tu salida primero.',
@@ -88,36 +111,49 @@ export default async function(req) {
         location_qr_id: locationId,
         location_name: location.name,
         operario_nombre: operarioNombre.trim(),
+        dni: dniNorm,
         entrada_timestamp: now,
         entrada_signature_url: sigResult.file_url,
         entrada_latitude: latitude || null,
         entrada_longitude: longitude || null,
         estado: 'abierta',
-        device_info: body.deviceInfo || navigator?.userAgent?.slice(0, 120) || '',
+        estado_admin: 'pendiente',
+        device_info: body.deviceInfo || '',
         sector_id: location.sector_id || null,
       });
 
       return Response.json({ success: true, jornada });
     }
 
-    // ── Registrar salida ─────────────────────────────────────────────────────
+    // ── Registrar salida ───────────────────────────────────────────────────────
     if (action === 'registrarSalida') {
-      const { locationId, operarioNombre, signatureBase64, latitude, longitude } = body;
+      const { locationId, operarioNombre, dni, signatureBase64, latitude, longitude } = body;
       if (!locationId || !operarioNombre?.trim()) {
         return Response.json({ error: 'Nombre y ubicación son requeridos' }, { status: 400 });
+      }
+      if (!dni?.trim() || normalizeDni(dni).length < 7) {
+        return Response.json({ error: 'El DNI es obligatorio (mínimo 7 dígitos)' }, { status: 400 });
       }
       if (!signatureBase64) {
         return Response.json({ error: 'La firma es obligatoria' }, { status: 400 });
       }
 
       const nameNorm = normalize(operarioNombre);
+      const dniNorm = normalizeDni(dni);
 
       // Buscar jornada abierta para esta persona + ubicación
       const open = await sb.entities.FichajeUbicacion.filter({
         location_qr_id: locationId,
         estado: 'abierta',
       }).catch(() => []);
-      const jornada = open.find(j => normalize(j.operario_nombre) === nameNorm);
+
+      let jornada = null;
+      if (dniNorm) {
+        jornada = open.find(j => normalizeDni(j.dni) === dniNorm);
+      }
+      if (!jornada) {
+        jornada = open.find(j => normalize(j.operario_nombre) === nameNorm);
+      }
       if (!jornada) {
         return Response.json({
           error: 'No se encontró una entrada abierta para este nombre en esta ubicación. Registrá tu entrada primero.',

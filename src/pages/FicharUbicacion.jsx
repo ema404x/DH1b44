@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   CheckCircle2, Clock, MapPin, Loader2, AlertTriangle,
-  LogIn, LogOut, Building2, User, PenLine, RotateCcw
+  LogIn, LogOut, Building2, User, PenLine, RotateCcw, CreditCard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,7 @@ export default function FicharUbicacion() {
 
   // Form state
   const [fullName, setFullName] = useState('');
+  const [dni, setDni] = useState('');
   const [signatureData, setSignatureData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(null); // { type, timestamp, jornada }
@@ -101,6 +102,7 @@ export default function FicharUbicacion() {
           action: 'getJornadaAbierta',
           locationId,
           operarioNombre: fullName.trim(),
+          dni: dni.trim(),
         });
         setJornadaAbierta(res.data?.jornada || null);
       } catch {
@@ -109,7 +111,7 @@ export default function FicharUbicacion() {
       setCheckingJornada(false);
     }, 600);
     return () => clearTimeout(timer);
-  }, [fullName, locationId]);
+  }, [fullName, dni, locationId]);
 
   // ── Signature pad ──────────────────────────────────────────────────────────
   const canvasRef = useRef(null);
@@ -165,7 +167,7 @@ export default function FicharUbicacion() {
 
   // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!fullName.trim() || !hasStrokes) return;
+    if (!fullName.trim() || !dni.trim() || !hasStrokes) return;
     setSubmitting(true);
 
     try {
@@ -180,6 +182,7 @@ export default function FicharUbicacion() {
         action,
         locationId,
         operarioNombre: fullName.trim(),
+        dni: dni.trim(),
         signatureBase64,
         latitude: gps?.lat || null,
         longitude: gps?.lng || null,
@@ -202,6 +205,7 @@ export default function FicharUbicacion() {
 
   const resetForm = () => {
     setFullName('');
+    setDni('');
     setJornadaAbierta(null);
     setHasStrokes(false);
     setSignatureData(null);
@@ -211,7 +215,7 @@ export default function FicharUbicacion() {
 
   const colors = COLOR_MAP[location?.color || 'blue'] || COLOR_MAP.blue;
   const isSalida = !!jornadaAbierta;
-  const canSubmit = fullName.trim().length > 2 && hasStrokes && !submitting && !checkingJornada;
+  const canSubmit = fullName.trim().length > 2 && dni.trim().length >= 7 && hasStrokes && !submitting && !checkingJornada;
 
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -322,6 +326,21 @@ export default function FicharUbicacion() {
             />
           </div>
 
+          {/* DNI */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+              <CreditCard className="h-3.5 w-3.5" /> DNI
+            </label>
+            <Input
+              placeholder="Ej: 12345678"
+              value={dni}
+              onChange={e => setDni(e.target.value.replace(/[^0-9]/g, ''))}
+              className="h-12 text-base"
+              inputMode="numeric"
+              maxLength={10}
+            />
+          </div>
+
           {/* Estado detectado */}
           {fullName.trim().length >= 3 && (
             <div className={`py-3 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 ${isSalida ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>
@@ -394,11 +413,13 @@ export default function FicharUbicacion() {
             }
           </Button>
 
-          {(!fullName.trim() || fullName.trim().length <= 2 || !hasStrokes) && (
+          {(!fullName.trim() || fullName.trim().length <= 2 || dni.trim().length < 7 || !hasStrokes) && (
             <p className="text-center text-xs text-slate-400">
               {!fullName.trim() || fullName.trim().length <= 2
                 ? 'Ingresá tu nombre completo para continuar'
-                : 'Dibujá tu firma para continuar'}
+                : dni.trim().length < 7
+                  ? 'Ingresá tu DNI para continuar'
+                  : 'Dibujá tu firma para continuar'}
             </p>
           )}
         </div>

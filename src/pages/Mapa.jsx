@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Activity, List, Users, Globe, School, CheckCircle2, Download } from 'lucide-react';
+import { MapPin, Activity, List, Users, Globe, School, CheckCircle2, Download, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useUbicaciones } from '@/hooks/useUbicaciones';
@@ -13,6 +13,7 @@ import AsignacionesUbicacion from '@/components/mapa/AsignacionesUbicacion';
 import MapaProyectosOTs from '@/components/mapa/MapaProyectosOTs';
 import MapaColegios from '@/components/mapa/MapaColegios';
 import MapaOTsCompletadas from '@/components/mapa/MapaOTsCompletadas';
+import AsistenciasPanel from '@/components/mapa/AsistenciasPanel';
 
 export default function Mapa() {
   const [tab, setTab] = useState('mapa');
@@ -133,6 +134,9 @@ export default function Mapa() {
           <TabsTrigger value="ots-completadas" className="gap-2">
             <CheckCircle2 className="h-4 w-4" /> OTs Completadas
           </TabsTrigger>
+          <TabsTrigger value="asistencias" className="gap-2">
+            <Clock className="h-4 w-4" /> Asistencias
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="proyectos-ots" className="mt-5">
@@ -178,6 +182,10 @@ export default function Mapa() {
             logs={logs}
             onUpdate={(id, data) => updateLocation.mutate({ id, data })}
           />
+        </TabsContent>
+
+        <TabsContent value="asistencias" className="mt-5">
+          <AsistenciasPanel locations={locations} />
         </TabsContent>
       </Tabs>
     </div>
