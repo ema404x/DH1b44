@@ -14,6 +14,10 @@
       "type": "string",
       "description": "Nombre y apellido ingresado manualmente por el operario en el momento del fichaje."
     },
+    "dni": {
+      "type": "string",
+      "description": "DNI del operario (solo d\u00edgitos). Ingresado manualmente al fichar. Usado como clave de matching para entrada/salida."
+    },
     "entrada_timestamp": {
       "type": "string",
       "format": "date-time",
@@ -57,6 +61,29 @@
       "default": "abierta",
       "description": "abierta = entrada registrada sin salida; cerrada = jornada completa con salida."
     },
+    "estado_admin": {
+      "type": "string",
+      "enum": [
+        "pendiente",
+        "revisado",
+        "incidencia"
+      ],
+      "default": "pendiente",
+      "description": "Estado administrativo del fichaje. pendiente = sin revisar; revisado = verificado OK; incidencia = reportado con problema. No altera las marcas horarias ni las firmas."
+    },
+    "notas_admin": {
+      "type": "string",
+      "description": "Notas administrativas (ej: motivo de incidencia o aclaraci\u00f3n)."
+    },
+    "revisado_por": {
+      "type": "string",
+      "description": "Nombre del usuario que cambi\u00f3 el estado administrativo por \u00faltima vez."
+    },
+    "fecha_revision": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora del \u00faltimo cambio de estado administrativo."
+    },
     "device_info": {
       "type": "string",
       "description": "Info del dispositivo desde el que se fich\u00f3 (user agent)."
@@ -84,21 +111,53 @@
           "data.sector_id": "{{user.data.sector_id}}"
         },
         {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
           "user_condition": {
             "role": "admin"
           }
         }
       ]
-    },
-    "update": {
-      "user_condition": {
-        "role": "admin"
-      }
-    },
-    "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
     }
   }
 }
