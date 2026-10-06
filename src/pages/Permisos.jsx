@@ -44,7 +44,7 @@ const MODULES = [
   { key: 'Inventory', label: 'Inventario', group: 'Administración' },
   { key: 'Asset', label: 'Activos (Catálogo)', group: 'Administración' },
   { key: 'PendienteSAP', label: 'Pendientes SAP', group: 'Administración' },
-  { key: 'RevisionBapro', label: 'Revisión BAPRO', group: 'Administración' },
+  { key: 'RevisionBapro', label: 'Revisión', group: 'Administración' },
   { key: 'InformacionGeneral', label: 'Información General', group: 'Administración' },
   { key: 'Sectores', label: 'Sectores / Unidades', group: 'Administración' },
   { key: 'Automatizaciones', label: 'Automatizaciones', group: 'Sistema' },

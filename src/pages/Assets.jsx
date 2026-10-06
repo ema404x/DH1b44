@@ -62,7 +62,7 @@ export default function Assets() {
         <TabsList>
           <TabsTrigger value="activos" className="gap-1.5" disabled={!permActivos.allowed}><Boxes className="h-3.5 w-3.5" />Catálogo</TabsTrigger>
           <TabsTrigger value="pendientes" className="gap-1.5" disabled={!permPendientes.allowed}><ClipboardList className="h-3.5 w-3.5" />Pendientes SAP</TabsTrigger>
-          <TabsTrigger value="bapro" className="gap-1.5" disabled={!permBapro.allowed}><Link2 className="h-3.5 w-3.5" />Revisión BAPRO</TabsTrigger>
+          <TabsTrigger value="bapro" className="gap-1.5" disabled={!permBapro.allowed}><Link2 className="h-3.5 w-3.5" />Revisión</TabsTrigger>
           <TabsTrigger value="sync" className="gap-1.5" disabled={!permActivos.allowed}><RefreshCw className="h-3.5 w-3.5" />Sincronización</TabsTrigger>
         </TabsList>
         <TabsContent value="activos" className="mt-5">
