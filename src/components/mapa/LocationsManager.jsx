@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, QrCode, MapPin, Pencil, Trash2, Building2, Search, CheckCheck, X, Crosshair, Loader2, ArrowUpDown, Users, ScanLine, Power } from 'lucide-react';
 import LocationQRModal from '@/components/mapa/LocationQRModal';
+import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 const COLOR_OPTIONS = [
@@ -35,7 +37,7 @@ const SORT_OPTIONS = [
 const emptyForm = {
   name: '', description: '', address: '', project_name: '',
   color: 'blue', is_active: true, event_type: 'ambos',
-  latitude: '', longitude: '',
+  latitude: '', longitude: '', jefe_sitio: '',
 };
 
 // Normalizar texto: lowercase + sin acentos + trimmed
@@ -92,6 +94,16 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
   const [capturingGPS, setCapturingGPS] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
   const cardRefs = useRef({});
+
+  // Jefes de sitio para el selector de asignación manual
+  const { data: jefes = [] } = useQuery({
+    queryKey: ['employees-jefe-sitio'],
+    queryFn: async () => {
+      const res = await base44.entities.Employee.filter({ role: 'jefe_sitio' });
+      return Array.isArray(res) ? res : (res.items || []);
+    },
+    staleTime: 60000,
+  });
 
   // Scroll to highlighted location
   useEffect(() => {
@@ -153,6 +165,7 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
       ...form,
       latitude: form.latitude ? parseFloat(form.latitude) : null,
       longitude: form.longitude ? parseFloat(form.longitude) : null,
+      jefe_sitio_email: jefes.find(j => j.full_name === form.jefe_sitio)?.email || null,
     };
     try {
       if (editing) {
@@ -432,6 +445,19 @@ export default function LocationsManager({ locations, isLoading, onUpdate, onDel
             <div className="space-y-1.5">
               <Label className="text-xs">Proyecto asociado</Label>
               <Input value={form.project_name || ''} onChange={e => set('project_name', e.target.value)} placeholder="Nombre del proyecto (opcional)" />
+            </div>
+
+            {/* Jefe de sitio responsable */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Jefe de sitio responsable</Label>
+              <Select value={form.jefe_sitio || '_none'} onValueChange={v => set('jefe_sitio', v === '_none' ? '' : v)}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Sin asignar</SelectItem>
+                  {jefes.map(j => <SelectItem key={j.id} value={j.full_name}>{j.full_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">El jefe asignado verá únicamente esta ubicación y sus fichajes.</p>
             </div>
 
             {/* GPS coords con captura */}

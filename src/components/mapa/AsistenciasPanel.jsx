@@ -6,7 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Clock, LogIn, LogOut, Download, Search, AlertTriangle, CheckCircle2, Loader2, Eye } from 'lucide-react';
+import { Clock, LogIn, LogOut, Download, Search, AlertTriangle, CheckCircle2, Loader2, Eye, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -17,6 +17,28 @@ const ESTADO_ADMIN = {
   revisado: { label: 'Revisado', class: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
   incidencia: { label: 'Incidencia', class: 'bg-red-500/15 text-red-400 border-red-500/30' },
 };
+
+const DISTANCE_THRESHOLD_M = 150; // Umbral de alerta: fichajes a más de 150m del sitio
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000; // metros
+  const toRad = (d) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function calcFichajeDistance(fichaje, locCoords) {
+  const loc = locCoords.get(fichaje.location_qr_id);
+  if (!loc) return { status: 'no_coords', text: 'Sin coords.' };
+  const lat = fichaje.entrada_latitude;
+  const lng = fichaje.entrada_longitude;
+  if (lat == null || lng == null) return { status: 'no_gps', text: 'Sin GPS' };
+  const dist = haversine(loc.lat, loc.lng, lat, lng);
+  if (dist > DISTANCE_THRESHOLD_M) return { status: 'far', text: `${dist}m`, dist };
+  return { status: 'ok', text: `${dist}m`, dist };
+}
 
 function calcDuration(entrada, salida) {
   if (!entrada || !salida) return null;
@@ -81,12 +103,28 @@ export default function AsistenciasPanel({ locations = [] }) {
 
   const items = data?.items || [];
 
+  // Lookup de coordenadas de cada ubicación para cálculo de distancia
+  const locCoords = useMemo(() => {
+    const m = new Map();
+    for (const l of locations) {
+      if (l.latitude && l.longitude) m.set(l.id, { lat: l.latitude, lng: l.longitude });
+    }
+    return m;
+  }, [locations]);
+
   const stats = useMemo(() => {
     const total = items.length;
     const abiertas = items.filter(i => i.estado === 'abierta').length;
     const cerradas = items.filter(i => i.estado === 'cerrada').length;
     const incidencias = items.filter(i => i.estado_admin === 'incidencia').length;
     const revisados = items.filter(i => i.estado_admin === 'revisado').length;
+    let lejosSitio = 0;
+    let sinGps = 0;
+    for (const i of items) {
+      const d = calcFichajeDistance(i, locCoords);
+      if (d.status === 'far') lejosSitio++;
+      if (d.status === 'no_gps' || d.status === 'no_coords') sinGps++;
+    }
     const horasMs = items.reduce((acc, i) => {
       if (i.entrada_timestamp && i.salida_timestamp) {
         return acc + (new Date(i.salida_timestamp).getTime() - new Date(i.entrada_timestamp).getTime());
@@ -95,12 +133,12 @@ export default function AsistenciasPanel({ locations = [] }) {
     }, 0);
     const horas = Math.floor(horasMs / 3600000);
     const minutos = Math.floor((horasMs % 3600000) / 60000);
-    return { total, abiertas, cerradas, incidencias, revisados, horas, minutos };
-  }, [items]);
+    return { total, abiertas, cerradas, incidencias, revisados, horas, minutos, lejosSitio, sinGps };
+  }, [items, locCoords]);
 
   const exportCSV = () => {
     if (!items.length) { toast.error('No hay registros para exportar'); return; }
-    const headers = ['Operario', 'DNI', 'Ubicacion', 'Entrada', 'Salida', 'Duracion', 'Estado', 'Estado Admin', 'Notas'];
+    const headers = ['Operario', 'DNI', 'Ubicacion', 'Entrada', 'Salida', 'Duracion', 'Distancia', 'Estado', 'Estado Admin', 'Notas'];
     const rows = items.map(i => [
       i.operario_nombre || '',
       i.dni || '',
@@ -108,6 +146,7 @@ export default function AsistenciasPanel({ locations = [] }) {
       i.entrada_timestamp ? format(new Date(i.entrada_timestamp), 'dd/MM/yyyy HH:mm') : '',
       i.salida_timestamp ? format(new Date(i.salida_timestamp), 'dd/MM/yyyy HH:mm') : '',
       calcDuration(i.entrada_timestamp, i.salida_timestamp) || '',
+      calcFichajeDistance(i, locCoords).text,
       i.estado || '',
       ESTADO_ADMIN[i.estado_admin]?.label || 'Pendiente',
       (i.notas_admin || '').replace(/[\n\r]/g, ' '),
@@ -191,8 +230,8 @@ export default function AsistenciasPanel({ locations = [] }) {
         <StatCard icon={Clock} label="Total fichajes" value={stats.total} tone="slate" />
         <StatCard icon={LogIn} label="Jornadas abiertas" value={stats.abiertas} tone="blue" />
         <StatCard icon={LogOut} label="Jornadas cerradas" value={stats.cerradas} tone="emerald" />
-        <StatCard icon={CheckCircle2} label="Revisados" value={stats.revisados} tone="emerald" />
-        <StatCard icon={AlertTriangle} label="Incidencias" value={stats.incidencias} tone="red" />
+        <StatCard icon={AlertTriangle} label={`Lejos del sitio (>${DISTANCE_THRESHOLD_M}m)`} value={stats.lejosSitio} tone="red" />
+        <StatCard icon={MapPin} label="Sin GPS" value={stats.sinGps} tone="amber" />
         <StatCard icon={Clock} label="Horas trabajadas" value={`${stats.horas}h ${stats.minutos}m`} tone="amber" />
       </div>
 
@@ -216,6 +255,7 @@ export default function AsistenciasPanel({ locations = [] }) {
             <TableHead>Entrada</TableHead>
             <TableHead>Salida</TableHead>
             <TableHead>Duración</TableHead>
+            <TableHead>Distancia</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead>Admin</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
@@ -224,13 +264,13 @@ export default function AsistenciasPanel({ locations = [] }) {
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center py-8">
+              <TableCell colSpan={10} className="text-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" />
               </TableCell>
             </TableRow>
           ) : items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground text-sm">
+              <TableCell colSpan={10} className="text-center py-8 text-muted-foreground text-sm">
                 No hay registros de asistencia para los filtros seleccionados.
               </TableCell>
             </TableRow>
@@ -249,6 +289,15 @@ export default function AsistenciasPanel({ locations = [] }) {
                 </TableCell>
                 <TableCell className="text-xs tabular-nums">
                   {calcDuration(fichaje.entrada_timestamp, fichaje.salida_timestamp) || (fichaje.estado === 'abierta' ? 'En curso' : '—')}
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const d = calcFichajeDistance(fichaje, locCoords);
+                    if (d.status === 'far') return <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-400 gap-1"><AlertTriangle className="h-2.5 w-2.5" />{d.text}</Badge>;
+                    if (d.status === 'no_gps') return <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-400">{d.text}</Badge>;
+                    if (d.status === 'no_coords') return <span className="text-xs text-muted-foreground">{d.text}</span>;
+                    return <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400">{d.text}</Badge>;
+                  })()}
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className={fichaje.estado === 'abierta' ? 'border-blue-500/30 bg-blue-500/10 text-blue-400' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'}>
@@ -272,6 +321,7 @@ export default function AsistenciasPanel({ locations = [] }) {
       <AsistenciaDetailDialog
         fichaje={selected}
         onClose={() => setSelected(null)}
+        locCoords={selected ? locCoords.get(selected.location_qr_id) : null}
       />
     </div>
   );

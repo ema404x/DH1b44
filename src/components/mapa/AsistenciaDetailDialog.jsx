@@ -17,6 +17,17 @@ const ESTADO_ADMIN = {
   incidencia: { label: 'Incidencia', class: 'bg-red-500/15 text-red-400 border-red-500/30' },
 };
 
+const DISTANCE_THRESHOLD_M = 150;
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
 function calcDuration(entrada, salida) {
   if (!entrada || !salida) return null;
   const ms = new Date(salida).getTime() - new Date(entrada).getTime();
@@ -26,7 +37,7 @@ function calcDuration(entrada, salida) {
   return `${h}h ${m}m`;
 }
 
-function SignatureBlock({ title, timestamp, signatureUrl, latitude, longitude, icon: Icon, tone }) {
+function SignatureBlock({ title, timestamp, signatureUrl, latitude, longitude, icon: Icon, tone, distance }) {
   const tones = {
     in: 'text-emerald-400 bg-emerald-500/10',
     out: 'text-blue-400 bg-blue-500/10',
@@ -58,11 +69,17 @@ function SignatureBlock({ title, timestamp, signatureUrl, latitude, longitude, i
           <MapPin className="h-3 w-3" /> GPS: {latitude.toFixed(5)}, {longitude.toFixed(5)}
         </div>
       )}
+      {distance && (
+        <div className={`flex items-center gap-1.5 text-xs font-medium ${distance.status === 'far' ? 'text-red-400' : distance.status === 'ok' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+          {distance.status === 'far' && <AlertTriangle className="h-3 w-3" />}
+          <span>Distancia al sitio: {distance.text}</span>
+        </div>
+      )}
     </div>
   );
 }
 
-export default function AsistenciaDetailDialog({ fichaje, onClose }) {
+export default function AsistenciaDetailDialog({ fichaje, onClose, locCoords }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [estadoAdmin, setEstadoAdmin] = useState('pendiente');
@@ -99,6 +116,16 @@ export default function AsistenciaDetailDialog({ fichaje, onClose }) {
 
   const ea = ESTADO_ADMIN[estadoAdmin] || ESTADO_ADMIN.pendiente;
   const duracion = calcDuration(fichaje.entrada_timestamp, fichaje.salida_timestamp);
+
+  const refCoords = locCoords?.lat != null ? locCoords : null;
+  const calcDist = (lat, lng) => {
+    if (!refCoords || lat == null || lng == null) return null;
+    const dist = haversine(refCoords.lat, refCoords.lng, lat, lng);
+    if (dist > DISTANCE_THRESHOLD_M) return { status: 'far', text: `${dist}m` };
+    return { status: 'ok', text: `${dist}m` };
+  };
+  const entradaDist = calcDist(fichaje.entrada_latitude, fichaje.entrada_longitude);
+  const salidaDist = calcDist(fichaje.salida_latitude, fichaje.salida_longitude);
 
   return (
     <Dialog open={!!fichaje} onOpenChange={onClose}>
@@ -153,6 +180,7 @@ export default function AsistenciaDetailDialog({ fichaje, onClose }) {
             signatureUrl={fichaje.entrada_signature_url}
             latitude={fichaje.entrada_latitude}
             longitude={fichaje.entrada_longitude}
+            distance={entradaDist}
           />
           <SignatureBlock
             title="Salida"
@@ -162,6 +190,7 @@ export default function AsistenciaDetailDialog({ fichaje, onClose }) {
             signatureUrl={fichaje.salida_signature_url}
             latitude={fichaje.salida_latitude}
             longitude={fichaje.salida_longitude}
+            distance={salidaDist}
           />
         </div>
 

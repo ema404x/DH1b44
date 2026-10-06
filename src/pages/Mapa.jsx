@@ -6,6 +6,7 @@ import { MapPin, Activity, List, Users, Globe, School, CheckCircle2, Download, C
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useUbicaciones } from '@/hooks/useUbicaciones';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import ExportarQRsDialog from '@/components/mapa/ExportarQRsDialog';
 import MapaFichajes from '@/components/mapa/MapaFichajes';
 import LocationsManager from '@/components/mapa/LocationsManager';
@@ -36,6 +37,33 @@ export default function Mapa() {
   // Datos unificados (service role) para mapear cada QR a su jefe de sitio
   // y para exportar SIEMPRE el listado completo de QRs sin depender de RLS.
   const { locationQRs: allQRs, locations: joinedLocations } = useUbicaciones();
+
+  // Filtrar ubicaciones para jefes de sitio: solo ven las asignadas a ellos.
+  // Admin y gerente ven todas. Combina asignación manual (jefe_sitio_email)
+  // con asignación existente (assigned_employees).
+  const { isSuperAdmin, employeeName, currentUser } = useCurrentUser();
+  const visibleLocations = useMemo(() => {
+    if (isSuperAdmin) return locations;
+    const userName = employeeName || currentUser?.full_name || '';
+    const userEmail = currentUser?.email || '';
+    return locations.filter(loc =>
+      loc.jefe_sitio_email === userEmail ||
+      loc.jefe_sitio === userName ||
+      loc.assigned_employees?.some(a => a === userName || a === currentUser?.id)
+    );
+  }, [locations, isSuperAdmin, employeeName, currentUser]);
+
+  const visibleQRs = useMemo(() => {
+    if (isSuperAdmin) return allQRs;
+    const userName = employeeName || currentUser?.full_name || '';
+    const userEmail = currentUser?.email || '';
+    return allQRs.filter(q =>
+      q.jefe_sitio_email === userEmail ||
+      q.jefe_sitio === userName ||
+      q.assigned_employees?.some(a => a === userName || a === currentUser?.id)
+    );
+  }, [allQRs, isSuperAdmin, employeeName, currentUser]);
+
   const jefeByLocId = useMemo(() => {
     const m = new Map();
     for (const ld of joinedLocations) {
@@ -78,7 +106,7 @@ export default function Mapa() {
   const [exportQRsOpen, setExportQRsOpen] = useState(false);
 
   const handleActivateAll = async () => {
-    const inactivas = locations.filter(l => !l.is_active);
+    const inactivas = visibleLocations.filter(l => !l.is_active);
     await Promise.all(inactivas.map(l => base44.entities.LocationQR.update(l.id, { is_active: true })));
     queryClient.invalidateQueries({ queryKey: ['locations'] });
     toast.success(`${inactivas.length} ubicación${inactivas.length !== 1 ? 'es' : ''} activada${inactivas.length !== 1 ? 's' : ''}`);
@@ -110,7 +138,7 @@ export default function Mapa() {
       <ExportarQRsDialog
         open={exportQRsOpen}
         onOpenChange={setExportQRsOpen}
-        locations={allQRs}
+        locations={visibleQRs}
         jefeByLocId={jefeByLocId}
       />
 
@@ -145,7 +173,7 @@ export default function Mapa() {
 
         <TabsContent value="mapa" className="mt-5">
           <MapaFichajes
-            locations={locations}
+            locations={visibleLocations}
             logs={logs}
             logsLoading={logsLoading}
             onLocationUpdate={(id, data) => updateLocation.mutate({ id, data })}
@@ -156,7 +184,7 @@ export default function Mapa() {
 
         <TabsContent value="gestion" className="mt-5">
           <LocationsManager
-            locations={locations}
+            locations={visibleLocations}
             isLoading={locLoading}
             onUpdate={(id, data) => updateLocation.mutate({ id, data })}
             onDelete={(id) => deleteLocation.mutate(id)}
@@ -177,7 +205,7 @@ export default function Mapa() {
 
         <TabsContent value="asignaciones" className="mt-5">
           <AsignacionesUbicacion
-            locations={locations}
+            locations={visibleLocations}
             employees={employees}
             logs={logs}
             onUpdate={(id, data) => updateLocation.mutate({ id, data })}
@@ -185,7 +213,7 @@ export default function Mapa() {
         </TabsContent>
 
         <TabsContent value="asistencias" className="mt-5">
-          <AsistenciasPanel locations={locations} />
+          <AsistenciasPanel locations={visibleLocations} />
         </TabsContent>
       </Tabs>
     </div>

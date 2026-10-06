@@ -118,6 +118,7 @@ export default async function(req) {
         entrada_longitude: longitude || null,
         estado: 'abierta',
         estado_admin: 'pendiente',
+        jefe_sitio_email: location.jefe_sitio_email || null,
         device_info: body.deviceInfo || '',
         sector_id: location.sector_id || null,
       });

@@ -60,6 +60,14 @@
       },
       "description": "Nombres de empleados/cuadrilla asignados a esta ubicaci\u00f3n"
     },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Nombre del jefe de sitio responsable de esta ubicaci\u00f3n. Asignaci\u00f3n manual editable desde la gesti\u00f3n de ubicaciones."
+    },
+    "jefe_sitio_email": {
+      "type": "string",
+      "description": "Email del jefe de sitio responsable. Usado por RLS para que el jefe vea y gestione \u00fanicamente sus ubicaciones y sus fichajes."
+    },
     "sector_id": {
       "type": "string",
       "description": "Sector/unidad de negocio. A\u00edsla datos entre sectores. Se estampa desde el creador; sin default."
@@ -75,7 +83,36 @@
       }
     },
     "read": {
-      "data.sector_id": "{{user.data.sector_id}}"
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
+              "data.jefe_sitio_email": "{{user.email}}"
+            },
+            {
+              "data.assigned_employees": {
+                "$in": [
+                  "{{user.id}}",
+                  "{{user.full_name}}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     },
     "update": {
       "$and": [
@@ -88,6 +125,14 @@
               "user_condition": {
                 "role": "admin"
               }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
+              "data.jefe_sitio_email": "{{user.email}}"
             },
             {
               "data.assigned_employees": {
