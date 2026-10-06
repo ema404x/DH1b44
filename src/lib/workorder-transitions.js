@@ -6,6 +6,7 @@
 // Transiciones drag-and-drop: "desde→hacia" = acción
 const DRAG_TRANSITIONS = {
   'pendiente→asignada': 'asignar',
+  'pendiente→en_progreso': 'iniciar',
   'asignada→en_progreso': 'iniciar',
   'en_progreso→pendiente_validacion': 'finalizar',
   'pendiente_validacion→completada': 'aprobar',
