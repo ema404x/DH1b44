@@ -31,6 +31,7 @@ import PullToRefresh from '@/components/shared/PullToRefresh';
 import { usePermission } from '@/hooks/usePermission';
 import { getTransitionAction } from '@/lib/workorder-transitions';
 import AdvancedFilters from '@/components/workorders/AdvancedFilters';
+import CancelarOTModal from '@/components/workorders/CancelarOTModal';
 import { useResolveCreator } from '@/hooks/useResolveCreator';
 import { isJefeSitioRole } from '@/lib/roles';
 import { esOtVencida } from '@/lib/otVencimiento';
@@ -62,6 +63,7 @@ export default function WorkOrders() {
   const [modoCampo, setModoCampo] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showAllGrid, setShowAllGrid] = useState(false);
+  const [pendingCancel, setPendingCancel] = useState(null); // { id, title } — drag-to-cancelada pendiente de confirmación
   const [advFilters, setAdvFilters] = useState({
     priority: '', type: '', assigned_to: '', jefe_sitio: '',
     date_from: '', date_to: '', overdue_only: false,
@@ -279,10 +281,8 @@ export default function WorkOrders() {
       return;
     }
     if (action === 'cancelar') {
-      if (!window.confirm('¿Está seguro de que desea cancelar esta OT? Esta acción no se puede deshacer.')) {
-        queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
-        return;
-      }
+      setPendingCancel({ id, title: order.title });
+      return;
     }
     try {
       // Toda transición de estado pasa por la máquina (transicionEstadoOT) —
@@ -292,6 +292,22 @@ export default function WorkOrders() {
       queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Error al cambiar el estado';
+      toast.error(msg);
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
+    }
+  };
+
+  // Ejecuta la cancelación confirmada desde el diálogo propio (arrastre Kanban → cancelada).
+  const confirmarCancelacionKanban = async () => {
+    if (!pendingCancel) return;
+    const { id } = pendingCancel;
+    setPendingCancel(null);
+    try {
+      const res = await base44.functions.invoke('transicionEstadoOT', { ot_id: id, accion: 'cancelar' });
+      toast.success(res.data.mensaje);
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Error al cancelar la OT';
       toast.error(msg);
       queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
     }
@@ -708,6 +724,16 @@ export default function WorkOrders() {
           }
         />
       )}
+
+      <CancelarOTModal
+        open={!!pendingCancel}
+        otTitle={pendingCancel?.title}
+        onClose={() => {
+          setPendingCancel(null);
+          queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
+        }}
+        onConfirm={confirmarCancelacionKanban}
+      />
     </div>
     </PullToRefresh>
   );

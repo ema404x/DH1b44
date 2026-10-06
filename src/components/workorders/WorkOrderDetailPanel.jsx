@@ -21,6 +21,7 @@ import { exportWorkOrderPDF } from '@/utils/exportWorkOrderPDF';
 import LocationEditor from './LocationEditor';
 import ReporteOperarioResumen from './ReporteOperarioResumen';
 import RechazoOTModal from './RechazoOTModal';
+import CancelarOTModal from './CancelarOTModal';
 import { getAvailableActions, getTransitionAction, ACTION_VARIANTS } from '@/lib/workorder-transitions';
 import { useResolveCreator } from '@/hooks/useResolveCreator';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -109,6 +110,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [convertingToObra, setConvertingToObra] = useState(false);
   const [rechazoOpen, setRechazoOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const queryClient = useQueryClient();
   const { resolveOTOwner } = useResolveCreator();
   const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
@@ -318,10 +320,9 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       return;
     }
     if (accion === 'cancelar') {
-      if (!window.confirm('¿Está seguro de que desea cancelar esta OT? Esta acción no se puede deshacer.')) {
-        setStateActionLoading(false);
-        return;
-      }
+      setStateActionLoading(false);
+      setCancelOpen(true);
+      return;
     }
     try {
       const extraData = {};
@@ -338,6 +339,27 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       if (accion === 'aprobar' || accion === 'cancelar' || accion === 'convertir_obra' || accion === 'completar') onClose();
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Error al cambiar el estado';
+      toast.error(msg);
+    } finally {
+      setStateActionLoading(false);
+    }
+  };
+
+  // Confirmación de cancelación desde el diálogo propio — reemplaza window.confirm.
+  const confirmarCancelacion = async () => {
+    setCancelOpen(false);
+    setStateActionLoading(true);
+    if (dirtyRef.current.size > 0) flushDirty();
+    try {
+      const res = await base44.functions.invoke('transicionEstadoOT', {
+        ot_id: order.id, accion: 'cancelar',
+      });
+      toast.success(res.data.mensaje);
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
+      onClose();
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Error al cancelar la OT';
       toast.error(msg);
     } finally {
       setStateActionLoading(false);
@@ -798,6 +820,14 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
         open={rechazoOpen}
         onClose={() => setRechazoOpen(false)}
         onConfirm={confirmarRechazo}
+        loading={stateActionLoading}
+      />
+
+      <CancelarOTModal
+        open={cancelOpen}
+        otTitle={data.title}
+        onClose={() => setCancelOpen(false)}
+        onConfirm={confirmarCancelacion}
         loading={stateActionLoading}
       />
     </>
