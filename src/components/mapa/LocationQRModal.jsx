@@ -190,6 +190,19 @@ export default function LocationQRModal({ open, onClose, location }) {
             </div>
           )}
         </div>
+        )}
+
+        {qrMode === 'fichaje' && (
+          <div className="border-t border-border pt-3">
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-xs text-blue-600">
+              <p className="font-semibold mb-1">QR de Fichaje</p>
+              <p className="text-muted-foreground leading-relaxed">
+                Al escanearlo, el operario ingresa su nombre, firma y registra entrada o salida.
+                Es independiente del QR de órdenes de trabajo.
+              </p>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
