@@ -71,6 +71,13 @@ export const TIPS_POR_TIPO = {
         '¿Se incluyen fotos del avance inicial o del trabajo correctivo terminado?',
       ],
     },
+    {
+      categoria: 'Limpieza de Campanas',
+      tips: [
+        '¿Tiene remito?',
+        '¿Tiene oblea QR?',
+      ],
+    },
   ],
 };
 
