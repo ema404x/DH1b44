@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { normalizeRole } from "../../shared/roles.ts";
 
 /**
@@ -10,7 +10,7 @@ import { normalizeRole } from "../../shared/roles.ts";
  *
  * Bypassa RLS de User.update (admin-only) vía asServiceRole.
  */
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
@@ -24,42 +24,28 @@ Deno.serve(async (req) => {
 
     const sb = base44.asServiceRole;
 
-    // ── Gate de rol: platform admin puede siempre; gerente_general (empleado) autorizado ──
-    let puedeCambiar = user.role === 'admin';
-    let emp = null;
-    if (!puedeCambiar) {
-      // 1) Por user_id (patrón primario de vincularEmpleado)
-      const byUserId = await sb.entities.Employee.filter({ user_id: user.id }).catch(() => []);
-      emp = byUserId[0];
-      // 2) Fallback por email (ficha sin user_id estampado aún)
-      if (!emp && user.email) {
-        const byEmail = await sb.entities.Employee.filter({ email: user.email }).catch(() => []);
-        emp = byEmail.find(e => e.email?.toLowerCase().trim() === user.email.toLowerCase().trim());
-      }
-      // 3) Fallback case-insensitive: si el filter exacto por email no matcheó
-      // (mismatch de mayúsculas/minúsculas en el email almacenado), fetch amplio
-      // + find normalizado. Sino el gerente no puede cambiar de sector.
-      if (!emp && user.email) {
-        try {
-          const all = await sb.entities.Employee.list('-created_date', 2000);
-          emp = (all || []).find(e => e.email?.toLowerCase().trim() === user.email.toLowerCase().trim()) || null;
-        } catch {}
-      }
-      if (emp && normalizeRole(emp.role) === 'gerente_general') {
-        puedeCambiar = true;
-        // Auto-curación: estampar user_id si faltaba
-        if (emp.user_id !== user.id) {
-          await sb.entities.Employee.update(emp.id, { user_id: user.id }).catch(() => {});
-        }
-      }
+    // Resolver la misma ficha que se utilizará al recargar, también para admins.
+    const sectorIdActual = user.data?.sector_id ?? user.sector_id ?? null;
+    const byUserId = await sb.entities.Employee.filter({ user_id: user.id }, { limit: 1 });
+    let emp = byUserId.items[0] || null;
+    if (!emp && user.email) {
+      const emailPattern = user.email.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const byEmail = await sb.entities.Employee.filter(
+        { email: { $regex: `^\\s*${emailPattern}\\s*$`, $options: 'i' } },
+        { limit: 50 }
+      );
+      emp = byEmail.items.find(e => e.user_id === user.id)
+        || byEmail.items.find(e => e.sector_id === sectorIdActual)
+        || byEmail.items.find(e => e.status === 'activo')
+        || byEmail.items[0] || null;
     }
-    if (!puedeCambiar) {
-      return Response.json({ error: 'Forbidden: solo gerente_general puede cambiar de sector' }, { status: 403 });
+    if (user.role !== 'admin' && normalizeRole(emp?.role) !== 'gerente_general') {
+      return Response.json({ error: 'Forbidden: solo administradores y gerente_general pueden cambiar de sector' }, { status: 403 });
     }
 
     // ── Validar que el sector destino exista y esté activo ──
-    const sectores = await sb.entities.Sector.filter({ clave: sector_destino }).catch(() => []);
-    const sector = sectores[0];
+    const sectores = await sb.entities.Sector.filter({ clave: sector_destino }, { limit: 1 });
+    const sector = sectores.items[0];
     if (!sector) return Response.json({ error: 'Sector no encontrado' }, { status: 404 });
     if (sector.activo === false) {
       return Response.json({ error: 'Sector inactivo' }, { status: 409 });
@@ -70,38 +56,53 @@ Deno.serve(async (req) => {
     // parámetros top-level del payload dentro del blob `data` del User.
     // PASAR `data: { sector_id }` crea `data.data.sector_id` (doble anidamiento)
     // — bug histórico. Patrón limpio: solo parámetros top-level.
-    const sectorBaseActual = user.data?.sector_base ?? null;
-    const sectorIdActual = user.data?.sector_id ?? user.sector_id ?? null;
-
-    const updatePayload = { sector_id: sector_destino } as any;
-    if (!sectorBaseActual && sectorIdActual) {
+    const sectorBaseActual = user.data?.sector_base ?? user.sector_base ?? null;
+    const updatePayload = { sector_id: sector_destino };
+    if (!sectorBaseActual && sectorIdActual && sectorIdActual !== sector_destino) {
       // Preservar sector_base la primera vez — también como top-level.
       updatePayload.sector_base = sectorIdActual;
     }
 
-    await sb.entities.User.update(user.id, updatePayload);
-
-    // ── Sincronizar la ficha Employee al nuevo sector (fix rebote de limbo) ──
-    // Sin esto la ficha queda en el sector viejo y vincularEmpleado (que trata a
-    // la ficha como fuente de verdad) revierte el User al sector viejo en el
-    // próximo login → el empleado queda en limbo (no visto en ningún sector).
-    // Best-effort: si no hay ficha (platform admin puro) no rompe el flujo.
-    // Los registros históricos (OTs/Activos/Pendientes) NO se migran: quedan en
-    // su sector original, preservando el aislamiento y evitando contaminación.
+    // Guardar y comprobar ambas partes antes de confirmar. Un admin sin ficha
+    // Employee puede cambiar igualmente. Si falla, restaurar lo que se intentó.
+    let employeeAttempted = false;
+    let userAttempted = false;
+    let stage = 'sincronizar la ficha de empleado';
     try {
-      let empRow = emp;
-      if (!empRow) {
-        const byUid = user.id ? (await sb.entities.Employee.filter({ user_id: user.id }).catch(() => [])) : [];
-        empRow = byUid[0];
-        if (!empRow && user.email) {
-          const byEmail = await sb.entities.Employee.filter({ email: user.email }).catch(() => []);
-          empRow = byEmail.find(e => e.email?.toLowerCase().trim() === user.email.toLowerCase().trim());
+      if (emp) {
+        employeeAttempted = true;
+        await sb.entities.Employee.update(emp.id, { sector_id: sector_destino, user_id: user.id });
+        const savedEmployee = await sb.entities.Employee.get(emp.id);
+        if (savedEmployee.sector_id !== sector_destino) {
+          throw new Error('El sector de la ficha no se guardó');
         }
       }
-      if (empRow && empRow.sector_id !== sector_destino) {
-        await sb.entities.Employee.update(empRow.id, { sector_id: sector_destino }).catch(() => {});
+      stage = 'guardar el sector de la cuenta';
+      userAttempted = true;
+      await sb.entities.User.update(user.id, updatePayload);
+      const savedUser = await sb.entities.User.get(user.id);
+      if ((savedUser.data?.sector_id ?? savedUser.sector_id) !== sector_destino) {
+        throw new Error('El sector de la cuenta no se guardó');
       }
-    } catch (_) {}
+    } catch (error) {
+      const restoreTasks = [];
+      if (userAttempted) {
+        restoreTasks.push(sb.entities.User.update(user.id, {
+          sector_id: sectorIdActual || '', sector_base: sectorBaseActual || ''
+        }));
+      }
+      if (employeeAttempted) {
+        restoreTasks.push(sb.entities.Employee.update(emp.id, {
+          sector_id: emp.sector_id || '', user_id: emp.user_id || ''
+        }));
+      }
+      const restored = await Promise.allSettled(restoreTasks);
+      if (restored.some(result => result.status === 'rejected')) {
+        console.error('No se pudo restaurar el sector anterior');
+        return Response.json({ error: 'No se pudo completar ni restaurar el cambio de sector. Volvé a intentarlo antes de continuar.' }, { status: 500 });
+      }
+      return Response.json({ error: `No se pudo ${stage}: ${error.message}` }, { status: 500 });
+    }
 
     return Response.json({
       ok: true,
@@ -111,4 +112,4 @@ Deno.serve(async (req) => {
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}

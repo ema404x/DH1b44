@@ -42,6 +42,7 @@ export default function SectorSwitcher() {
   const currentSectorName = currentSector?.nombre || currentSectorId;
 
   const handleSwitch = async (sectorClave, sectorNombre) => {
+    if (switching) return;
     if (sectorClave === currentSectorId) { setOpen(false); return; }
     setSwitching(sectorClave);
     try {
@@ -50,7 +51,6 @@ export default function SectorSwitcher() {
       setOpen(false);
     } catch (e) {
       toast.error('Error al cambiar de sector: ' + (e.message || ''));
-    } finally {
       setSwitching(null);
     }
   };
@@ -89,7 +89,7 @@ export default function SectorSwitcher() {
                   <button
                     key={s.id}
                     onClick={() => handleSwitch(s.clave, s.nombre)}
-                    disabled={isCurrent || switching === s.clave || !s.activo}
+                    disabled={isCurrent || switching !== null || s.activo === false}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors text-left",
                       isCurrent ? "bg-primary/10" : "hover:bg-accent",

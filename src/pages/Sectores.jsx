@@ -83,14 +83,15 @@ export default function Sectores() {
     setSwitching(sectorClave);
     try {
       // Cambiar el sector del usuario actual via función server-side (Modelo B)
-      await base44.functions.invoke('cambiarSectorActivo', { sector_destino: sectorClave });
+      const result = await base44.functions.invoke('cambiarSectorActivo', { sector_destino: sectorClave });
+      if (!result.data?.ok) throw new Error(result.data?.error || 'No se pudo cambiar de sector');
       toast.success(`Ingresaste al sector: ${sectorNombre}`, { duration: 3000 });
       // Navegar al dashboard para ver los datos del sector
       navigate('/');
       // Recargar para que todos los contextos (auth, queries) se refresquen
       setTimeout(() => window.location.reload(), 500);
     } catch (e) {
-      toast.error('Error al cambiar de sector: ' + (e.message || ''));
+      toast.error('Error al cambiar de sector: ' + (e?.response?.data?.error || e?.data?.error || e.message || ''));
       setSwitching(null);
     }
   };
@@ -118,7 +119,7 @@ export default function Sectores() {
     }
   };
 
-  const currentSectorId = currentUser?.sector_id || currentUser?.data?.sector_id || employeeSector || 'escuela';
+  const currentSectorId = currentUser?.data?.sector_id || currentUser?.sector_id || employeeSector || 'escuela';
 
   const entityLabels = {
     WorkOrder: 'Órdenes de Trabajo', Employee: 'Empleados', Certificado: 'Certificados',
@@ -210,7 +211,7 @@ export default function Sectores() {
                     <Button
                       size="sm"
                       variant={isCurrent ? "secondary" : "default"}
-                      disabled={isCurrent || switching === s.clave || !s.activo}
+                      disabled={isCurrent || switching !== null || s.activo === false}
                       onClick={() => handleObservar(s.clave, s.nombre)}
                     >
                       {switching === s.clave ? (

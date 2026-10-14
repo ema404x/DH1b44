@@ -275,16 +275,16 @@ export const AuthProvider = ({ children }) => {
         },
       }));
       setUserPermissions(prev => ({ ...prev, _employeeSector: nuevoSector }));
-      queryClientInstance.invalidateQueries();
+      await queryClientInstance.cancelQueries();
       queryClientInstance.removeQueries();
       // Recarga completa para purgar state local stale y forzar sincronización de
       // todos los módulos con el nuevo sector (RLS hard-AND exige sector exacto).
       if (typeof window !== 'undefined') {
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 500);
       }
       return nuevoSector;
     } catch (e) {
-      throw new Error(e?.message || 'Error al cambiar de sector');
+      throw new Error(e?.response?.data?.error || e?.data?.error || e?.message || 'Error al cambiar de sector');
     }
   };
 
