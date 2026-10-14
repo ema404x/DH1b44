@@ -153,13 +153,9 @@ function makeScopedEntity(entity, sector, isGlobal) {
         return stamp(data, sector);
       });
       const ids = [...new Set(clean.map(data => data.id))];
-      for (let start = 0; start < ids.length; start += 50) {
-        const batchIds = ids.slice(start, start + 50);
-        const result = await entity.filter({ sector_id: sector, id: { $in: batchIds } }, '-created_date', 50);
-        const records = Array.isArray(result) ? result : result.items;
-        if (!Array.isArray(records)) throw new SectorError('No se pudo verificar el lote', 503);
-        const allowed = new Set(records.map(record => record.id));
-        if (batchIds.some(id => !allowed.has(id))) throw new SectorError('El lote contiene registros fuera del sector activo');
+      for (let start = 0; start < ids.length; start += 6) {
+        const records = await Promise.all(ids.slice(start, start + 6).map(id => entity.get(id)));
+        records.forEach(record => assertScopedRecord(record, sector));
       }
       return clean.length ? entity.bulkUpdate(clean) : [];
     },

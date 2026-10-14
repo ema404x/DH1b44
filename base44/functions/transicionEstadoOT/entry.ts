@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     // (solo creador / jefe_sitio_email / admin+sector / gerente+sector), así que un
     // operario que escanea una OT libre recibe null → 404. Los permisos de la
     // transición ya los controla la función explícitamente.
-    const ot = await base44.asServiceRole.entities.WorkOrder.get(ot_id);
+    const ot = await base44.asServiceRole.entities.WorkOrder.get(ot_id).catch(() => null);
     if (!ot) {
       return Response.json({ error: 'Orden de trabajo no encontrada' }, { status: 404 });
     }
