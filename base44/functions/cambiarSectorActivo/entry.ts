@@ -25,7 +25,7 @@ export default async function(req) {
     const sb = base44.asServiceRole;
 
     // Resolver la misma ficha que se utilizará al recargar, también para admins.
-    const sectorIdActual = user.data?.sector_id ?? user.sector_id ?? null;
+    const sectorIdActual = user.sector_id ?? user.data?.sector_id ?? null;
     const byUserId = await sb.entities.Employee.filter({ user_id: user.id }, { limit: 1 });
     let emp = byUserId.items[0] || null;
     if (!emp && user.email) {
