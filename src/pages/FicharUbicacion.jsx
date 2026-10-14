@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import GpsStatus from '@/components/fichar/GpsStatus';
+import useRequiredGps from '@/components/fichar/useRequiredGps';
 
 const COLOR_MAP = {
   blue:   { bg: 'from-blue-600 to-blue-800',     icon: 'bg-blue-500/20 text-blue-200' },
@@ -27,8 +28,7 @@ export default function FicharUbicacion() {
   const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [gps, setGps] = useState(null);
-  const [gpsLoading, setGpsLoading] = useState(true);
+  const { gps, loading: gpsLoading, error: gpsError, requestGps } = useRequiredGps();
 
   // Form state
   const [fullName, setFullName] = useState('');
@@ -79,15 +79,7 @@ export default function FicharUbicacion() {
     };
     init();
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => { setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setGpsLoading(false); },
-        () => setGpsLoading(false),
-        { timeout: 8000 }
-      );
-    } else {
-      setGpsLoading(false);
-    }
+
   }, [locationId]);
 
   // Debounced check for open jornada when name changes
@@ -168,10 +160,13 @@ export default function FicharUbicacion() {
 
   // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!fullName.trim() || !dni.trim() || !hasStrokes) return;
+    if (!fullName.trim() || !dni.trim() || !hasStrokes || submitting || gpsLoading || !gps) return;
     setSubmitting(true);
 
     try {
+      // Exigir una lectura nueva: el GPS pudo apagarse después de abrir el formulario.
+      const currentGps = await requestGps();
+      if (!currentGps) return;
       // Extraer base64 puro del dataURL de la firma
       const canvas = canvasRef.current;
       const dataUrl = canvas.toDataURL('image/png');
@@ -185,8 +180,8 @@ export default function FicharUbicacion() {
         operarioNombre: fullName.trim(),
         dni: dni.trim(),
         signatureBase64,
-        latitude: gps?.lat || null,
-        longitude: gps?.lng || null,
+        latitude: currentGps.lat,
+        longitude: currentGps.lng,
         deviceInfo: navigator.userAgent.slice(0, 120),
       });
 
@@ -216,7 +211,7 @@ export default function FicharUbicacion() {
 
   const colors = COLOR_MAP[location?.color || 'blue'] || COLOR_MAP.blue;
   const isSalida = !!jornadaAbierta;
-  const canSubmit = fullName.trim().length > 2 && dni.trim().length >= 7 && hasStrokes && !submitting && !checkingJornada;
+  const canSubmit = fullName.trim().length > 2 && dni.trim().length >= 7 && hasStrokes && !!gps && !gpsLoading && !submitting && !checkingJornada;
 
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -352,6 +347,14 @@ export default function FicharUbicacion() {
 
           {/* GPS status */}
           <GpsStatus gps={gps} location={location} loading={gpsLoading} />
+          {gpsError && (
+            <div role="alert" className="space-y-2 rounded-xl bg-destructive/10 p-3 text-sm text-destructive">
+              <p>{gpsError}</p>
+              <Button variant="outline" className="w-full" onClick={requestGps} disabled={gpsLoading || submitting}>
+                Reintentar ubicación
+              </Button>
+            </div>
+          )}
 
           {/* Firma */}
           <div className="space-y-2">

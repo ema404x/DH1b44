@@ -12,6 +12,15 @@ export default async function(req) {
     // Normalizar DNI: solo dígitos
     const normalizeDni = (s) => (s || '').replace(/\D/g, '');
 
+    // No aceptar entradas ni salidas sin coordenadas numéricas válidas.
+    if (action === 'registrarEntrada' || action === 'registrarSalida') {
+      const { latitude, longitude } = body;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+          Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+        return Response.json({ error: 'Para fichar, activá la ubicación y permití el acceso al GPS en el navegador.' }, { status: 400 });
+      }
+    }
+
     // ── Obtener datos de la ubicación (público, sin auth) ──────────────────────
     if (action === 'getUbicacion') {
       const { locationId } = body;
@@ -116,8 +125,8 @@ export default async function(req) {
         dni: dniNorm,
         entrada_timestamp: now,
         entrada_signature_url: sigResult.file_url,
-        entrada_latitude: latitude || null,
-        entrada_longitude: longitude || null,
+        entrada_latitude: latitude,
+        entrada_longitude: longitude,
         estado: 'abierta',
         estado_admin: 'pendiente',
         jefe_sitio_email: location.jefe_sitio_email || null,
@@ -173,8 +182,8 @@ export default async function(req) {
       const updated = await sb.entities.FichajeUbicacion.update(jornada.id, {
         salida_timestamp: now,
         salida_signature_url: sigResult.file_url,
-        salida_latitude: latitude || null,
-        salida_longitude: longitude || null,
+        salida_latitude: latitude,
+        salida_longitude: longitude,
         estado: 'cerrada',
       });
 
