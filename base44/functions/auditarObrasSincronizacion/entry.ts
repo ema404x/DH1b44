@@ -1,4 +1,6 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { createScopedClient, sectorErrorResponse } from '../../shared/sectorGuard.ts';
+import { resolveAndReconcileSector } from '../../shared/callerIdentity.ts';
 import * as XLSX from 'npm:xlsx@0.18.5';
 import { assertAllowedFileUrl } from '../../shared/excelImport.ts';
 
@@ -108,29 +110,27 @@ function parsePlanilla(buffer) {
   return rows;
 }
 
-// Carga TODOS los proyectos del sistema con paginación real (máx 5000 por request)
-async function loadAllProjects(base44) {
+// La comparación y sus correcciones operan exclusivamente en el sector activo.
+async function loadAllProjects(sb) {
   const all = [];
-  let skip = 0;
-  const PAGE = 5000;
-  while (true) {
-    const chunk = await base44.asServiceRole.entities.Project.list('id', PAGE, skip);
-    all.push(...chunk);
-    if (chunk.length < PAGE) break;
-    skip += PAGE;
-  }
+  let cursor;
+  do {
+    const page = await sb.entities.Project.filter({}, { sort: 'created_date', limit: 500, cursor });
+    all.push(...page.items);
+    cursor = page.has_more ? page.next_cursor : null;
+  } while (cursor);
   return all;
 }
 
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Aislamiento de raíz: las obras sincronizadas caen al sector activo del operador.
-    const callerSector = user.data?.sector_id || user.sector_id;
-    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+    if (user.role !== 'admin') return Response.json({ error: 'Solo administradores pueden auditar y corregir importaciones' }, { status: 403 });
+    const { sector: callerSector } = await resolveAndReconcileSector(base44.asServiceRole, user);
+    const sb = createScopedClient(base44, callerSector);
 
     const { file_url, fix = false } = await req.json();
     if (!file_url) return Response.json({ error: 'file_url requerido' }, { status: 400 });
@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
     if (!rows.length) return Response.json({ error: 'Planilla sin filas válidas' }, { status: 400 });
 
     // Cargar TODOS los proyectos existentes con paginación correcta
-    const existing = await loadAllProjects(base44);
+    const existing = await loadAllProjects(sb);
 
     const systemKeys = new Set();
     for (const p of existing) {
@@ -213,11 +213,11 @@ Deno.serve(async (req) => {
       for (let b = 0; b < toCreate.length; b += 500) {
         const batch = toCreate.slice(b, b + 500);
         try {
-          await base44.asServiceRole.entities.Project.bulkCreate(batch);
+          await sb.entities.Project.bulkCreate(batch);
           created += batch.length;
         } catch (_) {
           for (const it of batch) {
-            try { await base44.asServiceRole.entities.Project.create(it); created++; }
+            try { await sb.entities.Project.create(it); created++; }
             catch (e2) { errors++; console.error('create error:', e2.message); }
           }
         }
@@ -227,11 +227,11 @@ Deno.serve(async (req) => {
       for (let b = 0; b < toUpdate.length; b += 500) {
         const batch = toUpdate.slice(b, b + 500);
         try {
-          await base44.asServiceRole.entities.Project.bulkUpdate(batch);
+          await sb.entities.Project.bulkUpdate(batch);
           updated += batch.length;
         } catch (_) {
           for (const it of batch) {
-            try { await base44.asServiceRole.entities.Project.update(it.id, it); updated++; }
+            try { await sb.entities.Project.update(it.id, it); updated++; }
             catch (e2) { errors++; console.error('update error:', e2.message); }
           }
         }
@@ -272,6 +272,6 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error('auditarObrasSincronizacion error:', err);
-    return Response.json({ error: err.message }, { status: 500 });
+    return sectorErrorResponse(err);
   }
-});
+}

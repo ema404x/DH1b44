@@ -29,7 +29,7 @@ export default async function(req) {
     const displayName = employee?.full_name || user.full_name || '';
 
     const all = await fetchAll(sb, 'InspeccionColegio', { sector_id: sector });
-    const adminView = await resolveAdminView(sb, employee, 'InspeccionColegio');
+    const adminView = await resolveAdminView(sb, employee, 'InspeccionColegio', user);
 
     if (adminView) {
       return Response.json({ inspecciones: all, total: all.length, admin_view: true });

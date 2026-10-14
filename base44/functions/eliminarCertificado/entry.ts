@@ -80,7 +80,7 @@ export default async function(req) {
     // Verificar ownership: el caller debe ser el creador, aprobador, o tener
     // admin_view. Esto evita que un jefe borre certs de otros jefes aunque
     // tenga delete=true (a menos que tenga admin_view).
-    const isAdminView = await resolveAdminView(sb, employee, 'Certificado');
+    const isAdminView = await resolveAdminView(sb, employee, 'Certificado', user);
     if (!isAdminView) {
       const sols = await sb.entities.SolicitudCertificado.filter({ certificado_id }).catch(() => []);
       if (!certVisibleToUser(cert, user, callerSector, sols || [])) {

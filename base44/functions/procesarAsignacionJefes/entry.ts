@@ -1,6 +1,9 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { createScopedClient, sectorErrorResponse } from '../../shared/sectorGuard.ts';
+import { resolveAndReconcileSector } from '../../shared/callerIdentity.ts';
+import { assertAllowedFileUrl } from '../../shared/excelImport.ts';
 
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
@@ -9,6 +12,9 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    if (user.role !== 'admin') return Response.json({ error: 'Solo administradores pueden reasignar responsables' }, { status: 403 });
+    const { sector } = await resolveAndReconcileSector(base44.asServiceRole, user);
+    const sb = createScopedClient(base44, sector);
     const { fileUrl, comunaId } = await req.json();
 
     if (!fileUrl || !comunaId) {
@@ -16,7 +22,8 @@ Deno.serve(async (req) => {
     }
 
     // Descargar el archivo
-    const fileRes = await fetch(fileUrl);
+    assertAllowedFileUrl(fileUrl);
+    const fileRes = await fetch(fileUrl, { signal: AbortSignal.timeout(30000) });
     const buffer = await fileRes.arrayBuffer();
     
     // Importar xlsx en runtime
@@ -39,7 +46,7 @@ Deno.serve(async (req) => {
     const rows = XLSX.utils.sheet_to_json(ws);
 
     // Obtener todas las ubicaciones de la comuna
-    const locations = await base44.asServiceRole.entities.LocationData.filter({
+    const locations = await sb.entities.LocationData.filter({
       comuna: comunaId
     });
 
@@ -91,7 +98,7 @@ Deno.serve(async (req) => {
     for (const [locId, updates] of Object.entries(updatedMap)) {
       try {
         if (updates.jefe_sitio || updates.inspector) {
-          await base44.asServiceRole.entities.LocationData.update(locId, {
+          await sb.entities.LocationData.update(locId, {
             jefe_sitio: updates.jefe_sitio,
             inspector: updates.inspector,
           });
@@ -110,6 +117,6 @@ Deno.serve(async (req) => {
       message: `Procesadas ${rows.length} filas, actualizadas ${updateCount} escuelas.`,
     });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return sectorErrorResponse(error);
   }
-});
+}

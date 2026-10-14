@@ -48,7 +48,7 @@ export default async function(req) {
     const isCreator = inspeccion.created_by_id && inspeccion.created_by_id === userId;
     const isJefeByName = inspeccion.jefe_sitio && targetName
       && norm(inspeccion.jefe_sitio) === targetName;
-    const adminView = await resolveAdminView(sb, employee, 'InspeccionColegio');
+    const adminView = await resolveAdminView(sb, employee, 'InspeccionColegio', user);
 
     let isEstablecimientoAsignado = false;
     if (!isCreator && !isJefeByName && !adminView && inspeccion.establecimiento) {

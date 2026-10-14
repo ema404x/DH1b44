@@ -48,7 +48,7 @@ export default async function(req) {
       fetchAll(sb, 'Asset', { sector_id: sector }),
     ]);
 
-    const adminView = await resolveAdminView(sb, employee, 'InspeccionColegio');
+    const adminView = await resolveAdminView(sb, employee, 'InspeccionColegio', user);
 
     // Predicado de matcheo de jefe (nombre o email normalizado).
     const matchJefe = (jefeStr: string | null | undefined): boolean => {

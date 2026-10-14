@@ -110,7 +110,7 @@ export async function buildOtVisibilityContext(
   // platformRole='admin' se rige por el admin_view de su ficha, igual que el
   // cliente (useCurrentUser.isSuperAdmin). Cierra el leak donde el jefe veía
   // TODAS las OTs del sector sin tener "Ver Todo" tildado en Control de Acceso.
-  const isAdminView = await resolveAdminView(sb, employee, 'WorkOrder');
+  const isAdminView = await resolveAdminView(sb, employee, 'WorkOrder', user);
   const isField = isFieldRole(employeeRole);
 
   // Linkage jefe de sitio: el operario de campo ejecuta el trabajo que le

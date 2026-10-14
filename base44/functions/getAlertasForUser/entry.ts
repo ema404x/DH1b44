@@ -80,7 +80,7 @@ export default async function (req) {
 
     // ── 2. PENDIENTES VENCIDOS ──
     if (tiposActivos.has('pendiente_vencido')) {
-      const adminView = await resolveAdminView(sb, employee, 'Pendientes');
+      const adminView = await resolveAdminView(sb, employee, 'Pendientes', user);
       const cfg = cfgOf('pendiente_vencido');
       const diasLimite = cfg.dias_vencimiento_pendiente || 7;
       const all = await fetchAll(sb, 'Pendiente', { sector_id: sector, estado: { $in: ['pendiente', 'asignado', 'en_progreso'] } });
@@ -105,7 +105,7 @@ export default async function (req) {
 
     // ── 3. GARANTÍA DE ACTIVOS ──
     if (tiposActivos.has('garantia_activo')) {
-      const adminView = await resolveAdminView(sb, employee, 'Asset');
+      const adminView = await resolveAdminView(sb, employee, 'Asset', user);
       const cfg = cfgOf('garantia_activo');
       const diasAnticipacion = cfg.dias_anticipacion || 30;
       const all = await fetchAll(sb, 'Asset', { sector_id: sector });
@@ -132,7 +132,7 @@ export default async function (req) {
 
     // ── 4. STOCK CRÍTICO DE MATERIALES ──
     if (tiposActivos.has('stock_material')) {
-      const adminView = await resolveAdminView(sb, employee, 'Inventory');
+      const adminView = await resolveAdminView(sb, employee, 'Inventory', user);
       if (adminView) {
         const cfg = cfgOf('stock_material');
         const pctExtra = cfg.umbral_stock_pct || 0;
@@ -162,7 +162,7 @@ export default async function (req) {
     // ve quien tenga "Ver Todo" en Facturación (admin_view del rol de empleado),
     // respetando el aislamiento por sector. Sin admin_view → sin alerta (no es
     // competencia de un operario/jefe saber de cobros).
-    const adminViewInv = await resolveAdminView(sb, employee, 'Invoice');
+    const adminViewInv = await resolveAdminView(sb, employee, 'Invoice', user);
     if (adminViewInv) {
       const all = await fetchAll(sb, 'Invoice', { sector_id: sector, status: { $in: ['pendiente', 'vencida'] } });
       for (const inv of all) {

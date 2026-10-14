@@ -71,7 +71,7 @@ export default async function(req) {
       && norm(inspeccion.jefe_sitio) === targetName;
 
     // 3) admin_view desde el rol del EMPLEADO (no platform role)
-    const adminView = await resolveAdminView(sb, employee, 'InspeccionColegio');
+    const adminView = await resolveAdminView(sb, employee, 'InspeccionColegio', user);
 
     // 4) Establecimiento asignado (cruce Direccion + Asset con norm)
     let isEstablecimientoAsignado = false;

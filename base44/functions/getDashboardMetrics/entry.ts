@@ -245,7 +245,7 @@ export default async function (req) {
     let visiblePendientes = null;
     if (loaded.pendientes) {
       const allPends = loaded.pendientes;
-      const pendAdminView = await resolveAdminView(sb, employee, 'Pendientes');
+      const pendAdminView = await resolveAdminView(sb, employee, 'Pendientes', user);
       let mine;
       if (pendAdminView) {
         mine = allPends;
