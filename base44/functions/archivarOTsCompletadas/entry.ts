@@ -1,4 +1,6 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
+import { createScopedClient, sectorErrorResponse } from '../../shared/sectorGuard.ts';
+import { resolveCallerSectorCanonical } from '../../shared/callerIdentity.ts';
 
 /**
  * Archivado automático de OTs al Historial.
@@ -9,10 +11,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
  * activas (Kanban/Grilla/Stats) ocultan las archivadas; el Historial las
  * muestra para visualización normal.
  *
- * Aplica a AMBOS sectores (escuela y bapro) de forma idéntica: corre como
- * service role, no filtra por sector — procesa todas las completadas del
- * sistema. El aislamiento se preserva en la visualización (cada sector ve
- * sus propias archivadas vía RLS).
+ * Procesa únicamente el sector canónico del administrador autenticado.
+ * Nunca admite un encabezado o un sector del payload como autorización
+ * para operar otro sector. Los registros sin sector se excluyen.
  *
  * Fail-safes:
  *  - Sólo archiva completadas con completed_date <= cutoff (hoy-30d).
@@ -27,69 +28,40 @@ function arDateStr(d: Date): string {
   return new Date(d.getTime() + AR_OFFSET_MS).toISOString().split('T')[0];
 }
 
-async function fetchAll(sb: any, entity: string, query: Record<string, any>, sort = 'created_date'): Promise<any[]> {
-  const all: any[] = [];
-  let cursor: string | undefined;
-  let prev: string | undefined;
-  for (let i = 0; i < 200; i++) {
-    let batch: any[];
-    try {
-      const q = { ...query };
-      if (cursor) q.created_date = { $gt: cursor };
-      batch = await sb.entities[entity].filter(q, sort, 500);
-    } catch { break; }
-    all.push(...batch);
-    if (batch.length < 500) break;
-    cursor = batch[batch.length - 1]?.created_date;
-    if (!cursor || cursor === prev) break;
-    prev = cursor;
-  }
-  return all;
-}
+
 
 export default async function (req) {
   try {
     const base44 = createClientFromRequest(req);
-    const sb = base44.asServiceRole;
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (user.role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
+    const { sector } = await resolveCallerSectorCanonical(base44.asServiceRole, user);
+    const sb = createScopedClient(base44, sector);
+    const body = await req.json().catch(() => ({}));
+    if (body.sector_id && body.sector_id !== sector) return Response.json({ error: 'Sector distinto del activo' }, { status: 403 });
     const now = new Date();
     const cutoff = arDateStr(new Date(now.getTime() - 30 * 86400000));
-
-    // Todas las completadas del sistema (ambos sectores). Paginado.
-    const candidatas = await fetchAll(sb, 'WorkOrder', { status: 'completada' }, 'completed_date');
-
-    // Filtrado idempotente: no archivadas + completed_date <= cutoff.
-    const aArchivar = candidatas.filter((o) => !o.archivada && o.completed_date && o.completed_date <= cutoff);
-
-    let archivadas = 0;
-    const porSector: Record<string, number> = {};
-    const updates = aArchivar.map((o) => {
-      archivadas++;
-      const s = o.sector_id || 'sin_sector';
-      porSector[s] = (porSector[s] || 0) + 1;
-      return { id: o.id, archivada: true, fecha_archivado: now.toISOString() };
-    });
-
-    for (let i = 0; i < updates.length; i += 500) {
-      await sb.entities.WorkOrder.bulkUpdate(updates.slice(i, i + 500));
+    const query = { status: 'completada', archivada: { $ne: true }, completed_date: { $gte: '0001-01-01', $lte: cutoff } };
+    const total = await sb.entities.WorkOrder.count(query);
+    if (body.dry_run === true) return Response.json({ success: true, dry_run: true, sector, candidatas: total, cutoff });
+    if (total) {
+      let result;
+      do {
+        result = await sb.entities.WorkOrder.updateMany(query, { $set: { archivada: true, fecha_archivado: now.toISOString() } });
+      } while (result.has_more);
     }
-
-    // Auditoría
-    if (archivadas > 0) {
-      try {
-        await sb.entities.AuditLog.create({
-          entity_type: 'WorkOrder',
-          action: 'update',
-          user_email: 'automacion',
-          user_role: 'sistema',
-          timestamp: now.toISOString(),
-          changed_fields: ['archivada', 'fecha_archivado'],
-          notes: `Archivado automático de OTs completadas (cutoff ${cutoff}): ${archivadas} OTs. Por sector: ${JSON.stringify(porSector)}`,
-        });
-      } catch { /* best-effort */ }
+    const archivadas = Math.max(0, total - await sb.entities.WorkOrder.count(query));
+    if (archivadas) {
+      await sb.entities.AuditLog.create({
+        entity_type: 'WorkOrder', entity_id: `sector:${sector}`, action: 'update',
+        user_email: user.email, user_role: user.role, timestamp: now.toISOString(),
+        changed_fields: ['archivada', 'fecha_archivado'],
+        notes: `Archivado del sector ${sector}: ${archivadas} OTs (cutoff ${cutoff}).`,
+      });
     }
-
-    return Response.json({ success: true, archivadas, cutoff, porSector });
+    return Response.json({ success: true, sector, archivadas, cutoff, porSector: { [sector]: archivadas } });
   } catch (e) {
-    return Response.json({ error: e.message }, { status: 500 });
+    return sectorErrorResponse(e);
   }
 }

@@ -12,7 +12,7 @@
     },
     "sede_scope": {
       "type": "string",
-      "description": "Sede/edificio del scope: 'TODAS' o un location_id de Edificio"
+      "description": "Sede/edificio del scope: TODAS o un location_id de Edificio"
     },
     "sede_nombre": {
       "type": "string",
@@ -27,7 +27,11 @@
       "items": {
         "type": "string"
       },
-      "description": "IDs expl\u00edcitos de activos del lote. Vac\u00edo = todos los del sector/sede."
+      "description": "IDs expl\u00edcitos de activos del lote. Vac\u00edo = todos los del sector/sede para enlaces anteriores."
+    },
+    "snapshot_fijo": {
+      "type": "boolean",
+      "description": "Un snapshot fijo vac\u00edo no autoriza ning\u00fan activo adicional."
     },
     "expiracion": {
       "type": "string",
@@ -56,17 +60,17 @@
     "total_activos": {
       "type": "number",
       "default": 0,
-      "description": "Total de activos en scope al momento de la generaci\u00f3n"
+      "description": "Cantidad de activos autorizados al generar el enlace"
     },
     "vistos_count": {
       "type": "number",
       "default": 0,
-      "description": "Cantidad de activos marcados como vistos con este token"
+      "description": "Cantidad de activos vistos con este token"
     },
     "ultima_actividad": {
       "type": "string",
       "format": "date-time",
-      "description": "\u00daltima vez que el banco marc\u00f3 un visto con este link"
+      "description": "\u00daltima actividad del banco con este link"
     },
     "notas": {
       "type": "string"
@@ -79,14 +83,41 @@
   ],
   "rls": {
     "create": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$and": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "data.sector_id": {
+            "$nin": [
+              null,
+              "",
+              "SIN_SECTOR",
+              "sistema"
+            ]
+          }
+        }
+      ]
     },
     "read": {
       "$and": [
         {
           "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "data.sector_id": {
+            "$nin": [
+              null,
+              "",
+              "SIN_SECTOR",
+              "sistema"
+            ]
+          }
         },
         {
           "user_condition": {
@@ -101,6 +132,16 @@
           "data.sector_id": "{{user.data.sector_id}}"
         },
         {
+          "data.sector_id": {
+            "$nin": [
+              null,
+              "",
+              "SIN_SECTOR",
+              "sistema"
+            ]
+          }
+        },
+        {
           "user_condition": {
             "role": "admin"
           }
@@ -111,6 +152,16 @@
       "$and": [
         {
           "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "data.sector_id": {
+            "$nin": [
+              null,
+              "",
+              "SIN_SECTOR",
+              "sistema"
+            ]
+          }
         },
         {
           "user_condition": {

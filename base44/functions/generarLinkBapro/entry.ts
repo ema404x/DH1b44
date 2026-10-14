@@ -1,5 +1,6 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
-import { resolveCallerSector, SectorError } from "../../shared/sectorGuard.ts";
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
+import { createScopedClient, SectorError } from "../../shared/sectorGuard.ts";
+import { resolveCallerSectorCanonical } from '../../shared/callerIdentity.ts';
 
 // Genera un link de revisión BAPRO (token único) para un sector + scope de sede + mes.
 // El admin comparte el link con el banco; el banco marca visto sin login.
@@ -17,20 +18,21 @@ function currentMonth() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Forbidden: solo admin' }, { status: 403 });
 
-    const callerSector = resolveCallerSector(user);
-    const sb = base44.asServiceRole;
+    const { sector: callerSector } = await resolveCallerSectorCanonical(base44.asServiceRole, user);
+    const sb = createScopedClient(base44, callerSector);
 
     const body = await req.json().catch(() => ({}));
     const { sede_scope, sede_nombre, mes_periodo, dias_expiracion, notas, activo_ids } = body;
 
     const mes = mes_periodo || currentMonth();
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) return Response.json({ error: 'Período inválido' }, { status: 400 });
     const dias = Math.max(1, Math.min(365, parseInt(dias_expiracion, 10) || 30));
     const expiracion = new Date(Date.now() + dias * 86400000).toISOString();
 
@@ -38,15 +40,23 @@ Deno.serve(async (req) => {
     let totalActivos = 0;
     let activoIdsFinal = [];
     if (Array.isArray(activo_ids) && activo_ids.length > 0) {
-      activoIdsFinal = activo_ids;
-      totalActivos = activo_ids.length;
+      activoIdsFinal = [...new Set(activo_ids)];
+      for (let i = 0; i < activoIdsFinal.length; i += 6) {
+        const activos = await Promise.all(activoIdsFinal.slice(i, i + 6).map(id => sb.entities.Asset.get(id)));
+        if (sede_scope && sede_scope !== 'TODAS' && activos.some(a => a.location_id !== sede_scope)) {
+          throw new SectorError('El lote contiene activos fuera de la sede seleccionada');
+        }
+      }
+      totalActivos = activoIdsFinal.length;
     } else {
-      const query = (sede_scope && sede_scope !== 'TODAS')
-        ? { sector_id: callerSector, location_id: sede_scope }
-        : { sector_id: callerSector };
-      const activos = await sb.entities.Asset.filter(query, '-updated_date', 500).catch(() => []);
-      activoIdsFinal = activos.map(a => a.id);
-      totalActivos = activos.length;
+      const query = sede_scope && sede_scope !== 'TODAS' ? { location_id: sede_scope } : {};
+      let cursor;
+      do {
+        const page = await sb.entities.Asset.filter(query, { sort: '-updated_date', limit: 500, cursor, fields: ['location_id'] });
+        activoIdsFinal.push(...page.items.map(a => a.id));
+        cursor = page.has_more ? page.next_cursor : undefined;
+      } while (cursor);
+      totalActivos = activoIdsFinal.length;
     }
 
     const token = genToken();
@@ -57,6 +67,7 @@ Deno.serve(async (req) => {
       sede_nombre: sede_nombre || 'Todas las sedes',
       mes_periodo: mes,
       activo_ids: activoIdsFinal,
+      snapshot_fijo: true,
       expiracion,
       creado_por: user.full_name || user.email,
       creado_por_email: user.email,
@@ -66,8 +77,8 @@ Deno.serve(async (req) => {
       notas: notas || '',
     });
 
-    const origin = req.headers.get('origin') || '';
-    const link = `${origin}/revision-bapro/${token}`;
+    const origin = req.headers.get('X-Base44-App-Url');
+    const link = `${origin ? new URL(origin).origin : 'https://dh1-mejores.base44.app'}/revision-bapro/${token}`;
 
     return Response.json({ ok: true, token, link, expiracion, total_activos: totalActivos, mes_periodo: mes });
   } catch (err) {
@@ -75,4 +86,4 @@ Deno.serve(async (req) => {
     console.error('generarLinkBapro error:', err);
     return Response.json({ error: `Error interno: ${err.message}` }, { status: 500 });
   }
-});
+}

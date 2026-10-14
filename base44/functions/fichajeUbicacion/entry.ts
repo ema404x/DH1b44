@@ -1,4 +1,6 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
+import { resolvePublicRecordScope } from '../../shared/publicSectorScope.ts';
+import { sectorErrorResponse } from '../../shared/sectorGuard.ts';
 
 export default async function(req) {
   try {
@@ -21,11 +23,17 @@ export default async function(req) {
       }
     }
 
+    const actions = ['getUbicacion', 'getJornadaAbierta', 'registrarEntrada', 'registrarSalida'];
+    const scope = actions.includes(action)
+      ? await resolvePublicRecordScope(base44, 'LocationQR', body.locationId)
+      : null;
+    const dataClient = scope?.sb || sb;
+
     // ── Obtener datos de la ubicación (público, sin auth) ──────────────────────
     if (action === 'getUbicacion') {
       const { locationId } = body;
       if (!locationId) return Response.json({ error: 'locationId requerido' }, { status: 400 });
-      const results = await sb.entities.LocationQR.filter({ id: locationId }).catch(() => []);
+      const results = await dataClient.entities.LocationQR.filter({ id: locationId }).catch(() => []);
       const location = results[0] || null;
       if (!location) return Response.json({ error: 'Ubicación no encontrada' }, { status: 404 });
       return Response.json({
@@ -49,7 +57,7 @@ export default async function(req) {
       if (!locationId || (!operarioNombre?.trim() && !dni?.trim())) {
         return Response.json({ jornada: null });
       }
-      const open = await sb.entities.FichajeUbicacion.filter({
+      const open = await dataClient.entities.FichajeUbicacion.filter({
         location_qr_id: locationId,
         estado: 'abierta',
       }).catch(() => []);
@@ -85,7 +93,7 @@ export default async function(req) {
       const dniNorm = normalizeDni(dni);
 
       // Validar ubicación
-      const locResults = await sb.entities.LocationQR.filter({ id: locationId }).catch(() => []);
+      const locResults = await dataClient.entities.LocationQR.filter({ id: locationId }).catch(() => []);
       const location = locResults[0];
       if (!location) return Response.json({ error: 'Ubicación no encontrada' }, { status: 404 });
       if (!location.is_active) {
@@ -93,7 +101,7 @@ export default async function(req) {
       }
 
       // Validar que no exista una jornada abierta para la misma persona + ubicación
-      const open = await sb.entities.FichajeUbicacion.filter({
+      const open = await dataClient.entities.FichajeUbicacion.filter({
         location_qr_id: locationId,
         estado: 'abierta',
       }).catch(() => []);
@@ -118,7 +126,7 @@ export default async function(req) {
       const sigResult = await sb.integrations.Core.UploadPublicFile({ file });
 
       const now = new Date().toISOString();
-      const jornada = await sb.entities.FichajeUbicacion.create({
+      const jornada = await dataClient.entities.FichajeUbicacion.create({
         location_qr_id: locationId,
         location_name: location.name,
         operario_nombre: operarioNombre.trim(),
@@ -131,7 +139,7 @@ export default async function(req) {
         estado_admin: 'pendiente',
         jefe_sitio_email: location.jefe_sitio_email || null,
         device_info: body.deviceInfo || '',
-        sector_id: location.sector_id || null,
+        sector_id: scope.sector,
       });
 
       return Response.json({ success: true, jornada });
@@ -154,7 +162,7 @@ export default async function(req) {
       const dniNorm = normalizeDni(dni);
 
       // Buscar jornada abierta para esta persona + ubicación
-      const open = await sb.entities.FichajeUbicacion.filter({
+      const open = await dataClient.entities.FichajeUbicacion.filter({
         location_qr_id: locationId,
         estado: 'abierta',
       }).catch(() => []);
@@ -179,7 +187,7 @@ export default async function(req) {
       const sigResult = await sb.integrations.Core.UploadPublicFile({ file });
 
       const now = new Date().toISOString();
-      const updated = await sb.entities.FichajeUbicacion.update(jornada.id, {
+      const updated = await dataClient.entities.FichajeUbicacion.update(jornada.id, {
         salida_timestamp: now,
         salida_signature_url: sigResult.file_url,
         salida_latitude: latitude,
@@ -192,6 +200,6 @@ export default async function(req) {
 
     return Response.json({ error: 'Acción no válida' }, { status: 400 });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return sectorErrorResponse(error);
   }
 }

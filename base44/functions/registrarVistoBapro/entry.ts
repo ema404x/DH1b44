@@ -1,4 +1,6 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
+import { resolveReviewScope } from '../../shared/baproReviewScope.ts';
+import { sectorErrorResponse } from '../../shared/sectorGuard.ts';
 
 // Endpoint PÚBLICO (sin auth) que el banco (BAPRO) usa para marcar un activo
 // (o todos los del lote) como visto en el mes del lote. Valida token + expiración
@@ -8,26 +10,12 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 // sobrescribir meses previos. El booleano visto_bapro (backward-compat) refleja
 // el último lote visto. vistos_count es idempotente (no acumula re-marcas).
 
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
-    const sb = base44.asServiceRole;
-
     const body = await req.json().catch(() => ({}));
     const { token, asset_id, marcar_todos } = body;
-    if (!token || typeof token !== 'string') {
-      return Response.json({ error: 'token requerido' }, { status: 400 });
-    }
-
-    const tokens = await sb.entities.RevisionBaproToken.filter({ token }).catch(() => []);
-    const tok = tokens[0];
-    if (!tok) return Response.json({ error: 'Link inválido' }, { status: 404 });
-    if (tok.estado === 'revocado') return Response.json({ error: 'Link revocado' }, { status: 403 });
-    if (new Date(tok.expiracion).getTime() < Date.now()) {
-      return Response.json({ error: 'Link expirado' }, { status: 410 });
-    }
-
-    const activoIds = Array.isArray(tok.activo_ids) ? tok.activo_ids : [];
+    const { tok, sb, getAsset, loadAssets } = await resolveReviewScope(base44, token);
     const ahora = new Date().toISOString();
     const lote = tok.mes_periodo;
     let vistosCountFinal = tok.vistos_count || 0;
@@ -47,18 +35,7 @@ Deno.serve(async (req) => {
       };
     };
 
-    // Carga los activos del lote (por IDs explícitos o por scope de sede).
-    const cargarLote = async () => {
-      if (activoIds.length > 0) {
-        const all = await sb.entities.Asset.filter({ sector_id: tok.sector_id }, '-name', 500).catch(() => []);
-        const idSet = new Set(activoIds);
-        return all.filter(a => idSet.has(a.id));
-      }
-      const query = tok.sede_scope && tok.sede_scope !== 'TODAS'
-        ? { sector_id: tok.sector_id, location_id: tok.sede_scope }
-        : { sector_id: tok.sector_id };
-      return sb.entities.Asset.filter(query, '-name', 500).catch(() => []);
-    };
+    const cargarLote = loadAssets;
 
     let marcadosAhora = 0;
 
@@ -66,11 +43,9 @@ Deno.serve(async (req) => {
       const activos = await cargarLote();
       const updates = activos.map(buildUpdate);
       if (updates.length > 0) {
-        await sb.entities.Asset.bulkUpdate(updates).catch(async () => {
-          for (const u of updates) {
-            try { await sb.entities.Asset.update(u.id, u); } catch (_) {}
-          }
-        });
+        for (let i = 0; i < updates.length; i += 500) {
+          await sb.entities.Asset.bulkUpdate(updates.slice(i, i + 500));
+        }
       }
       // Exacto: todos los del lote quedan vistos para este mes.
       vistosCountFinal = activos.length;
@@ -78,24 +53,13 @@ Deno.serve(async (req) => {
     } else {
       if (!asset_id) return Response.json({ error: 'asset_id requerido' }, { status: 400 });
 
-      // Validar pertenencia al lote y cargar el activo para merge del histórico.
-      let a = null;
-      let pertenece = true;
-      if (activoIds.length > 0) {
-        pertenece = activoIds.includes(asset_id);
-        if (pertenece) a = await sb.entities.Asset.get(asset_id).catch(() => null);
-      } else {
-        a = await sb.entities.Asset.get(asset_id).catch(() => null);
-        pertenece = !!a && a.sector_id === tok.sector_id &&
-          (!tok.sede_scope || tok.sede_scope === 'TODAS' || a.location_id === tok.sede_scope);
-      }
-      if (!pertenece) return Response.json({ error: 'Activo fuera del lote' }, { status: 403 });
-      if (!a) return Response.json({ error: 'Activo no encontrado' }, { status: 404 });
+      // Comprueba sector, sede y snapshot también cuando hay IDs explícitos.
+      const a = await getAsset(asset_id);
 
       // Idempotente: si ya estaba visto en este mes, no incrementa el contador.
       const yaVisto = !!(a.vistos_bapro_meses && a.vistos_bapro_meses[lote]);
       if (!yaVisto) {
-        await sb.entities.Asset.update(asset_id, buildUpdate(a)).catch(() => {});
+        await sb.entities.Asset.update(asset_id, buildUpdate(a));
         marcadosAhora = 1;
         vistosCountFinal = (tok.vistos_count || 0) + 1;
       }
@@ -105,11 +69,11 @@ Deno.serve(async (req) => {
       vistos_count: vistosCountFinal,
       ultima_actividad: ahora,
       estado: 'usado',
-    }).catch(() => {});
+    });
 
     return Response.json({ ok: true, vistos: marcadosAhora, total_vistos: vistosCountFinal });
   } catch (err) {
     console.error('registrarVistoBapro error:', err);
-    return Response.json({ error: `Error interno: ${err.message}` }, { status: 500 });
+    return sectorErrorResponse(err);
   }
-});
+}

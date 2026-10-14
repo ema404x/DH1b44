@@ -1,6 +1,8 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
+import { createScopedClient, sectorErrorResponse } from '../../shared/sectorGuard.ts';
+import { resolveCallerSectorCanonical } from '../../shared/callerIdentity.ts';
 
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
@@ -9,8 +11,11 @@ Deno.serve(async (req) => {
     }
 
     // Aislamiento de raíz: las órdenes de rutina caen al sector activo del operador.
-    const callerSector = user.data?.sector_id || user.sector_id;
-    if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
+    const { sector: callerSector } = await resolveCallerSectorCanonical(base44.asServiceRole, user);
+    const sb = createScopedClient(base44, callerSector);
+    const body = await req.json().catch(() => ({}));
+    if (body.sector_id && body.sector_id !== callerSector) return Response.json({ error: 'Sector distinto del activo' }, { status: 403 });
+    if (body.dry_run === true) return Response.json({ ok: true, sector: callerSector, dry_run: true });
 
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
@@ -23,8 +28,8 @@ Deno.serve(async (req) => {
     // ── 1. Marcar vencidas ─────────────────────────────────────────────────
     // Pre-cargar en paralelo órdenes abiertas (2 queries en vez de N updates individuales)
     const [ordenesAbiertas, ordenesEnProceso] = await Promise.all([
-      base44.asServiceRole.entities.OrdenRutina.filter({ estado: 'pendiente' }),
-      base44.asServiceRole.entities.OrdenRutina.filter({ estado: 'en_proceso' }),
+      sb.entities.OrdenRutina.filter({ estado: 'pendiente' }),
+      sb.entities.OrdenRutina.filter({ estado: 'en_proceso' }),
     ]);
     const toVencer = [...ordenesAbiertas, ...ordenesEnProceso]
       .filter(o => o.fecha_limite && o.fecha_limite < hoyStr);
@@ -32,24 +37,24 @@ Deno.serve(async (req) => {
     if (toVencer.length > 0) {
       const updatesBulk = toVencer.map(o => ({ id: o.id, estado: 'vencida' }));
       for (let i = 0; i < updatesBulk.length; i += 100) {
-        await base44.asServiceRole.entities.OrdenRutina.bulkUpdate(updatesBulk.slice(i, i + 100));
+        await sb.entities.OrdenRutina.bulkUpdate(updatesBulk.slice(i, i + 100));
       }
       ordenesVencidas = toVencer.length;
     }
 
     // ── 2. Generar nuevas órdenes ──────────────────────────────────────────
-    const rutinaEdificios = await base44.asServiceRole.entities.RutinaEdificio.filter({ activa: true });
+    const rutinaEdificios = await sb.entities.RutinaEdificio.filter({ activa: true });
 
     // Pre-cargar catálogo y órdenes pendientes para evitar N+1 queries
     const allCatalogo = await base44.asServiceRole.entities.RutinaCatalogo.list();
     const catalogoMap = new Map(allCatalogo.map(r => [r.id, r]));
-    const pendientesExistentes = await base44.asServiceRole.entities.OrdenRutina.filter({ estado: 'pendiente' });
+    const pendientesExistentes = await sb.entities.OrdenRutina.filter({ estado: 'pendiente' });
     const pendientesSet = new Set(pendientesExistentes.map(o => o.rutina_edificio_id));
 
     for (const re of rutinaEdificios) {
-      // Verificar si hoy >= proxima_ejecucion
-      if (!re.proxima_ejecucion) continue;
-      if (re.proxima_ejecucion > hoyStr) continue;
+      // No generar órdenes a partir de relaciones cruzadas o sin sector.
+      if (!re.proxima_ejecucion || re.proxima_ejecucion > hoyStr || !re.edificio_id) continue;
+      const edificio = await sb.entities.Edificio.get(re.edificio_id);
 
       // ── Verificar estacionalidad ──
       const rutina = catalogoMap.get(re.rutina_id);
@@ -63,7 +68,7 @@ Deno.serve(async (req) => {
           // Fuera de temporada: adelantar proxima_ejecucion sin generar orden
           const next = new Date(hoy);
           next.setDate(next.getDate() + (re.frecuencia_dias || 30));
-          await base44.asServiceRole.entities.RutinaEdificio.update(re.id, {
+          await sb.entities.RutinaEdificio.update(re.id, {
             proxima_ejecucion: next.toISOString().split('T')[0],
           });
           continue;
@@ -78,7 +83,7 @@ Deno.serve(async (req) => {
       const fechaLimite = new Date(hoy);
       fechaLimite.setDate(fechaLimite.getDate() + plazo);
 
-      await base44.asServiceRole.entities.OrdenRutina.create({
+      await sb.entities.OrdenRutina.create({
         sector_id: callerSector,
         rutina_edificio_id: re.id,
         edificio_id: re.edificio_id,
@@ -107,6 +112,6 @@ Deno.serve(async (req) => {
       ordenes_vencidas: ordenesVencidas,
     });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return sectorErrorResponse(error);
   }
-});
+}

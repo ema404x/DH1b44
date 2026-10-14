@@ -1,50 +1,22 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
+import { resolveReviewScope } from '../../shared/baproReviewScope.ts';
+import { sectorErrorResponse } from '../../shared/sectorGuard.ts';
 
 // Endpoint PÚBLICO (sin auth) que el banco (BAPRO) usa para ver los activos
 // de un lote de revisión. Valida el token + expiración antes de devolver datos.
 // Solo lectura — no muta nada.
 
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
-    const sb = base44.asServiceRole;
-
-    const body = await req.json().catch(() => ({}));
-    const { token } = body;
-    if (!token || typeof token !== 'string') {
-      return Response.json({ error: 'token requerido' }, { status: 400 });
-    }
-
-    const tokens = await sb.entities.RevisionBaproToken.filter({ token }).catch(() => []);
-    const tok = tokens[0];
-    if (!tok) return Response.json({ error: 'Link inválido' }, { status: 404 });
-
-    if (tok.estado === 'revocado') return Response.json({ error: 'Link revocado' }, { status: 403 });
-    if (new Date(tok.expiracion).getTime() < Date.now()) {
-      return Response.json({ error: 'Link expirado' }, { status: 410 });
-    }
-
-    // Cargar activos del lote.
-    const activoIds = Array.isArray(tok.activo_ids) ? tok.activo_ids : [];
-    let activos = [];
-    const scopeQuery = tok.sede_scope && tok.sede_scope !== 'TODAS'
-      ? { sector_id: tok.sector_id, location_id: tok.sede_scope }
-      : { sector_id: tok.sector_id };
-
-    if (activoIds.length > 0) {
-      // Snapshot del lote: filtrar por sector del token + IDs explícitos.
-      const all = await sb.entities.Asset.filter({ sector_id: tok.sector_id }, '-name', 500).catch(() => []);
-      const idSet = new Set(activoIds);
-      activos = all.filter(a => idSet.has(a.id));
-    }
-    // Fallback: si el snapshot no devuelve activos (movidos de sector, dados de
-    // baja, o lote vacío), mostrar los activos actuales del sector/sede del mes.
-    if (activos.length === 0) {
-      activos = await sb.entities.Asset.filter(scopeQuery, '-name', 500).catch(() => []);
-    }
-
-    // Cargar OTs del sector (historial por activo + listado del mes).
-    const allOts = await sb.entities.WorkOrder.filter({ sector_id: tok.sector_id }, '-created_date', 500).catch(() => []);
+    const { token } = await req.json().catch(() => ({}));
+    const { tok, sb, loadAssets } = await resolveReviewScope(base44, token);
+    const activos = await loadAssets();
+    const loteIds = activos.map(a => a.id);
+    // Los historiales y las OTs no pueden ampliar el lote a otras sedes.
+    const allOts = loteIds.length
+      ? await sb.entities.WorkOrder.filter({ asset_id: { $in: loteIds } }, '-created_date', 500)
+      : [];
 
     // Rango del mes del lote (YYYY-MM).
     const [yy, mm] = (tok.mes_periodo || '').split('-').map(Number);
@@ -72,7 +44,9 @@ Deno.serve(async (req) => {
     }
 
     // Modificaciones del mes (AssetHistory) por activo — lifecycle del mes.
-    const allHist = await sb.entities.AssetHistory.filter({ sector_id: tok.sector_id }, '-created_date', 500).catch(() => []);
+    const allHist = loteIds.length
+      ? await sb.entities.AssetHistory.filter({ asset_id: { $in: loteIds } }, '-created_date', 500)
+      : [];
     const modsByAsset = {};
     for (const h of allHist) {
       if (!h.asset_id || !inMes(h.created_date)) continue;
@@ -90,7 +64,7 @@ Deno.serve(async (req) => {
     // OTs generadas en el mes (listado plano para la solapa de OTs).
     const otsMes = [];
     for (const o of allOts) {
-      if (!inMes(o.created_date)) continue;
+      if (!idSet.has(o.asset_id) || !inMes(o.created_date)) continue;
       if (o.status !== 'completada') continue;
       if (otsMes.length >= 200) break;
       otsMes.push({
@@ -146,6 +120,6 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error('obtenerActivosParaRevision error:', err);
-    return Response.json({ error: `Error interno: ${err.message}` }, { status: 500 });
+    return sectorErrorResponse(err);
   }
-});
+}

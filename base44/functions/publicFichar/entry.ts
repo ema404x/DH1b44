@@ -1,12 +1,25 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
 import { verificarClaveOperario } from "../../shared/operarioAuth.ts";
+import { resolvePublicRecordScope } from '../../shared/publicSectorScope.ts';
+import { sectorErrorResponse } from '../../shared/sectorGuard.ts';
 
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const { action, locationId, attendanceData } = body;
-    const sb = base44.asServiceRole;
+    const targets = {
+      getLocationData: ['LocationQR', locationId],
+      getWorkOrderForLocation: ['LocationQR', locationId],
+      createAttendance: ['LocationQR', attendanceData?.location_qr_id],
+      getWorkOrder: ['WorkOrder', body.workOrderId],
+      updateWorkOrder: ['WorkOrder', body.workOrderId],
+      getWorkOrdersForAsset: ['Asset', body.assetId],
+      getOTsForTablet: ['Tablet', body.tablet_id],
+    };
+    const target = targets[action];
+    const scope = target ? await resolvePublicRecordScope(base44, target[0], target[1]) : null;
+    const sb = scope?.sb || base44.asServiceRole;
 
     // GET location data — buscar directamente por ID en lugar de listar todo
     if (action === 'getLocationData') {
@@ -21,6 +34,8 @@ Deno.serve(async (req) => {
       if (!attendanceData) return Response.json({ error: 'attendanceData requerido' }, { status: 400 });
 
       const { location_qr_id, ...logData } = attendanceData;
+      if (logData.employee_id) await sb.entities.Employee.get(logData.employee_id);
+      logData.location_name = scope.record.name;
 
       // Crear el log y buscar location en paralelo (si se necesita actualizar el contador)
       const [log, locResults] = await Promise.all([
@@ -63,11 +78,9 @@ Deno.serve(async (req) => {
       const location = locResults[0] || null;
       if (!location) return Response.json({ workOrders: [], workOrder: null, locationName: '' });
 
-      // Aislamiento por sector: las OTs de la ubicación deben pertenecer al mismo
-      // sector que ella. Si la ubicación o la OT no tienen sector (legacy), no se
-      // bloquea (deuda de migración). Evita fugas cross-sector en el fallback difuso.
+      // Sin sector, ni la ubicación ni sus OTs se habilitan para el portal.
       const locSector = location.sector_id;
-      const sameSector = (o) => !locSector || !o.sector_id || o.sector_id === locSector;
+      const sameSector = (o) => !!locSector && o.sector_id === locSector;
 
       // 1) OTs activas vinculadas por location_qr_id
       let activeOrders = ordersById.filter(o =>
@@ -127,7 +140,7 @@ Deno.serve(async (req) => {
       if (!asset) return Response.json({ workOrders: [], workOrder: null, asset: null, assetName: '', assetSede: '', assetType: '' });
 
       const assetSector = asset.sector_id;
-      const sameSector = (o) => !assetSector || !o.sector_id || o.sector_id === assetSector;
+      const sameSector = (o) => !!assetSector && o.sector_id === assetSector;
 
       // 1) OTs activas vinculadas por FK asset_id
       let activeOrders = ordersByAsset.filter(o =>
@@ -264,7 +277,8 @@ Deno.serve(async (req) => {
       if (!tablet || !tablet.activa) {
         return Response.json({ valid: false });
       }
-      await sb.entities.Tablet.update(tablet.id, { ultima_actividad: new Date().toISOString() }).catch(() => {});
+      const tabletScope = await resolvePublicRecordScope(base44, 'Tablet', tablet.id);
+      await tabletScope.sb.entities.Tablet.update(tablet.id, { ultima_actividad: new Date().toISOString() });
       return Response.json({
         valid: true,
         tablet: { id: tablet.id, nombre: tablet.nombre, jefe_sitio: tablet.jefe_sitio },
@@ -290,6 +304,6 @@ Deno.serve(async (req) => {
 
     return Response.json({ error: 'Acción no válida' }, { status: 400 });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return sectorErrorResponse(error);
   }
-});
+}
