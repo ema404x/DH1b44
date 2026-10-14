@@ -23,6 +23,11 @@
       "type": "boolean",
       "default": false,
       "description": "Habilita al usuario a eliminar pendientes SAP"
+    },
+    "ultimo_aviso_ot_miercoles": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha local de Buenos Aires del \u00faltimo aviso semanal de \u00f3rdenes de trabajo mostrado al usuario. Evita repetirlo al abrir DH1 desde otra PC."
     }
   },
   "required": [],

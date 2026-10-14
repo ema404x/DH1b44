@@ -8,6 +8,7 @@ import MobileHeader from './MobileHeader';
 import MobileBottomNav from './MobileBottomNav';
 import GlobalSearch from './GlobalSearch';
 import NotificationBell from './NotificationBell';
+import AvisoSemanalOT from '@/components/layout/AvisoSemanalOT';
 import UserMenu from './UserMenu';
 import SectorSwitcher from './SectorSwitcher';
 import OfflineBar from '@/components/pwa/OfflineBar';
@@ -144,6 +145,7 @@ export default function AppLayout() {
       <MobileBottomNav onMore={handleMoreMobile} />
       <ChatbotSoporte />
       <BugReportBubble />
+      <AvisoSemanalOT />
       <EmergencyAlert
         emergencia={activeEmergency}
         onClose={handleCloseEmergency}
