@@ -16,7 +16,9 @@ function getAppBaseUrl() {
  * con las OTs de esa ubicación.
  * @param {Array} locations — lista de LocationQR
  */
-export async function exportarQRsUbicacionesPDF(locations) {
+export async function exportarQRsUbicacionesPDF(locations, mode = 'ot') {
+  const isFichaje = mode === 'fichaje';
+  const route = isFichaje ? 'fichar-ubicacion' : 'portal-operario';
   const list = (locations || []).filter(Boolean);
   if (!list.length) return;
 
@@ -30,7 +32,7 @@ export async function exportarQRsUbicacionesPDF(locations) {
     const chunk = list.slice(i, i + BATCH);
     const datas = await Promise.all(
       chunk.map(async (l) => {
-        const url = `${origin}${base}/portal-operario?loc=${l.id}`;
+        const url = `${origin}${base}/${route}?loc=${encodeURIComponent(l.id)}`;
         try {
           return await QRCode.toDataURL(url, {
             width: 300,
@@ -66,7 +68,7 @@ export async function exportarQRsUbicacionesPDF(locations) {
     doc.setFontSize(14);
     doc.setTextColor(15, 23, 42);
     doc.setFont('helvetica', 'bold');
-    doc.text('Códigos QR · Ubicaciones', margin, margin + 5);
+    doc.text(isFichaje ? 'Códigos QR · Fichaje de entrada y salida' : 'Códigos QR · Ubicaciones', margin, margin + 5);
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139);
     doc.setFont('helvetica', 'normal');
@@ -128,7 +130,7 @@ export async function exportarQRsUbicacionesPDF(locations) {
     // Pie de tarjeta
     doc.setFontSize(7);
     doc.setTextColor(148, 163, 184);
-    doc.text('Escanear para ver OTs de la ubicación', x + 5, y + cardH - 4);
+    doc.text(isFichaje ? 'Escanear para fichar entrada o salida' : 'Escanear para ver OTs de la ubicación', x + 5, y + cardH - 4);
 
     c++;
     if (c >= cols) {
@@ -151,5 +153,5 @@ export async function exportarQRsUbicacionesPDF(locations) {
     );
   }
 
-  doc.save('QRs_Ubicaciones.pdf');
+  doc.save(isFichaje ? 'QRs_Fichaje.pdf' : 'QRs_Ubicaciones.pdf');
 }

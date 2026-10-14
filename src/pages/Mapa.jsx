@@ -104,6 +104,7 @@ export default function Mapa() {
   });
 
   const [exportQRsOpen, setExportQRsOpen] = useState(false);
+  const [exportQRMode, setExportQRMode] = useState('ot');
 
   const handleActivateAll = async () => {
     const inactivas = visibleLocations.filter(l => !l.is_active);
@@ -124,15 +125,20 @@ export default function Mapa() {
             Gestión de sitios, mapa de fichajes GPS y asignación de cuadrillas
           </p>
         </div>
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => setExportQRsOpen(true)}
-          disabled={locLoading || !visibleQRs.length}
-        >
-          <Download className="h-4 w-4" />
-          Exportar QRs a PDF
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="gap-2"
+            onClick={() => { setExportQRMode('ot'); setExportQRsOpen(true); }}
+            disabled={locLoading || !visibleQRs.length}>
+            <Download className="h-4 w-4" />
+            Exportar QRs a PDF
+          </Button>
+          <Button variant="outline" className="gap-2"
+            onClick={() => { setExportQRMode('fichaje'); setExportQRsOpen(true); }}
+            disabled={locLoading || !visibleQRs.length}>
+            <Download className="h-4 w-4" />
+            Descargar QRs de fichaje
+          </Button>
+        </div>
       </div>
 
       <ExportarQRsDialog
@@ -140,6 +146,7 @@ export default function Mapa() {
         onOpenChange={setExportQRsOpen}
         locations={visibleQRs}
         jefeByLocId={jefeByLocId}
+        mode={exportQRMode}
       />
 
       <Tabs value={tab} onValueChange={setTab}>

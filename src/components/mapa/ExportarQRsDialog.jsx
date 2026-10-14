@@ -11,7 +11,7 @@ import { toast } from 'sonner';
  * @param locations    — LocationQR[] (lista completa, service role)
  * @param jefeByLocId  — Map<locationId, jefe_sitio> (de LocationData join)
  */
-export default function ExportarQRsDialog({ open, onOpenChange, locations, jefeByLocId }) {
+export default function ExportarQRsDialog({ open, onOpenChange, locations, jefeByLocId, mode = 'ot' }) {
   const [selected, setSelected] = useState('TODOS');
   const [exporting, setExporting] = useState(false);
 
@@ -39,7 +39,7 @@ export default function ExportarQRsDialog({ open, onOpenChange, locations, jefeB
     }
     setExporting(true);
     try {
-      await exportarQRsUbicacionesPDF(filtered);
+      await exportarQRsUbicacionesPDF(filtered, mode);
       toast.success(`PDF generado · ${filtered.length} QR${filtered.length !== 1 ? 's' : ''}`);
       onOpenChange(false);
     } catch (e) {
@@ -55,7 +55,7 @@ export default function ExportarQRsDialog({ open, onOpenChange, locations, jefeB
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Download className="h-4 w-4 text-primary" />
-            Exportar QRs a PDF
+            {mode === 'fichaje' ? 'Descargar QRs de fichaje' : 'Exportar QRs a PDF'}
           </DialogTitle>
         </DialogHeader>
 
