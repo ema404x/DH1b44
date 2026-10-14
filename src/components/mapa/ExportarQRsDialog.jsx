@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download, Loader2, User } from 'lucide-react';
 import { exportarQRsUbicacionesPDF } from '@/utils/exportLocationsQR';
+import exportQrGroups, { getQrJefe } from '@/components/mapa/exportQrGroups';
 import { toast } from 'sonner';
 
 /**
@@ -19,7 +20,7 @@ export default function ExportarQRsDialog({ open, onOpenChange, locations, jefeB
   const jefes = useMemo(() => {
     const counts = new Map();
     for (const loc of locations) {
-      const jefe = jefeByLocId?.get(loc.id) || 'Sin jefe asignado';
+      const jefe = getQrJefe(loc, jefeByLocId);
       counts.set(jefe, (counts.get(jefe) || 0) + 1);
     }
     return Array.from(counts.entries())
@@ -29,7 +30,7 @@ export default function ExportarQRsDialog({ open, onOpenChange, locations, jefeB
 
   const filtered = useMemo(() => {
     if (selected === 'TODOS') return locations;
-    return locations.filter((l) => (jefeByLocId?.get(l.id) || 'Sin jefe asignado') === selected);
+    return locations.filter((l) => getQrJefe(l, jefeByLocId) === selected);
   }, [selected, locations, jefeByLocId]);
 
   const handleExport = async () => {
@@ -39,11 +40,16 @@ export default function ExportarQRsDialog({ open, onOpenChange, locations, jefeB
     }
     setExporting(true);
     try {
-      await exportarQRsUbicacionesPDF(filtered, mode);
-      toast.success(`PDF generado · ${filtered.length} QR${filtered.length !== 1 ? 's' : ''}`);
+      if (selected === 'TODOS') {
+        const count = await exportQrGroups(filtered, jefeByLocId, mode);
+        toast.success(`Descarga lista · ${count} PDFs separados por jefe · ${filtered.length} QRs`);
+      } else {
+        await exportarQRsUbicacionesPDF(filtered, mode, { jefe: selected });
+        toast.success(`PDF generado · ${filtered.length} QR${filtered.length !== 1 ? 's' : ''}`);
+      }
       onOpenChange(false);
     } catch (e) {
-      toast.error('Error al generar el PDF de QRs');
+      toast.error('Error al generar la descarga de QRs');
     } finally {
       setExporting(false);
     }
@@ -84,7 +90,7 @@ export default function ExportarQRsDialog({ open, onOpenChange, locations, jefeB
           <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             <User className="h-3.5 w-3.5 shrink-0" />
             {selected === 'TODOS'
-              ? `Se exportarán los ${locations.length} QRs de todas las ubicaciones`
+              ? `Se descargarán los ${locations.length} QRs en un ZIP con ${jefes.length} PDFs separados, uno por jefe de sitio`
               : `Se exportarán ${filtered.length} QR${filtered.length !== 1 ? 's' : ''} del jefe "${selected}"`}
           </div>
         </div>
@@ -95,7 +101,7 @@ export default function ExportarQRsDialog({ open, onOpenChange, locations, jefeB
           </Button>
           <Button onClick={handleExport} disabled={exporting || !filtered.length} className="gap-2">
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            {exporting ? 'Generando...' : 'Descargar PDF'}
+            {exporting ? 'Generando...' : selected === 'TODOS' ? 'Descargar todos (ZIP)' : 'Descargar PDF'}
           </Button>
         </DialogFooter>
       </DialogContent>

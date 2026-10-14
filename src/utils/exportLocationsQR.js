@@ -16,7 +16,7 @@ function getAppBaseUrl() {
  * con las OTs de esa ubicación.
  * @param {Array} locations — lista de LocationQR
  */
-export async function exportarQRsUbicacionesPDF(locations, mode = 'ot') {
+export async function exportarQRsUbicacionesPDF(locations, mode = 'ot', { jefe = '', download = true } = {}) {
   const isFichaje = mode === 'fichaje';
   const route = isFichaje ? 'fichar-ubicacion' : 'portal-operario';
   const list = (locations || []).filter(Boolean);
@@ -33,16 +33,12 @@ export async function exportarQRsUbicacionesPDF(locations, mode = 'ot') {
     const datas = await Promise.all(
       chunk.map(async (l) => {
         const url = `${origin}${base}/${route}?loc=${encodeURIComponent(l.id)}`;
-        try {
-          return await QRCode.toDataURL(url, {
-            width: 300,
-            margin: 1,
-            color: { dark: '#000000', light: '#ffffff' },
-            errorCorrectionLevel: 'M',
-          });
-        } catch {
-          return null;
-        }
+        return await QRCode.toDataURL(url, {
+          width: 300,
+          margin: 1,
+          color: { dark: '#000000', light: '#ffffff' },
+          errorCorrectionLevel: 'M',
+        });
       })
     );
     chunk.forEach((l, idx) => items.push({ location: l, dataUrl: datas[idx] }));
@@ -77,9 +73,13 @@ export async function exportarQRsUbicacionesPDF(locations, mode = 'ot') {
       margin,
       margin + 10
     );
+    if (jefe) {
+      doc.setFontSize(8);
+      doc.text(doc.splitTextToSize(`Jefe de sitio: ${jefe}`, pageW - margin * 2)[0], margin, margin + 14);
+    }
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.3);
-    doc.line(margin, margin + 13, pageW - margin, margin + 13);
+    doc.line(margin, margin + (jefe ? 16 : 13), pageW - margin, margin + (jefe ? 16 : 13));
   };
 
   header();
@@ -153,5 +153,8 @@ export async function exportarQRsUbicacionesPDF(locations, mode = 'ot') {
     );
   }
 
-  doc.save(isFichaje ? 'QRs_Fichaje.pdf' : 'QRs_Ubicaciones.pdf');
+  const suffix = jefe ? `_${jefe.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').trim()}` : '';
+  const name = `${isFichaje ? 'QRs_Fichaje' : 'QRs_Ubicaciones'}${suffix}.pdf`;
+  if (download) doc.save(name);
+  return { name, blob: doc.output('blob') };
 }
