@@ -27,6 +27,7 @@
 //   // catch final: return sectorErrorResponse(error);
 
 export class SectorError extends Error {
+  status = 403;
   constructor(message, status = 403) {
     super(message);
     this.name = 'SectorError';
@@ -161,7 +162,7 @@ function makeScopedEntity(entity, sector, isGlobal) {
     },
 
     count: (query = {}) => entity.count(isGlobal ? query : { ...query, sector_id: sector }),
-    aggregate: (options = {}) => entity.aggregate(isGlobal ? options : { ...options, query: { ...(options.query || {}), sector_id: sector } }),
+    aggregate: (options = { query: {} }) => entity.aggregate(isGlobal ? options : { ...options, query: { ...(options.query || {}), sector_id: sector } }),
   };
 }
 
