@@ -43,12 +43,15 @@ export async function fetchAll(
   entity: string,
   query: Record<string, any> = {},
   sort = 'created_date',
+  strict = false,
 ): Promise<any[]> {
   try {
     const batch = await sb.entities[entity].filter(query, sort, LIMIT);
+    if (strict && !Array.isArray(batch)) throw new Error('Respuesta inválida al cargar las órdenes.');
     return Array.isArray(batch) ? batch : [];
-  } catch {
-    // fail-safe: si la query falla, devolver vacío (el caller decide qué hacer).
+  } catch (error) {
+    // El tablero debe distinguir un fallo de consulta de una lista vacía.
+    if (strict) throw error;
     return [];
   }
 }

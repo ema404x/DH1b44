@@ -36,6 +36,7 @@ import { useResolveCreator } from '@/hooks/useResolveCreator';
 import { isJefeSitioRole } from '@/lib/roles';
 import { esOtVencida } from '@/lib/otVencimiento';
 import { useWorkOrderRealtime } from '@/hooks/useWorkOrderRealtime';
+import WorkOrdersLoadState from '@/components/workorders/WorkOrdersLoadState';
 
 
 
@@ -70,7 +71,9 @@ export default function WorkOrders() {
   });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { currentUser, isAdmin, isSuperAdmin, employeeRole } = useCurrentUser();
+  const { currentUser, isAdmin, isSuperAdmin, employeeRole, employeeSector, loading } = useCurrentUser();
+  const activeSector = currentUser?.data?.sector_id || employeeSector || currentUser?.sector_id || null;
+  const boardQueryKey = useMemo(() => ['workorders-board', currentUser?.id || null, activeSector, employeeRole], [currentUser?.id, activeSector, employeeRole]);
   const isGerente = isAdmin || currentUser?.role === 'gerente';
   const isJefeSitio = isJefeSitioRole(employeeRole);
   const canCompleteOT = isGerente || isJefeSitio;
@@ -87,7 +90,7 @@ export default function WorkOrders() {
   //   la query (sin depender de visibleOrders, declarado más abajo → TDZ).
   const handleComplete = useCallback(async (id) => {
     if (!navigator.onLine) { toast.info('Sin conexión — modo offline. No se puede cambiar el estado hasta reconectar.'); return; }
-    const cached = queryClient.getQueryData(['workorders-board'])?.orders || [];
+    const cached = queryClient.getQueryData(boardQueryKey)?.orders || [];
     const order = cached.find(o => o.id === id);
     const accion = order?.status === 'pendiente_validacion' ? 'aprobar'
                  : order?.status === 'obra' ? 'completar'
@@ -100,7 +103,7 @@ export default function WorkOrders() {
       const msg = err.response?.data?.error || err.message || 'Error al actualizar la OT';
       toast.error(msg);
     }
-  }, [queryClient]);
+  }, [queryClient, boardQueryKey]);
 
   const handleStart = useCallback(async (id) => {
     if (!navigator.onLine) { toast.info('Sin conexión — modo offline. No se puede iniciar la OT hasta reconectar.'); return; }
@@ -126,19 +129,26 @@ export default function WorkOrders() {
     queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['workorders-board'],
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: boardQueryKey,
+    enabled: !loading && !!currentUser?.id,
+    initialData: () => {
+      const saved = queryClient.getQueryData(['workorders-board']);
+      // Reusar el respaldo offline solo si pertenece al mismo usuario y sector.
+      return saved?.ctx?.userId === currentUser?.id && saved?.ctx?.sector === activeSector &&
+        saved?.ctx?.employeeRole === (employeeRole || '') && !saved?.ctx?.forceOwnOnly &&
+        Array.isArray(saved?.orders) ? saved : undefined;
+    },
+    initialDataUpdatedAt: 1,
     queryFn: async () => {
-      // Visibilidad por rol (control de acceso):
-      //  - Admin / Gerente: sin scope → ven todo su sector según RLS/RolePermission
-      //    (admin-view y linkage de jefe ya aplicados en el predicado del backend).
-      //  - Jefe de sitio / operario: scope='own' → solo sus OTs (creador/asignado/
-      //    jefe_sitio). La decisión de tier vive acá; la autorización efectiva
-      //    (qué registros) sigue en el backend (otEsVisiblePara).
-      const res = await base44.functions.invoke('getWorkOrdersForUser', {
-        scope: isGerente ? undefined : 'own',
-      });
-      return res.data; // { orders, total, role, ctx }
+      // El backend resuelve el sector y los permisos. El tablero no fuerza
+      // scope='own': eso anulaba Ver Todo y el vínculo con el jefe de sitio.
+      const res = await base44.functions.invoke('getWorkOrdersForUser', {});
+      if (res.data?.error) throw new Error(res.data.error);
+      if (!res.data?.ctx || !Array.isArray(res.data?.orders)) {
+        throw new Error('No se pudo resolver el sector o cargar las órdenes.');
+      }
+      return res.data;
     },
     // staleTime 30s: al volver de otra página dentro de 30s no refetchea → el
     // conteo hidratado desde IndexedDB no salta. refetchOnMount/focus solo
@@ -155,7 +165,7 @@ export default function WorkOrders() {
 
   // ── Realtime: suscribe a eventos de WorkOrder y aplica al cache en vivo ──
   // Offline: no suscribe (el tablero queda en modo lectura con el snapshot).
-  useWorkOrderRealtime(ctx, isOnline);
+  useWorkOrderRealtime(ctx, isOnline && !loading, boardQueryKey);
 
   // Direcciones — fuente canónica de jefes de sitio.
   // Se usa para resolver el jefe_sitio de OTs que no lo tienen poblado,
@@ -236,7 +246,7 @@ export default function WorkOrders() {
     onSuccess: (ot) => {
       if (ot?._offline) {
         // No refetcheamos offline (fallaría). Inyectamos la OT local en el cache.
-        queryClient.setQueryData(['workorders-board'], (old) => {
+        queryClient.setQueryData(boardQueryKey, (old) => {
           const base = old && Array.isArray(old.orders) ? old : { orders: [], ...(old || {}) };
           return { ...base, orders: [ot, ...(base.orders || [])] };
         });
@@ -271,7 +281,7 @@ export default function WorkOrders() {
     if (!isOnline) { toast.info('Sin conexión — modo offline. No se puede mover la OT hasta reconectar.'); return; }
     // Leer del cache (consistencia con handleComplete) — evita depender de
     // visibleOrders que se declara más abajo en el componente (TDZ-safe).
-    const cached = queryClient.getQueryData(['workorders-board'])?.orders || [];
+    const cached = queryClient.getQueryData(boardQueryKey)?.orders || [];
     const order = cached.find(o => o.id === id);
     if (!order || order.status === newStatus) return;
     const action = getTransitionAction(order.status, newStatus);
@@ -635,8 +645,10 @@ export default function WorkOrders() {
         </motion.div>
       )}
 
+      {!modoCampo && <WorkOrdersLoadState loading={loading || isLoading} error={isError ? (error?.response?.data?.error || error?.message || 'No se pudieron cargar las órdenes.') : null} onRetry={refetch} />}
+
       {/* Kanban */}
-      {!modoCampo && viewMode === 'kanban' && (
+      {!modoCampo && !loading && !isLoading && !isError && viewMode === 'kanban' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           {filtered.length === 0 && !isLoading ? (
             <EmptyState icon={ClipboardList} title="No hay órdenes" description="Creá una nueva orden de trabajo" actionLabel="Nueva OT" onAction={() => navigate('/crear-ot')} />
@@ -653,7 +665,7 @@ export default function WorkOrders() {
       )}
 
       {/* Grid */}
-      {!modoCampo && viewMode === 'grid' && (filtered.length === 0 && !isLoading ? (
+      {!modoCampo && !loading && !isLoading && !isError && viewMode === 'grid' && (filtered.length === 0 ? (
         <EmptyState icon={ClipboardList} title="No hay órdenes" description="Creá una nueva orden de trabajo" actionLabel="Nueva OT" onAction={() => navigate('/crear-ot')} />
       ) : (
         <>

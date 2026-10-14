@@ -32,7 +32,7 @@ const BURST_THRESHOLD = 3;      // eventos mínimos en la ventana para reconcili
 const BURST_WINDOW_MS = 2000;   // ventana de la ráfaga
 const RECONCILE_DEBOUNCE_MS = 800;
 
-export function useWorkOrderRealtime(ctx, isOnline) {
+export function useWorkOrderRealtime(ctx, isOnline, queryKey) {
   const queryClient = useQueryClient();
   const burstRef = useRef({ count: 0, firstAt: 0, timer: null });
 
@@ -67,7 +67,7 @@ export function useWorkOrderRealtime(ctx, isOnline) {
       const id = event?.id || data?.id;
       if (!type || !id) return;
 
-      queryClient.setQueryData(['workorders-board'], (old) => {
+      queryClient.setQueryData(queryKey, (old) => {
         const base =
           old && typeof old === 'object' && Array.isArray(old.orders)
             ? old
@@ -115,5 +115,5 @@ export function useWorkOrderRealtime(ctx, isOnline) {
       burstRef.current.count = 0;
       burstRef.current.firstAt = 0;
     };
-  }, [queryClient, ctx, isOnline]);
+  }, [queryClient, ctx, isOnline, queryKey]);
 }

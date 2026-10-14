@@ -260,7 +260,7 @@ export async function getVisibleWorkOrders(
   // llamada. El predicado otEsVisiblePara se aplica UNA vez sobre el set
   // completo — el caller decide si quiere solo activas (excludeArchived) o
   // todas. El archived_count sale gratis porque ya tenemos el set en memoria.
-  const all = await fetchAll(sb, 'WorkOrder', { sector_id: ctx.sector }, '-updated_date');
+  const all = await fetchAll(sb, 'WorkOrder', { sector_id: ctx.sector }, '-updated_date', true);
 
   // Split en memoria post-visibilidad: activas y archivadas, ambas ya filtradas
   // por otEsVisiblePara (defense-in-depth — el predicado es la última barrera).
