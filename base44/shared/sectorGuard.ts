@@ -54,8 +54,40 @@ export function sectorErrorResponse(e) {
 const GLOBAL_ENTITIES = new Set(['PrecarioMinisterio']);
 
 function stamp(data, sector) {
-  if (!data || typeof data !== 'object') return data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new SectorError('Datos inválidos', 400);
+  }
+  if (Object.prototype.hasOwnProperty.call(data, 'sector_id') && data.sector_id !== sector) {
+    throw new SectorError('No se permite transferir registros entre sectores');
+  }
   return { ...data, sector_id: sector };
+}
+
+function assertScopedRecord(item, sector) {
+  if (!item) throw new SectorError('Registro no encontrado', 404);
+  if (!item.sector_id || item.sector_id !== sector) {
+    throw new SectorError('Registro fuera del sector activo o sin sector asignado');
+  }
+}
+
+function assertScopedUpdate(update, sector) {
+  for (const [operator, values] of Object.entries(update || {})) {
+    if (!operator.startsWith('$')) {
+      if (operator === 'sector_id' && values !== sector) throw new SectorError('No se permite cambiar el sector');
+      continue;
+    }
+    if (!values || typeof values !== 'object') continue;
+    for (const [field, value] of Object.entries(values)) {
+      if (field === 'sector_id' || field.startsWith('sector_id.')) {
+        if (operator !== '$set' || field !== 'sector_id' || value !== sector) {
+          throw new SectorError('No se permite cambiar el sector');
+        }
+      }
+      if (operator === '$rename' && (value === 'sector_id' || String(value).startsWith('sector_id.'))) {
+        throw new SectorError('No se permite cambiar el sector');
+      }
+    }
+  }
 }
 
 function makeScopedEntity(entity, sector, isGlobal) {
@@ -77,41 +109,33 @@ function makeScopedEntity(entity, sector, isGlobal) {
       return entity.filter({ ...query, sector_id: sector }, sort, limit);
     },
 
-    list: async (sort, limit, skip) => {
-      const items = await entity.list(sort, limit, skip);
-      if (isGlobal) return items;
-      return items.filter(x => !x.sector_id || x.sector_id === sector);
+    list: (sort, limit, skip) => {
+      if (isGlobal) return entity.list(sort, limit, skip);
+      if (skip) throw new SectorError('Usá paginación por cursor dentro del sector', 400);
+      return entity.filter({ sector_id: sector }, sort, limit);
     },
 
     get: async (id) => {
       const item = await entity.get(id);
-      if (!isGlobal && item && item.sector_id && item.sector_id !== sector) {
-        throw new SectorError('Forbidden: registro de otro sector', 403);
-      }
+      if (!isGlobal) assertScopedRecord(item, sector);
       return item;
     },
 
-    // ── Mutaciones: verifican sector antes de tocar ──────────────────────
     update: async (id, data) => {
       if (isGlobal) return entity.update(id, data);
-      const existing = await entity.get(id).catch(() => null);
-      if (existing && existing.sector_id && existing.sector_id !== sector) {
-        throw new SectorError('Forbidden: registro de otro sector', 403);
-      }
-      return entity.update(id, data);
+      const cleanData = stamp(data, sector);
+      assertScopedRecord(await entity.get(id), sector);
+      return entity.update(id, cleanData);
     },
 
     delete: async (id) => {
-      if (isGlobal) return entity.delete(id);
-      const existing = await entity.get(id).catch(() => null);
-      if (existing && existing.sector_id && existing.sector_id !== sector) {
-        throw new SectorError('Forbidden: registro de otro sector', 403);
-      }
+      if (!isGlobal) assertScopedRecord(await entity.get(id), sector);
       return entity.delete(id);
     },
 
     updateMany: (query, update) => {
       if (isGlobal) return entity.updateMany(query, update);
+      assertScopedUpdate(update, sector);
       return entity.updateMany({ ...query, sector_id: sector }, update);
     },
 
@@ -120,10 +144,28 @@ function makeScopedEntity(entity, sector, isGlobal) {
       return entity.deleteMany({ ...query, sector_id: sector });
     },
 
-    // bulkUpdate no filtra por query. Contrato: los ids provienen de un
-    // filter/list scoped (ya sector-safe), por lo que es seguro. No re-estampa
-    // sector_id porque el update puede ser parcial.
-    bulkUpdate: (arr) => entity.bulkUpdate(arr),
+    // Verificar TODO el lote antes de modificar el primer registro.
+    bulkUpdate: async (arr) => {
+      if (isGlobal) return entity.bulkUpdate(arr);
+      if (!Array.isArray(arr) || arr.length > 500) throw new SectorError('Lote inválido (máximo 500)', 400);
+      const clean = arr.map(data => {
+        if (!data.id) throw new SectorError('Falta el identificador del registro', 400);
+        return stamp(data, sector);
+      });
+      const ids = [...new Set(clean.map(data => data.id))];
+      for (let start = 0; start < ids.length; start += 50) {
+        const batchIds = ids.slice(start, start + 50);
+        const result = await entity.filter({ sector_id: sector, id: { $in: batchIds } }, '-created_date', 50);
+        const records = Array.isArray(result) ? result : result.items;
+        if (!Array.isArray(records)) throw new SectorError('No se pudo verificar el lote', 503);
+        const allowed = new Set(records.map(record => record.id));
+        if (batchIds.some(id => !allowed.has(id))) throw new SectorError('El lote contiene registros fuera del sector activo');
+      }
+      return clean.length ? entity.bulkUpdate(clean) : [];
+    },
+
+    count: (query = {}) => entity.count(isGlobal ? query : { ...query, sector_id: sector }),
+    aggregate: (options = {}) => entity.aggregate(isGlobal ? options : { ...options, query: { ...(options.query || {}), sector_id: sector } }),
   };
 }
 
@@ -136,6 +178,9 @@ function makeScopedEntity(entity, sector, isGlobal) {
 // nombre. Las funciones que ya usan createScopedClient acceden por nombre
 // (sb.entities.Asset), así que la API se preserva.
 export function createScopedClient(base44, sector) {
+  if (typeof sector !== 'string' || !sector.trim() || sector === 'SIN_SECTOR' || sector === 'sistema') {
+    throw new SectorError('Se requiere un sector operativo válido');
+  }
   const raw = base44.asServiceRole.entities;
   const cache = new Map();
   const entities = new Proxy({}, {

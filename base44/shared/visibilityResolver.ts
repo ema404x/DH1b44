@@ -68,9 +68,10 @@ export async function resolveAdminView(
   sb: any,
   employee: any,
   moduleKey: string,
+  user: any = null,
 ): Promise<boolean> {
-  // Sin ficha de empleado → super-admin puro → visibilidad total.
-  if (!employee || !employee.role) return true;
+  // La ausencia de ficha nunca concede permisos por sí sola.
+  if (!employee || !employee.role) return user?.role === 'admin';
   try {
     const allRps = await loadRolePermissions(sb);
     const rp = allRps.find((r: any) => norm(r.role_name) === norm(employee.role));

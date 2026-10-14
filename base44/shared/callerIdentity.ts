@@ -30,43 +30,22 @@ export async function resolveCallerSectorCanonical(
   const userEmail = (user?.email || '').toLowerCase().trim();
   let employee: any | null = null;
 
-  // Parallelizar ambas queries (email + user_id) en lugar de secuenciales.
-  // Prioridad: email primero, fallback por user_id. Ahorra 1 round-trip.
+  // Resolver por vínculo estable; no ampliar permisos si falla la consulta.
+  const platformSector = user?.sector_id ?? user?.data?.sector_id ?? null;
+  const emailPattern = userEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const [byEmail, byUid] = await Promise.all([
     userEmail
-      ? sb.entities.Employee.filter({ email: userEmail }).catch(() => [])
+      ? sb.entities.Employee.filter({ email: { $regex: `^\\s*${emailPattern}\\s*$`, $options: 'i' } }, '-created_date', 50)
       : Promise.resolve([]),
-    user?.id
-      ? sb.entities.Employee.filter({ user_id: user.id }).catch(() => [])
-      : Promise.resolve([]),
+    user?.id ? sb.entities.Employee.filter({ user_id: user.id }, '-created_date', 50) : Promise.resolve([]),
   ]);
-
-  if (userEmail) {
-    employee =
-      (byEmail || []).find(
-        (e: any) => (e?.email || '').toLowerCase().trim() === userEmail,
-      ) || null;
-  }
-  if (!employee && user?.id) {
-    employee = byUid && byUid.length > 0 ? byUid[0] : null;
-  }
-
-  // FALLBACK case-insensitive: si los filtros rápidos por email lowercased y
-  // user_id no encontraron la ficha (mismatch de mayúsculas/minúsculas en el
-  // email almacenado), hacer un fetch amplio y matchear por email normalizado.
-  // Mismo patrón que vincularEmpleado. Solo se activa cuando los filtros
-  // anteriores fallaron — no impacta el happy path. Fail-safe a null.
-  if (!employee && userEmail) {
-    try {
-      const allFallback = await sb.entities.Employee.list('-created_date', 2000);
-      employee = (allFallback || []).find(
-        (e: any) => (e?.email || '').toLowerCase().trim() === userEmail,
-      ) || null;
-    } catch {}
-  }
-
-  const sector =
-    employee?.sector_id || user?.data?.sector_id || user?.sector_id || null;
+  const emails = Array.isArray(byEmail) ? byEmail : byEmail.items;
+  const linked = Array.isArray(byUid) ? byUid : byUid.items;
+  const candidates = linked.length ? linked : emails.filter(e => !e.user_id || e.user_id === user.id);
+  const sectors = new Set(candidates.map(e => e.sector_id).filter(Boolean));
+  if (sectors.size > 1) throw new Error('Vínculo de empleado ambiguo entre sectores. Requiere revisión administrativa.');
+  employee = candidates.find(e => e.sector_id === platformSector) || candidates[0] || null;
+  const sector = employee?.sector_id || (user?.role === 'admin' ? platformSector : null);
   return { sector, employee };
 }
 

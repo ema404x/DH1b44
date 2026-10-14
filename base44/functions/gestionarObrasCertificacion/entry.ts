@@ -116,7 +116,10 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'No tenés permiso para editar esta obra' }, { status: 403 });
       }
 
-      const updated = await sb.entities.ObraCertificacion.update(id, data);
+      if (Object.prototype.hasOwnProperty.call(data, 'sector_id') && data.sector_id !== callerSector) {
+        return Response.json({ error: 'No se permite transferir obras a otro sector. Seleccioná el sector activo para operar.' }, { status: 403 });
+      }
+      const updated = await sb.entities.ObraCertificacion.update(id, { ...data, sector_id: callerSector });
       return Response.json({ obra: updated });
     }
 

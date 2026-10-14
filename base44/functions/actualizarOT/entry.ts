@@ -51,7 +51,7 @@ export default async function (req) {
     // conserva acceso total.
     const P = await resolveOtPermissions(base44, user);
     const employee = P.employee;
-    if (!P.callerSector && !P.superAdmin) {
+    if (!P.callerSector) {
       return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
     }
 
@@ -63,7 +63,7 @@ export default async function (req) {
     if (!ot) return Response.json({ error: 'Orden de trabajo no encontrada' }, { status: 404 });
 
     // Aislamiento por sector (salvo super-admin puro sin sector).
-    if (!P.superAdmin && ot.sector_id !== P.callerSector) {
+    if (!ot.sector_id || ot.sector_id !== P.callerSector) {
       return Response.json({ error: 'Esta OT pertenece a otro sector. Cambiá de sector activo para operarla.' }, { status: 403 });
     }
 

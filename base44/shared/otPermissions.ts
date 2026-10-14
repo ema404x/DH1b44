@@ -26,6 +26,7 @@
 // ot.sector_id === callerSector antes de escribir.
 
 import { isAdminLevelRole, canManageOT } from "./roles.ts";
+import { resolveCallerSectorCanonical } from "./callerIdentity.ts";
 
 export interface OtPermissions {
   user: any;
@@ -60,32 +61,7 @@ export function explicitOrLegacy(perms: any, action: string, legacy: boolean): b
 
 /** Resuelve la ficha de Empleado del caller por email y luego por user_id. */
 export async function resolveEmployee(sb: any, user: any): Promise<any | null> {
-  const userEmail = (user.email || '').toLowerCase().trim();
-  let employee: any = null;
-  if (userEmail) {
-    const byEmail = await sb.asServiceRole.entities.Employee
-      .filter({ email: userEmail }).catch(() => []);
-    employee = byEmail && byEmail.length > 0 ? byEmail[0] : null;
-  }
-  if (!employee && user.id) {
-    const byUid = await sb.asServiceRole.entities.Employee
-      .filter({ user_id: user.id }).catch(() => []);
-    employee = byUid && byUid.length > 0 ? byUid[0] : null;
-  }
-
-  // FALLBACK case-insensitive: si los filtros rápidos por email lowercased y
-  // user_id no encontraron la ficha (mismatch de mayúsculas/minúsculas o
-  // acentos en el email almacenado), fetch amplio + match normalizado.
-  // Cierra la escalada de privilegios: sin este fallback, un jefe_sitio sin
-  // ficha encontrada cae en `superAdmin: true` → acceso total injustificado.
-  if (!employee && userEmail) {
-    try {
-      const all = await sb.asServiceRole.entities.Employee.list('-created_date', 2000);
-      employee = (all || []).find((e: any) => norm(e?.email || '') === norm(userEmail)) || null;
-    } catch {}
-  }
-
-  return employee;
+  return (await resolveCallerSectorCanonical(sb.asServiceRole, user)).employee;
 }
 
 /**
@@ -95,14 +71,15 @@ export async function resolveEmployee(sb: any, user: any): Promise<any | null> {
  *   fallback legacy. Fail-closed si el lookup de RolePermission lanza.
  */
 export async function resolveOtPermissions(sb: any, user: any): Promise<OtPermissions> {
-  const employee = await resolveEmployee(sb, user);
-  const callerSector = employee?.sector_id || user?.data?.sector_id || user?.sector_id || null;
+  const { employee, sector: callerSector } = await resolveCallerSectorCanonical(sb.asServiceRole, user);
 
-  // Super-admin puro: sin ficha de empleado → acceso total (trusted).
+  // Una cuenta sin ficha NO se convierte en administradora por omisión.
+  // Incluso el admin puro queda limitado al sector activo seleccionado.
   if (!employee || !employee.role) {
+    const admin = user?.role === 'admin' && !!callerSector;
     return {
-      user, employee, callerSector, superAdmin: true, perms: null,
-      adminView: true, canUpdateAny: true, canApprove: true, isJefeLevel: true,
+      user, employee, callerSector, superAdmin: admin, perms: null,
+      adminView: admin, canUpdateAny: admin, canApprove: admin, isJefeLevel: admin,
     };
   }
 

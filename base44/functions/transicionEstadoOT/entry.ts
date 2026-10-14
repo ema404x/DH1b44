@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
         }
       } catch (_) {}
 
-      if (!P.superAdmin && ot.sector_id !== P.callerSector) {
+      if (!P.callerSector || !ot.sector_id || ot.sector_id !== P.callerSector) {
         return Response.json({ error: 'Esta OT pertenece a otro sector. Cambiá de sector activo para operarla.' }, { status: 403 });
       }
       callerSector = P.callerSector;
