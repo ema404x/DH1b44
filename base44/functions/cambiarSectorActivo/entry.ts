@@ -51,15 +51,20 @@ export default async function(req) {
       return Response.json({ error: 'Sector inactivo' }, { status: 409 });
     }
 
-    // ── Fijar sector_base solo la primera vez (preserva el sector de origen) ──
-    // La RLS lee {{user.data.sector_id}}. El SDK del service role almacena los
-    // parámetros top-level del payload dentro del blob `data` del User.
-    // PASAR `data: { sector_id }` crea `data.data.sector_id` (doble anidamiento)
-    // — bug histórico. Patrón limpio: solo parámetros top-level.
-    const sectorBaseActual = user.data?.sector_base ?? user.sector_base ?? null;
+    // Los campos personalizados se leen en el nivel superior del SDK.
+    // Quitar solo las copias legacy del sector dentro del campo personalizado
+    // `data`: no son el contenedor interno que usa RLS y pueden estar obsoletas.
+    const sectorBaseActual = user.sector_base ?? user.data?.sector_base ?? null;
     const updatePayload = { sector_id: sector_destino };
-    if (!sectorBaseActual && sectorIdActual && sectorIdActual !== sector_destino) {
-      // Preservar sector_base la primera vez — también como top-level.
+    const hasLegacySector = user.data && typeof user.data === 'object'
+      && ('sector_id' in user.data || 'sector_base' in user.data);
+    if (hasLegacySector) {
+      const { sector_id: obsoleteSector, sector_base: obsoleteBase, ...otherData } = user.data;
+      updatePayload.data = otherData;
+    }
+    if (sectorBaseActual) {
+      updatePayload.sector_base = sectorBaseActual;
+    } else if (sectorIdActual && sectorIdActual !== sector_destino) {
       updatePayload.sector_base = sectorIdActual;
     }
 
@@ -81,14 +86,16 @@ export default async function(req) {
       userAttempted = true;
       await sb.entities.User.update(user.id, updatePayload);
       const savedUser = await sb.entities.User.get(user.id);
-      if ((savedUser.data?.sector_id ?? savedUser.sector_id) !== sector_destino) {
+      if (savedUser.sector_id !== sector_destino
+        || (hasLegacySector && savedUser.data?.sector_id !== undefined)) {
         throw new Error('El sector de la cuenta no se guardó');
       }
     } catch (error) {
       const restoreTasks = [];
       if (userAttempted) {
         restoreTasks.push(sb.entities.User.update(user.id, {
-          sector_id: sectorIdActual || '', sector_base: sectorBaseActual || ''
+          sector_id: sectorIdActual || '', sector_base: sectorBaseActual || '',
+          ...(hasLegacySector ? { data: user.data } : {})
         }));
       }
       if (employeeAttempted) {
