@@ -12,9 +12,9 @@ export default function SignaturePad({ onSign, signed }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#f8fafc';
+    ctx.fillStyle = window.getComputedStyle(canvas).backgroundColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = '#1e293b';
+    ctx.strokeStyle = window.getComputedStyle(canvas).color;
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -62,7 +62,7 @@ export default function SignaturePad({ onSign, signed }) {
   const clear = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#f8fafc';
+    ctx.fillStyle = window.getComputedStyle(canvas).backgroundColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     setHasStrokes(false);
   };
@@ -82,12 +82,12 @@ export default function SignaturePad({ onSign, signed }) {
           <RotateCcw className="h-3 w-3" /> Borrar
         </button>
       </div>
-      <div className="relative border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-slate-50" style={{ touchAction: 'none' }}>
+      <div className="relative border-2 border-dashed border-signature-border rounded-xl overflow-hidden bg-signature" style={{ touchAction: 'none' }}>
         <canvas
           ref={canvasRef}
           width={400}
           height={160}
-          className="w-full block cursor-crosshair"
+          className="w-full block cursor-crosshair bg-signature text-signature-ink"
           onMouseDown={startDraw}
           onMouseMove={draw}
           onMouseUp={endDraw}
@@ -98,7 +98,7 @@ export default function SignaturePad({ onSign, signed }) {
         />
         {!hasStrokes && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-slate-300 text-sm">Dibujá tu firma aquí</p>
+            <p className="text-signature-hint text-sm">Dibujá tu firma aquí</p>
           </div>
         )}
       </div>

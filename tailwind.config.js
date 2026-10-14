@@ -13,6 +13,12 @@ module.exports = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		colors: {
+          signature: {
+            DEFAULT: 'hsl(var(--signature-surface))',
+            ink: 'hsl(var(--signature-ink))',
+            border: 'hsl(var(--signature-border))',
+            hint: 'hsl(var(--signature-hint))'
+          },
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

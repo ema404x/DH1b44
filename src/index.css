@@ -7,6 +7,10 @@
 @layer base {
   :root {
     --font-inter: 'Inter', sans-serif;
+    --signature-surface: 0 0% 100%;
+    --signature-ink: 222 47% 11%;
+    --signature-border: 215 20% 65%;
+    --signature-hint: 215 19% 35%;
     --background: 217 33% 17%;
     --foreground: 214 32% 91%;
     --card: 215 25% 27%;
@@ -43,6 +47,10 @@
   }
 
   .dark {
+    --signature-surface: 0 0% 100%;
+    --signature-ink: 222 47% 11%;
+    --signature-border: 215 20% 65%;
+    --signature-hint: 215 19% 35%;
     --background: 217 33% 15%;
     --foreground: 214 32% 91%;
     --card: 215 25% 25%;
