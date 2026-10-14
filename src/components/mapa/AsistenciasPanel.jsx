@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import AsistenciaDetailDialog from './AsistenciaDetailDialog';
+import exportAsistenciasExcel from '@/components/fichar/exportAsistenciasExcel';
 import { DISTANCE_THRESHOLD_M, getDistanceStatus, hasCoordinates } from '@/components/fichar/geoDistance';
 
 const ESTADO_ADMIN = {
@@ -67,6 +68,7 @@ export default function AsistenciasPanel({ locations = [] }) {
     dateFrom: '', dateTo: '', locationId: 'all', estado: 'all', estadoAdmin: 'all', search: '',
   });
   const [selected, setSelected] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const query = useMemo(() => {
     const q = {};
@@ -128,32 +130,17 @@ export default function AsistenciasPanel({ locations = [] }) {
     return { total, abiertas, cerradas, incidencias, revisados, horas, minutos, lejosSitio, sinGps };
   }, [items, locCoords]);
 
-  const exportCSV = () => {
-    if (!items.length) { toast.error('No hay registros para exportar'); return; }
-    const headers = ['Operario', 'DNI', 'Ubicacion', 'Entrada', 'Salida', 'Duracion', 'Distancia', 'Estado', 'Estado Admin', 'Notas'];
-    const rows = items.map(i => [
-      i.operario_nombre || '',
-      i.dni || '',
-      i.location_name || '',
-      i.entrada_timestamp ? format(new Date(i.entrada_timestamp), 'dd/MM/yyyy HH:mm') : '',
-      i.salida_timestamp ? format(new Date(i.salida_timestamp), 'dd/MM/yyyy HH:mm') : '',
-      calcDuration(i.entrada_timestamp, i.salida_timestamp) || '',
-      calcFichajeDistance(i, locCoords).text,
-      i.estado || '',
-      ESTADO_ADMIN[i.estado_admin]?.label || 'Pendiente',
-      (i.notas_admin || '').replace(/[\n\r]/g, ' '),
-    ]);
-    const csv = [headers, ...rows]
-      .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `asistencias_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(`${items.length} registros exportados`);
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      const count = await exportAsistenciasExcel(query, locCoords);
+      if (!count) { toast.error('No hay registros para exportar'); return; }
+      toast.success(`${count} registros exportados a Excel`);
+    } catch (error) {
+      toast.error(error?.message || 'No se pudo generar el Excel');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -235,8 +222,9 @@ export default function AsistenciasPanel({ locations = [] }) {
           {isLoading ? 'Cargando...' : `${items.length} registro${items.length !== 1 ? 's' : ''}`}
           {data?.has_more && ' (mostrando los primeros 200)'}
         </p>
-        <Button variant="outline" size="sm" className="gap-2" onClick={exportCSV} disabled={!items.length}>
-          <Download className="h-4 w-4" /> Exportar CSV
+        <Button variant="outline" size="sm" className="gap-2" onClick={exportExcel} disabled={exporting || isLoading || !items.length}>
+          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          {exporting ? 'Generando Excel...' : 'Exportar Excel'}
         </Button>
       </div>
 
