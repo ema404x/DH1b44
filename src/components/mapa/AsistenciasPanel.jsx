@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import AsistenciaDetailDialog from './AsistenciaDetailDialog';
+import { DISTANCE_THRESHOLD_M, getDistanceStatus, hasCoordinates } from '@/components/fichar/geoDistance';
 
 const ESTADO_ADMIN = {
   pendiente: { label: 'Pendiente', class: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
@@ -18,26 +19,17 @@ const ESTADO_ADMIN = {
   incidencia: { label: 'Incidencia', class: 'bg-red-500/15 text-red-400 border-red-500/30' },
 };
 
-const DISTANCE_THRESHOLD_M = 150; // Umbral de alerta: fichajes a más de 150m del sitio
-
-function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371000; // metros
-  const toRad = (d) => d * Math.PI / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-}
-
 function calcFichajeDistance(fichaje, locCoords) {
   const loc = locCoords.get(fichaje.location_qr_id);
-  if (!loc) return { status: 'no_coords', text: 'Sin coords.' };
-  const lat = fichaje.entrada_latitude;
-  const lng = fichaje.entrada_longitude;
-  if (lat == null || lng == null) return { status: 'no_gps', text: 'Sin GPS' };
-  const dist = haversine(loc.lat, loc.lng, lat, lng);
-  if (dist > DISTANCE_THRESHOLD_M) return { status: 'far', text: `${dist}m`, dist };
-  return { status: 'ok', text: `${dist}m`, dist };
+  const entrada = getDistanceStatus(fichaje.entrada_latitude, fichaje.entrada_longitude, loc?.lat, loc?.lng);
+  if (!fichaje.salida_timestamp) return entrada;
+  const salida = getDistanceStatus(fichaje.salida_latitude, fichaje.salida_longitude, loc?.lat, loc?.lng);
+  if (entrada.status === 'far' || salida.status === 'far') {
+    return (salida.dist ?? -1) > (entrada.dist ?? -1) ? salida : entrada;
+  }
+  if (entrada.status !== 'ok') return entrada;
+  if (salida.status !== 'ok') return salida;
+  return salida.dist > entrada.dist ? salida : entrada;
 }
 
 function calcDuration(entrada, salida) {
@@ -107,7 +99,7 @@ export default function AsistenciasPanel({ locations = [] }) {
   const locCoords = useMemo(() => {
     const m = new Map();
     for (const l of locations) {
-      if (l.latitude && l.longitude) m.set(l.id, { lat: l.latitude, lng: l.longitude });
+      if (hasCoordinates(l.latitude, l.longitude)) m.set(l.id, { lat: l.latitude, lng: l.longitude });
     }
     return m;
   }, [locations]);
@@ -278,11 +270,15 @@ export default function AsistenciasPanel({ locations = [] }) {
             </TableRow>
           ) : items.map(fichaje => {
             const ea = ESTADO_ADMIN[fichaje.estado_admin] || ESTADO_ADMIN.pendiente;
+            const distance = calcFichajeDistance(fichaje, locCoords);
             return (
               <TableRow key={fichaje.id} className="cursor-pointer hover:bg-accent/20" onClick={() => setSelected(fichaje)}>
                 <TableCell className="font-medium">{fichaje.operario_nombre || '—'}</TableCell>
                 <TableCell className="tabular-nums text-muted-foreground">{fichaje.dni || '—'}</TableCell>
-                <TableCell className="text-muted-foreground text-xs max-w-[160px] truncate">{fichaje.location_name || '—'}</TableCell>
+                <TableCell className={`text-xs max-w-[160px] ${distance.status === 'far' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+                  <span className="block truncate">{fichaje.location_name || '—'}</span>
+                  {distance.status === 'far' && <span className="flex items-center gap-1 mt-1"><AlertTriangle className="h-3 w-3 shrink-0" />Ubicación no coincide</span>}
+                </TableCell>
                 <TableCell className="text-xs tabular-nums">
                   {fichaje.entrada_timestamp ? format(new Date(fichaje.entrada_timestamp), 'dd/MM/yy HH:mm') : '—'}
                 </TableCell>

@@ -10,6 +10,7 @@ import { LogIn, LogOut, MapPin, Clock, PenLine, CheckCircle2, AlertTriangle, Loa
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { getDistanceStatus, hasCoordinates } from '@/components/fichar/geoDistance';
 
 const ESTADO_ADMIN = {
   pendiente: { label: 'Pendiente', class: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
@@ -17,16 +18,6 @@ const ESTADO_ADMIN = {
   incidencia: { label: 'Incidencia', class: 'bg-red-500/15 text-red-400 border-red-500/30' },
 };
 
-const DISTANCE_THRESHOLD_M = 150;
-
-function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371000;
-  const toRad = (d) => d * Math.PI / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-}
 
 function calcDuration(entrada, salida) {
   if (!entrada || !salida) return null;
@@ -64,15 +55,15 @@ function SignatureBlock({ title, timestamp, signatureUrl, latitude, longitude, i
           Sin firma registrada
         </div>
       )}
-      {latitude && longitude && (
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      {hasCoordinates(latitude, longitude) && (
+        <div className={`flex items-center gap-1.5 text-xs ${distance?.status === 'far' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
           <MapPin className="h-3 w-3" /> GPS: {latitude.toFixed(5)}, {longitude.toFixed(5)}
         </div>
       )}
       {distance && (
-        <div className={`flex items-center gap-1.5 text-xs font-medium ${distance.status === 'far' ? 'text-red-400' : distance.status === 'ok' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+        <div className={`flex items-center gap-1.5 text-xs font-medium ${distance.status === 'far' ? 'text-destructive' : distance.status === 'ok' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
           {distance.status === 'far' && <AlertTriangle className="h-3 w-3" />}
-          <span>Distancia al sitio: {distance.text}</span>
+          <span>{distance.status === 'far' ? 'Ubicación no coincide · ' : 'Distancia al sitio: '}{distance.text}</span>
         </div>
       )}
     </div>
@@ -117,15 +108,10 @@ export default function AsistenciaDetailDialog({ fichaje, onClose, locCoords }) 
   const ea = ESTADO_ADMIN[estadoAdmin] || ESTADO_ADMIN.pendiente;
   const duracion = calcDuration(fichaje.entrada_timestamp, fichaje.salida_timestamp);
 
-  const refCoords = locCoords?.lat != null ? locCoords : null;
-  const calcDist = (lat, lng) => {
-    if (!refCoords || lat == null || lng == null) return null;
-    const dist = haversine(refCoords.lat, refCoords.lng, lat, lng);
-    if (dist > DISTANCE_THRESHOLD_M) return { status: 'far', text: `${dist}m` };
-    return { status: 'ok', text: `${dist}m` };
-  };
-  const entradaDist = calcDist(fichaje.entrada_latitude, fichaje.entrada_longitude);
-  const salidaDist = calcDist(fichaje.salida_latitude, fichaje.salida_longitude);
+  const entradaDist = getDistanceStatus(fichaje.entrada_latitude, fichaje.entrada_longitude, locCoords?.lat, locCoords?.lng);
+  const salidaDist = fichaje.salida_timestamp
+    ? getDistanceStatus(fichaje.salida_latitude, fichaje.salida_longitude, locCoords?.lat, locCoords?.lng)
+    : null;
 
   return (
     <Dialog open={!!fichaje} onOpenChange={onClose}>
@@ -155,7 +141,7 @@ export default function AsistenciaDetailDialog({ fichaje, onClose, locCoords }) 
         </div>
 
         {/* Ubicación */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className={`flex items-center gap-2 text-sm ${entradaDist.status === 'far' || salidaDist?.status === 'far' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
           <MapPin className="h-4 w-4 shrink-0" />
           <span className="truncate">{fichaje.location_name || 'Ubicación no registrada'}</span>
         </div>

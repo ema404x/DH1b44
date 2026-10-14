@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import GpsStatus from '@/components/fichar/GpsStatus';
 
 const COLOR_MAP = {
   blue:   { bg: 'from-blue-600 to-blue-800',     icon: 'bg-blue-500/20 text-blue-200' },
@@ -277,12 +278,7 @@ export default function FicharUbicacion() {
             <MapPin className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
             <span className="text-xs leading-relaxed">{location.name}{location.address ? ` · ${location.address}` : ''}</span>
           </div>
-          {gps && (
-            <div className="flex items-center gap-2 text-emerald-600 text-xs">
-              <MapPin className="h-3.5 w-3.5" />
-              <span>GPS: {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}</span>
-            </div>
-          )}
+          <GpsStatus gps={gps} location={location} />
         </div>
         <Button variant="outline" className="w-full" onClick={resetForm}>Nuevo fichaje</Button>
         <p className="text-xs text-muted-foreground mt-3">Podés cerrar esta ventana.</p>
@@ -355,15 +351,7 @@ export default function FicharUbicacion() {
           )}
 
           {/* GPS status */}
-          <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2.5">
-            <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-            {gpsLoading
-              ? <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Obteniendo GPS...</span>
-              : gps
-                ? <span className="text-emerald-600 font-semibold">GPS capturado ✓ ({gps.lat.toFixed(4)}, {gps.lng.toFixed(4)})</span>
-                : <span className="text-amber-600">Sin GPS disponible</span>
-            }
-          </div>
+          <GpsStatus gps={gps} location={location} loading={gpsLoading} />
 
           {/* Firma */}
           <div className="space-y-2">

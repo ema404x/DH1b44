@@ -24,6 +24,8 @@ export default async function(req) {
           id: location.id,
           name: location.name,
           address: location.address,
+          latitude: location.latitude ?? null,
+          longitude: location.longitude ?? null,
           is_active: location.is_active,
           color: location.color,
           sector_id: location.sector_id,
