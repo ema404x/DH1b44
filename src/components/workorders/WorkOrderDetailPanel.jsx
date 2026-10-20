@@ -212,6 +212,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       base44.functions.invoke('actualizarOT', { ot_id: order.id, patch: d }).then(r => r.data?.ot),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
       toast.success('Guardado');
       if (closeAfterSaveRef.current) {
@@ -334,6 +335,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       });
       toast.success(res.data.mensaje);
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
       if (accion === 'aprobar') queryClient.invalidateQueries({ queryKey: ['workorders-validacion'] });
       if (accion === 'aprobar' || accion === 'cancelar' || accion === 'convertir_obra' || accion === 'completar') onClose();
@@ -356,6 +358,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       });
       toast.success(res.data.mensaje);
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
       onClose();
     } catch (err) {
@@ -378,6 +381,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       });
       toast.success(res.data.mensaje);
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
       queryClient.invalidateQueries({ queryKey: ['workorders-validacion'] });
       queryClient.invalidateQueries({ queryKey: ['workorders-operario'] });
@@ -434,6 +438,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
       }
       queryClient.invalidateQueries({ queryKey: ['pendientes'] });
       queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
       queryClient.invalidateQueries({ queryKey: ['workorder-detail', order.id] });
       toast.success('OT convertida a Futura Obra correctamente');
       onClose();

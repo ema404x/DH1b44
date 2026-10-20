@@ -1,5 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { compressImage } from '@/lib/compressImage';
+import { toast } from 'sonner';
 import { Camera, Image, X, Loader2, ZoomIn } from 'lucide-react';
 
 export default function WorkOrderPhotos({ photos = [], onChange }) {
@@ -15,10 +17,12 @@ export default function WorkOrderPhotos({ photos = [], onChange }) {
       const uploaded = [];
       for (const file of Array.from(files)) {
         try {
-          const { file_url } = await base44.integrations.Core.UploadFile({ file });
+          const compressed = await compressImage(file);
+          const { file_url } = await base44.integrations.Core.UploadPublicFile({ file: compressed });
           if (file_url) uploaded.push(file_url);
         } catch (err) {
           console.error('Error subiendo archivo:', file?.name, err);
+          toast.error(`Error subiendo ${file?.name || 'la imagen'}`);
         }
       }
       if (uploaded.length) {

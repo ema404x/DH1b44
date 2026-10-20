@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Mic, MicOff, Camera, CheckCircle2, Loader2, MapPin,
+  Mic, MicOff, Camera, Image, CheckCircle2, Loader2, MapPin,
   ClipboardList, Zap, X, QrCode, Plus, Trash2, ChevronRight,
   ChevronLeft, Clock, Package, Wrench, AlertTriangle,
   Layers, ArrowLeft, Search, User
@@ -170,6 +170,7 @@ export default function CrearOT() {
 
   // Photo upload
   const fileRef = useRef();
+  const cameraRef = useRef();
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // ── Location search state ────────────────────────────────────────────────
@@ -308,6 +309,7 @@ export default function CrearOT() {
         toast.success('OT guardada sin conexión. Se sincronizará al reconectar.');
       } else {
         queryClient.invalidateQueries({ queryKey: ['workorders'] });
+        queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
         queryClient.invalidateQueries({ queryKey: ['workorders-campo'] });
         setCreatedOT(ot);
         setStep(5);
@@ -467,16 +469,21 @@ export default function CrearOT() {
   const handlePhotos = async (files) => {
     if (!files?.length) return;
     setUploadingPhoto(true);
-    for (const file of Array.from(files)) {
-      try {
-        const compressed = await compressImage(file);
-        const { file_url } = await base44.integrations.Core.UploadFile({ file: compressed });
-        setPhotos(prev => [...prev, file_url]);
-      } catch {
-        toast.error(`Error subiendo ${file.name}`);
+    try {
+      for (const file of Array.from(files)) {
+        try {
+          const compressed = await compressImage(file);
+          const { file_url } = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+          if (file_url) setPhotos(prev => [...prev, file_url]);
+        } catch {
+          toast.error(`Error subiendo ${file.name}`);
+        }
       }
+    } finally {
+      setUploadingPhoto(false);
+      if (cameraRef.current) cameraRef.current.value = '';
+      if (fileRef.current) fileRef.current.value = '';
     }
-    setUploadingPhoto(false);
   };
 
   // Crear
@@ -924,17 +931,29 @@ export default function CrearOT() {
                   ))}
                 </div>
               )}
-              <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={e => handlePhotos(e.target.files)} />
-              <button
-                onClick={() => fileRef.current?.click()}
-                disabled={uploadingPhoto}
-                className="w-full h-11 rounded-xl border-2 border-dashed border-border bg-card hover:border-primary/50 flex items-center justify-center gap-2 text-muted-foreground text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                {uploadingPhoto
-                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Subiendo...</>
-                  : <><Camera className="h-4 w-4" /> Agregar foto(s) de referencia</>
-                }
-              </button>
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handlePhotos(e.target.files)} />
+              <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handlePhotos(e.target.files)} />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => cameraRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="h-11 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 flex items-center justify-center gap-2 text-primary text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {uploadingPhoto
+                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Subiendo...</>
+                    : <><Camera className="h-4 w-4" /> Cámara</>
+                  }
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="h-11 rounded-xl border-2 border-dashed border-border bg-card hover:border-primary/50 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  <Image className="h-4 w-4" /> Galería
+                </button>
+              </div>
             </FieldGroup>
           </div>
         )}

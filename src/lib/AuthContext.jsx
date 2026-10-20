@@ -45,7 +45,6 @@ export const AuthProvider = ({ children }) => {
           setTimeout(run, 2500);
         }
       };
-      schedulePrefetch('workorders', () => base44.entities.WorkOrder.list('-updated_date', 300));
       schedulePrefetch('employees',  () => base44.entities.Employee.list('-updated_date', 200));
       schedulePrefetch('pendientes', () => base44.entities.Pendiente.list('-updated_date', 300));
 
