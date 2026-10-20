@@ -50,11 +50,11 @@ export default function OperarioPasswordPanel() {
   return (
     <Card className="p-6">
       <div className="flex items-start gap-3 mb-4">
-        <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-          <KeyRound className="h-5 w-5 text-amber-600" />
+        <div className="h-10 w-10 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+          <KeyRound className="h-5 w-5 text-amber-400" />
         </div>
         <div>
-          <h3 className="font-bold">Clave de Operario (kiosko / tablet)</h3>
+          <h3 className="font-bold text-foreground">Clave de Operario (kiosko / tablet)</h3>
           <p className="text-sm text-muted-foreground mt-0.5">
             Clave compartida que los operarios ingresan para fichar y completar órdenes desde los portales públicos y tablets.
           </p>
@@ -66,14 +66,14 @@ export default function OperarioPasswordPanel() {
           <Loader2 className="h-4 w-4 animate-spin" /> Cargando estado…
         </div>
       ) : status?.configured ? (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-4">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2 mb-4">
           <ShieldCheck className="h-4 w-4" />
           <span className="font-medium">Clave configurada</span>
           {status.updated_by && <span className="text-muted-foreground">· actualizada por {status.updated_by}</span>}
           {status.updated_at && <span className="text-muted-foreground">· {new Date(status.updated_at).toLocaleString('es-AR')}</span>}
         </div>
       ) : (
-        <div className="flex items-center gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+        <div className="flex items-center gap-2 text-sm text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 mb-4">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           Sin clave configurada — se usa el secreto de plataforma como respaldo. Configurá una clave acá para gestionarla desde este módulo.
         </div>

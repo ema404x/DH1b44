@@ -9,10 +9,10 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const statusColors = {
-  pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  completed: 'bg-green-50 text-green-700 border-green-200',
-  failed: 'bg-red-50 text-red-700 border-red-200',
-  verified: 'bg-blue-50 text-blue-700 border-blue-200'
+  pending: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  completed: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  failed: 'bg-red-500/15 text-red-300 border-red-500/30',
+  verified: 'bg-blue-500/15 text-blue-300 border-blue-500/30'
 };
 
 export default function BackupManager() {
@@ -103,10 +103,10 @@ export default function BackupManager() {
         )}
       </div>
 
-      <Card className="p-4 bg-blue-50 border-blue-200">
+      <Card className="p-4 bg-blue-500/10 border-blue-500/30">
         <div className="flex gap-3">
-          <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-800">
+          <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-200/90">
             <strong>Política de Retención:</strong> Los backups se eliminan automáticamente después de 90 días.
             Los backups diarios se hacen automáticamente cada medianoche (Argentina).
           </div>
