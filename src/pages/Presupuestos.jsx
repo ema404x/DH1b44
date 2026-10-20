@@ -7,9 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   FileSpreadsheet, Upload, Trash2, Download, Search,
-  Plus, Loader2, FileText, Calendar, Building2, Calculator, ExternalLink
+  Plus, Loader2, FileText, Calendar, Building2
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -47,11 +46,6 @@ export default function Presupuestos() {
   const { data: presupuestos = [], isLoading } = useQuery({
     queryKey: ['presupuestos-excel'],
     queryFn: () => base44.entities.PresupuestoExcel.list('-created_date', 100),
-  });
-
-  const { data: presupuestosObra = [] } = useQuery({
-    queryKey: ['presupuestos-obra'],
-    queryFn: () => base44.entities.PresupuestoObraEnhanced.list('-updated_date', 100),
   });
 
   const deleteMutation = useMutation({
@@ -118,17 +112,6 @@ export default function Presupuestos() {
     p.obra?.toLowerCase().includes(search.toLowerCase()) ||
     p.archivo_nombre?.toLowerCase().includes(search.toLowerCase())
   );
-
-  const filteredObra = search.trim()
-    ? presupuestosObra.filter(p => {
-        const q = search.toLowerCase();
-        return p.titulo?.toLowerCase().includes(q) ||
-          p.codigo?.toLowerCase().includes(q) ||
-          p.licitacion?.toLowerCase().includes(q) ||
-          p.escuela?.toLowerCase().includes(q) ||
-          p.proyecto_nombre?.toLowerCase().includes(q);
-      })
-    : [];
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
@@ -219,44 +202,6 @@ export default function Presupuestos() {
           className="pl-10"
         />
       </div>
-
-      {/* Resultados de Presupuestos Obra cuando hay búsqueda */}
-      {search.trim() && filteredObra.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-            <Calculator className="h-3.5 w-3.5" />
-            Presupuestos Obra ({filteredObra.length})
-          </p>
-          <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
-            {filteredObra.map(p => (
-              <Link
-                key={p.id}
-                to="/presupuestos-obra"
-                className="flex items-center gap-3 px-4 py-3 bg-card hover:bg-muted/40 transition-colors group"
-              >
-                <div className="h-9 w-9 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center flex-shrink-0">
-                  <Calculator className="h-4 w-4 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-sm text-foreground truncate group-hover:text-primary">{p.titulo || '(Sin título)'}</p>
-                  <p className="text-[10px] text-muted-foreground font-mono">{p.codigo}{p.licitacion ? ` · ${p.licitacion}` : ''}{p.escuela ? ` · ${p.escuela}` : ''}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  {p.estado && (
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border
-                      ${p.estado === 'aprobado' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                      : p.estado === 'enviado' ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-                      : 'bg-slate-500/15 text-slate-300 border-slate-500/30'}`}>
-                      {p.estado}
-                    </span>
-                  )}
-                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary mt-1 ml-auto" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* List */}
       {isLoading ? (
