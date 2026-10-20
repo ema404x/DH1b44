@@ -10,7 +10,6 @@ const ENTITY_DEFAULTS = {
    WorkOrder: { status: 'pendiente', priority: 'media', type: 'mantenimiento_correctivo' },
    Asset: { status: 'operativo', type: 'equipo_mecanico', criticality: 'media' },
    PrecarioMinisterio: { activo: true, pu_mat: 0, pu_mo: 0, coef_pase: 1.6504, coef_oferta: 1.38 },
-   Quote: { status: 'borrador', tax_rate: 21, subtotal: 0, total: 0 },
    Invoice: { status: 'pendiente', tax_rate: 21, subtotal: 0, total: 0 },
    LocationData: { estado: 'activo', m2: 0 },
  };
@@ -18,7 +17,7 @@ const ENTITY_DEFAULTS = {
  const ENTITY_LABELS = {
    InformePlaneacion: 'Informes de Planificación', Client: 'Clientes', Employee: 'Empleados', Material: 'Materiales',
    Project: 'Proyectos', WorkOrder: 'Órdenes de Trabajo', Asset: 'Activos',
-   PrecarioMinisterio: 'Preciario Ministerial', Quote: 'Presupuestos', Invoice: 'Facturas',
+   PrecarioMinisterio: 'Preciario Ministerial', Invoice: 'Facturas',
    LocationData: 'Ubicaciones Técnicas',
  };
 

@@ -23,7 +23,7 @@ export default async function(req) {
     const dataToBackup = {};
     const entitiesToBackup = entities.length > 0 ? entities : [
       'WorkOrder', 'Certificado', 'Project', 'Client', 'Employee',
-      'Asset', 'Invoice', 'Quote', 'AuditLog'
+      'Asset', 'Invoice', 'AuditLog'
     ];
 
     for (const entityName of entitiesToBackup) {

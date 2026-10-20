@@ -25,7 +25,6 @@ const MODULES = [
   { key: 'Asset', label: 'Activos / Equipos', icon: 'TrendingUp', color: 'from-cyan-500', hint: 'Nombre, serie, marca, modelo...' },
   { key: 'LocationData', label: 'Ubicaciones Técnicas', icon: 'MapPin', color: 'from-pink-500', hint: 'Ubic. técnica, establecimiento, m2...' },
   { key: 'PrecarioMinisterio', label: 'Preciario Ministerial', icon: 'DollarSign', color: 'from-lime-500', hint: 'Código, descripción, PU mat, PU mo...' },
-  { key: 'Quote', label: 'Presupuestos', icon: 'FileText', color: 'from-teal-500', hint: 'Título, cliente, subtotal, total...' },
   { key: 'Invoice', label: 'Facturas', icon: 'DollarSign', color: 'from-red-500', hint: 'Cliente, importe, fecha, estado...' },
   { key: 'Informe', label: 'Informes', icon: 'ScrollText', color: 'from-indigo-500', hint: 'Título, establecimiento, jefe de sitio...' },
   { key: 'Emergencia', label: 'Emergencias', icon: 'AlertTriangle', color: 'from-rose-500', hint: 'Tipo, establecimiento, estado, descripción...' },

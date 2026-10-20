@@ -80,11 +80,10 @@ export default async function (req) {
     const sec = { sector_id: callerSector };
 
     // ── Fetch paralelo (todo el sector, paginado) ──
-    const [orders, pendientes, timeLogs, projects, employees, materials, locations] =
+    const [orders, pendientes, projects, employees, materials, locations] =
       await Promise.all([
         fetchAll(sb, 'WorkOrder', sec),
         fetchAll(sb, 'Pendiente', sec),
-        fetchAll(sb, 'TimeLog', sec),
         fetchAll(sb, 'Project', sec),
         fetchAll(sb, 'Employee', sec),
         fetchAll(sb, 'Material', sec),
@@ -136,12 +135,7 @@ export default async function (req) {
       return true;
     });
 
-    // ── TimeLogs (rango + técnico) ──
-    const filteredTimeLogs = timeLogs.filter((l) => {
-      if (!inRange(l.created_date)) return false;
-      if (tecnicoF !== 'all' && !eqNorm(l.employee_name || l.user_name, tecnicoF)) return false;
-      return true;
-    });
+    const ordersWithHours = filteredOrders.filter((o) => (o.actual_hours || o.estimated_hours) > 0);
 
     // ── Opciones de filtro (derivadas de datos reales del sector) ──
     // Dedup canónico: un único label por clave normalizada, prefiriendo el casing
@@ -199,8 +193,8 @@ export default async function (req) {
         0
       )
     );
-    const horasPromedio = filteredTimeLogs.length > 0
-      ? Math.round((filteredTimeLogs.reduce((s, l) => s + (l.hours || 0), 0) / filteredTimeLogs.length) * 10) / 10
+    const horasPromedio = ordersWithHours.length > 0
+      ? Math.round((ordersWithHours.reduce((s, o) => s + (o.actual_hours || o.estimated_hours || 0), 0) / ordersWithHours.length) * 10) / 10
       : 0;
 
     // ── OTs por mes ──
@@ -359,10 +353,7 @@ export default async function (req) {
       title: o.title, project_name: o.project_name, assigned_name: o.assigned_name,
       location: o.location, materials_used: o.materials_used,
     }));
-    const timeLogsExport = filteredTimeLogs.map((l) => ({
-      id: l.id, created_date: l.created_date, hours: l.hours,
-      employee_name: l.employee_name, user_name: l.user_name,
-    }));
+    const timeLogsExport = [];
 
     return Response.json({
       sector: callerSector,
@@ -374,7 +365,7 @@ export default async function (req) {
         eficiencia,
         costoMaterialTotal,
         horasPromedio,
-        timeLogsCount: filteredTimeLogs.length,
+        timeLogsCount: ordersWithHours.length,
       },
       otsPorMes,
       otsPorTipo,

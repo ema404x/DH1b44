@@ -36,11 +36,7 @@ export default function NotificationBell() {
   const qc = useQueryClient();
   const navigate = useNavigate();
 
-  const { data: notifications = [] } = useQuery({
-    queryKey: ['notifications'],
-    queryFn: () => base44.entities.Notification.list('-created_date', 30),
-    staleTime: 1000 * 60 * 2,
-  });
+  const notifications = [];
 
   // Alertas del sistema: ÚNICA fuente de verdad = getAlertasForUser (backend).
   // Comparte el cache con AlertasBanner (mismo queryKey) → una sola petición
@@ -52,24 +48,6 @@ export default function NotificationBell() {
     queryFn: async () => (await base44.functions.invoke('getAlertasForUser')).data.alertas || [],
     refetchInterval: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-  });
-
-  const markReadMutation = useMutation({
-    mutationFn: (id) => base44.entities.Notification.update(id, { read: true }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
-  });
-
-  const deleteNotifMutation = useMutation({
-    mutationFn: (id) => base44.entities.Notification.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
-  });
-
-  const clearAllReadMutation = useMutation({
-    mutationFn: async () => {
-      const read = notifications.filter(n => n.read);
-      await Promise.all(read.map(n => base44.entities.Notification.delete(n.id)));
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
   // Agrupa las alertas del backend por tipo → una entrada resumen por tipo
@@ -107,7 +85,6 @@ export default function NotificationBell() {
     const newOpen = !open;
     setOpen(newOpen);
     if (newOpen) {
-      qc.invalidateQueries({ queryKey: ['notifications'] });
       qc.invalidateQueries({ queryKey: ['alertas-activas'] });
     }
   };
@@ -115,7 +92,6 @@ export default function NotificationBell() {
   const handleClick = (n) => {
     const isSystem = typeof n.id === 'string' && n.path;
     if (isSystem) { navigate(n.path); setOpen(false); }
-    else if (n.id && !n.read) markReadMutation.mutate(n.id);
   };
 
   return (
@@ -199,76 +175,9 @@ export default function NotificationBell() {
                     </>
                   )}
 
-                  {/* Notificaciones de usuario */}
-                  {notifications.length > 0 && (
-                    <>
-                      <div className="px-2 pt-2 pb-0.5">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Actividad</span>
-                      </div>
-                      {notifications.map(n => {
-                        const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.info;
-                        const Icon = cfg.icon;
-                        const timeAgo = n.created_date
-                          ? formatDistanceToNow(new Date(n.created_date), { addSuffix: true, locale: es })
-                          : null;
-                        return (
-                          <div key={n.id}
-                            className={cn(
-                              'group flex items-start gap-3 px-3 py-2.5 rounded-xl transition-all hover:bg-muted/40',
-                              !n.read && 'bg-primary/5 border border-primary/10'
-                            )}>
-                            <button className="flex items-start gap-3 flex-1 min-w-0 text-left" onClick={() => handleClick(n)}>
-                              <div className="mt-0.5 h-7 w-7 rounded-lg flex items-center justify-center shrink-0 bg-muted/50">
-                                <Icon className={cn('h-3.5 w-3.5', cfg.icon_color)} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-foreground leading-tight">{n.title}</p>
-                                {n.message && <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{n.message}</p>}
-                                {timeAgo && <p className="text-[10px] text-muted-foreground/50 mt-1">{timeAgo}</p>}
-                              </div>
-                            </button>
-                            <button
-                              onClick={() => deleteNotifMutation.mutate(n.id)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-red-400 hover:bg-red-500/10 shrink-0">
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
                 </div>
               )}
             </div>
-
-            {/* Footer */}
-            {notifications.length > 0 && (
-              <div className="px-4 py-2.5 border-t border-border/40 bg-muted/10 flex items-center justify-between gap-2">
-                {notifications.some(n => n.read) ? (
-                  <button
-                    onClick={() => clearAllReadMutation.mutate()}
-                    disabled={clearAllReadMutation.isPending}
-                    className="text-xs text-muted-foreground hover:text-red-400 font-medium transition-colors flex items-center gap-1">
-                    <X className="h-3 w-3" /> Limpiar leídas
-                  </button>
-                ) : <span />}
-                {notifications.some(n => !n.read) && (
-                  <button
-                    onClick={async () => {
-                      const unread = notifications.filter(n => !n.read);
-                      try {
-                        await Promise.all(unread.map(n => base44.entities.Notification.update(n.id, { read: true })));
-                      } catch (err) {
-                        toast.error('No se pudieron marcar todas como leídas');
-                      }
-                      qc.invalidateQueries({ queryKey: ['notifications'] });
-                    }}
-                    className="text-xs text-primary hover:text-primary/80 font-medium transition-colors flex items-center gap-1">
-                    <CheckCheck className="h-3 w-3" /> Marcar todo leído
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         </>
       )}

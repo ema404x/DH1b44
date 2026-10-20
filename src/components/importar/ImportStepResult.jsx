@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 const ENTITY_ROUTES = {
    InformePlaneacion: '/informe-planeacion', Client: '/clientes', Employee: '/empleados', Material: '/inventario',
    Project: '/proyectos', WorkOrder: '/ordenes', Asset: '/activos',
-   PrecarioMinisterio: '/presupuestos-obra', Quote: '/presupuestos', Invoice: '/facturacion',
+   PrecarioMinisterio: '/presupuestos-obra', Invoice: '/facturacion',
    LocationData: '/informacion-general',
  };
 
