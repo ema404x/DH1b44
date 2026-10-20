@@ -11,18 +11,23 @@ export default function WorkOrderPhotos({ photos = [], onChange }) {
   const [lightbox, setLightbox] = useState(null); // url
 
   const handleFiles = async (files) => {
-    if (!files?.length) return;
+    const selectedFiles = Array.from(files || []);
+    if (!selectedFiles.length) return;
     setUploading(true);
     try {
       const uploaded = [];
-      for (const file of Array.from(files)) {
+      for (const file of selectedFiles) {
         try {
           const compressed = await compressImage(file);
-          const { file_url } = await base44.integrations.Core.UploadPublicFile({ file: compressed });
-          if (file_url) uploaded.push(file_url);
+          const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+          const uploadedUrl = res?.file_url;
+          if (!uploadedUrl) {
+            throw new Error('No se recibió la URL de la imagen subida');
+          }
+          uploaded.push(uploadedUrl);
         } catch (err) {
           console.error('Error subiendo archivo:', file?.name, err);
-          toast.error(`Error subiendo ${file?.name || 'la imagen'}`);
+          toast.error(err?.message || `Error subiendo ${file?.name || 'la imagen'}`);
         }
       }
       if (uploaded.length) {

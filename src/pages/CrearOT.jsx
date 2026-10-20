@@ -467,16 +467,21 @@ export default function CrearOT() {
   // Fotos — compresión client-side pre-upload (anti-crash RAM en mobile).
   // Procesamiento secuencial: nunca dos bitmaps full-res simultáneos en RAM.
   const handlePhotos = async (files) => {
-    if (!files?.length) return;
+    const selectedFiles = Array.from(files || []);
+    if (!selectedFiles.length) return;
     setUploadingPhoto(true);
     try {
-      for (const file of Array.from(files)) {
+      for (const file of selectedFiles) {
         try {
           const compressed = await compressImage(file);
-          const { file_url } = await base44.integrations.Core.UploadPublicFile({ file: compressed });
-          if (file_url) setPhotos(prev => [...prev, file_url]);
-        } catch {
-          toast.error(`Error subiendo ${file.name}`);
+          const res = await base44.integrations.Core.UploadPublicFile({ file: compressed });
+          const uploadedUrl = res?.file_url;
+          if (!uploadedUrl) {
+            throw new Error('No se recibió la URL de la foto subida');
+          }
+          setPhotos(prev => [...prev, uploadedUrl]);
+        } catch (err) {
+          toast.error(err?.message || `Error subiendo ${file?.name || 'la foto'}`);
         }
       }
     } finally {
