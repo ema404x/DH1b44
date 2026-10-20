@@ -86,7 +86,7 @@ export async function compressImage(file, opts = {}) {
     canvas = document.createElement('canvas');
     canvas.width = targetW;
     canvas.height = targetH;
-    const ctx = canvas.getContext('2d', { alpha: false });
+    const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('No se pudo inicializar el contexto gráfico');
 
     ctx.imageSmoothingEnabled = true;

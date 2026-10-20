@@ -1087,7 +1087,9 @@ export default function CrearOT() {
           {step < 3 ? (
             <Button
               className="flex-1 h-12 gap-2 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/30"
+              disabled={uploadingPhoto}
               onClick={() => {
+                if (uploadingPhoto) return;
                 if (!canProceed()) {
                   toast.error('Completá el título para continuar');
                   return;
@@ -1095,7 +1097,11 @@ export default function CrearOT() {
                 setStep(s => s + 1);
               }}
             >
-              Continuar <ChevronRight className="h-4 w-4" />
+              {uploadingPhoto ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Procesando fotos...</>
+              ) : (
+                <>Continuar <ChevronRight className="h-4 w-4" /></>
+              )}
             </Button>
           ) : (
             <Button
@@ -1105,7 +1111,7 @@ export default function CrearOT() {
                   : 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/30'
               }`}
               onClick={handleCreate}
-              disabled={createMutation.isPending || createFuturaObraMutation.isPending}
+              disabled={uploadingPhoto || createMutation.isPending || createFuturaObraMutation.isPending}
             >
               {(createMutation.isPending || createFuturaObraMutation.isPending)
                 ? <><Loader2 className="h-5 w-5 animate-spin" /> Guardando...</>
