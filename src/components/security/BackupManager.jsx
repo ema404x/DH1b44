@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Download, HardDrive, Loader2, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import EntityArchiveBackupPanel from '@/components/security/EntityArchiveBackupPanel';
 
 const statusColors = {
   pending: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
@@ -50,8 +49,6 @@ export default function BackupManager() {
 
   return (
     <div className="space-y-4">
-      <EntityArchiveBackupPanel />
-
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
           <div>

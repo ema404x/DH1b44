@@ -1,5 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
-import { crypto } from 'https://deno.land/std@0.208.0/crypto/mod.ts';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
 
 async function hashData(data) {
   const encoder = new TextEncoder();
@@ -9,22 +8,22 @@ async function hashData(data) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-Deno.serve(async (req) => {
-  const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  
-  if (!user || user.role !== 'admin') {
-    return Response.json({ error: 'Solo admins pueden hacer backup' }, { status: 403 });
-  }
-
-  const { backup_type = 'manual', entities = [] } = await req.json();
-
+export default async function(req) {
   try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    
+    if (!user || user.role !== 'admin') {
+      return Response.json({ error: 'Solo admins pueden hacer backup' }, { status: 403 });
+    }
+
+    const { backup_type = 'manual', entities = [] } = await req.json();
+
     // Obtener todas las entidades importantes
     const dataToBackup = {};
     const entitiesToBackup = entities.length > 0 ? entities : [
       'WorkOrder', 'Certificado', 'Project', 'Client', 'Employee',
-      'Asset', 'Inventory', 'Invoice', 'Quote', 'AuditLog', 'DigitalSignature'
+      'Asset', 'Invoice', 'Quote', 'AuditLog'
     ];
 
     for (const entityName of entitiesToBackup) {
@@ -70,4 +69,4 @@ Deno.serve(async (req) => {
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}
