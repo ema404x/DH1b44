@@ -49,6 +49,7 @@ export default function Emergencias() {
     setShowForm(false);
     refetch();
     queryClient.invalidateQueries({ queryKey: ['workorders'] });
+    queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
   };
 
   return (

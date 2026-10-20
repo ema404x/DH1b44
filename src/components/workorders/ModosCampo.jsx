@@ -45,6 +45,7 @@ export default function ModoCampo({ currentUser, onOpenOrder }) {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['workorders-campo'] });
       qc.invalidateQueries({ queryKey: ['workorders'] });
+      qc.invalidateQueries({ queryKey: ['workorders-board'] });
       toast.success(data?.mensaje || 'Estado actualizado');
     },
     onError: (err) => {

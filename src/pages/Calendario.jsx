@@ -112,7 +112,11 @@ export default function Calendario() {
 
   const updateOT = useMutation({
     mutationFn: ({ id, data }) => base44.entities.WorkOrder.update(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workorders'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workorders'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
+      queryClient.invalidateQueries({ queryKey: ['workorders-calendario'] });
+    },
   });
 
   const updateInforme = useMutation({
