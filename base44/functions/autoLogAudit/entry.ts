@@ -1,11 +1,11 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
 
 /**
  * Función llamada automáticamente por automaciones de entidad.
  * Registra en AuditLog cualquier create/update/delete sobre las entidades monitoreadas.
  * NOTA: Las automaciones corren como sistema, sin token de usuario — usar asServiceRole directamente.
  */
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
@@ -43,14 +43,28 @@ Deno.serve(async (req) => {
 
     // Sector de la ENTIDAD auditada (regla de oro). Las automaciones corren sin
     // sesión, así que el sector del actor no es confiable; el de la entidad sí.
-    // Estampa sector_id para que el RLS aísle la auditoría entre sectores.
+    // Si en un create el sector aún no fue estampado por stampSectorOnCreate,
+    // resolverlo desde el creador (Employee / User).
+    let resolvedSector = data?.sector_id || old_data?.sector_id || null;
+    const creatorId = data?.created_by_id || old_data?.created_by_id || null;
+    if (!resolvedSector && creatorId && !String(creatorId).startsWith('service_')) {
+      try {
+        const emps = await base44.asServiceRole.entities.Employee.filter({ user_id: creatorId });
+        resolvedSector = emps?.[0]?.sector_id || null;
+        if (!resolvedSector) {
+          const creator = await base44.asServiceRole.entities.User.get(creatorId);
+          resolvedSector = creator?.sector_id || creator?.data?.sector_id || null;
+        }
+      } catch { /* fallback null */ }
+    }
+
     const auditEntry = {
       entity_type: event.entity_name,
       entity_id: event.entity_id,
       action: event.type,
       user_email: actorEmail,
       user_role: actorEmail === 'sistema' ? 'sistema' : 'usuario',
-      sector_id: data?.sector_id || old_data?.sector_id || null,
+      sector_id: resolvedSector,
       timestamp: new Date().toISOString(),
       old_values: event.type === 'update' ? old_data : null,
       new_values: event.type === 'update' ? data : null,
@@ -65,4 +79,4 @@ Deno.serve(async (req) => {
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
-});
+}
