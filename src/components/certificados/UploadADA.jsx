@@ -5,9 +5,9 @@ import { Upload, FileText, Loader2, Sparkles, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner';
 
 const TIPOS = [
-  { value: 'abono_mensual', label: 'Abono Mensual', desc: 'Contrato de servicio recurrente mensual', color: 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100' },
-  { value: 'obra',         label: 'Obra / Presupuesto', desc: 'Contrato o presupuesto de obra civil', color: 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100' },
-  { value: 'informe',      label: 'Informe / Certificado', desc: 'Informe de avance o certificado de medición', color: 'border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100' },
+  { value: 'abono_mensual', label: 'Abono Mensual', desc: 'Contrato de servicio recurrente mensual', color: 'border-blue-500/40 bg-blue-500/10 text-blue-300 hover:bg-blue-500/15' },
+  { value: 'obra',         label: 'Obra / Presupuesto', desc: 'Contrato o presupuesto de obra civil', color: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15' },
+  { value: 'informe',      label: 'Informe / Certificado', desc: 'Informe de avance o certificado de medición', color: 'border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/15' },
 ];
 
 const TIPO_LABELS = { abono_mensual: 'Abono Mensual', obra: 'Obra / Presupuesto', informe: 'Informe / Certificado' };

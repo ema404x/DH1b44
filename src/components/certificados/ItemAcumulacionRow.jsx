@@ -20,7 +20,7 @@ export default function ItemAcumulacionRow({ item, index, onChange, onRemove }) 
     />
   );
   return (
-    <tr className={item._sobrecertificado ? 'bg-red-50/70' : (index % 2 === 0 ? 'bg-background' : 'bg-muted/30')}>
+    <tr className={item._sobrecertificado ? 'bg-red-500/10' : (index % 2 === 0 ? 'bg-background' : 'bg-muted/30')}>
       <td className="px-1 py-1">
         <Input className="h-8 text-xs" value={item.numero ?? index + 1} onChange={e => onChange(index, 'numero', +e.target.value)} />
       </td>
@@ -35,11 +35,11 @@ export default function ItemAcumulacionRow({ item, index, onChange, onRemove }) 
       <td className="px-1 py-1 text-right text-xs font-medium tabular-nums align-middle">{fmt(item.importe_total)}</td>
       <td className="px-1 py-1">{num('med_acum_anterior_unidad', item.med_acum_anterior_unidad, { step: '0.01' })}</td>
       <td className="px-1 py-1">{num('med_acum_anterior_importe', item.med_acum_anterior_importe)}</td>
-      <td className="px-1 py-1 bg-blue-50/40">{num('med_presente_unidad', item.med_presente_unidad, { step: '0.01', className: 'border-blue-300 focus:ring-blue-400' })}</td>
-      <td className="px-1 py-1 bg-blue-50/40">{num('med_presente_importe', item.med_presente_importe, { className: 'border-blue-300 focus:ring-blue-400' })}</td>
+      <td className="px-1 py-1 bg-blue-500/10">{num('med_presente_unidad', item.med_presente_unidad, { step: '0.01', className: 'border-blue-500/40 focus:ring-blue-400' })}</td>
+      <td className="px-1 py-1 bg-blue-500/10">{num('med_presente_importe', item.med_presente_importe, { className: 'border-blue-500/40 focus:ring-blue-400' })}</td>
       <td className="px-1 py-1 text-right text-xs tabular-nums align-middle">{fmt(item.med_acum_presente_unidad)}</td>
       <td className="px-1 py-1 text-right text-xs font-medium tabular-nums align-middle">{fmt(item.med_acum_presente_importe)}</td>
-      <td className={`px-1 py-1 text-right text-xs tabular-nums align-middle ${item._sobrecertificado ? 'text-red-600 font-semibold' : 'text-orange-600 font-medium'}`}>{fmt(item.saldo_pendiente_importe)}</td>
+      <td className={`px-1 py-1 text-right text-xs tabular-nums align-middle ${item._sobrecertificado ? 'text-red-400 font-semibold' : 'text-orange-400 font-medium'}`}>{fmt(item.saldo_pendiente_importe)}</td>
       <td className="px-1 py-1 text-center align-middle">
         <button onClick={() => onRemove(index)} className="text-destructive hover:bg-destructive/10 rounded p-1" title="Eliminar ítem">
           <Trash2 className="h-3.5 w-3.5" />

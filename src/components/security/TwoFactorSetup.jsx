@@ -62,12 +62,12 @@ export default function TwoFactorSetup() {
 
   if (enabled2FA) {
     return (
-      <Card className="p-6 bg-green-50 border-green-200">
+      <Card className="p-6 bg-emerald-500/10 border-emerald-500/30">
         <div className="flex items-center gap-3 mb-4">
-          <Shield className="h-6 w-6 text-green-600" />
-          <h3 className="font-bold text-green-900">2FA Habilitado</h3>
+          <Shield className="h-6 w-6 text-emerald-400" />
+          <h3 className="font-bold text-emerald-300">2FA Habilitado</h3>
         </div>
-        <p className="text-sm text-green-800 mb-4">Tu cuenta está protegida con autenticación de dos factores.</p>
+        <p className="text-sm text-emerald-200/80 mb-4">Tu cuenta está protegida con autenticación de dos factores.</p>
         <Button variant="outline" onClick={handleDisable} className="text-destructive hover:text-destructive">
           Deshabilitar 2FA
         </Button>
@@ -94,14 +94,14 @@ export default function TwoFactorSetup() {
           <div className="mb-4 p-4 bg-muted rounded-lg">
             <img src={qrUrl} alt="QR Code" className="w-48 h-48 mx-auto" />
           </div>
-          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800 font-semibold mb-2">Códigos de Backup:</p>
+          <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+            <p className="text-sm text-amber-300 font-semibold mb-2">Códigos de Backup:</p>
             <div className="grid grid-cols-2 gap-2">
               {backupCodes.map((code, i) => (
-                <code key={i} className="text-xs bg-white p-2 rounded border">{code}</code>
+                <code key={i} className="text-xs bg-card text-foreground p-2 rounded border border-border">{code}</code>
               ))}
             </div>
-            <p className="text-xs text-yellow-700 mt-2">Guarda estos códigos en un lugar seguro. Los necesitarás si pierdes acceso a tu autenticador.</p>
+            <p className="text-xs text-amber-300/80 mt-2">Guarda estos códigos en un lugar seguro. Los necesitarás si pierdes acceso a tu autenticador.</p>
           </div>
           <Button
             onClick={() => setStep('verify')}
@@ -134,9 +134,9 @@ export default function TwoFactorSetup() {
       )}
 
       {step === 'done' && (
-        <Card className="p-6 bg-green-50 border-green-200">
-          <h3 className="font-bold text-green-900 mb-2">✓ 2FA Activado</h3>
-          <p className="text-sm text-green-800">Tu cuenta está protegida. Se te pedirá un código cada vez que inicies sesión.</p>
+        <Card className="p-6 bg-emerald-500/10 border-emerald-500/30">
+          <h3 className="font-bold text-emerald-300 mb-2">✓ 2FA Activado</h3>
+          <p className="text-sm text-emerald-200/80">Tu cuenta está protegida. Se te pedirá un código cada vez que inicies sesión.</p>
         </Card>
       )}
     </div>

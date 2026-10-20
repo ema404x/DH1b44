@@ -299,9 +299,9 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
         </div>
         <div className="flex items-center gap-2">
           <Badge className={
-            form.tipo === 'abono_mensual' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-            form.tipo === 'informe' ? 'bg-purple-100 text-purple-700 border-purple-200' :
-            'bg-green-100 text-green-700 border-green-200'
+            form.tipo === 'abono_mensual' ? 'bg-blue-500/15 text-blue-300 border-blue-500/30' :
+            form.tipo === 'informe' ? 'bg-purple-500/15 text-purple-300 border-purple-500/30' :
+            'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
           }>
             {form.tipo === 'abono_mensual' ? 'Abono Mensual' : form.tipo === 'informe' ? 'Informe' : 'Obra'}
           </Badge>
@@ -329,7 +329,7 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
 
       {/* Banner de validación de subtotal */}
       {validacion && (
-        <div className={`flex items-start gap-3 rounded-lg p-4 border text-sm ${validacion.coincide ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+        <div className={`flex items-start gap-3 rounded-lg p-4 border text-sm ${validacion.coincide ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'}`}>
           {validacion.coincide
             ? <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
             : <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />}
@@ -416,43 +416,43 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
 
       {/* Resumen de certificación en tiempo real */}
       {hasMedicion && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-blue-800">Progresión de certificación</span>
-            <span className={`text-2xl font-bold ${overCertContrato ? 'text-red-600' : 'text-blue-700'}`}>{pctFinal.toFixed(1)}%</span>
+            <span className="text-sm font-semibold text-blue-300">Progresión de certificación</span>
+            <span className={`text-2xl font-bold ${overCertContrato ? 'text-red-400' : 'text-blue-400'}`}>{pctFinal.toFixed(1)}%</span>
           </div>
           {/* Barra apilada: % anterior (verde) + % actual (azul) sobre el contrato */}
-          <div className="w-full bg-blue-100 rounded-full h-3 overflow-hidden flex">
+          <div className="w-full bg-muted rounded-full h-3 overflow-hidden flex">
             <div className="h-3 bg-emerald-500 transition-all duration-300" style={{ width: `${Math.min(100, pctAnterior)}%` }} title={`Pagado anteriormente: ${pctAnterior.toFixed(1)}%`} />
-            <div className="h-3 bg-blue-600 transition-all duration-300" style={{ width: `${Math.min(100, pctActual)}%` }} title={`Este certificado: ${pctActual.toFixed(1)}%`} />
+            <div className="h-3 bg-blue-500 transition-all duration-300" style={{ width: `${Math.min(100, pctActual)}%` }} title={`Este certificado: ${pctActual.toFixed(1)}%`} />
           </div>
           {/* Desglose: anterior + actual = final · restante */}
           <div className="grid grid-cols-4 gap-2 text-xs">
-            <div className="bg-white rounded-md p-2 border border-emerald-200 text-center">
+            <div className="bg-card rounded-md p-2 border border-emerald-500/30 text-center">
               <div className="text-muted-foreground mb-0.5">% Anterior</div>
-              <div className="font-bold text-emerald-600 tabular-nums">{pctAnterior.toFixed(1)}%</div>
+              <div className="font-bold text-emerald-400 tabular-nums">{pctAnterior.toFixed(1)}%</div>
             </div>
             <div className="bg-blue-600 rounded-md p-2 text-center">
               <div className="text-blue-100 mb-0.5">% Actual</div>
               <div className="font-bold text-white tabular-nums">{pctActual.toFixed(1)}%</div>
             </div>
-            <div className="bg-white rounded-md p-2 border border-blue-300 text-center">
+            <div className="bg-card rounded-md p-2 border border-blue-500/40 text-center">
               <div className="text-muted-foreground mb-0.5">% Final</div>
-              <div className={`font-bold tabular-nums ${overCertContrato ? 'text-red-600' : 'text-blue-700'}`}>{pctFinal.toFixed(1)}%</div>
+              <div className={`font-bold tabular-nums ${overCertContrato ? 'text-red-400' : 'text-blue-400'}`}>{pctFinal.toFixed(1)}%</div>
             </div>
-            <div className="bg-white rounded-md p-2 border border-orange-200 text-center">
+            <div className="bg-card rounded-md p-2 border border-orange-500/30 text-center">
               <div className="text-muted-foreground mb-0.5">% Restante</div>
-              <div className="font-bold text-orange-600 tabular-nums">{pctRestante.toFixed(1)}%</div>
+              <div className="font-bold text-orange-400 tabular-nums">{pctRestante.toFixed(1)}%</div>
             </div>
           </div>
           {overCertContrato && (
-            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            <div className="flex items-center gap-2 text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               El acumulado ({pctFinal.toFixed(1)}%) supera el 100% del contrato. Revisá el % pagado anteriormente o lo certificado ahora.
             </div>
           )}
           <div className="grid grid-cols-3 gap-3 text-xs">
-            <div className="bg-white rounded-md p-2 border border-blue-100 text-center">
+            <div className="bg-card rounded-md p-2 border border-border text-center">
               <div className="text-muted-foreground mb-0.5">Total contrato</div>
               <div className="font-bold text-foreground">{fmt(subtotal)}</div>
             </div>
@@ -460,12 +460,12 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
               <div className="text-blue-100 mb-0.5">Certificado (presente)</div>
               <div className="font-bold text-white">{fmt(totalPresente)}</div>
             </div>
-            <div className="bg-white rounded-md p-2 border border-orange-200 text-center">
+            <div className="bg-card rounded-md p-2 border border-orange-500/30 text-center">
               <div className="text-muted-foreground mb-0.5">Saldo pendiente</div>
-              <div className="font-bold text-orange-600">{fmt(totalSaldo)}</div>
+              <div className="font-bold text-orange-400">{fmt(totalSaldo)}</div>
             </div>
           </div>
-          <div className="flex justify-between text-xs text-blue-700 font-medium pt-1 border-t border-blue-200">
+          <div className="flex justify-between text-xs text-blue-300 font-medium pt-1 border-t border-blue-500/30">
             <span>Total Neto a cobrar:</span>
             <span className="font-bold">{fmt(totalNeto)}</span>
           </div>
@@ -520,8 +520,8 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
                 <th className="px-1 py-2 text-right font-semibold w-28">Total cto.</th>
                 <th className="px-1 py-2 text-right font-semibold w-20" title="Acumulado anterior — unidades">A.Ant U</th>
                 <th className="px-1 py-2 text-right font-semibold w-28" title="Acumulado anterior — importe">A.Ant $</th>
-                <th className="px-1 py-2 text-right font-semibold w-20 text-blue-700" title="Presente — unidades">Pres U</th>
-                <th className="px-1 py-2 text-right font-semibold w-28 text-blue-700" title="A certificar — importe">Pres $</th>
+                <th className="px-1 py-2 text-right font-semibold w-20 text-blue-400" title="Presente — unidades">Pres U</th>
+                <th className="px-1 py-2 text-right font-semibold w-28 text-blue-400" title="A certificar — importe">Pres $</th>
                 <th className="px-1 py-2 text-right font-semibold w-20" title="Acumulado presente — unidades">Ac.Pres U</th>
                 <th className="px-1 py-2 text-right font-semibold w-28" title="Acumulado presente — importe">Ac.Pres $</th>
                 <th className="px-1 py-2 text-right font-semibold w-28">Saldo $</th>
@@ -536,7 +536,7 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
           </table>
         </div>
         {form.items.some(it => it._sobrecertificado) && (
-          <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <div className="flex items-center gap-2 text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             Hay ítems que superan la cantidad contratada (sobrecertificación). Revisá el acumulado anterior o el presente.
           </div>

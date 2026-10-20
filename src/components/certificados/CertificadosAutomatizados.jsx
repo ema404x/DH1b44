@@ -90,7 +90,7 @@ export default function CertificadosAutomatizados() {
             </div>
           </div>
           {isToday && (
-            <Badge className="mt-2 bg-green-100 text-green-700 border-green-200 text-xs">¡Hoy es el día!</Badge>
+            <Badge className="mt-2 bg-emerald-500/15 text-emerald-300 border-emerald-500/30 text-xs">¡Hoy es el día!</Badge>
           )}
         </Card>
 
@@ -137,11 +137,11 @@ export default function CertificadosAutomatizados() {
       </div>
 
       {resultMessage && (
-        <Card className="p-4 bg-green-50 border-green-200">
+        <Card className="p-4 bg-emerald-500/10 border-emerald-500/30">
           <div className="flex items-start gap-2">
-            <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" />
-            <p className="text-sm text-green-700">{resultMessage}</p>
-            <button className="ml-auto text-green-600 hover:text-green-700 text-xs" onClick={() => setResultMessage(null)}>✕</button>
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5" />
+            <p className="text-sm text-emerald-300">{resultMessage}</p>
+            <button className="ml-auto text-emerald-400 hover:text-emerald-300 text-xs" onClick={() => setResultMessage(null)}>✕</button>
           </div>
         </Card>
       )}
@@ -192,9 +192,9 @@ export default function CertificadosAutomatizados() {
                       </div>
                       <Badge
                         className={`text-xs border ${
-                          cert.estado === 'aprobado' ? 'bg-green-50 text-green-700 border-green-200' :
-                          cert.estado === 'emitido' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                          'bg-gray-50 text-gray-600 border-gray-200'
+                          cert.estado === 'aprobado' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' :
+                          cert.estado === 'emitido' ? 'bg-blue-500/15 text-blue-300 border-blue-500/30' :
+                          'bg-slate-500/15 text-slate-300 border-slate-500/30'
                         }`}
                       >
                         {cert.estado}

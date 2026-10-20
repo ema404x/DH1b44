@@ -214,9 +214,9 @@ export default function GeneracionMasiva({ open, onClose, onSuccess }) {
                       )}
                     </div>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
-                      a.comuna === '8A' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                      a.comuna === '8B' ? 'bg-violet-50 text-violet-700 border-violet-200' :
-                      a.comuna === '10A' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      a.comuna === '8A' ? 'bg-blue-500/15 text-blue-300 border-blue-500/30' :
+                      a.comuna === '8B' ? 'bg-violet-500/15 text-violet-300 border-violet-500/30' :
+                      a.comuna === '10A' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' :
                       'bg-muted text-muted-foreground border-border'
                     }`}>
                       {a.comuna || 'Sin asignar'}
@@ -239,7 +239,7 @@ export default function GeneracionMasiva({ open, onClose, onSuccess }) {
           {/* Resumen post-proceso */}
           {todosTerminados && (
             <div className={`rounded-lg p-3 border text-sm flex items-center gap-3 ${
-              conError === 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'
+              conError === 0 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
             }`}>
               {conError === 0 ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
               <span>

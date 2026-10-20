@@ -15,10 +15,10 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const ESTADO_COLORS = {
-  borrador: 'bg-slate-100 text-slate-700',
-  enviado: 'bg-blue-100 text-blue-700',
-  aprobado: 'bg-emerald-100 text-emerald-700',
-  rechazado: 'bg-red-100 text-red-700',
+  borrador: 'bg-slate-500/15 text-slate-300 border border-slate-500/30',
+  enviado: 'bg-blue-500/15 text-blue-300 border border-blue-500/30',
+  aprobado: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+  rechazado: 'bg-red-500/15 text-red-300 border border-red-500/30',
 };
 
 const ESTADO_LABELS = {
@@ -135,7 +135,7 @@ export default function Presupuestos() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Presupuestos de Obra</h1>
+          <h1 className="text-2xl font-bold text-foreground">Presupuestos de Obra</h1>
           <p className="text-sm text-muted-foreground mt-1">Almacenamiento de presupuestos en formato Excel</p>
         </div>
         <Button onClick={() => fileRef.current?.click()} className="gap-2 self-start sm:self-auto">
@@ -148,17 +148,17 @@ export default function Presupuestos() {
       {showForm && pendingFile && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-3 mb-4 p-3 bg-white rounded-lg border border-border">
-              <FileSpreadsheet className="h-8 w-8 text-emerald-600 flex-shrink-0" />
+            <div className="flex items-center gap-3 mb-4 p-3 bg-card rounded-lg border border-border">
+              <FileSpreadsheet className="h-8 w-8 text-emerald-400 flex-shrink-0" />
               <div className="min-w-0">
-                <p className="font-medium text-sm truncate">{pendingFile.name}</p>
+                <p className="font-medium text-sm text-foreground truncate">{pendingFile.name}</p>
                 <p className="text-xs text-muted-foreground">{formatBytes(pendingFile.size)}</p>
               </div>
             </div>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-700 mb-1 block">Nombre del presupuesto *</label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Nombre del presupuesto *</label>
                   <Input
                     placeholder="Ej: Presupuesto Escuela Norte"
                     value={form.nombre}
@@ -167,7 +167,7 @@ export default function Presupuestos() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-700 mb-1 block">Obra / Proyecto</label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Obra / Proyecto</label>
                   <Input
                     placeholder="Nombre de la obra"
                     value={form.obra}
@@ -176,7 +176,7 @@ export default function Presupuestos() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-700 mb-1 block">Descripción / Notas</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Descripción / Notas</label>
                 <Input
                   placeholder="Notas adicionales (opcional)"
                   value={form.descripcion}
@@ -184,11 +184,11 @@ export default function Presupuestos() {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-700 mb-1 block">Estado</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Estado</label>
                 <select
                   value={form.estado}
                   onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}
-                  className="flex h-9 w-full sm:w-48 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="flex h-9 w-full sm:w-48 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   {Object.entries(ESTADO_LABELS).map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
@@ -223,34 +223,34 @@ export default function Presupuestos() {
       {/* Resultados de Presupuestos Obra cuando hay búsqueda */}
       {search.trim() && filteredObra.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
             <Calculator className="h-3.5 w-3.5" />
             Presupuestos Obra ({filteredObra.length})
           </p>
-          <div className="rounded-xl border overflow-hidden divide-y divide-slate-100">
+          <div className="rounded-xl border border-border overflow-hidden divide-y divide-border">
             {filteredObra.map(p => (
               <Link
                 key={p.id}
                 to="/presupuestos-obra"
-                className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-red-50 transition-colors group"
+                className="flex items-center gap-3 px-4 py-3 bg-card hover:bg-muted/40 transition-colors group"
               >
-                <div className="h-9 w-9 rounded-lg bg-red-50 border border-red-200 flex items-center justify-center flex-shrink-0">
-                  <Calculator className="h-4 w-4 text-red-700" />
+                <div className="h-9 w-9 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center flex-shrink-0">
+                  <Calculator className="h-4 w-4 text-primary" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-sm text-slate-800 truncate group-hover:text-red-700">{p.titulo || '(Sin título)'}</p>
-                  <p className="text-[10px] text-slate-400 font-mono">{p.codigo}{p.licitacion ? ` · ${p.licitacion}` : ''}{p.escuela ? ` · ${p.escuela}` : ''}</p>
+                  <p className="font-semibold text-sm text-foreground truncate group-hover:text-primary">{p.titulo || '(Sin título)'}</p>
+                  <p className="text-[10px] text-muted-foreground font-mono">{p.codigo}{p.licitacion ? ` · ${p.licitacion}` : ''}{p.escuela ? ` · ${p.escuela}` : ''}</p>
                 </div>
                 <div className="text-right shrink-0">
                   {p.estado && (
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border
-                      ${p.estado === 'aprobado' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : p.estado === 'enviado' ? 'bg-blue-50 text-blue-700 border-blue-200'
-                      : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                      ${p.estado === 'aprobado' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      : p.estado === 'enviado' ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                      : 'bg-slate-500/15 text-slate-300 border-slate-500/30'}`}>
                       {p.estado}
                     </span>
                   )}
-                  <ExternalLink className="h-3.5 w-3.5 text-slate-300 group-hover:text-red-400 mt-1 ml-auto" />
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary mt-1 ml-auto" />
                 </div>
               </Link>
             ))}
@@ -266,7 +266,7 @@ export default function Presupuestos() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <FileSpreadsheet className="h-16 w-16 text-muted-foreground/20 mb-4" />
-          <p className="font-semibold text-slate-600">
+          <p className="font-semibold text-foreground">
             {search ? 'Sin resultados' : 'Sin presupuestos aún'}
           </p>
           <p className="text-sm text-muted-foreground mt-1">
@@ -280,11 +280,11 @@ export default function Presupuestos() {
               <CardContent className="pt-5 space-y-4">
                 {/* File icon + name */}
                 <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0">
-                    <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
+                  <div className="h-10 w-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+                    <FileSpreadsheet className="h-5 w-5 text-emerald-400" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-900 leading-tight truncate">{p.nombre}</p>
+                    <p className="font-semibold text-foreground leading-tight truncate">{p.nombre}</p>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">{p.archivo_nombre}</p>
                   </div>
                 </div>
@@ -292,18 +292,18 @@ export default function Presupuestos() {
                 {/* Meta */}
                 <div className="space-y-1.5">
                   {p.obra && (
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Building2 className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                       <span className="truncate">{p.obra}</span>
                     </div>
                   )}
                   {p.descripcion && (
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                       <span className="truncate">{p.descripcion}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Calendar className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                     <span>{format(new Date(p.created_date), "d 'de' MMMM yyyy", { locale: es })}</span>
                     {p.archivo_size && <span className="text-muted-foreground">· {formatBytes(p.archivo_size)}</span>}
@@ -315,22 +315,22 @@ export default function Presupuestos() {
                   <select
                     value={p.estado || 'borrador'}
                     onChange={e => updateEstadoMutation.mutate({ id: p.id, estado: e.target.value })}
-                    className={`text-xs font-medium px-2 py-1 rounded-md border-0 cursor-pointer ${ESTADO_COLORS[p.estado || 'borrador']}`}
+                    className={`text-xs font-medium px-2 py-1 rounded-md cursor-pointer ${ESTADO_COLORS[p.estado || 'borrador']}`}
                   >
                     {Object.entries(ESTADO_LABELS).map(([val, label]) => (
-                      <option key={val} value={val}>{label}</option>
+                      <option key={val} value={val} className="bg-background text-foreground">{label}</option>
                     ))}
                   </select>
                   <div className="flex items-center gap-1">
                     <a href={p.archivo_url} target="_blank" rel="noopener noreferrer" download>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-primary">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
                         <Download className="h-4 w-4" />
                       </Button>
                     </a>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-slate-500 hover:text-destructive"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       onClick={() => {
                         if (confirm('¿Eliminar este presupuesto?')) deleteMutation.mutate(p.id);
                       }}
