@@ -72,12 +72,41 @@ export default function Mapa() {
     return m;
   }, [joinedLocations]);
 
-  const { data: logs = [], isLoading: logsLoading } = useQuery({
-    queryKey: ['attendanceLogs'],
-    queryFn: () => base44.entities.AttendanceLog.list('-timestamp', 500),
+  const { data: rawFichajes = [], isLoading: logsLoading } = useQuery({
+    queryKey: ['fichajesUbicacionMapa'],
+    queryFn: () => base44.entities.FichajeUbicacion.list('-entrada_timestamp', 500),
     staleTime: 15000,
     refetchInterval: 30000,
   });
+
+  const logs = useMemo(() => {
+    const out = [];
+    for (const f of rawFichajes) {
+      if (f.entrada_timestamp) {
+        out.push({
+          id: `${f.id}-entrada`,
+          type: 'entrada',
+          timestamp: f.entrada_timestamp,
+          latitude: f.entrada_latitude,
+          longitude: f.entrada_longitude,
+          employee_name: f.operario_nombre,
+          location_name: f.location_name,
+        });
+      }
+      if (f.salida_timestamp) {
+        out.push({
+          id: `${f.id}-salida`,
+          type: 'salida',
+          timestamp: f.salida_timestamp,
+          latitude: f.salida_latitude,
+          longitude: f.salida_longitude,
+          employee_name: f.operario_nombre,
+          location_name: f.location_name,
+        });
+      }
+    }
+    return out;
+  }, [rawFichajes]);
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees'],

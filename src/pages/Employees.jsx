@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Search, UserCog, Mail, SettingsIcon, Plus, Users, Zap, Building2, AlertTriangle } from 'lucide-react';
-import QRCodeModal from '@/components/shared/QRCodeModal';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
@@ -96,7 +95,6 @@ export default function Employees() {
   const [onlyIssues, setOnlyIssues] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [qrEmployee, setQrEmployee] = useState(null);
   const [signEmp, setSignEmp] = useState(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -453,7 +451,6 @@ export default function Employees() {
               item={MOTION_ITEM}
               onEdit={handleEdit}
               onDelete={handleDelete}
-              onQR={setQrEmployee}
               onSign={setSignEmp}
               onRelink={handleRelink}
               isRelinking={relinkMutation.isPending}
@@ -463,14 +460,6 @@ export default function Employees() {
           ))}
         </motion.div>
       )}
-
-      <QRCodeModal
-        open={!!qrEmployee}
-        onClose={() => setQrEmployee(null)}
-        title={qrEmployee?.full_name || ''}
-        subtitle={`Fichaje · ${qrEmployee?.role || ''}`}
-        value={qrEmployee ? `${window.location.origin}/fichar?id=${qrEmployee.id}` : ''}
-      />
 
       <InviteUserDialog open={inviteOpen} onOpenChange={setInviteOpen} />
 

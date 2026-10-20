@@ -188,12 +188,6 @@
       ]
     },
     {
-      "entity_name": "AttendanceLog",
-      "allowed_operations": [
-        "read"
-      ]
-    },
-    {
       "entity_name": "AlertaConfig",
       "allowed_operations": [
         "read"

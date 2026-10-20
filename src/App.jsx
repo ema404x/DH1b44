@@ -10,7 +10,6 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AppLayout from '@/components/layout/AppLayout';
 
 // Páginas públicas — se cargan inmediatamente (no requieren auth)
-import Fichar from '@/pages/Fichar';
 import FicharUbicacion from '@/pages/FicharUbicacion';
 import OrdenTrabajoPublica from '@/pages/OrdenTrabajoPublica';
 import EjecutarOrdenPublica from '@/pages/EjecutarOrdenPublica';
@@ -209,7 +208,6 @@ function App() {
         <Router>
           <Routes>
             {/* Rutas públicas — sin autenticación */}
-            <Route path="/fichar" element={<Fichar />} />
             <Route path="/fichar-ubicacion" element={<FicharUbicacion />} />
             <Route path="/orden-trabajo" element={<OrdenTrabajoPublica />} />
             <Route path="/ejecutar-ot" element={<EjecutarOrdenPublica />} />

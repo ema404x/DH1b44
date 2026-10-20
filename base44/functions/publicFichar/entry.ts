@@ -7,11 +7,10 @@ export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
-    const { action, locationId, attendanceData } = body;
+    const { action, locationId } = body;
     const targets = {
       getLocationData: ['LocationQR', locationId],
       getWorkOrderForLocation: ['LocationQR', locationId],
-      createAttendance: ['LocationQR', attendanceData?.location_qr_id],
       getWorkOrder: ['WorkOrder', body.workOrderId],
       updateWorkOrder: ['WorkOrder', body.workOrderId],
       getWorkOrdersForAsset: ['Asset', body.assetId],
@@ -27,30 +26,6 @@ export default async function(req) {
       const results = await sb.entities.LocationQR.filter({ id: locationId }).catch(() => []);
       const location = results[0] || null;
       return Response.json({ location });
-    }
-
-    // CREATE attendance log
-    if (action === 'createAttendance') {
-      if (!attendanceData) return Response.json({ error: 'attendanceData requerido' }, { status: 400 });
-
-      const { location_qr_id, ...logData } = attendanceData;
-      if (logData.employee_id) await sb.entities.Employee.get(logData.employee_id);
-      logData.location_name = scope.record.name;
-
-      // Crear el log y buscar location en paralelo (si se necesita actualizar el contador)
-      const [log, locResults] = await Promise.all([
-        sb.entities.AttendanceLog.create(logData),
-        location_qr_id ? sb.entities.LocationQR.filter({ id: location_qr_id }).catch(() => []) : Promise.resolve([]),
-      ]);
-
-      if (location_qr_id && locResults.length > 0) {
-        const loc = locResults[0];
-        await sb.entities.LocationQR.update(loc.id, {
-          total_scans: (loc.total_scans || 0) + 1,
-        });
-      }
-
-      return Response.json({ success: true, log });
     }
 
     // GET work order by ID
