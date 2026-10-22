@@ -78,7 +78,7 @@ export default async function(req) {
 
     // ── Registrar entrada ──────────────────────────────────────────────────────
     if (action === 'registrarEntrada') {
-      const { locationId, operarioNombre, dni, signatureBase64, latitude, longitude } = body;
+      const { locationId, operarioNombre, dni, signatureBase64, latitude, longitude, accuracy } = body;
       if (!locationId || !operarioNombre?.trim()) {
         return Response.json({ error: 'Nombre y ubicación son requeridos' }, { status: 400 });
       }
@@ -135,6 +135,7 @@ export default async function(req) {
         entrada_signature_url: sigResult.file_url,
         entrada_latitude: latitude,
         entrada_longitude: longitude,
+        entrada_accuracy: Number.isFinite(accuracy) && accuracy > 0 ? Math.round(accuracy) : null,
         estado: 'abierta',
         estado_admin: 'pendiente',
         jefe_sitio_email: location.jefe_sitio_email || null,
@@ -147,7 +148,7 @@ export default async function(req) {
 
     // ── Registrar salida ───────────────────────────────────────────────────────
     if (action === 'registrarSalida') {
-      const { locationId, operarioNombre, dni, signatureBase64, latitude, longitude } = body;
+      const { locationId, operarioNombre, dni, signatureBase64, latitude, longitude, accuracy } = body;
       if (!locationId || !operarioNombre?.trim()) {
         return Response.json({ error: 'Nombre y ubicación son requeridos' }, { status: 400 });
       }
@@ -192,6 +193,7 @@ export default async function(req) {
         salida_signature_url: sigResult.file_url,
         salida_latitude: latitude,
         salida_longitude: longitude,
+        salida_accuracy: Number.isFinite(accuracy) && accuracy > 0 ? Math.round(accuracy) : null,
         estado: 'cerrada',
       });
 
