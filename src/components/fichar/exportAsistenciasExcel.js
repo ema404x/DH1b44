@@ -14,10 +14,13 @@ function excelDate(value) {
   const parts = Object.fromEntries(clock.formatToParts(date).map(p => [p.type, p.value]));
   return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second) / 86400000 + 25569;
 }
+function isSalidaOmitida(item) {
+  return Boolean(item?.salida_omitida || item?.estado === 'salida_omitida');
+}
 function distance(item, coordinates) {
   const loc = coordinates.get(item.location_qr_id);
   const entry = getDistanceStatus(item.entrada_latitude, item.entrada_longitude, loc?.lat, loc?.lng, item.entrada_accuracy);
-  if (!item.salida_timestamp) return entry;
+  if (!item.salida_timestamp || isSalidaOmitida(item)) return entry;
   const exit = getDistanceStatus(item.salida_latitude, item.salida_longitude, loc?.lat, loc?.lng, item.salida_accuracy);
   if (entry.status === 'far' || exit.status === 'far') return (exit.dist ?? -1) > (entry.dist ?? -1) ? exit : entry;
   if (entry.status !== 'ok') return entry;
@@ -57,37 +60,41 @@ export default async function exportAsistenciasExcel(query, coordinates) {
   const totals = new Map();
   for (const i of records) {
     const key = JSON.stringify([i.dni || '', i.operario_nombre || '']);
-    const total = totals.get(key) || { days: 0, open: 0, closed: 0, incidents: 0 };
-    const elapsed = i.entrada_timestamp && i.salida_timestamp
+    const total = totals.get(key) || { days: 0, open: 0, closed: 0, omitted: 0, incidents: 0 };
+    const omitted = isSalidaOmitida(i);
+    const elapsed = !omitted && i.entrada_timestamp && i.salida_timestamp
       ? (new Date(i.salida_timestamp) - new Date(i.entrada_timestamp)) / 86400000 : null;
     const duration = elapsed !== null && Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : null;
     total.days += duration ?? 0;
     total.open += i.estado === 'abierta' ? 1 : 0;
-    total.closed += i.estado === 'cerrada' ? 1 : 0;
-    total.incidents += i.estado_admin === 'incidencia' ? 1 : 0;
+    total.closed += (i.estado === 'cerrada' && !omitted) ? 1 : 0;
+    total.omitted += omitted ? 1 : 0;
+    total.incidents += (i.estado_admin === 'incidencia' || omitted) ? 1 : 0;
     totals.set(key, total);
+    const jornadaLabel = omitted ? 'Salida omitida' : (i.estado === 'abierta' ? 'Abierta' : 'Cerrada');
     detail.push([i.operario_nombre || '', String(i.dni || ''), i.location_name || '',
       excelDate(i.entrada_timestamp), excelDate(i.salida_timestamp), duration ?? '',
-      distance(i, coordinates).text, i.estado === 'abierta' ? 'Abierta' : 'Cerrada',
-      ADMIN[i.estado_admin] || 'Pendiente', i.notas_admin || '']);
+      distance(i, coordinates).text, jornadaLabel,
+      ADMIN[i.estado_admin] || (omitted ? 'Incidencia' : 'Pendiente'), i.notas_admin || '']);
   }
-  const summary = [['Operario', 'DNI', 'Total fichajes', 'Jornadas abiertas', 'Jornadas cerradas', 'Horas trabajadas', 'Incidencias']];
+  const summary = [['Operario', 'DNI', 'Total fichajes', 'Jornadas abiertas', 'Jornadas cerradas', 'Salidas omitidas', 'Horas trabajadas', 'Incidencias']];
   const groups = [...grouped.rows].sort((a, b) => (a.operario_nombre || '').localeCompare(b.operario_nombre || '', 'es'));
   for (const group of groups) {
     const name = group.operario_nombre || '';
     const dni = String(group.dni || '');
-    const total = totals.get(JSON.stringify([dni, name])) || { days: 0, open: 0, closed: 0, incidents: 0 };
+    const total = totals.get(JSON.stringify([dni, name])) || { days: 0, open: 0, closed: 0, omitted: 0, incidents: 0 };
     const row = summary.length + 1;
     const end = detail.length;
     const criteria = `'Detalle'!$A$2:$A$${end},A${row},'Detalle'!$B$2:$B$${end},B${row}`;
     summary.push([name, dni, group.count,
       { t: 'n', f: `COUNTIFS(${criteria},'Detalle'!$H$2:$H$${end},"Abierta")`, v: total.open },
       { t: 'n', f: `COUNTIFS(${criteria},'Detalle'!$H$2:$H$${end},"Cerrada")`, v: total.closed },
+      { t: 'n', f: `COUNTIFS(${criteria},'Detalle'!$H$2:$H$${end},"Salida omitida")`, v: total.omitted },
       { t: 'n', f: `SUMIFS('Detalle'!$F$2:$F$${end},${criteria})`, v: total.days, z: '[h]:mm' },
       { t: 'n', f: `COUNTIFS(${criteria},'Detalle'!$I$2:$I$${end},"Incidencia")`, v: total.incidents }]);
   }
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet(summary, [32, 15, 18, 21, 21, 21, 16], { 5: '[h]:mm' }), 'Resumen por operario');
+  XLSX.utils.book_append_sheet(wb, sheet(summary, [32, 15, 18, 21, 21, 21, 21, 16], { 6: '[h]:mm' }), 'Resumen por operario');
   XLSX.utils.book_append_sheet(wb, sheet(detail, [32, 15, 44, 23, 23, 21, 32, 15, 24, 60],
     { 3: 'dd/mm/yyyy hh:mm', 4: 'dd/mm/yyyy hh:mm', 5: '[h]:mm' }), 'Detalle');
   wb.Props = { Title: 'Resumen de asistencias', Subject: 'Horarios de Argentina (UTC-3)', Author: 'DH1' };

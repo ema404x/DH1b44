@@ -60,14 +60,20 @@
       "type": "number",
       "description": "Precisi\u00f3n estimada del GPS en metros al momento de la salida."
     },
+    "salida_omitida": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si la jornada fue cerrada autom\u00e1ticamente al cambio de d\u00eda porque el operario no registr\u00f3 su salida."
+    },
     "estado": {
       "type": "string",
       "enum": [
         "abierta",
-        "cerrada"
+        "cerrada",
+        "salida_omitida"
       ],
       "default": "abierta",
-      "description": "abierta = entrada registrada sin salida; cerrada = jornada completa con salida."
+      "description": "abierta = entrada registrada sin salida; cerrada = jornada completa con salida; salida_omitida = cerrada autom\u00e1ticamente al cambio de d\u00eda por falta de fichaje de salida."
     },
     "estado_admin": {
       "type": "string",

@@ -1,0 +1,45 @@
+{
+  "description": "Cierra autom\u00e1ticamente al cambio de d\u00eda (00:01 hora de Buenos Aires) los fichajes abiertos de d\u00edas anteriores cuya salida no fue registrada por el operario, marc\u00e1ndolos como salida omitida a las 23:59:59 del d\u00eda de entrada.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "1 0 * * *",
+      "one_time_date": null,
+      "timezone": "America/Buenos_Aires",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "name": "Cierre Diario de Fichajes Omitidos",
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "cierre_diario_fichajes_omitidos",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "cerrar_fichajes": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "cerrarFichajesOmitidos",
+            "args": {}
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Cerrar fichajes sin salida",
+            "description": "Marca como salida omitida a las 23:59:59"
+          }
+        }
+      }
+    ]
+  }
+}

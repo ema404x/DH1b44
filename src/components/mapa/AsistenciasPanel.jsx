@@ -20,10 +20,14 @@ const ESTADO_ADMIN = {
   incidencia: { label: 'Incidencia', class: 'bg-red-500/15 text-red-400 border-red-500/30' },
 };
 
+function isSalidaOmitida(fichaje) {
+  return Boolean(fichaje?.salida_omitida || fichaje?.estado === 'salida_omitida');
+}
+
 function calcFichajeDistance(fichaje, locCoords) {
   const loc = locCoords.get(fichaje.location_qr_id);
   const entrada = getDistanceStatus(fichaje.entrada_latitude, fichaje.entrada_longitude, loc?.lat, loc?.lng, fichaje.entrada_accuracy);
-  if (!fichaje.salida_timestamp) return entrada;
+  if (!fichaje.salida_timestamp || isSalidaOmitida(fichaje)) return entrada;
   const salida = getDistanceStatus(fichaje.salida_latitude, fichaje.salida_longitude, loc?.lat, loc?.lng, fichaje.salida_accuracy);
   if (entrada.status === 'far' || salida.status === 'far') {
     return (salida.dist ?? -1) > (entrada.dist ?? -1) ? salida : entrada;
@@ -70,6 +74,10 @@ export default function AsistenciasPanel({ locations = [] }) {
   const [selected, setSelected] = useState(null);
   const [exporting, setExporting] = useState(false);
 
+  React.useEffect(() => {
+    base44.functions.invoke('cerrarFichajesOmitidos', {}).catch(() => {});
+  }, []);
+
   const query = useMemo(() => {
     const q = {};
     if (filters.locationId !== 'all') q.location_qr_id = filters.locationId;
@@ -109,8 +117,9 @@ export default function AsistenciasPanel({ locations = [] }) {
   const stats = useMemo(() => {
     const total = items.length;
     const abiertas = items.filter(i => i.estado === 'abierta').length;
-    const cerradas = items.filter(i => i.estado === 'cerrada').length;
-    const incidencias = items.filter(i => i.estado_admin === 'incidencia').length;
+    const cerradas = items.filter(i => i.estado === 'cerrada' && !isSalidaOmitida(i)).length;
+    const salidasOmitidas = items.filter(i => isSalidaOmitida(i)).length;
+    const incidencias = items.filter(i => i.estado_admin === 'incidencia' || isSalidaOmitida(i)).length;
     const revisados = items.filter(i => i.estado_admin === 'revisado').length;
     let lejosSitio = 0;
     let sinGps = 0;
@@ -120,14 +129,14 @@ export default function AsistenciasPanel({ locations = [] }) {
       if (d.status === 'no_gps' || d.status === 'no_coords') sinGps++;
     }
     const horasMs = items.reduce((acc, i) => {
-      if (i.entrada_timestamp && i.salida_timestamp) {
+      if (i.entrada_timestamp && i.salida_timestamp && !isSalidaOmitida(i)) {
         return acc + (new Date(i.salida_timestamp).getTime() - new Date(i.entrada_timestamp).getTime());
       }
       return acc;
     }, 0);
     const horas = Math.floor(horasMs / 3600000);
     const minutos = Math.floor((horasMs % 3600000) / 60000);
-    return { total, abiertas, cerradas, incidencias, revisados, horas, minutos, lejosSitio, sinGps };
+    return { total, abiertas, cerradas, salidasOmitidas, incidencias, revisados, horas, minutos, lejosSitio, sinGps };
   }, [items, locCoords]);
 
   const exportExcel = async () => {
@@ -176,6 +185,7 @@ export default function AsistenciasPanel({ locations = [] }) {
               <SelectItem value="all">Todas las jornadas</SelectItem>
               <SelectItem value="abierta">Abiertas</SelectItem>
               <SelectItem value="cerrada">Cerradas</SelectItem>
+              <SelectItem value="salida_omitida">Salida omitida</SelectItem>
             </SelectContent>
           </Select>
           <Select value={filters.estadoAdmin} onValueChange={v => setFilters(f => ({ ...f, estadoAdmin: v }))}>
@@ -205,10 +215,11 @@ export default function AsistenciasPanel({ locations = [] }) {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
         <StatCard icon={Clock} label="Total fichajes" value={stats.total} tone="slate" />
         <StatCard icon={LogIn} label="Jornadas abiertas" value={stats.abiertas} tone="blue" />
         <StatCard icon={LogOut} label="Jornadas cerradas" value={stats.cerradas} tone="emerald" />
+        <StatCard icon={AlertTriangle} label="Salida omitida" value={stats.salidasOmitidas} tone="red" />
         <StatCard icon={Clock} label="Horas trabajadas" value={`${stats.horas}h ${stats.minutos}m`} tone="amber" />
         <StatCard icon={CheckCircle2} label="Revisados" value={stats.revisados} tone="emerald" />
         <StatCard icon={AlertTriangle} label="Incidencias" value={stats.incidencias} tone="red" />
@@ -271,10 +282,25 @@ export default function AsistenciasPanel({ locations = [] }) {
                   {fichaje.entrada_timestamp ? format(new Date(fichaje.entrada_timestamp), 'dd/MM/yy HH:mm') : '—'}
                 </TableCell>
                 <TableCell className="text-xs tabular-nums">
-                  {fichaje.salida_timestamp ? format(new Date(fichaje.salida_timestamp), 'dd/MM/yy HH:mm') : '—'}
+                  {isSalidaOmitida(fichaje) ? (
+                    <div className="space-y-0.5">
+                      <span className="text-red-400 font-semibold flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 shrink-0" /> Jamás fichó salida
+                      </span>
+                      {fichaje.salida_timestamp && (
+                        <span className="block text-[11px] text-muted-foreground">
+                          Cierre auto: {format(new Date(fichaje.salida_timestamp), 'dd/MM/yy HH:mm')}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    fichaje.salida_timestamp ? format(new Date(fichaje.salida_timestamp), 'dd/MM/yy HH:mm') : '—'
+                  )}
                 </TableCell>
                 <TableCell className="text-xs tabular-nums">
-                  {calcDuration(fichaje.entrada_timestamp, fichaje.salida_timestamp) || (fichaje.estado === 'abierta' ? 'En curso' : '—')}
+                  {isSalidaOmitida(fichaje)
+                    ? <span className="text-red-400 font-medium">Sin salida</span>
+                    : (calcDuration(fichaje.entrada_timestamp, fichaje.salida_timestamp) || (fichaje.estado === 'abierta' ? 'En curso' : '—'))}
                 </TableCell>
                 <TableCell>
                   {(() => {
@@ -286,9 +312,15 @@ export default function AsistenciasPanel({ locations = [] }) {
                   })()}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline" className={fichaje.estado === 'abierta' ? 'border-blue-500/30 bg-blue-500/10 text-blue-400' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'}>
-                    {fichaje.estado === 'abierta' ? 'Abierta' : 'Cerrada'}
-                  </Badge>
+                  {isSalidaOmitida(fichaje) ? (
+                    <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-400 gap-1">
+                      <AlertTriangle className="h-3 w-3" /> Salida omitida
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className={fichaje.estado === 'abierta' ? 'border-blue-500/30 bg-blue-500/10 text-blue-400' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'}>
+                      {fichaje.estado === 'abierta' ? 'Abierta' : 'Cerrada'}
+                    </Badge>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className={ea.class}>{ea.label}</Badge>

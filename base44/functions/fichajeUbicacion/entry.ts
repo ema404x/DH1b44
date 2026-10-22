@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
 import { resolvePublicRecordScope } from '../../shared/publicSectorScope.ts';
 import { sectorErrorResponse } from '../../shared/sectorGuard.ts';
+import { reconcileExpiredOpenFichajes } from '../../shared/fichajeAutoCierre.ts';
 
 export default async function(req) {
   try {
@@ -57,10 +58,11 @@ export default async function(req) {
       if (!locationId || (!operarioNombre?.trim() && !dni?.trim())) {
         return Response.json({ jornada: null });
       }
-      const open = await dataClient.entities.FichajeUbicacion.filter({
+      const rawOpen = await dataClient.entities.FichajeUbicacion.filter({
         location_qr_id: locationId,
         estado: 'abierta',
       }).catch(() => []);
+      const { activeToday: open } = await reconcileExpiredOpenFichajes(dataClient, rawOpen);
 
       const dniNorm = normalizeDni(dni);
       const nameNorm = normalize(operarioNombre);
@@ -100,11 +102,12 @@ export default async function(req) {
         return Response.json({ error: 'Este punto de fichaje está desactivado' }, { status: 403 });
       }
 
-      // Validar que no exista una jornada abierta para la misma persona + ubicación
-      const open = await dataClient.entities.FichajeUbicacion.filter({
+      // Validar que no exista una jornada abierta para la misma persona + ubicación (cerrando primero las de días anteriores)
+      const rawOpen = await dataClient.entities.FichajeUbicacion.filter({
         location_qr_id: locationId,
         estado: 'abierta',
       }).catch(() => []);
+      const { activeToday: open } = await reconcileExpiredOpenFichajes(dataClient, rawOpen);
 
       let existing = null;
       if (dniNorm) {
@@ -162,11 +165,12 @@ export default async function(req) {
       const nameNorm = normalize(operarioNombre);
       const dniNorm = normalizeDni(dni);
 
-      // Buscar jornada abierta para esta persona + ubicación
-      const open = await dataClient.entities.FichajeUbicacion.filter({
+      // Buscar jornada abierta para esta persona + ubicación (solo del día actual)
+      const rawOpen = await dataClient.entities.FichajeUbicacion.filter({
         location_qr_id: locationId,
         estado: 'abierta',
       }).catch(() => []);
+      const { activeToday: open } = await reconcileExpiredOpenFichajes(dataClient, rawOpen);
 
       let jornada = null;
       if (dniNorm) {

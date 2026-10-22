@@ -28,10 +28,10 @@ function calcDuration(entrada, salida) {
   return `${h}h ${m}m`;
 }
 
-function SignatureBlock({ title, timestamp, signatureUrl, latitude, longitude, icon: Icon, tone, distance }) {
+function SignatureBlock({ title, timestamp, signatureUrl, latitude, longitude, icon: Icon, tone, distance, omitida }) {
   const tones = {
     in: 'text-emerald-400 bg-emerald-500/10',
-    out: 'text-blue-400 bg-blue-500/10',
+    out: omitida ? 'text-red-400 bg-red-500/10' : 'text-blue-400 bg-blue-500/10',
   };
   return (
     <div className="space-y-2">
@@ -42,13 +42,19 @@ function SignatureBlock({ title, timestamp, signatureUrl, latitude, longitude, i
         <span className="text-sm font-semibold">{title}</span>
         {timestamp && (
           <span className="text-xs text-muted-foreground tabular-nums ml-auto">
-            {format(new Date(timestamp), "dd/MM/yyyy 'a las' HH:mm'hs'", { locale: es })}
+            {omitida ? 'Cierre auto: ' : ''}{format(new Date(timestamp), "dd/MM/yyyy 'a las' HH:mm'hs'", { locale: es })}
           </span>
         )}
       </div>
       {signatureUrl ? (
         <div className="rounded-lg border border-border bg-white overflow-hidden">
           <img src={signatureUrl} alt={`Firma ${title}`} className="w-full max-h-24 object-contain" />
+        </div>
+      ) : omitida ? (
+        <div className="rounded-lg border border-dashed border-red-500/40 bg-red-500/10 flex flex-col items-center justify-center py-5 px-3 text-center text-xs text-red-400 gap-1">
+          <AlertTriangle className="h-4 w-4" />
+          <span className="font-semibold">Jamás fichó la salida</span>
+          <span className="text-[11px] text-red-300/80">Cerrado automáticamente al cambio de día</span>
         </div>
       ) : (
         <div className="rounded-lg border border-dashed border-border/50 flex items-center justify-center py-6 text-xs text-muted-foreground">
@@ -105,11 +111,12 @@ export default function AsistenciaDetailDialog({ fichaje, onClose, locCoords }) 
 
   if (!fichaje) return null;
 
+  const salidaOmitida = Boolean(fichaje.salida_omitida || fichaje.estado === 'salida_omitida');
   const ea = ESTADO_ADMIN[estadoAdmin] || ESTADO_ADMIN.pendiente;
-  const duracion = calcDuration(fichaje.entrada_timestamp, fichaje.salida_timestamp);
+  const duracion = salidaOmitida ? null : calcDuration(fichaje.entrada_timestamp, fichaje.salida_timestamp);
 
   const entradaDist = getDistanceStatus(fichaje.entrada_latitude, fichaje.entrada_longitude, locCoords?.lat, locCoords?.lng, fichaje.entrada_accuracy);
-  const salidaDist = fichaje.salida_timestamp
+  const salidaDist = (fichaje.salida_timestamp && !salidaOmitida)
     ? getDistanceStatus(fichaje.salida_latitude, fichaje.salida_longitude, locCoords?.lat, locCoords?.lng, fichaje.salida_accuracy)
     : null;
 
@@ -134,11 +141,29 @@ export default function AsistenciaDetailDialog({ fichaje, onClose, locCoords }) 
             <p className="text-xs text-muted-foreground tabular-nums">DNI: {fichaje.dni || 'Sin DNI'}</p>
           </div>
           <div className="text-right">
-            <Badge variant="outline" className={fichaje.estado === 'abierta' ? 'border-blue-500/30 bg-blue-500/10 text-blue-400' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'}>
-              {fichaje.estado === 'abierta' ? 'Abierta' : 'Cerrada'}
-            </Badge>
+            {salidaOmitida ? (
+              <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-400 gap-1">
+                <AlertTriangle className="h-3 w-3" /> Salida omitida
+              </Badge>
+            ) : (
+              <Badge variant="outline" className={fichaje.estado === 'abierta' ? 'border-blue-500/30 bg-blue-500/10 text-blue-400' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'}>
+                {fichaje.estado === 'abierta' ? 'Abierta' : 'Cerrada'}
+              </Badge>
+            )}
           </div>
         </div>
+
+        {salidaOmitida && (
+          <div className="flex items-start gap-2.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-300">
+            <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-400">El operario jamás fichó la salida</p>
+              <p className="text-red-300/90 mt-0.5">
+                La jornada fue cerrada automáticamente al cambio de día (23:59hs del día de entrada) sin firma ni ubicación de salida.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Ubicación */}
         <div className={`flex items-center gap-2 text-sm ${entradaDist.status === 'far' || salidaDist?.status === 'far' ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
@@ -177,6 +202,7 @@ export default function AsistenciaDetailDialog({ fichaje, onClose, locCoords }) 
             latitude={fichaje.salida_latitude}
             longitude={fichaje.salida_longitude}
             distance={salidaDist}
+            omitida={salidaOmitida}
           />
         </div>
 

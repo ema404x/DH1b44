@@ -93,7 +93,7 @@ export default function Mapa() {
           location_name: f.location_name,
         });
       }
-      if (f.salida_timestamp) {
+      if (f.salida_timestamp && !f.salida_omitida && f.estado !== 'salida_omitida') {
         out.push({
           id: `${f.id}-salida`,
           type: 'salida',
