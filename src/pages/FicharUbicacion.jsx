@@ -182,6 +182,7 @@ export default function FicharUbicacion() {
         signatureBase64,
         latitude: currentGps.lat,
         longitude: currentGps.lng,
+        accuracy: currentGps.accuracy,
         deviceInfo: navigator.userAgent.slice(0, 120),
       });
 

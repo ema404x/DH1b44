@@ -22,9 +22,9 @@ const ESTADO_ADMIN = {
 
 function calcFichajeDistance(fichaje, locCoords) {
   const loc = locCoords.get(fichaje.location_qr_id);
-  const entrada = getDistanceStatus(fichaje.entrada_latitude, fichaje.entrada_longitude, loc?.lat, loc?.lng);
+  const entrada = getDistanceStatus(fichaje.entrada_latitude, fichaje.entrada_longitude, loc?.lat, loc?.lng, fichaje.entrada_accuracy);
   if (!fichaje.salida_timestamp) return entrada;
-  const salida = getDistanceStatus(fichaje.salida_latitude, fichaje.salida_longitude, loc?.lat, loc?.lng);
+  const salida = getDistanceStatus(fichaje.salida_latitude, fichaje.salida_longitude, loc?.lat, loc?.lng, fichaje.salida_accuracy);
   if (entrada.status === 'far' || salida.status === 'far') {
     return (salida.dist ?? -1) > (entrada.dist ?? -1) ? salida : entrada;
   }

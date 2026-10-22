@@ -19,7 +19,10 @@ export default function useRequiredGps() {
         return;
       }
       navigator.geolocation.getCurrentPosition(position => {
-        const coordinates = { lat: position.coords.latitude, lng: position.coords.longitude };
+        const accuracy = Number.isFinite(position.coords.accuracy) && position.coords.accuracy > 0
+          ? Math.round(position.coords.accuracy)
+          : null;
+        const coordinates = { lat: position.coords.latitude, lng: position.coords.longitude, accuracy };
         setGps(coordinates);
         setLoading(false);
         resolve(coordinates);

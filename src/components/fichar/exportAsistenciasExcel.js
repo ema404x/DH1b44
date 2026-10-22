@@ -16,9 +16,9 @@ function excelDate(value) {
 }
 function distance(item, coordinates) {
   const loc = coordinates.get(item.location_qr_id);
-  const entry = getDistanceStatus(item.entrada_latitude, item.entrada_longitude, loc?.lat, loc?.lng);
+  const entry = getDistanceStatus(item.entrada_latitude, item.entrada_longitude, loc?.lat, loc?.lng, item.entrada_accuracy);
   if (!item.salida_timestamp) return entry;
-  const exit = getDistanceStatus(item.salida_latitude, item.salida_longitude, loc?.lat, loc?.lng);
+  const exit = getDistanceStatus(item.salida_latitude, item.salida_longitude, loc?.lat, loc?.lng, item.salida_accuracy);
   if (entry.status === 'far' || exit.status === 'far') return (exit.dist ?? -1) > (entry.dist ?? -1) ? exit : entry;
   if (entry.status !== 'ok') return entry;
   if (exit.status !== 'ok') return exit;

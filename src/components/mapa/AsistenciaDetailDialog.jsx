@@ -108,9 +108,9 @@ export default function AsistenciaDetailDialog({ fichaje, onClose, locCoords }) 
   const ea = ESTADO_ADMIN[estadoAdmin] || ESTADO_ADMIN.pendiente;
   const duracion = calcDuration(fichaje.entrada_timestamp, fichaje.salida_timestamp);
 
-  const entradaDist = getDistanceStatus(fichaje.entrada_latitude, fichaje.entrada_longitude, locCoords?.lat, locCoords?.lng);
+  const entradaDist = getDistanceStatus(fichaje.entrada_latitude, fichaje.entrada_longitude, locCoords?.lat, locCoords?.lng, fichaje.entrada_accuracy);
   const salidaDist = fichaje.salida_timestamp
-    ? getDistanceStatus(fichaje.salida_latitude, fichaje.salida_longitude, locCoords?.lat, locCoords?.lng)
+    ? getDistanceStatus(fichaje.salida_latitude, fichaje.salida_longitude, locCoords?.lat, locCoords?.lng, fichaje.salida_accuracy)
     : null;
 
   return (

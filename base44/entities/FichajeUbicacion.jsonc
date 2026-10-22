@@ -35,6 +35,10 @@
       "type": "number",
       "description": "Longitud GPS al momento de la entrada (opcional)."
     },
+    "entrada_accuracy": {
+      "type": "number",
+      "description": "Precisi\u00f3n estimada del GPS en metros al momento de la entrada."
+    },
     "salida_timestamp": {
       "type": "string",
       "format": "date-time",
@@ -51,6 +55,10 @@
     "salida_longitude": {
       "type": "number",
       "description": "Longitud GPS al momento de la salida (opcional)."
+    },
+    "salida_accuracy": {
+      "type": "number",
+      "description": "Precisi\u00f3n estimada del GPS en metros al momento de la salida."
     },
     "estado": {
       "type": "string",
