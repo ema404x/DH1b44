@@ -65,41 +65,41 @@ export default function FicharUbicacion() {
     return () => clearInterval(timer);
   }, []);
 
-  // Load location
-  useEffect(() => {
+  const loadLocation = React.useCallback(async () => {
     if (!locationId) {
       setError('QR inválido. No se encontró la ubicación.');
       setLoading(false);
       return;
     }
-
-    const init = async () => {
-      try {
-        const res = await invokeWithRetry('fichajeUbicacion', {
-          action: 'getUbicacion',
-          locationId,
-        });
-        const loc = res.data?.location;
-        if (!loc) {
-          setError('Punto de fichaje no encontrado.');
-          setLoading(false);
-          return;
-        }
-        if (!loc.is_active) {
-          setError('Este punto de fichaje está desactivado.');
-          setLoading(false);
-          return;
-        }
-        setLocation(loc);
-      } catch (e) {
-        setError('Error al cargar datos. Intentá de nuevo.');
+    setLoading(true);
+    setError('');
+    try {
+      const res = await invokeWithRetry('fichajeUbicacion', {
+        action: 'getUbicacion',
+        locationId,
+      });
+      const loc = res.data?.location;
+      if (!loc) {
+        setError('Punto de fichaje no encontrado.');
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-    };
-    init();
-
-
+      if (!loc.is_active) {
+        setError('Este punto de fichaje está desactivado.');
+        setLoading(false);
+        return;
+      }
+      setLocation(loc);
+    } catch (e) {
+      setError('Error al cargar datos. Intentá de nuevo.');
+    }
+    setLoading(false);
   }, [locationId]);
+
+  // Load location
+  useEffect(() => {
+    loadLocation();
+  }, [loadLocation]);
 
   // Debounced check for open jornada when name changes
   useEffect(() => {
@@ -227,6 +227,9 @@ export default function FicharUbicacion() {
     setSignatureData(null);
     setDone(null);
     setError('');
+    if (!location) {
+      loadLocation();
+    }
   };
 
   const colors = COLOR_MAP[location?.color || 'blue'] || COLOR_MAP.blue;
@@ -243,15 +246,15 @@ export default function FicharUbicacion() {
     </div>
   );
 
-  // ── Error ────────────────────────────────────────────────────────────────────
-  if (error && !done) return (
+  // ── Error o sin ubicación ────────────────────────────────────────────────────
+  if ((error || !location) && !done) return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
       <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
         <div className="h-14 w-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="h-7 w-7 text-red-500" />
         </div>
         <h2 className="font-bold text-lg mb-2">No se pudo registrar</h2>
-        <p className="text-muted-foreground text-sm mb-5">{error}</p>
+        <p className="text-muted-foreground text-sm mb-5">{error || 'QR inválido. No se encontró la ubicación.'}</p>
         <Button variant="outline" className="w-full" onClick={resetForm}>Intentar de nuevo</Button>
       </div>
     </div>
@@ -291,7 +294,7 @@ export default function FicharUbicacion() {
           )}
           <div className="flex items-start gap-2 text-slate-600">
             <MapPin className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
-            <span className="text-xs leading-relaxed">{location.name}{location.address ? ` · ${location.address}` : ''}</span>
+            <span className="text-xs leading-relaxed">{location?.name}{location?.address ? ` · ${location.address}` : ''}</span>
           </div>
           <GpsStatus gps={gps} location={location} />
         </div>
@@ -315,8 +318,8 @@ export default function FicharUbicacion() {
           <Building2 className="h-8 w-8" />
         </div>
         <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-1">Punto de fichaje</p>
-        <h1 className="font-bold text-2xl">{location.name}</h1>
-        {location.address && <p className="text-white/50 text-sm mt-1">{location.address}</p>}
+        <h1 className="font-bold text-2xl">{location?.name || 'Ubicación'}</h1>
+        {location?.address && <p className="text-white/50 text-sm mt-1">{location.address}</p>}
         <p className="text-white/40 text-xs mt-3 font-mono">{format(now, "HH:mm:ss · d MMM yyyy")}</p>
       </div>
 
