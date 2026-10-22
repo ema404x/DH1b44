@@ -3,21 +3,23 @@ import QRCode from 'qrcode';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, Printer, Copy, Check } from 'lucide-react';
+import { toPublicQrUrl } from '@/utils';
 
 export default function QRCodeModal({ open, onClose, title, subtitle, value }) {
   const canvasRef = useRef(null);
   const [copied, setCopied] = useState(false);
   const [qrReady, setQrReady] = useState(false);
+  const canonicalValue = toPublicQrUrl(value);
 
   useEffect(() => {
-    if (!open || !value) return;
+    if (!open || !canonicalValue) return;
     setQrReady(false);
 
     // Esperar al siguiente frame para que el Dialog esté visible en el DOM
     const timer = setTimeout(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      QRCode.toCanvas(canvas, value, {
+      QRCode.toCanvas(canvas, canonicalValue, {
         width: 220,
         margin: 2,
         color: { dark: '#0a1628', light: '#ffffff' },
@@ -28,7 +30,7 @@ export default function QRCodeModal({ open, onClose, title, subtitle, value }) {
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [open, value]);
+  }, [open, canonicalValue]);
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
@@ -65,7 +67,7 @@ export default function QRCodeModal({ open, onClose, title, subtitle, value }) {
   };
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(value || '');
+    await navigator.clipboard.writeText(canonicalValue || '');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

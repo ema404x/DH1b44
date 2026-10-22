@@ -250,6 +250,12 @@ export default function PortalOperarioApp() {
     // (mostrando el flash verde de "código detectado"). Si lo cerramos acá,
     // el flash nunca se ve y el feedback visual se pierde.
 
+    // Tipo 'fichaje' — redirigir siempre al dominio público dh1m.com
+    if (result.type === 'fichaje') {
+      window.location.href = `https://dh1m.com/fichar-ubicacion?loc=${encodeURIComponent(result.value)}`;
+      return;
+    }
+
     // Tipo 'loc' — buscar OTs de la ubicación via backend (service role, sin RLS)
     if (result.type === 'loc') {
       // Sin conexión: resolver desde el cache (solo lectura)

@@ -77,8 +77,7 @@ export default async function(req) {
       notas: notas || '',
     });
 
-    const origin = req.headers.get('X-Base44-App-Url');
-    const link = `${origin ? new URL(origin).origin : 'https://dh1-mejores.base44.app'}/revision-bapro/${token}`;
+    const link = `https://dh1m.com/revision-bapro/${token}`;
 
     return Response.json({ ok: true, token, link, expiracion, total_activos: totalActivos, mes_periodo: mes });
   } catch (err) {

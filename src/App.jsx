@@ -201,9 +201,32 @@ const AuthenticatedApp = () => {
   );
 };
 
+const PUBLIC_QR_PATHS = new Set([
+  '/fichar-ubicacion',
+  '/orden-trabajo',
+  '/ejecutar-ot',
+  '/ejecutar-ot-simple',
+  '/portal-operario',
+  '/tablet',
+]);
+
+function CanonicalPublicDomainRedirect() {
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const host = window.location.hostname.toLowerCase();
+    const path = window.location.pathname;
+    const isPublicQrRoute = PUBLIC_QR_PATHS.has(path) || path.startsWith('/revision-bapro/');
+    if (isPublicQrRoute && (host.endsWith('.base44.app') || host === 'www.dh1m.com')) {
+      window.location.replace(`https://dh1m.com${path}${window.location.search}${window.location.hash}`);
+    }
+  }, []);
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
+      <CanonicalPublicDomainRedirect />
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <Routes>

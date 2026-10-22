@@ -359,6 +359,8 @@ function parseQRContent(decodedText) {
       const loc = url.searchParams.get('loc') || url.searchParams.get('ubicacion');
       const asset = url.searchParams.get('asset');
       const ot  = url.searchParams.get('ot');
+      const isFichaje = url.pathname.includes('fichar-ubicacion');
+      if (loc && isFichaje) return { type: 'fichaje', value: loc, raw: text };
       if (loc) return { type: 'loc', value: loc, raw: text };
       if (asset) return { type: 'asset', value: asset, raw: text };
       if (ot)  return { type: 'ot',  value: ot,  raw: text };
@@ -368,7 +370,7 @@ function parseQRContent(decodedText) {
     } catch { return null; }
   };
   const abs = tryUrl(text);            if (abs) return abs;
-  const rel = tryUrl(text, window.location.origin); if (rel) return rel;
+  const rel = tryUrl(text, 'https://dh1m.com'); if (rel) return rel;
 
   // Regex fallback: ?loc= / ?ubicacion= / ?ot= / ?asset=
   const locMatch = text.match(/[?&](?:loc|ubicacion)=([^&\s]+)/);

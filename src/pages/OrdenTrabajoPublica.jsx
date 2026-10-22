@@ -75,9 +75,9 @@ export default function OrdenTrabajoPublica() {
           setLoading(false);
           return;
         }
-        // Si la orden está activa, redirigir automáticamente a ejecutar
+        // Si la orden está activa, redirigir automáticamente a ejecutar en dh1m.com
         if (!['completada', 'cancelada'].includes(ot.status)) {
-          window.location.replace(`/ejecutar-ot?ot=${otId}`);
+          window.location.replace(`https://dh1m.com/ejecutar-ot?ot=${encodeURIComponent(otId)}`);
           return;
         }
         setOrder(ot);
@@ -298,7 +298,7 @@ export default function OrdenTrabajoPublica() {
         {!['completada', 'cancelada'].includes(order.status) && (
           <div className="sticky bottom-4">
             <a
-              href={`/ejecutar-ot?ot=${otId}`}
+              href={`https://dh1m.com/ejecutar-ot?ot=${encodeURIComponent(otId)}`}
               className="flex items-center justify-center gap-3 w-full h-16 rounded-2xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold text-lg shadow-xl shadow-emerald-900/40 transition-all"
             >
               <Wrench className="h-6 w-6" />

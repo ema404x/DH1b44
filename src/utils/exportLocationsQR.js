@@ -1,6 +1,6 @@
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
-import { getPublicAppOrigin } from '@/utils';
+import { toPublicQrUrl } from '@/utils';
 
 /**
  * Genera un PDF con todos los QRs de ubicaciones, listos para imprimir/pegar.
@@ -14,8 +14,6 @@ export async function exportarQRsUbicacionesPDF(locations, mode = 'ot', { jefe =
   const list = (locations || []).filter(Boolean);
   if (!list.length) return;
 
-  const origin = getPublicAppOrigin();
-
   // Generar data URLs de cada QR (en lotes para no saturar el render)
   const items = [];
   const BATCH = 12;
@@ -23,7 +21,7 @@ export async function exportarQRsUbicacionesPDF(locations, mode = 'ot', { jefe =
     const chunk = list.slice(i, i + BATCH);
     const datas = await Promise.all(
       chunk.map(async (l) => {
-        const url = `${origin}/${route}?loc=${encodeURIComponent(l.id)}`;
+        const url = toPublicQrUrl(`/${route}?loc=${encodeURIComponent(l.id)}`);
         return await QRCode.toDataURL(url, {
           width: 300,
           margin: 1,

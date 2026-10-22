@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { base44 } from '@/api/base44Client';
-import { getPublicAppOrigin } from '@/utils';
+import { toPublicQrUrl } from '@/utils';
 import { Download, Copy, Check, ClipboardList, Clock, CheckCircle2, AlertCircle, Loader2, Cpu } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -29,7 +29,7 @@ export default function AssetQRModal({ open, onOpenChange, asset }) {
   const [workOrders, setWorkOrders] = useState([]);
   const [isLoadingOTs, setIsLoadingOTs] = useState(false);
 
-  const qrValue = asset ? `${getPublicAppOrigin()}/portal-operario?asset=${asset.id}` : '';
+  const qrValue = asset ? toPublicQrUrl(`/portal-operario?asset=${encodeURIComponent(asset.id)}`) : '';
 
   // Cargar OTs del activo vía backend (service role, sin RLS)
   useEffect(() => {

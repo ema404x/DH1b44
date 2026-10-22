@@ -8,7 +8,7 @@ import { LogIn, LogOut, MapPin, Users, Activity, Calendar, Loader2, QrCode } fro
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import QRCodeModal from '@/components/shared/QRCodeModal';
+import LocationQRModal from '@/components/mapa/LocationQRModal';
 
 const COLOR_MAP = {
   blue: '#3b82f6', green: '#10b981', purple: '#a855f7',
@@ -51,8 +51,6 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
   const [typeFilter, setTypeFilter] = useState('all');
   const [selectedEmployee, setSelectedEmployee] = useState('all');
   const [qrLoc, setQrLoc] = useState(null);
-
-  const getQROTUrl = (loc) => `https://dh1m.com/ejecutar-ot?loc=${loc.id}`;
 
   const validLocations = locations.filter(l =>
     l.latitude && l.longitude && !isNaN(l.latitude) && !isNaN(l.longitude)
@@ -269,12 +267,10 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
       </div>
 
       {/* QR Modal */}
-      <QRCodeModal
+      <LocationQRModal
         open={!!qrLoc}
         onClose={() => setQrLoc(null)}
-        title={qrLoc?.name || ''}
-        subtitle={qrLoc?.address || qrLoc?.project_name || 'Escanear para ver y completar la OT'}
-        value={qrLoc ? getQROTUrl(qrLoc) : ''}
+        location={qrLoc}
       />
     </div>
   );

@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { base44 } from '@/api/base44Client';
-import { getPublicAppOrigin } from '@/utils';
+import { toPublicQrUrl } from '@/utils';
 import { Download, Copy, Check, ClipboardList, Clock, CheckCircle2, AlertCircle, Loader2, LogIn } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -25,9 +25,8 @@ export default function LocationQRModal({ open, onClose, location }) {
   const [isLoadingOTs, setIsLoadingOTs] = useState(false);
   const [qrMode, setQrMode] = useState('ot'); // 'ot' | 'fichaje'
 
-  const publicOrigin = getPublicAppOrigin();
-  const qrValueOt = location ? `${publicOrigin}/portal-operario?loc=${location.id}` : '';
-  const qrValueFichaje = location ? `${publicOrigin}/fichar-ubicacion?loc=${location.id}` : '';
+  const qrValueOt = location ? toPublicQrUrl(`/portal-operario?loc=${encodeURIComponent(location.id)}`) : '';
+  const qrValueFichaje = location ? toPublicQrUrl(`/fichar-ubicacion?loc=${encodeURIComponent(location.id)}`) : '';
   const qrValue = qrMode === 'ot' ? qrValueOt : qrValueFichaje;
 
   // Cargar OTs de la ubicación via backend (service role, sin RLS)
