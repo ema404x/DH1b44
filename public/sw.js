@@ -47,7 +47,7 @@
  *   para no interrumpir formularios en progreso.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'dh1-erp-v3';
+const CACHE_NAME = 'dh1-erp-v4';
 const OFFLINE_URL = '/offline.html';
 
 // Recursos estáticos que se precachean en install. Solo los esenciales

@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "@/components/ui/sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -203,20 +203,47 @@ const AuthenticatedApp = () => {
 
 const PUBLIC_QR_PATHS = new Set([
   '/fichar-ubicacion',
+  '/fichar',
+  '/ficharubicacion',
+  '/fichar_ubicacion',
   '/orden-trabajo',
+  '/ordentrabajo',
+  '/ordentrabajopublica',
   '/ejecutar-ot',
+  '/ejecutarot',
+  '/ejecutarordenpublica',
   '/ejecutar-ot-simple',
+  '/ejecutarotsimple',
   '/portal-operario',
+  '/portaloperario',
   '/tablet',
+  '/portaltablet',
 ]);
+
+function LegacyRouteRedirect({ to }) {
+  const { search, hash } = useLocation();
+  return <Navigate to={`${to}${search || ''}${hash || ''}`} replace />;
+}
 
 function CanonicalPublicDomainRedirect() {
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
     const host = window.location.hostname.toLowerCase();
-    const path = window.location.pathname;
-    const isPublicQrRoute = PUBLIC_QR_PATHS.has(path) || path.startsWith('/revision-bapro/');
-    if (isPublicQrRoute && (host.endsWith('.base44.app') || host === 'www.dh1m.com')) {
+    const path = window.location.pathname.replace(/\/+$/, '') || '/';
+    const pathLower = path.toLowerCase();
+    const params = new URLSearchParams(window.location.search);
+    const hasQrParams = Boolean(
+      params.get('loc') || params.get('ubicacion') || params.get('location') || params.get('locationId') ||
+      params.get('asset') || params.get('assetId') ||
+      params.get('ot') || params.get('workOrderId') || params.get('orderId')
+    );
+    const isPublicQrRoute = PUBLIC_QR_PATHS.has(pathLower) || pathLower.startsWith('/revision-bapro/') || hasQrParams;
+    const isNonCanonicalHost =
+      host === 'www.dh1m.com' ||
+      host === 'dh1-mejores.base44.app' ||
+      ((host.endsWith('.base44.app') || host.includes('preview') || host.includes('sandbox')) && window.self === window.top);
+
+    if (isPublicQrRoute && isNonCanonicalHost && host !== 'dh1m.com') {
       window.location.replace(`https://dh1m.com${path}${window.location.search}${window.location.hash}`);
     }
   }, []);
@@ -232,11 +259,32 @@ function App() {
           <Routes>
             {/* Rutas públicas — sin autenticación */}
             <Route path="/fichar-ubicacion" element={<FicharUbicacion />} />
+            <Route path="/fichar" element={<LegacyRouteRedirect to="/fichar-ubicacion" />} />
+            <Route path="/Fichar" element={<LegacyRouteRedirect to="/fichar-ubicacion" />} />
+            <Route path="/FicharUbicacion" element={<LegacyRouteRedirect to="/fichar-ubicacion" />} />
+            <Route path="/fichar_ubicacion" element={<LegacyRouteRedirect to="/fichar-ubicacion" />} />
+
             <Route path="/orden-trabajo" element={<OrdenTrabajoPublica />} />
+            <Route path="/OrdenTrabajo" element={<LegacyRouteRedirect to="/orden-trabajo" />} />
+            <Route path="/OrdenTrabajoPublica" element={<LegacyRouteRedirect to="/orden-trabajo" />} />
+            <Route path="/orden_trabajo" element={<LegacyRouteRedirect to="/orden-trabajo" />} />
+
             <Route path="/ejecutar-ot" element={<EjecutarOrdenPublica />} />
+            <Route path="/EjecutarOT" element={<LegacyRouteRedirect to="/ejecutar-ot" />} />
+            <Route path="/EjecutarOrdenPublica" element={<LegacyRouteRedirect to="/ejecutar-ot" />} />
+            <Route path="/ejecutar_ot" element={<LegacyRouteRedirect to="/ejecutar-ot" />} />
+
             <Route path="/ejecutar-ot-simple" element={<EjecutarOTSimplePublic />} />
+            <Route path="/EjecutarOTSimple" element={<LegacyRouteRedirect to="/ejecutar-ot-simple" />} />
+            <Route path="/ejecutar_ot_simple" element={<LegacyRouteRedirect to="/ejecutar-ot-simple" />} />
+
             <Route path="/portal-operario" element={<PortalOperario />} />
+            <Route path="/PortalOperario" element={<LegacyRouteRedirect to="/portal-operario" />} />
+            <Route path="/portal_operario" element={<LegacyRouteRedirect to="/portal-operario" />} />
+
             <Route path="/tablet" element={<PortalTablet />} />
+            <Route path="/PortalTablet" element={<LegacyRouteRedirect to="/tablet" />} />
+
             <Route path="/revision-bapro/:token" element={<RevisionBapro />} />
             {/* Rutas autenticadas */}
             <Route path="/*" element={

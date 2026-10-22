@@ -21,9 +21,28 @@ const COLOR_MAP = {
   pink:   { bg: 'from-pink-600 to-pink-800',     icon: 'bg-pink-500/20 text-pink-200' },
 };
 
+const invokeWithRetry = async (fnName, payload, retries = 2) => {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await base44.functions.invoke(fnName, payload);
+    } catch (err) {
+      lastErr = err;
+      const status = err?.status || err?.response?.status;
+      if (status && status >= 400 && status < 500 && status !== 429) {
+        throw err;
+      }
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr;
+};
+
 export default function FicharUbicacion() {
   const params = new URLSearchParams(window.location.search);
-  const locationId = params.get('loc');
+  const locationId = params.get('loc') || params.get('ubicacion') || params.get('location') || params.get('locationId');
 
   const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -56,7 +75,7 @@ export default function FicharUbicacion() {
 
     const init = async () => {
       try {
-        const res = await base44.functions.invoke('fichajeUbicacion', {
+        const res = await invokeWithRetry('fichajeUbicacion', {
           action: 'getUbicacion',
           locationId,
         });
@@ -174,7 +193,7 @@ export default function FicharUbicacion() {
 
       const action = jornadaAbierta ? 'registrarSalida' : 'registrarEntrada';
 
-      const res = await base44.functions.invoke('fichajeUbicacion', {
+      const res = await invokeWithRetry('fichajeUbicacion', {
         action,
         locationId,
         operarioNombre: fullName.trim(),

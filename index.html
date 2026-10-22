@@ -21,6 +21,101 @@
     <meta name="application-name" content="DH1 ERP" />
 
     <title>DH1 ERP — Mejores</title>
+    <script>
+      (function () {
+        try {
+          var CANONICAL_HOST = 'dh1m.com';
+          var CANONICAL_ORIGIN = 'https://dh1m.com';
+          var loc = window.location;
+          var host = (loc.hostname || '').toLowerCase();
+          var rawPath = loc.pathname || '/';
+          var cleanPath = rawPath.replace(/\/+$/, '') || '/';
+          var pathKey = cleanPath.toLowerCase();
+
+          var LEGACY_PATH_MAP = {
+            '/fichar': '/fichar-ubicacion',
+            '/ficharubicacion': '/fichar-ubicacion',
+            '/fichar_ubicacion': '/fichar-ubicacion',
+            '/portaloperario': '/portal-operario',
+            '/portal_operario': '/portal-operario',
+            '/ejecutarot': '/ejecutar-ot',
+            '/ejecutar_ot': '/ejecutar-ot',
+            '/ejecutarordenpublica': '/ejecutar-ot',
+            '/ejecutarotsimple': '/ejecutar-ot-simple',
+            '/ejecutar_ot_simple': '/ejecutar-ot-simple',
+            '/ordentrabajo': '/orden-trabajo',
+            '/ordentrabajopublica': '/orden-trabajo',
+            '/orden_trabajo': '/orden-trabajo',
+            '/portaltablet': '/tablet'
+          };
+
+          var mappedPath = LEGACY_PATH_MAP[pathKey] || cleanPath;
+
+          var params = new URLSearchParams(loc.search || '');
+          var locParam = params.get('loc') || params.get('ubicacion') || params.get('location') || params.get('locationId');
+          var assetParam = params.get('asset') || params.get('assetId');
+          var otParam = params.get('ot') || params.get('workOrderId') || params.get('orderId');
+
+          if (locParam && !params.get('loc')) {
+            params.set('loc', locParam);
+          }
+          if (assetParam && !params.get('asset')) {
+            params.set('asset', assetParam);
+          }
+          if (otParam && !params.get('ot')) {
+            params.set('ot', otParam);
+          }
+
+          // Limpiar parámetros efímeros de sandbox/editor en enlaces de QR
+          var hasQrTarget = Boolean(locParam || assetParam || otParam) ||
+            mappedPath === '/fichar-ubicacion' ||
+            mappedPath === '/portal-operario' ||
+            mappedPath === '/ejecutar-ot' ||
+            mappedPath === '/ejecutar-ot-simple' ||
+            mappedPath === '/orden-trabajo' ||
+            mappedPath === '/tablet' ||
+            mappedPath.indexOf('/revision-bapro/') === 0;
+
+          if (hasQrTarget) {
+            params.delete('from_url');
+            params.delete('functions_version');
+            params.delete('app_base_url');
+            params.delete('app_id');
+            params.delete('clear_access_token');
+          }
+
+          // Si un QR viejo apuntaba a "/" o a una ruta desconocida pero trae parámetros de QR, resolver ruta canónica
+          if (mappedPath === '/' && (locParam || assetParam || otParam)) {
+            if (otParam) {
+              mappedPath = '/orden-trabajo';
+            } else if (assetParam) {
+              mappedPath = '/portal-operario';
+            } else if (locParam) {
+              mappedPath = '/fichar-ubicacion';
+            }
+          }
+
+          var isPublicHostAlias = host === 'www.dh1m.com' || host === 'dh1-mejores.base44.app';
+          var isSandboxOrPreviewHost = (host.endsWith('.base44.app') || host.indexOf('preview') !== -1 || host.indexOf('sandbox') !== -1) && window.self === window.top;
+
+          if (hasQrTarget && (isPublicHostAlias || isSandboxOrPreviewHost) && host !== CANONICAL_HOST) {
+            var qs = params.toString();
+            var targetUrl = CANONICAL_ORIGIN + mappedPath + (qs ? '?' + qs : '') + (loc.hash || '');
+            loc.replace(targetUrl);
+            return;
+          }
+
+          // En dh1m.com mismo: si la ruta o query params eran legacy, normalizar sin recargar de más
+          if (host === CANONICAL_HOST && (mappedPath !== cleanPath || params.toString() !== new URLSearchParams(loc.search || '').toString())) {
+            var nextQs = params.toString();
+            var nextRel = mappedPath + (nextQs ? '?' + nextQs : '') + (loc.hash || '');
+            if (nextRel !== (loc.pathname + loc.search + loc.hash)) {
+              loc.replace(CANONICAL_ORIGIN + nextRel);
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

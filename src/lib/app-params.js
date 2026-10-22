@@ -39,6 +39,17 @@ const getAppParams = () => {
 		storage.removeItem('base44_access_token');
 		storage.removeItem('token');
 	}
+	if (!isNode) {
+		const host = (window.location.hostname || '').toLowerCase();
+		if (host === 'dh1m.com' || host === 'www.dh1m.com' || host === 'dh1-mejores.base44.app') {
+			const storedBase = storage.getItem('base44_app_base_url') || '';
+			if (storedBase && (storedBase.includes('preview') || storedBase.includes('sandbox'))) {
+				storage.removeItem('base44_app_base_url');
+				storage.removeItem('base44_functions_version');
+				storage.removeItem('base44_from_url');
+			}
+		}
+	}
 	return {
 		appId: getAppParamValue("app_id", { defaultValue: import.meta.env.VITE_BASE44_APP_ID }),
 		token: getAppParamValue("access_token", { removeFromUrl: true }),

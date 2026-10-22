@@ -18,6 +18,28 @@ export default function PageNotFound({}) {
             }
         }
     });
+
+    if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(location.search || '');
+        const loc = params.get('loc') || params.get('ubicacion') || params.get('location') || params.get('locationId');
+        const asset = params.get('asset') || params.get('assetId');
+        const ot = params.get('ot') || params.get('workOrderId') || params.get('orderId');
+        const lowerPath = (location.pathname || '').toLowerCase();
+
+        if (ot) {
+            window.location.replace(`https://dh1m.com/orden-trabajo?ot=${encodeURIComponent(ot)}`);
+            return null;
+        }
+        if (asset) {
+            window.location.replace(`https://dh1m.com/portal-operario?asset=${encodeURIComponent(asset)}`);
+            return null;
+        }
+        if (loc) {
+            const targetRoute = lowerPath.includes('fichar') ? '/fichar-ubicacion' : '/portal-operario';
+            window.location.replace(`https://dh1m.com${targetRoute}?loc=${encodeURIComponent(loc)}`);
+            return null;
+        }
+    }
     
     return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">

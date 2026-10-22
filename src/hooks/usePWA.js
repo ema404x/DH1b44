@@ -48,11 +48,15 @@ export function usePWA() {
         })
         .catch((err) => console.warn('[PWA] SW registration failed:', err));
 
-      // Recargar cuando el nuevo SW tome control (garantiza código fresco)
+      // Recargar cuando el nuevo SW tome control (salvo en rutas públicas de QR para no interrumpir firmas o fichajes)
       if (navigator.serviceWorker.controller) {
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           if (refreshing) return;
+          const p = window.location.pathname;
+          if (p.startsWith('/fichar') || p.startsWith('/portal-operario') || p.startsWith('/ejecutar-ot') || p.startsWith('/orden-trabajo')) {
+            return;
+          }
           refreshing = true;
           window.location.reload();
         });

@@ -9,9 +9,22 @@ import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
 import { useOperarioClave } from '@/hooks/useOperarioClave';
 import OperarioClavePrompt from '@/components/operario/OperarioClavePrompt';
 
-const callFn = async (payload) => {
-  const res = await base44.functions.invoke('publicFichar', payload);
-  return res.data;
+const callFn = async (payload, retries = 2) => {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await base44.functions.invoke('publicFichar', payload);
+      return res.data;
+    } catch (err) {
+      lastErr = err;
+      const status = err?.status || err?.response?.status;
+      if (status && status >= 400 && status < 500 && status !== 429) throw err;
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr;
 };
 
 const PRIORITY_STYLE = {
@@ -81,7 +94,7 @@ function FotoUploader({ photos, onAdd, onRemove }) {
 
 export default function EjecutarOTSimple() {
   const params = new URLSearchParams(window.location.search);
-  const otId = params.get('ot');
+  const otId = params.get('ot') || params.get('workOrderId') || params.get('orderId');
 
   const [phase, setPhase] = useState('loading');
   const [order, setOrder] = useState(null);

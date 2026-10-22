@@ -14,9 +14,22 @@ import { setClave, setNombre, getNombre } from '@/lib/operarioClave';
 import { usePortalOfflineActions } from '@/hooks/usePortalOfflineActions';
 import { canActOn } from '@/lib/workOrderActions';
 
-const callFn = async (payload) => {
-  const res = await base44.functions.invoke('publicFichar', payload);
-  return res.data;
+const callFn = async (payload, retries = 2) => {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await base44.functions.invoke('publicFichar', payload);
+      return res.data;
+    } catch (err) {
+      lastErr = err;
+      const status = err?.status || err?.response?.status;
+      if (status && status >= 400 && status < 500 && status !== 429) throw err;
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr;
 };
 
 const PRIORITY_STYLE = {
@@ -292,8 +305,8 @@ function ListaOTs({ orders, locationName, locationAddress, onSelect, resolveActi
 // ── Componente principal ────────────────────────────────────────────────────
 export default function PortalOperario() {
   const params = new URLSearchParams(window.location.search);
-  const locationId = params.get('loc');
-  const assetId = params.get('asset');
+  const locationId = params.get('loc') || params.get('ubicacion') || params.get('location') || params.get('locationId');
+  const assetId = params.get('asset') || params.get('assetId');
 
   const [phase, setPhase] = useState('loading'); // loading | pin | list | execute | done | error
   const [locationData, setLocationData] = useState(null);

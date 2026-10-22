@@ -22,9 +22,22 @@ import { useOperarioClave } from '@/hooks/useOperarioClave';
 import OperarioClavePrompt from '@/components/operario/OperarioClavePrompt';
 
 // ── Helper: llamar funciones públicas via SDK (no requiere auth) ─────────────
-const callPublicFn = async (fnName, payload) => {
-  const res = await base44.functions.invoke(fnName, payload);
-  return res.data;
+const callPublicFn = async (fnName, payload, retries = 2) => {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await base44.functions.invoke(fnName, payload);
+      return res.data;
+    } catch (err) {
+      lastErr = err;
+      const status = err?.status || err?.response?.status;
+      if (status && status >= 400 && status < 500 && status !== 429) throw err;
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr;
 };
 
 // ── Configuraciones visuales ─────────────────────────────────────────────────
@@ -231,8 +244,8 @@ function FotosGrandes({ label, photos, onAdd, onRemove }) {
 // ── Componente principal ─────────────────────────────────────────────────────
 export default function EjecutarOrdenPublica() {
   const params = new URLSearchParams(window.location.search);
-  const locId = params.get('loc');
-  const otId = params.get('ot');
+  const locId = params.get('loc') || params.get('ubicacion') || params.get('location') || params.get('locationId');
+  const otId = params.get('ot') || params.get('workOrderId') || params.get('orderId');
 
   const [phase, setPhase] = useState('loading'); // loading | not_found | no_ot | select_ot | work | done
   const [order, setOrder] = useState(null);
