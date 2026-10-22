@@ -58,6 +58,7 @@ export default function FicharUbicacion() {
   const [now, setNow] = useState(new Date());
   const [jornadaAbierta, setJornadaAbierta] = useState(null);
   const [checkingJornada, setCheckingJornada] = useState(false);
+  const [jornadaCheckError, setJornadaCheckError] = useState('');
 
   // Live clock
   useEffect(() => {
@@ -105,9 +106,11 @@ export default function FicharUbicacion() {
   useEffect(() => {
     if (!locationId || !fullName.trim() || fullName.trim().length < 3) {
       setJornadaAbierta(null);
+      setJornadaCheckError('');
       return;
     }
     setCheckingJornada(true);
+    setJornadaCheckError('');
     const timer = setTimeout(async () => {
       try {
         const res = await base44.functions.invoke('fichajeUbicacion', {
@@ -116,9 +119,14 @@ export default function FicharUbicacion() {
           operarioNombre: fullName.trim(),
           dni: dni.trim(),
         });
+        if (res.data?.error) {
+          throw new Error(res.data.error);
+        }
         setJornadaAbierta(res.data?.jornada || null);
-      } catch {
+      } catch (err) {
         setJornadaAbierta(null);
+        const msg = err?.response?.data?.error || err?.message || 'No se pudo verificar el estado de la jornada.';
+        setJornadaCheckError(msg);
       }
       setCheckingJornada(false);
     }, 600);
@@ -223,6 +231,7 @@ export default function FicharUbicacion() {
     setFullName('');
     setDni('');
     setJornadaAbierta(null);
+    setJornadaCheckError('');
     setHasStrokes(false);
     setSignatureData(null);
     setDone(null);
@@ -234,7 +243,7 @@ export default function FicharUbicacion() {
 
   const colors = COLOR_MAP[location?.color || 'blue'] || COLOR_MAP.blue;
   const isSalida = !!jornadaAbierta;
-  const canSubmit = fullName.trim().length > 2 && dni.trim().length >= 7 && hasStrokes && !!gps && !gpsLoading && !submitting && !checkingJornada;
+  const canSubmit = fullName.trim().length > 2 && dni.trim().length >= 7 && hasStrokes && !!gps && !gpsLoading && !submitting && !checkingJornada && !jornadaCheckError;
 
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -357,9 +366,11 @@ export default function FicharUbicacion() {
 
           {/* Estado detectado */}
           {fullName.trim().length >= 3 && (
-            <div className={`py-3 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 ${isSalida ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>
+            <div className={`py-3 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 ${jornadaCheckError ? 'bg-red-50 text-red-700' : isSalida ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>
               {checkingJornada ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Verificando...</>
+              ) : jornadaCheckError ? (
+                <><AlertTriangle className="h-4 w-4 shrink-0" /> <span className="text-xs">{jornadaCheckError}</span></>
               ) : isSalida ? (
                 <><LogOut className="h-4 w-4" /> Vas a registrar tu SALIDA</>
               ) : (

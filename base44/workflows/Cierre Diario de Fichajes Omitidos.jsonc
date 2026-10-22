@@ -31,7 +31,9 @@
           "call": "invoke_backend_function",
           "with": {
             "function_name": "cerrarFichajesOmitidos",
-            "args": {}
+            "args": {
+              "workflow_trigger": true
+            }
           },
           "then": "end",
           "x-base44": {

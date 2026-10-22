@@ -74,9 +74,7 @@ export default function AsistenciasPanel({ locations = [] }) {
   const [selected, setSelected] = useState(null);
   const [exporting, setExporting] = useState(false);
 
-  React.useEffect(() => {
-    base44.functions.invoke('cerrarFichajesOmitidos', {}).catch(() => {});
-  }, []);
+
 
   const query = useMemo(() => {
     const q = {};

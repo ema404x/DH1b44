@@ -1,7 +1,11 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.57';
 import { resolvePublicRecordScope } from '../../shared/publicSectorScope.ts';
 import { sectorErrorResponse } from '../../shared/sectorGuard.ts';
-import { reconcileExpiredOpenFichajes } from '../../shared/fichajeAutoCierre.ts';
+import {
+  fetchAllFichajesPaginated,
+  reconcileExpiredOpenFichajes,
+  isExpiredOpenFichaje,
+} from '../../shared/fichajeAutoCierre.ts';
 
 export default async function(req) {
   try {
@@ -34,8 +38,9 @@ export default async function(req) {
     if (action === 'getUbicacion') {
       const { locationId } = body;
       if (!locationId) return Response.json({ error: 'locationId requerido' }, { status: 400 });
-      const results = await dataClient.entities.LocationQR.filter({ id: locationId }).catch(() => []);
-      const location = results[0] || null;
+      const results = await dataClient.entities.LocationQR.filter({ id: locationId });
+      const list = Array.isArray(results) ? results : (results?.items || []);
+      const location = list[0] || null;
       if (!location) return Response.json({ error: 'Ubicación no encontrada' }, { status: 404 });
       return Response.json({
         location: {
@@ -52,28 +57,29 @@ export default async function(req) {
     }
 
     // ── Verificar si hay jornada abierta para un nombre/DNI + ubicación ─────────
-    // Permite a la UI mostrar "Registrar Salida" en lugar de "Registrar Entrada".
+    // Cierra primero los registros vencidos confirmando su persistencia; si falla, propaga error.
     if (action === 'getJornadaAbierta') {
       const { locationId, operarioNombre, dni } = body;
       if (!locationId || (!operarioNombre?.trim() && !dni?.trim())) {
         return Response.json({ jornada: null });
       }
-      const rawOpen = await dataClient.entities.FichajeUbicacion.filter({
+      const rawOpen = await fetchAllFichajesPaginated(dataClient, {
         location_qr_id: locationId,
         estado: 'abierta',
-      }).catch(() => []);
-      const { activeToday: open } = await reconcileExpiredOpenFichajes(dataClient, rawOpen);
+      });
+      const { activeToday: open } = await reconcileExpiredOpenFichajes(dataClient, rawOpen, new Date(), {
+        throwOnFailure: true,
+      });
 
       const dniNorm = normalizeDni(dni);
       const nameNorm = normalize(operarioNombre);
 
-      // Priorizar match por DNI (más confiable); fallback a nombre
       let match = null;
       if (dniNorm) {
-        match = open.find(j => normalizeDni(j.dni) === dniNorm);
+        match = open.find(j => !isExpiredOpenFichaje(j) && normalizeDni(j.dni) === dniNorm);
       }
       if (!match && nameNorm) {
-        match = open.find(j => normalize(j.operario_nombre) === nameNorm);
+        match = open.find(j => !isExpiredOpenFichaje(j) && normalize(j.operario_nombre) === nameNorm);
       }
       return Response.json({ jornada: match || null });
     }
@@ -94,20 +100,22 @@ export default async function(req) {
       const nameNorm = normalize(operarioNombre);
       const dniNorm = normalizeDni(dni);
 
-      // Validar ubicación
-      const locResults = await dataClient.entities.LocationQR.filter({ id: locationId }).catch(() => []);
-      const location = locResults[0];
+      const locResults = await dataClient.entities.LocationQR.filter({ id: locationId });
+      const locList = Array.isArray(locResults) ? locResults : (locResults?.items || []);
+      const location = locList[0];
       if (!location) return Response.json({ error: 'Ubicación no encontrada' }, { status: 404 });
       if (!location.is_active) {
         return Response.json({ error: 'Este punto de fichaje está desactivado' }, { status: 403 });
       }
 
-      // Validar que no exista una jornada abierta para la misma persona + ubicación (cerrando primero las de días anteriores)
-      const rawOpen = await dataClient.entities.FichajeUbicacion.filter({
+      // Cerrar primero jornadas vencidas; si una actualización falla, lanza error y bloquea nueva entrada
+      const rawOpen = await fetchAllFichajesPaginated(dataClient, {
         location_qr_id: locationId,
         estado: 'abierta',
-      }).catch(() => []);
-      const { activeToday: open } = await reconcileExpiredOpenFichajes(dataClient, rawOpen);
+      });
+      const { activeToday: open } = await reconcileExpiredOpenFichajes(dataClient, rawOpen, new Date(), {
+        throwOnFailure: true,
+      });
 
       let existing = null;
       if (dniNorm) {
@@ -165,23 +173,25 @@ export default async function(req) {
       const nameNorm = normalize(operarioNombre);
       const dniNorm = normalizeDni(dni);
 
-      // Buscar jornada abierta para esta persona + ubicación (solo del día actual)
-      const rawOpen = await dataClient.entities.FichajeUbicacion.filter({
+      // Cerrar primero jornadas vencidas; si una actualización falla, lanza error y bloquea salida inválida
+      const rawOpen = await fetchAllFichajesPaginated(dataClient, {
         location_qr_id: locationId,
         estado: 'abierta',
-      }).catch(() => []);
-      const { activeToday: open } = await reconcileExpiredOpenFichajes(dataClient, rawOpen);
+      });
+      const { activeToday: open } = await reconcileExpiredOpenFichajes(dataClient, rawOpen, new Date(), {
+        throwOnFailure: true,
+      });
 
       let jornada = null;
       if (dniNorm) {
-        jornada = open.find(j => normalizeDni(j.dni) === dniNorm);
+        jornada = open.find(j => !isExpiredOpenFichaje(j) && normalizeDni(j.dni) === dniNorm);
       }
       if (!jornada) {
-        jornada = open.find(j => normalize(j.operario_nombre) === nameNorm);
+        jornada = open.find(j => !isExpiredOpenFichaje(j) && normalize(j.operario_nombre) === nameNorm);
       }
       if (!jornada) {
         return Response.json({
-          error: 'No se encontró una entrada abierta para este nombre en esta ubicación. Registrá tu entrada primero.',
+          error: 'No se encontró una entrada abierta vigente para hoy en esta ubicación. Registrá tu entrada primero.',
         }, { status: 404 });
       }
 
