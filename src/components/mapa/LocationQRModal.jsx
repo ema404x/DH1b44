@@ -4,18 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { base44 } from '@/api/base44Client';
+import { getPublicAppOrigin } from '@/utils';
 import { Download, Copy, Check, ClipboardList, Clock, CheckCircle2, AlertCircle, Loader2, LogIn } from 'lucide-react';
-
-/**
- * Deriva la URL base de la app desde el pathname actual.
- * Ej: /apps/myapp/mapa → /apps/myapp  |  /mapa → (vacío)
- */
-function getAppBaseUrl() {
-  const path = window.location.pathname.replace(/\/$/, '');
-  const segments = path.split('/').filter(Boolean);
-  segments.pop(); // quitar el último segmento (ruta actual)
-  return segments.length > 0 ? '/' + segments.join('/') : '';
-}
 
 const STATUS_CONFIG = {
   pendiente: { label: 'Pendiente', cls: 'bg-slate-500/15 text-slate-400 border-slate-500/30', icon: Clock },
@@ -35,8 +25,9 @@ export default function LocationQRModal({ open, onClose, location }) {
   const [isLoadingOTs, setIsLoadingOTs] = useState(false);
   const [qrMode, setQrMode] = useState('ot'); // 'ot' | 'fichaje'
 
-  const qrValueOt = location ? `${window.location.origin}${getAppBaseUrl()}/portal-operario?loc=${location.id}` : '';
-  const qrValueFichaje = location ? `${window.location.origin}${getAppBaseUrl()}/fichar-ubicacion?loc=${location.id}` : '';
+  const publicOrigin = getPublicAppOrigin();
+  const qrValueOt = location ? `${publicOrigin}/portal-operario?loc=${location.id}` : '';
+  const qrValueFichaje = location ? `${publicOrigin}/fichar-ubicacion?loc=${location.id}` : '';
   const qrValue = qrMode === 'ot' ? qrValueOt : qrValueFichaje;
 
   // Cargar OTs de la ubicación via backend (service role, sin RLS)

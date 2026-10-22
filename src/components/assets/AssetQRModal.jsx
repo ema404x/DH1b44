@@ -4,18 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { base44 } from '@/api/base44Client';
+import { getPublicAppOrigin } from '@/utils';
 import { Download, Copy, Check, ClipboardList, Clock, CheckCircle2, AlertCircle, Loader2, Cpu } from 'lucide-react';
-
-/**
- * Deriva la URL base de la app desde el pathname actual.
- * Ej: /apps/myapp/activos → /apps/myapp  |  /activos → (vacío)
- */
-function getAppBaseUrl() {
-  const path = window.location.pathname.replace(/\/$/, '');
-  const segments = path.split('/').filter(Boolean);
-  segments.pop();
-  return segments.length > 0 ? '/' + segments.join('/') : '';
-}
 
 const STATUS_CONFIG = {
   pendiente: { label: 'Pendiente', cls: 'bg-slate-500/15 text-slate-400 border-slate-500/30', icon: Clock },
@@ -39,7 +29,7 @@ export default function AssetQRModal({ open, onOpenChange, asset }) {
   const [workOrders, setWorkOrders] = useState([]);
   const [isLoadingOTs, setIsLoadingOTs] = useState(false);
 
-  const qrValue = asset ? `${window.location.origin}${getAppBaseUrl()}/portal-operario?asset=${asset.id}` : '';
+  const qrValue = asset ? `${getPublicAppOrigin()}/portal-operario?asset=${asset.id}` : '';
 
   // Cargar OTs del activo vía backend (service role, sin RLS)
   useEffect(() => {

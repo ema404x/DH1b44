@@ -731,8 +731,8 @@ export default function WorkOrders() {
           title={qrOrder.title}
           subtitle={qrOrder.location || `OT ${qrOrder.code || ''}`}
           value={qrOrder.location_qr_id
-            ? `${window.location.origin}/portal-operario?loc=${qrOrder.location_qr_id}`
-            : `${window.location.origin}/ejecutar-ot-simple?ot=${qrOrder.id}`
+            ? `https://dh1m.com/portal-operario?loc=${qrOrder.location_qr_id}`
+            : `https://dh1m.com/ejecutar-ot-simple?ot=${qrOrder.id}`
           }
         />
       )}

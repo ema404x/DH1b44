@@ -52,7 +52,7 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
   const [selectedEmployee, setSelectedEmployee] = useState('all');
   const [qrLoc, setQrLoc] = useState(null);
 
-  const getQROTUrl = (loc) => `${window.location.origin}/ejecutar-ot?loc=${loc.id}`;
+  const getQROTUrl = (loc) => `https://dh1m.com/ejecutar-ot?loc=${loc.id}`;
 
   const validLocations = locations.filter(l =>
     l.latitude && l.longitude && !isNaN(l.latitude) && !isNaN(l.longitude)

@@ -60,7 +60,7 @@ export default function ActivoFicha() {
   if (!asset) return <div className="p-6 text-center text-muted-foreground">Activo no encontrado.</div>;
 
   const sedeName = sedes.find((s) => s.id === asset.location_id)?.nombre || asset.sede || '—';
-  const qrValue = `${window.location.origin}/portal-operario?asset=${asset.id}`;
+  const qrValue = `https://dh1m.com/portal-operario?asset=${asset.id}`;
   const nextMaint = asset.next_maintenance ? differenceInDays(new Date(asset.next_maintenance), new Date()) : null;
   const maintColor = nextMaint == null ? '' : nextMaint < 0 ? 'text-red-600' : nextMaint <= 14 ? 'text-amber-600' : 'text-emerald-600';
 

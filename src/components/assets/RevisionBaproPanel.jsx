@@ -175,10 +175,10 @@ export default function RevisionBaproPanel({ sedes }) {
                         </div>
                       </div>
                       <div className="flex gap-1.5 flex-shrink-0">
-                        <Button size="sm" variant="default" className="h-8 gap-1.5" onClick={() => window.open(`${window.location.origin}/revision-bapro/${t.token}`, '_blank')}>
+                        <Button size="sm" variant="default" className="h-8 gap-1.5" onClick={() => window.open(`https://dh1m.com/revision-bapro/${t.token}`, '_blank')}>
                           <ExternalLink className="h-3.5 w-3.5" /> Abrir
                         </Button>
-                        <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => copyLink(`${window.location.origin}/revision-bapro/${t.token}`)}>
+                        <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => copyLink(`https://dh1m.com/revision-bapro/${t.token}`)}>
                           <Copy className="h-3.5 w-3.5" /> Copiar
                         </Button>
                         {(t.estado === 'activo' || t.estado === 'usado') && (

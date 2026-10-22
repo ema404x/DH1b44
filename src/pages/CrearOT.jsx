@@ -632,7 +632,7 @@ export default function CrearOT() {
             onClose={() => setShowQR(false)}
             title={createdOT.title}
             subtitle={selectedLocation?.name || ''}
-            value={`${window.location.origin}/ejecutar-ot?ot=${createdOT.id}`}
+            value={`https://dh1m.com/ejecutar-ot?ot=${createdOT.id}`}
           />
         )}
       </div>

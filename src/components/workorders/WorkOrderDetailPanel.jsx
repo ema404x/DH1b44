@@ -818,7 +818,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
         onClose={() => setQrOpen(false)}
         title={data.title}
         subtitle={data.location || data.asset_name || `OT ${data.code || ''}`}
-        value={`${window.location.origin}/orden-trabajo?ot=${data.id}`}
+        value={`https://dh1m.com/orden-trabajo?ot=${data.id}`}
       />
 
       <RechazoOTModal
