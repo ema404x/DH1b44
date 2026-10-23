@@ -15,7 +15,6 @@ const normKey = (s) => String(s == null ? '' : s)
 
 // Busca el valor de una columna con tolerancia: 1) exacto (case/trim),
 // 2) normalizado igual, 3) normalizado contiene el token.
-// Acepta varios alias por campo para soportar variantes del Excel real.
 function pick(row, tokens) {
   const arr = Array.isArray(tokens) ? tokens : [tokens];
   const entries = Object.entries(row);
@@ -47,14 +46,11 @@ function parseNum(v) {
   const commas = (s.match(/,/g) || []).length;
   let norm;
   if (commas > 0) {
-    // coma decimal, puntos de miles → "876.435,98" => "876435.98"
     norm = s.replace(/\./g, '').replace(',', '.');
   } else if (dots > 1) {
-    // varios puntos = separadores de miles sin coma → "1.234.567" => "1234567"
     norm = s.replace(/\./g, '');
   } else if (dots === 1) {
     const [ent, dec] = s.split('.');
-    // "1.234" (3 dec) → miles en AR; "1.23" (2 dec) → decimal
     if (dec && dec.length === 3 && /^\d+$/.test(ent)) norm = s.replace('.', '');
     else norm = s;
   } else {
@@ -93,19 +89,62 @@ function parseDate(v) {
 
 function toString(v) {
   if (v == null) return '';
-  // Nros grandes en notación científica o float → enteros legibles
   if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(v);
   return String(v).trim();
 }
 
-// Mapeo robusto de columnas del Excel de Actas (tolera variantes de encabezados)
-function mapRow(row, comuna) {
+const normAddr = (s) => String(s || '')
+  .toUpperCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/\(.*?\)/g, '')
+  .replace(/[^A-Z0-9 ]/g, ' ')
+  .replace(/\b(AVDA|AV|AVENIDA|CNEL|CORONEL|GRAL|GENERAL|PJE|PASAJE|DR|DOCTOR|PTE|PRESIDENTE)\b/g, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+function matchDireccionPadron(rawAddress, dirItems = [], locItems = []) {
+  if (!rawAddress || !dirItems.length) return null;
+  const na = normAddr(rawAddress);
+  if (!na) return null;
+  let dMatch = dirItems.find(d => normAddr(d.direccion) === na);
+  if (!dMatch) {
+    const m = na.match(/^(.+?)\s+(\d{3,5})\b/);
+    if (m) {
+      const [, street, numStr] = m;
+      const num = parseInt(numStr, 10);
+      dMatch = dirItems.find(d => {
+        const nd = normAddr(d.direccion);
+        const md = nd.match(/^(.+?)\s+(\d{3,5})\b/);
+        if (!md) return false;
+        return md[1] === street && Math.abs(parseInt(md[2], 10) - num) <= 5;
+      });
+    }
+  }
+  if (!dMatch) {
+    dMatch = dirItems.find(d => {
+      const nd = normAddr(d.direccion);
+      return nd && (nd.includes(na) || na.includes(nd));
+    });
+  }
+  if (!dMatch) return null;
+  const loc = locItems.find(l => l.direccion_id === dMatch.id);
+  return {
+    jefe_sitio: dMatch.jefe_sitio || loc?.jefe_sitio || '',
+    establecimiento: loc?.establecimiento || dMatch.direccion || '',
+    comuna: dMatch.comuna,
+  };
+}
+
+// Mapeo robusto de columnas del Excel de Actas y planillas OBRAS TOM (tolera múltiples tablas y variantes)
+function mapRow(row, defaultComuna, currentSection = '', periodoDetectado = '', dirItems = [], locItems = []) {
   const get = (tokens) => pick(row, tokens);
 
-  const avanceRaw = parseNum(get(['%', '% AVANCE', 'AVANCE', 'AVANCE %', 'PORCENTAJE', 'PORCENTAJE DE AVANCE', 'PORCENT']));
-  const avance = avanceRaw <= 1 && avanceRaw > 0 ? avanceRaw * 100 : avanceRaw; // normalizar a 0-100
+  const avanceRaw = parseNum(get([
+    '% Avance ACUMULADO', '% AVANCE ACUMULADO', '% Avance CERTIFICADO',
+    '%', '% AVANCE', 'AVANCE', 'AVANCE %', 'PORCENTAJE', 'PORCENTAJE DE AVANCE', 'PORCENT'
+  ]));
+  const avance = avanceRaw <= 1 && avanceRaw > 0 ? Math.round(avanceRaw * 100) : Math.round(avanceRaw);
 
-  // Tramo y color según % de avance
   let tramo_certificacion = undefined;
   let color_avance = 'auto';
   if (avance >= 100) {
@@ -119,45 +158,71 @@ function mapRow(row, comuna) {
     color_avance = 'amarillo';
   }
 
-  // Determinar estado según observaciones (normalizado, sin acentos)
-  const obs = normKey(get(['OBSERVACIONES', 'OBSERVACION', 'OBS', 'NOTAS', 'ESTADO']));
+  // Determinar comuna desde columna COMUNA ("8B", "10A (*)") o nombre de hoja
+  const comunaCol = toString(get(['COMUNA'])).toUpperCase();
+  const comunaMatch = comunaCol.match(/(8A|8B|10A)/);
+  const comuna = comunaMatch ? comunaMatch[1] : defaultComuna;
+
+  // Determinar estado según observaciones, APRO, ESTADO SAP o sección de la tabla
+  const obsRaw = toString(get(['OBSERVACIONES', 'OBSERVACION', 'OBS', 'NOTAS', 'ESTADO']));
+  const obs = normKey(obsRaw);
+  const apro = normKey(get(['APRO']));
+  const estadoSapRaw = toString(get(['ESTADO SAP']));
+  const estadoSap = normKey(estadoSapRaw);
+  const secNorm = normKey(currentSection);
+
   let estado_cobro = 'pendiente';
   let prioridad = 'normal';
-  if (obs.includes('LISTO') && obs.includes('CERTIFIC')) {
-    estado_cobro = 'listo_certificar'; prioridad = 'alta';
-  } else if (obs.includes('FALTA') && obs.includes('MEIN')) {
-    estado_cobro = 'falta_aprobar_mein';
-  } else if (obs.includes('FALTA') && obs.includes('ACTA')) {
+  if ((obs.includes('LISTO') && obs.includes('CERTIFIC')) || apro === 'CERT' || (secNorm.includes('APROBADAS') && !secNorm.includes('FALTA'))) {
+    estado_cobro = 'listo_certificar';
+    prioridad = 'alta';
+  } else if ((obs.includes('FALTA') && obs.includes('MEIN')) || secNorm.includes('APROBAR ORDEN MEIN')) {
+    estado_cobro = 'faltan_actas';
+  } else if ((obs.includes('FALTA') && obs.includes('ACTA')) || secNorm.includes('FALTA CARGAR ACTAS') || apro === 'AINS') {
     estado_cobro = 'faltan_actas';
   } else if (obs.includes('OBSERV')) {
     estado_cobro = 'observado';
   }
 
-  const montoBase = parseNum(get(['MONTO BASE', 'MONTO BASE FEB-23', 'MONTO BASE FEB 23', 'MONTO CONTRATO', 'MONTO CONTRATADO', 'MONTO', 'IMPORTE']));
+  const montoBase = parseNum(get([
+    'MONTO BASE FEB-23', 'MONTO BASE FEB 23', 'MONTO BASE',
+    'MONTO CONTRATO', 'MONTO CONTRATADO', 'MONTO', 'IMPORTE'
+  ]));
+  const montoCertifRaw = get(['MONTO BASE FEB-23 CERTIF', 'MONTO CERTIF']);
+  const montoCertif = montoCertifRaw !== undefined && montoCertifRaw !== '' ? parseNum(montoCertifRaw) : montoBase;
+
+  const direccion = toString(get(['DIRECCION', 'DIRECCION DE OBRA', 'DOMICILIO'])) || '';
+  const addrMatch = matchDireccionPadron(direccion, dirItems, locItems);
+
+  const notasPartes = [
+    obsRaw,
+    !obsRaw && currentSection ? currentSection : '',
+    estadoSapRaw ? `SAP: ${estadoSapRaw}` : '',
+  ].filter(Boolean);
 
   const obj = {
     titulo:           toString(get(['TITULO DE OBRA EN SAP', 'TITULO DE OBRA', 'TITULO OBRA', 'TITULO', 'OBRA EN SAP', 'OBRA'])) || '',
-    direccion:        toString(get(['DIRECCION', 'DIRECCION DE OBRA', 'DOMICILIO'])) || '',
-    establecimiento:  toString(get(['ESTABLECIMIENTO', 'ESCUELA', 'ESTABLECIMIENTO DE OBRA'])) || '',
-    comuna:           comuna,
-    jefe_sitio:       toString(get(['JEFE DE SITIO', 'JEFE SITIO', 'JEFE DE OBRA', 'JEFE'])) || '',
+    direccion,
+    establecimiento:  toString(get(['ESTABLECIMIENTO', 'ESCUELA', 'ESTABLECIMIENTO DE OBRA'])) || addrMatch?.establecimiento || direccion,
+    comuna:           comuna || addrMatch?.comuna,
+    jefe_sitio:       toString(get(['JEFE DE SITIO', 'JEFE SITIO', 'JEFE DE OBRA', 'JEFE'])) || addrMatch?.jefe_sitio || '',
     inspector:        toString(get(['INSPECTOR', 'INSPECCION', 'SUPERVISOR'])) || '',
-    oc_numero:        toString(get(['N° MTOM', 'Nº MTOM', 'MTOM', 'NRO MTOM', 'NUMERO MTOM', 'N MTOM', 'ORDEN MTOM', 'MTOM N'])),
-    ada_numero:       toString(get(['N° MEIN', 'Nº MEIN', 'MEIN', 'NRO MEIN', 'NUMERO MEIN', 'N MEIN', 'ORDEN MEIN', 'MEIN N', 'ADA'])),
+    oc_numero:        toString(get(['Nº orden SAP', 'N° orden SAP', 'NRO ORDEN SAP', 'ORDEN SAP', 'N° MTOM', 'Nº MTOM', 'MTOM', 'NRO MTOM', 'NUMERO MTOM', 'N MTOM', 'ORDEN MTOM', 'MTOM N'])),
+    ada_numero:       toString(get(['MEIN', 'N° MEIN', 'Nº MEIN', 'NRO MEIN', 'NUMERO MEIN', 'N MEIN', 'ORDEN MEIN', 'MEIN N', 'ADA'])),
     monto_contrato:   montoBase,
     porcentaje_avance: avance,
     plazo_dias:       parseNum(get(['PLAZO', 'PLAZO DIAS', 'PLAZO DE OBRA', 'DIAS'])),
     fecha_inicio:     parseDate(get(['ACTA DE INICIO', 'INICIO', 'FECHA INICIO', 'ACTA INICIO', 'INICIO DE OBRA'])),
     fecha_fin_estimada: parseDate(get(['ACTA DE RECEPCION', 'ACTA DE RECEPCION PROVISIONAL', 'RECEPCION', 'RECEPCION PROVISIONAL', 'FECHA RECEPCION', 'FIN', 'FECHA FIN', 'ACTA RECEPCION'])),
-    notas:            toString(get(['OBSERVACIONES', 'OBSERVACION', 'OBS', 'NOTAS'])) || '',
+    notas:            notasPartes.join(' · '),
+    periodo:          periodoDetectado || undefined,
     estado_cobro,
     prioridad,
-    monto_a_cobrar:   montoBase,
+    monto_a_cobrar:   montoCertif > 0 ? montoCertif : montoBase,
     color_avance,
     tramo_certificacion,
   };
 
-  // Limpiar undefined y null — un enum (ej: comuna) en null rompe la validación al crear.
   Object.keys(obj).forEach(k => { if (obj[k] === undefined || obj[k] === null) delete obj[k]; });
   return obj;
 }
@@ -183,15 +248,103 @@ function detectarComuna(sheetName) {
 }
 
 // Detecta filas de TOTAL / SUBTOTAL del Excel que no son obras reales.
-// El Excel trae filas como "TOTAL", "TOTAL PARA CERTIFICAR", "TOTAL GENERAL"
-// con un título pero sin MTOM/dirección/jefe → no deben importarse como obras.
 function esFilaResumen(obra) {
   const t = (obra.titulo || '').toUpperCase().trim();
   if (!t) return false;
-  if (/^(TOTAL|SUBTOTAL|TOTALES|SUB TOTAL|SALDO|GRAN TOTAL|TOTAL GENERAL|TOTAL PARA CERTIFICAR|SUMA)\b/.test(t)) return true;
-  // Sin MTOM, sin dirección, sin jefe y sin establecimiento → no es una obra real
+  if (/^(TOTAL|SUBTOTAL|TOTALES|SUB TOTAL|SALDO|GRAN TOTAL|TOTAL GENERAL|TOTAL PARA CERTIFICAR|SUMA|OBRAS TOM|OBRAS FUERA|RESUMEN)\b/.test(t)) return true;
+  if (t.startsWith('(*)')) return true;
   if (!obra.oc_numero && !obra.direccion && !obra.jefe_sitio && !obra.establecimiento) return true;
   return false;
+}
+
+// Extrae filas de una hoja incluso cuando el encabezado no está en la fila 1 o se repite en bloques ("OBRAS TOM")
+function parseSheetRows(ws, sheetName, dirItems, locItems) {
+  const defaultComuna = detectarComuna(sheetName);
+  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  const parsedRows = [];
+  const errs = [];
+  const ignoredRows = [];
+
+  let currentHeaders = null;
+  let currentSection = '';
+  let periodoDetectado = '';
+
+  for (let r = 0; r < aoa.length; r++) {
+    const row = aoa[r];
+    if (!Array.isArray(row)) continue;
+    const nonEmpty = row.map(c => String(c ?? '').trim()).filter(Boolean);
+    if (nonEmpty.length === 0) continue;
+
+    const firstCell = String(row[0] ?? '').trim();
+    const normFirst = normKey(firstCell);
+
+    // Detectar período en banner superior ("CERTIFICACIÓN MES DE SEPTIEMBRE 2026...")
+    if (normFirst.includes('CERTIFICACION MES DE')) {
+      const m = firstCell.match(/MES DE\s+([A-Za-zÁÉÍÓÚáéíóú]+\s+\d{4})/i);
+      if (m) {
+        const rawP = m[1].trim().toLowerCase();
+        periodoDetectado = rawP.charAt(0).toUpperCase() + rawP.slice(1);
+      }
+      continue;
+    }
+
+    // Detectar fila de encabezados en cualquier posición de la hoja
+    const normCells = row.map(c => normKey(c));
+    const hasTituloHeader = normCells.some(c =>
+      c.includes('TITULO DE OBRA') || c === 'TITULO OBRA' || c === 'OBRA EN SAP' || c === 'TITULO'
+    );
+    const hasSecondaryHeader = normCells.some(c =>
+      c.includes('DIRECCION') || c.includes('MONTO') || c.includes('ORDEN SAP') || c.includes('MTOM')
+    );
+    if (hasTituloHeader && hasSecondaryHeader) {
+      currentHeaders = row.map(c => String(c ?? '').trim());
+      continue;
+    }
+
+    // Detectar separadores de sección o títulos de bloque
+    if (nonEmpty.length <= 2 && (
+      normFirst.startsWith('OBRAS ') ||
+      normFirst.startsWith('RESUMEN') ||
+      normFirst.startsWith('TOTAL') ||
+      normFirst.startsWith('COMUNAS ') ||
+      normFirst === 'ESTADO'
+    )) {
+      currentSection = firstCell;
+      continue;
+    }
+
+    // Ignorar notas al pie tipo "(*) MEIN creada..."
+    if (firstCell.startsWith('(*)')) {
+      ignoredRows.push({ sheet: sheetName, row: r + 1, titulo: firstCell });
+      continue;
+    }
+
+    // Si la hoja aún no definió encabezados de obras (ej: hoja "Resumen"), ignorar fila
+    if (!currentHeaders) continue;
+
+    const rowObj = {};
+    currentHeaders.forEach((h, idx) => {
+      if (h) rowObj[h] = row[idx];
+    });
+
+    const obra = mapRow(rowObj, defaultComuna, currentSection, periodoDetectado, dirItems, locItems);
+    if (!obra.titulo) {
+      // Si la fila tiene otros datos reales pero no título, avisar
+      if (obra.oc_numero || obra.direccion) {
+        errs.push(`${sheetName} fila ${r + 1}: falta "TITULO DE OBRA EN SAP"`);
+      }
+      continue;
+    }
+
+    if (esFilaResumen(obra)) {
+      ignoredRows.push({ sheet: sheetName, row: r + 1, titulo: obra.titulo });
+      continue;
+    }
+
+    parsedRows.push({ obra, sheetName: currentSection ? `${sheetName} · ${currentSection}` : sheetName, rowIndex: r + 1 });
+  }
+
+  return { parsedRows, errs, ignoredRows };
 }
 
 export default function ImportarObrasExcel({ open, onClose, onImported }) {
@@ -210,10 +363,22 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
 
   const handleClose = () => { reset(); onClose(); };
 
-  const handleFile = (e) => {
+  const handleFile = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setFile(f); setResult(null);
+
+    // Cargar padrón de Direcciones y Establecimientos para completar Jefe de Sitio y Escuela cuando el Excel no trae la columna
+    let dirItems = [];
+    let locItems = [];
+    try {
+      const [dRes, lRes] = await Promise.all([
+        base44.entities.Direccion.filter({}, { limit: 500 }),
+        base44.entities.LocationData.filter({}, { limit: 1000 }),
+      ]);
+      dirItems = Array.isArray(dRes) ? dRes : (dRes?.items || []);
+      locItems = Array.isArray(lRes) ? lRes : (lRes?.items || []);
+    } catch { /* continúa sin padrón */ }
 
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -223,23 +388,11 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
       const ignoredRows = [];
 
       wb.SheetNames.forEach(sheetName => {
-        const comuna = detectarComuna(sheetName);
         const ws = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
-        rows.forEach((row, i) => {
-          const obra = mapRow(row, comuna);
-          if (!obra.titulo) {
-            errs.push(`${sheetName} fila ${i + 2}: falta "TITULO DE OBRA EN SAP"`);
-            return;
-          }
-          // Descartar filas de TOTAL / SUBTOTAL (no son obras reales)
-          if (esFilaResumen(obra)) {
-            ignoredRows.push({ sheet: sheetName, row: i + 2, titulo: obra.titulo });
-            return;
-          }
-          allRows.push({ obra, sheetName, rowIndex: i + 2 });
-        });
+        const { parsedRows, errs: sErrs, ignoredRows: sIgnored } = parseSheetRows(ws, sheetName, dirItems, locItems);
+        allRows.push(...parsedRows);
+        errs.push(...sErrs);
+        ignoredRows.push(...sIgnored);
       });
 
       setPreview(allRows);
@@ -258,16 +411,15 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
     try {
       const res = await base44.functions.invoke('gestionarObrasCertificacion', { action: 'list' });
       (res.data.obras || []).forEach(o => {
-        // TOTAL / SUBTOTAL de importaciones previas → eliminar (no son obras reales)
         const t = (o.titulo || '').toUpperCase().trim();
         if (/^(TOTAL|SUBTOTAL|TOTALES|SUB TOTAL|SALDO|GRAN TOTAL|TOTAL GENERAL|TOTAL PARA CERTIFICAR|SUMA)\b/.test(t)) {
           bogusToDelete.push(o.id);
           return;
         }
-        if (o.oc_numero) existingMap.set(String(o.oc_numero).trim(), o);
+        if (o.oc_numero && !o.ciclo_archivado) existingMap.set(String(o.oc_numero).trim(), o);
       });
     } catch { /* si falla, todo será create */ }
-    // Borrar obras TOTAL bogus dejadas por importaciones previas (con el mapeo antiguo)
+
     for (const id of bogusToDelete) {
       try { await base44.functions.invoke('gestionarObrasCertificacion', { action: 'delete', id }); } catch {}
     }
@@ -275,22 +427,17 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
     let created = 0, updated = 0, failed = 0;
     const detalles = [];
     for (const { obra, sheetName, rowIndex } of preview) {
-      // Limpieza final: nunca enviar null/undefined (rompe enums en la creación)
       const clean = {};
       for (const [k, v] of Object.entries(obra)) {
         if (v === undefined || v === null) continue;
         clean[k] = v;
       }
-      // Asegurar tipos numéricos (evita rechazos por string donde se espera number)
       ['monto_contrato', 'monto_a_cobrar', 'porcentaje_avance', 'plazo_dias'].forEach(f => {
         if (clean[f] !== undefined) clean[f] = Number(clean[f]) || 0;
       });
-      // Asegurar strings en campos de texto
       ['oc_numero', 'ada_numero', 'titulo', 'jefe_sitio', 'inspector'].forEach(f => {
         if (clean[f] !== undefined) clean[f] = String(clean[f]).trim();
       });
-      // Traer la obra al ciclo activo — importaciones previas pueden haberla dejado
-      // archivada en un ciclo anterior, por lo que no se veía en la lista activa.
       clean.ciclo = '';
       clean.ciclo_archivado = false;
 
@@ -330,7 +477,7 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
     if (created + updated > 0) onImported();
   };
 
-  // Agrupar preview por hoja para mostrar en tabla
+  // Agrupar preview por hoja/bloque para mostrar en tabla
   const bySheet = preview.reduce((acc, r) => {
     if (!acc[r.sheetName]) acc[r.sheetName] = [];
     acc[r.sheetName].push(r.obra);
@@ -352,9 +499,9 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
           <div className="flex items-start gap-3 px-4 py-3 rounded-xl border border-blue-500/30 bg-blue-500/5">
             <Info className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
             <div className="text-xs text-blue-300 space-y-0.5">
-              <p className="font-semibold text-blue-200">Formato esperado</p>
-              <p>El Excel debe tener una hoja por comuna: <strong>COMUNA 8A</strong>, <strong>COMUNA 8B</strong>, <strong>COMUNA 10A</strong></p>
-              <p>Columnas requeridas: <code>TITULO DE OBRA EN SAP</code>, <code>MONTO BASE FEB-23</code>, <code>N° MTOM</code>, <code>N° MEIN</code>, <code>JEFE DE SITIO</code>, <code>INSPECTOR</code>, <code>OBSERVACIONES</code></p>
+              <p className="font-semibold text-blue-200">Formatos compatibles</p>
+              <p>Soporta planillas de <strong>OBRAS TOM</strong> (con bloques por estado en una sola hoja) y planillas por hojas <strong>COMUNA 8A / 8B / 10A</strong>.</p>
+              <p>Detecta automáticamente: <code>COMUNA</code>, <code>DIRECCION</code>, <code>TITULO DE OBRA EN SAP</code>, <code>MONTO BASE FEB-23</code>, <code>Nº orden SAP / MTOM</code>, <code>MEIN</code>, <code>INSPECTOR</code> y asigna el Jefe de Sitio según la dirección.</p>
             </div>
           </div>
 
@@ -362,7 +509,7 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
           <div className="flex items-center justify-between px-4 py-3 rounded-xl border border-border bg-muted/30">
             <div>
               <p className="text-sm font-medium">¿Necesitás la plantilla?</p>
-              <p className="text-xs text-muted-foreground">Excel modelo con el formato correcto de 3 hojas</p>
+              <p className="text-xs text-muted-foreground">Excel modelo con el formato estándar</p>
             </div>
             <Button variant="outline" size="sm" onClick={descargarPlantilla} className="gap-2 shrink-0">
               <Download className="h-4 w-4" /> Plantilla
@@ -375,8 +522,8 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
               onClick={() => fileRef.current?.click()}
             >
               <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm font-medium">{file ? file.name : 'Seleccioná el archivo Excel de Actas'}</p>
-              <p className="text-xs text-muted-foreground mt-1">.xlsx — con hojas COMUNA 8A / 8B / 10A</p>
+              <p className="text-sm font-medium">{file ? file.name : 'Seleccioná el archivo Excel de Obras / Actas'}</p>
+              <p className="text-xs text-muted-foreground mt-1">.xlsx — OBRAS TOM o COMUNA 8A / 8B / 10A</p>
               <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
             </div>
           )}
@@ -397,30 +544,29 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
             <div className="flex items-start gap-2 px-4 py-2.5 rounded-xl border border-sky-500/30 bg-sky-500/5">
               <Info className="h-4 w-4 text-sky-400 shrink-0 mt-0.5" />
               <div className="text-xs text-sky-300">
-                <span className="font-medium text-sky-200">{ignored.length} fila(s) de totales ignorada(s)</span> (no son obras reales):
-                <span className="text-sky-400/70"> {ignored.slice(0, 4).map(i => `"${i.titulo}"`).join(', ')}{ignored.length > 4 ? '…' : ''}</span>
+                <span className="font-medium text-sky-200">{ignored.length} fila(s) de resumen/notas ignorada(s)</span>
               </div>
             </div>
           )}
 
-          {/* Preview por hoja */}
+          {/* Preview por hoja/bloque */}
           {preview.length > 0 && !result && (
             <div className="space-y-3">
               <p className="text-sm font-medium text-muted-foreground">
-                Vista previa — <span className="text-foreground font-semibold">{preview.length} obras</span> en {Object.keys(bySheet).length} hoja{Object.keys(bySheet).length > 1 ? 's' : ''}
+                Vista previa — <span className="text-foreground font-semibold">{preview.length} obras</span> en {Object.keys(bySheet).length} bloque{Object.keys(bySheet).length > 1 ? 's' : ''}
               </p>
 
               {Object.entries(bySheet).map(([sheet, rows]) => (
                 <div key={sheet} className="rounded-xl border border-border overflow-hidden">
-                  <div className="px-3 py-2 bg-muted/40 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground">{sheet}</span>
-                    <span className="text-xs text-muted-foreground">{rows.length} obras</span>
+                  <div className="px-3 py-2 bg-muted/40 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-foreground truncate">{sheet}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{rows.length} obras</span>
                   </div>
                   <div className="overflow-x-auto max-h-48">
                     <table className="w-full text-xs">
                       <thead className="bg-muted/20">
                         <tr>
-                          {['Establecimiento', 'Título obra SAP', 'Monto Base', 'MTOM', 'MEIN', '%', 'Jefe Sitio', 'Estado'].map(h => (
+                          {['Comuna', 'Dirección / Escuela', 'Título obra SAP', 'Monto Base', 'Orden SAP', 'MEIN', '%', 'Jefe Sitio', 'Estado'].map(h => (
                             <th key={h} className="px-3 py-1.5 text-left font-medium text-muted-foreground whitespace-nowrap">{h}</th>
                           ))}
                         </tr>
@@ -428,13 +574,14 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
                       <tbody>
                         {rows.map((r, i) => (
                           <tr key={i} className="border-t border-border">
-                            <td className="px-3 py-1.5 max-w-[120px] truncate">{r.establecimiento || r.direccion || '—'}</td>
+                            <td className="px-3 py-1.5 whitespace-nowrap font-medium">{r.comuna || '—'}</td>
+                            <td className="px-3 py-1.5 max-w-[140px] truncate">{r.establecimiento || r.direccion || '—'}</td>
                             <td className="px-3 py-1.5 max-w-[180px] truncate">{r.titulo}</td>
                             <td className="px-3 py-1.5 whitespace-nowrap">${Number(r.monto_contrato).toLocaleString('es-AR', {maximumFractionDigits: 0})}</td>
                             <td className="px-3 py-1.5 whitespace-nowrap">{r.oc_numero}</td>
-                            <td className="px-3 py-1.5 whitespace-nowrap">{r.ada_numero}</td>
+                            <td className="px-3 py-1.5 whitespace-nowrap">{r.ada_numero || '—'}</td>
                             <td className="px-3 py-1.5 whitespace-nowrap">{r.porcentaje_avance}%</td>
-                            <td className="px-3 py-1.5 whitespace-nowrap">{r.jefe_sitio}</td>
+                            <td className="px-3 py-1.5 whitespace-nowrap">{r.jefe_sitio || '—'}</td>
                             <td className="px-3 py-1.5 whitespace-nowrap">
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                                 r.estado_cobro === 'listo_certificar' ? 'bg-emerald-500/20 text-emerald-300' :
@@ -474,7 +621,6 @@ export default function ImportarObrasExcel({ open, onClose, onImported }) {
                 </div>
               </div>
 
-              {/* Detalle de filas fallidas */}
               {result.detalles?.some(d => d.estado === 'failed') && (
                 <div className="max-h-56 overflow-y-auto rounded-xl border border-border divide-y divide-border">
                   {result.detalles.filter(d => d.estado === 'failed').map((d, i) => (
