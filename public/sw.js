@@ -47,7 +47,7 @@
  *   para no interrumpir formularios en progreso.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'dh1-erp-v4';
+const CACHE_NAME = 'dh1-erp-v5';
 const OFFLINE_URL = '/offline.html';
 
 // Recursos estáticos que se precachean en install. Solo los esenciales
@@ -75,8 +75,15 @@ function isBackendApi(url) {
 }
 
 function isStaticAsset(url, request) {
-  // JS/CSS de mismo origen (módulos Vite compilados con hash)
+  // JS/CSS de mismo origen (módulos Vite compilados con hash; excluir rutas dev de Vite)
   if (!isSameOrigin(url)) return false;
+  if (
+    url.pathname.startsWith('/src/') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.startsWith('/@')
+  ) {
+    return false;
+  }
   const dest = request.destination;
   if (dest === 'script' || dest === 'style') return true;
   return /\.(js|mjs|css)(\?|$)/i.test(url.pathname);
@@ -239,4 +246,70 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(handleStaleWhileRevalidate(request));
     return;
   }
+});
+
+// ── Evento: PUSH (Web Push en PC y móvil aun con navegador cerrado) ──────────
+self.addEventListener('push', (event) => {
+  let payload = {
+    title: '📋 DH1 · ¿Cómo vienen con las órdenes de trabajo?',
+    body: 'Revisá el avance de las órdenes de trabajo y mantené sus estados actualizados.',
+    url: '/ordenes-trabajo',
+    tag: 'dh1-aviso-ot',
+  };
+
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      payload = { ...payload, ...parsed };
+    } catch (_) {
+      const text = event.data.text();
+      if (text) payload.body = text;
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      tag: payload.tag || 'dh1-aviso-ot',
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [300, 120, 300, 120, 400],
+      data: {
+        url: payload.url || '/ordenes-trabajo',
+        date: payload.date || null,
+      },
+      actions: [
+        { action: 'open_ots', title: 'Ver Órdenes de Trabajo' },
+      ],
+    })
+  );
+});
+
+// ── Evento: NOTIFICATIONCLICK (Abrir DH1 al tocar la notificación push) ──────
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification?.data?.url || '/ordenes-trabajo';
+
+  event.waitUntil(
+    (async () => {
+      const windowClients = await self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true,
+      });
+
+      for (const client of windowClients) {
+        if (client.url && 'focus' in client) {
+          await client.focus();
+          if ('navigate' in client) {
+            try { await client.navigate(targetUrl); } catch (_) {}
+          }
+          return;
+        }
+      }
+
+      if (self.clients.openWindow) {
+        await self.clients.openWindow(targetUrl);
+      }
+    })()
+  );
 });

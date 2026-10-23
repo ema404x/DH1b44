@@ -28,6 +28,11 @@
       "type": "string",
       "format": "date",
       "description": "Fecha local de Buenos Aires del \u00faltimo aviso semanal de \u00f3rdenes de trabajo mostrado al usuario. Evita repetirlo al abrir DH1 desde otra PC."
+    },
+    "ultimo_push_ot_fecha": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha local de Buenos Aires del \u00faltimo env\u00edo push semanal de OTs al usuario. Evita duplicados por fecha."
     }
   },
   "required": [],

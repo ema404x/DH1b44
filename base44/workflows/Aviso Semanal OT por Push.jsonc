@@ -1,0 +1,48 @@
+{
+  "name": "Aviso Semanal OT por Push",
+  "description": "Env\u00eda autom\u00e1ticamente todos los mi\u00e9rcoles y viernes a las 09:00 (hora de Buenos Aires) la notificaci\u00f3n push de seguimiento de \u00f3rdenes de trabajo a dispositivos PC (Web Push) y m\u00f3viles registrados, sin requerir que DH1 est\u00e9 abierta y sin enviar correos.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 9 * * 3,5",
+      "one_time_date": null,
+      "timezone": "America/Buenos_Aires",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "aviso_semanal_ot_por_push",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "enviar_push_semanal": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "gestionarPushSemanal",
+            "args": {
+              "action": "send_weekly_ot_push",
+              "workflow_trigger": true
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Enviar aviso push de OTs",
+            "description": "Notifica a PC (Web Push) y m\u00f3viles registrados los mi\u00e9rcoles y viernes"
+          }
+        }
+      }
+    ]
+  }
+}

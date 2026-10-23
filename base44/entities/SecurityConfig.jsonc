@@ -14,6 +14,14 @@
     "operario_password_updated_by": {
       "type": "string",
       "description": "Email del administrador que actualiz\u00f3 la clave"
+    },
+    "vapid_public_key": {
+      "type": "string",
+      "description": "Clave p\u00fablica VAPID para notificaciones Web Push en PC y m\u00f3vil"
+    },
+    "vapid_private_key": {
+      "type": "string",
+      "description": "Clave privada VAPID para firmar env\u00edos Web Push desde el servidor"
     }
   },
   "required": [],
