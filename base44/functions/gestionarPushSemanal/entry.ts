@@ -245,7 +245,6 @@ export default async function (req) {
         if (!dias.includes(dayIdx) || hourAr < hora || cfg.ultimo_envio_push === todayAr) {
           return Response.json({ ok: true, skipped: true, reason: 'Fuera del día/horario configurado o ya enviado hoy.' });
         }
-        await sb.entities.AlertaConfig.update(cfg.id, { ultimo_envio_push: todayAr, ultima_notificacion: now.toISOString() });
       }
 
       const title = cfg?.titulo_push || '📋 DH1 · ¿Cómo vienen con las órdenes de trabajo?';
@@ -256,30 +255,20 @@ export default async function (req) {
       webpush.setVapidDetails('mailto:notificaciones@dh1m.com', publicKey, privateKey);
 
       const allSubs = await fetchAllActiveSubscriptions(sb);
-      const targetSubs = onlySelf ? allSubs.filter((s) => s.user_id === user.id) : allSubs;
+      const allUsersRes = await sb.entities.User.list();
+      const userList = Array.isArray(allUsersRes) ? allUsersRes : (allUsersRes?.items || []);
+      const targetUsers = onlySelf ? userList.filter((u) => u.id === user.id) : userList;
 
-      // Deduplicar por endpoint y por fecha de envío para evitar duplicados por dispositivo
-      const uniqueByEndpoint = new Map();
-      let webSkippedDuplicate = 0;
-
-      for (const sub of targetSubs) {
-        if (!sub.endpoint || !sub.p256dh || !sub.auth) continue;
-        if (uniqueByEndpoint.has(sub.endpoint)) {
-          webSkippedDuplicate++;
-          continue;
-        }
-        if (!force && sub.ultimo_envio_fecha === todayAr) {
-          webSkippedDuplicate++;
-          continue;
-        }
-        uniqueByEndpoint.set(sub.endpoint, sub);
+      // Agrupar dispositivos por usuario (deduplicados por endpoint)
+      const subsByUser = new Map();
+      const seenEndpoints = new Set();
+      for (const sub of allSubs) {
+        if (!sub.user_id || !sub.endpoint || !sub.p256dh || !sub.auth) continue;
+        if (seenEndpoints.has(sub.endpoint)) continue;
+        seenEndpoints.add(sub.endpoint);
+        if (!subsByUser.has(sub.user_id)) subsByUser.set(sub.user_id, []);
+        subsByUser.get(sub.user_id).push(sub);
       }
-
-      const subsToSend = Array.from(uniqueByEndpoint.values());
-      let webSent = 0;
-      let webExpired = 0;
-      let webFailed = 0;
-      const notifiedUserIds = new Set();
 
       const payloadStr = JSON.stringify({
         title,
@@ -289,123 +278,102 @@ export default async function (req) {
         date: todayAr,
       });
 
-      for (let i = 0; i < subsToSend.length; i += 6) {
-        const batch = subsToSend.slice(i, i + 6);
-        await Promise.allSettled(
-          batch.map(async (sub) => {
-            try {
-              await webpush.sendNotification(
-                {
-                  endpoint: sub.endpoint,
-                  keys: {
-                    p256dh: sub.p256dh,
-                    auth: sub.auth,
-                  },
-                },
-                payloadStr,
-                { TTL: 86400, urgency: 'high' }
-              );
-              webSent++;
-              if (sub.user_id) notifiedUserIds.add(sub.user_id);
-              await sb.entities.PushSubscription.update(sub.id, {
-                ultimo_envio_fecha: todayAr,
-                ultimo_envio_timestamp: now.toISOString(),
-              });
-            } catch (err) {
-              const statusCode = err?.statusCode || err?.status;
-              if (statusCode === 404 || statusCode === 410) {
-                webExpired++;
-                await sb.entities.PushSubscription.update(sub.id, { activo: false }).catch(() => {});
-              } else {
-                webFailed++;
-              }
+      const stats = { sentWeb: 0, sentMobile: 0, alreadyNotified: 0, expiredRemoved: 0, failedRetryable: 0, noChannel: 0 };
+
+      // Intenta Web Push en todos los dispositivos del usuario. Devuelve: 'sent' | 'failed' | 'none'
+      const sendWebToUser = async (subs) => {
+        let anySent = false;
+        let anyFailed = false;
+        for (const sub of subs) {
+          try {
+            await webpush.sendNotification(
+              { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+              payloadStr,
+              { TTL: 86400, urgency: 'high' }
+            );
+            anySent = true;
+            await sb.entities.PushSubscription.update(sub.id, {
+              ultimo_envio_fecha: todayAr,
+              ultimo_envio_timestamp: now.toISOString(),
+            }).catch(() => {});
+          } catch (err) {
+            const statusCode = err?.statusCode || err?.status;
+            if (statusCode === 404 || statusCode === 410) {
+              stats.expiredRemoved++;
+              await sb.entities.PushSubscription.update(sub.id, { activo: false }).catch(() => {});
+            } else {
+              anyFailed = true;
             }
-          })
-        );
-      }
+          }
+        }
+        return anySent ? 'sent' : anyFailed ? 'failed' : 'none';
+      };
 
-      // Canal 2: Push móvil nativo (Core.SendPushNotification) para usuarios con app móvil nativa instalada
-      const allUsers = await sb.entities.User.list();
-      const userList = Array.isArray(allUsers) ? allUsers : (allUsers?.items || []);
-      const targetUsers = onlySelf ? userList.filter((u) => u.id === user.id) : userList;
-
-      let mobileSent = 0;
-      let mobileSkippedDuplicate = 0;
-      let mobileUnavailable = 0;
-      let mobileNote = null;
-
-      const usersForMobile = [];
-      for (const u of targetUsers) {
-        if (!u?.id) continue;
+      const processUser = async (u) => {
         const lastSent = u.ultimo_push_ot_fecha || u.data?.ultimo_push_ot_fecha || null;
         if (!force && lastSent === todayAr) {
-          mobileSkippedDuplicate++;
-          continue;
+          stats.alreadyNotified++;
+          return;
         }
-        usersForMobile.push(u);
+
+        // 1) Web Push primero; si llega a algún dispositivo, no se envía push nativo (evita duplicados entre canales)
+        const webResult = await sendWebToUser(subsByUser.get(u.id) || []);
+        let delivered = webResult === 'sent';
+        if (delivered) stats.sentWeb++;
+
+        // 2) Push móvil nativo solo si Web Push no llegó
+        if (!delivered) {
+          try {
+            await sb.integrations.Core.SendPushNotification({
+              user_id: u.id,
+              title,
+              content: messageBody,
+              action_label: 'Ver Órdenes de Trabajo',
+              action_url: actionUrl,
+            });
+            delivered = true;
+            stats.sentMobile++;
+          } catch (_) {
+            // Sin app nativa: no es reintentable salvo que el Web Push haya fallado transitoriamente
+          }
+        }
+
+        if (delivered) {
+          // Marca por usuario SOLO tras un envío exitoso: los reintentos no le vuelven a enviar
+          await sb.entities.User.update(u.id, {
+            ultimo_push_ot_fecha: todayAr,
+            ultimo_aviso_ot_miercoles: todayAr,
+          }).catch(() => {});
+        } else if (webResult === 'failed') {
+          stats.failedRetryable++;
+        } else {
+          stats.noChannel++;
+        }
+      };
+
+      for (let i = 0; i < targetUsers.length; i += 6) {
+        await Promise.allSettled(targetUsers.slice(i, i + 6).filter((u) => u?.id).map(processUser));
       }
 
-      for (let i = 0; i < usersForMobile.length; i += 6) {
-        const batch = usersForMobile.slice(i, i + 6);
-        await Promise.allSettled(
-          batch.map(async (u) => {
-            try {
-              await sb.integrations.Core.SendPushNotification({
-                user_id: u.id,
-                title,
-                content: messageBody,
-                action_label: 'Ver Órdenes de Trabajo',
-                action_url: actionUrl,
-              });
-              mobileSent++;
-              notifiedUserIds.add(u.id);
-              await sb.entities.User.update(u.id, {
-                ultimo_push_ot_fecha: todayAr,
-                ultimo_aviso_ot_miercoles: todayAr,
-              }).catch(() => {});
-            } catch (err) {
-              mobileUnavailable++;
-              if (!mobileNote) {
-                mobileNote =
-                  'Push móvil nativo requiere app nativa publicada con credenciales push activas; los dispositivos Android/PC con navegador suscripto reciben vía Web Push.';
-              }
-            }
-          })
-        );
-      }
-
-      // Actualizar marca de fecha en usuarios notificados vía Web Push para evitar duplicados al abrir la app
-      const webOnlyUserIds = Array.from(notifiedUserIds);
-      for (let i = 0; i < webOnlyUserIds.length; i += 6) {
-        const batch = webOnlyUserIds.slice(i, i + 6);
-        await Promise.allSettled(
-          batch.map((uid) =>
-            sb.entities.User.update(uid, {
-              ultimo_push_ot_fecha: todayAr,
-              ultimo_aviso_ot_miercoles: todayAr,
-            }).catch(() => {})
-          )
-        );
+      // El día se marca como completado solo si no quedaron fallos reintentables;
+      // si quedaron, la próxima ejecución horaria reintenta únicamente a esos usuarios.
+      const completed = stats.failedRetryable === 0;
+      if (cfg?.id && !onlySelf) {
+        const upd = { ultima_notificacion: now.toISOString() };
+        if (completed) upd.ultimo_envio_push = todayAr;
+        await sb.entities.AlertaConfig.update(cfg.id, upd).catch(() => {});
       }
 
       return Response.json({
         ok: true,
         date: todayAr,
         dia: diaLabel,
-        webPush: {
-          evaluated: targetSubs.length,
-          sent: webSent,
-          skippedDuplicate: webSkippedDuplicate,
-          expiredRemoved: webExpired,
-          failed: webFailed,
-        },
-        mobilePush: {
-          evaluated: targetUsers.length,
-          sent: mobileSent,
-          skippedDuplicate: mobileSkippedDuplicate,
-          unconfiguredOrNoDevice: mobileUnavailable,
-          note: mobileNote,
-        },
+        completed,
+        evaluatedUsers: targetUsers.length,
+        webPush: { sent: stats.sentWeb, sentWeb: stats.sentWeb, expiredRemoved: stats.expiredRemoved, failedRetryable: stats.failedRetryable },
+        mobilePush: { sent: stats.sentMobile },
+        alreadyNotifiedToday: stats.alreadyNotified,
+        sinCanalDisponible: stats.noChannel,
       });
     }
 
