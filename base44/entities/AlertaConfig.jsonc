@@ -8,7 +8,8 @@
         "garantia_activo",
         "stock_material",
         "pendiente_vencido",
-        "ot_vencida"
+        "ot_vencida",
+        "aviso_push_ot"
       ],
       "description": "Tipo de alerta"
     },
@@ -82,6 +83,31 @@
       "type": "number",
       "default": 24,
       "description": "Horas m\u00ednimas entre env\u00edos de email del mismo tipo"
+    },
+    "dias_semana": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Aviso push: d\u00edas de env\u00edo (0=domingo ... 6=s\u00e1bado)"
+    },
+    "hora_envio": {
+      "type": "number",
+      "default": 9,
+      "description": "Aviso push: hora de env\u00edo (0-23, hora Argentina)"
+    },
+    "titulo_push": {
+      "type": "string",
+      "description": "Aviso push: t\u00edtulo de la notificaci\u00f3n"
+    },
+    "mensaje_push": {
+      "type": "string",
+      "description": "Aviso push: texto de la notificaci\u00f3n"
+    },
+    "ultimo_envio_push": {
+      "type": "string",
+      "format": "date",
+      "description": "Aviso push: fecha (Argentina) del \u00faltimo env\u00edo autom\u00e1tico"
     },
     "sector_id": {
       "type": "string",

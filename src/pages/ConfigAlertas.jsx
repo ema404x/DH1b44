@@ -49,13 +49,24 @@ const TIPO_CONFIG = {
     border: 'border-orange-200',
     desc: 'Alerta cuando una orden de trabajo supera su fecha programada sin ser completada.',
   },
+  aviso_push_ot: {
+    label: 'Aviso Push de Avance de OTs',
+    icon: Bell,
+    color: 'text-cyan-600',
+    bg: 'bg-cyan-50',
+    border: 'border-cyan-200',
+    desc: 'Notificación push a todos los usuarios en los días y horario configurados.',
+  },
 };
+
+const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 const DEFAULT_CONFIGS = {
   garantia_activo:   { tipo: 'garantia_activo',   nombre: 'Alerta de Garantías', dias_anticipacion: 30, notificar_email: true, notificar_banner: true, email_destinatarios: [], activo: true },
   stock_material:    { tipo: 'stock_material',    nombre: 'Alerta de Stock',     umbral_stock_pct: 0,   notificar_email: true, notificar_banner: true, email_destinatarios: [], activo: true },
   pendiente_vencido: { tipo: 'pendiente_vencido', nombre: 'Pendientes Vencidos', dias_vencimiento_pendiente: 7, notificar_email: true, notificar_banner: true, email_destinatarios: [], activo: true },
   ot_vencida: { tipo: 'ot_vencida', nombre: 'OTs Vencidas', dias_vencimiento_ot: 1, notificar_email: true, notificar_banner: true, email_destinatarios: [], activo: true },
+  aviso_push_ot: { tipo: 'aviso_push_ot', nombre: 'Aviso de OTs', dias_semana: [3, 5], hora_envio: 9, titulo_push: '📋 DH1 · ¿Cómo vienen con las órdenes de trabajo?', mensaje_push: 'Revisá el avance de las órdenes de trabajo y mantené sus estados actualizados.', notificar_email: false, notificar_banner: false, activo: true },
 };
 
 
@@ -186,6 +197,38 @@ function ConfigCard({ config, onSave, onDelete, onTest }) {
             </div>
           )}
 
+          {form.tipo === 'aviso_push_ot' && (
+            <>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs">Días de envío</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {DIAS.map((d, i) => {
+                    const sel = (form.dias_semana || []).includes(i);
+                    return (
+                      <Button key={d} type="button" size="sm" variant={sel ? 'default' : 'outline'} className="h-7 px-2.5 text-xs"
+                        onClick={() => setForm(f => ({ ...f, dias_semana: sel ? (f.dias_semana || []).filter(x => x !== i) : [...(f.dias_semana || []), i] }))}>
+                        {d}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Hora de envío (Argentina)</Label>
+                <Input type="number" min={0} max={23} value={form.hora_envio ?? 9}
+                  onChange={e => setForm(f => ({ ...f, hora_envio: Number(e.target.value) }))} className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Título</Label>
+                <Input value={form.titulo_push || ''} onChange={e => setForm(f => ({ ...f, titulo_push: e.target.value }))} className="h-8 text-sm" />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs">Mensaje</Label>
+                <Input value={form.mensaje_push || ''} onChange={e => setForm(f => ({ ...f, mensaje_push: e.target.value }))} className="h-8 text-sm" />
+              </div>
+            </>
+          )}
+
         </div>
 
 
@@ -206,7 +249,7 @@ function ConfigCard({ config, onSave, onDelete, onTest }) {
           </Button>
           <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={handleTest} disabled={testing}>
             {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-            Probar ahora
+            {form.tipo === 'aviso_push_ot' ? 'Enviar ahora a todos' : 'Probar ahora'}
           </Button>
         </div>
       </CardContent>
@@ -245,6 +288,13 @@ export default function ConfigAlertas() {
   });
 
   const testConfig = async (form) => {
+    if (form.tipo === 'aviso_push_ot') {
+      await base44.entities.AlertaConfig.update(form.id, form);
+      const res = await base44.functions.invoke('gestionarPushSemanal', { action: 'send_weekly_ot_push', force: true });
+      toast.success(`Aviso enviado a ${res.data?.webPush?.sent ?? 0} dispositivo(s).`);
+      qc.invalidateQueries({ queryKey: ['alerta-configs'] });
+      return;
+    }
     try {
       const res = await base44.functions.invoke('checkAlertas', {});
       if (res.data?.success) {

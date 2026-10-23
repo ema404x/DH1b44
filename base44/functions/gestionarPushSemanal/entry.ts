@@ -229,17 +229,27 @@ export default async function (req) {
         );
       }
 
-      if (!isWedOrFri && !force) {
-        return Response.json({
-          ok: true,
-          skipped: true,
-          reason: `Hoy (${weekday} ${todayAr}) no es miércoles ni viernes en Buenos Aires.`,
-          date: todayAr,
-        });
+      // Configuración editable desde "Configuración de Alertas"
+      const cfgRes = await sb.entities.AlertaConfig.filter({ tipo: 'aviso_push_ot' });
+      const cfgList = Array.isArray(cfgRes) ? cfgRes : (cfgRes?.items || []);
+      const cfg = cfgList.find((c) => c.activo !== false) || null;
+
+      if (!force) {
+        if (!cfg) {
+          return Response.json({ ok: true, skipped: true, reason: 'Aviso push desactivado o sin configurar.' });
+        }
+        const dayIdx = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(weekday);
+        const hourAr = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Buenos_Aires', hour: 'numeric', hourCycle: 'h23' }).format(now));
+        const dias = Array.isArray(cfg.dias_semana) ? cfg.dias_semana : [3, 5];
+        const hora = typeof cfg.hora_envio === 'number' ? cfg.hora_envio : 9;
+        if (!dias.includes(dayIdx) || hourAr < hora || cfg.ultimo_envio_push === todayAr) {
+          return Response.json({ ok: true, skipped: true, reason: 'Fuera del día/horario configurado o ya enviado hoy.' });
+        }
+        await sb.entities.AlertaConfig.update(cfg.id, { ultimo_envio_push: todayAr, ultima_notificacion: now.toISOString() });
       }
 
-      const title = '📋 DH1 · ¿Cómo vienen con las órdenes de trabajo?';
-      const messageBody = `Es ${diaLabel}: revisá el avance de las órdenes de trabajo y mantené sus estados actualizados.`;
+      const title = cfg?.titulo_push || '📋 DH1 · ¿Cómo vienen con las órdenes de trabajo?';
+      const messageBody = cfg?.mensaje_push || 'Revisá el avance de las órdenes de trabajo y mantené sus estados actualizados.';
       const actionUrl = '/ordenes-trabajo';
 
       const { publicKey, privateKey } = await getOrCreateVapidKeys(sb);
