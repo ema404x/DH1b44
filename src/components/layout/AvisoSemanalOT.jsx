@@ -143,6 +143,12 @@ export default function AvisoSemanalOT() {
     initPushAndNotice();
   }, [user?.id, registerBrowserPushSubscription]);
 
+  useEffect(() => {
+    const handleOpenPushConfig = () => setOpen(true);
+    window.addEventListener('dh1:open-push-config', handleOpenPushConfig);
+    return () => window.removeEventListener('dh1:open-push-config', handleOpenPushConfig);
+  }, []);
+
   const handleEnablePush = async () => {
     if (!pushSupported) {
       toast.error('Este navegador no admite notificaciones Web Push.');

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { LogOut, ChevronDown, UserCircle, Trash2 } from 'lucide-react';
+import { LogOut, ChevronDown, UserCircle, Trash2, Bell } from 'lucide-react';
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction
@@ -49,6 +49,13 @@ export default function UserMenu() {
             >
               <UserCircle className="h-4 w-4 text-muted-foreground" />
               Mi perfil
+            </button>
+            <button
+              onClick={() => { window.dispatchEvent(new CustomEvent('dh1:open-push-config')); setOpen(false); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent transition-colors text-left text-popover-foreground"
+            >
+              <Bell className="h-4 w-4 text-muted-foreground" />
+              Notificaciones Push
             </button>
             <button
               onClick={() => { setShowDeleteDialog(true); setOpen(false); }}
