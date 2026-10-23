@@ -8,9 +8,10 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Archive, RotateCcw, ChevronDown, Clock, Lock } from 'lucide-react';
+import { Archive, Clock, Lock, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 /**
  * CicloSelector
@@ -23,8 +24,8 @@ import { es } from 'date-fns/locale';
 export default function CicloSelector({ cicloActivo, ciclosDisponibles, onCambiarCiclo, obrasActivas, canClose = false }) {
   const qc = useQueryClient();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [nuevoCicloNombre, setNuevoCicloNombre] = useState(() => {
-    // Sugiere el mes siguiente al actual
     const now = new Date();
     return format(now, 'MMMM yyyy', { locale: es })
       .replace(/^\w/, c => c.toUpperCase());
@@ -33,7 +34,6 @@ export default function CicloSelector({ cicloActivo, ciclosDisponibles, onCambia
   // Cierra el ciclo activo: marca todos los registros activos como archivados con el nombre del ciclo
   const cerrarCicloMutation = useMutation({
     mutationFn: async () => {
-      // Usar backend function para bypassar RLS
       for (const obra of obrasActivas) {
         await base44.functions.invoke('gestionarObrasCertificacion', {
           action: 'update',
@@ -46,13 +46,40 @@ export default function CicloSelector({ cicloActivo, ciclosDisponibles, onCambia
       qc.invalidateQueries({ queryKey: ['obras-certificacion'] });
       setConfirmOpen(false);
       onCambiarCiclo('activo');
+      toast.success(`Ciclo "${nuevoCicloNombre}" archivado correctamente`);
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.error || err?.message || 'No se pudo archivar el ciclo');
+    },
+  });
+
+  // Limpia el ciclo activo: elimina permanentemente las obras actuales (no archivadas) del sector
+  const limpiarCicloMutation = useMutation({
+    mutationFn: async () => {
+      const res = await base44.functions.invoke('gestionarObrasCertificacion', {
+        action: 'clearActiveCycle',
+      });
+      if (!res?.data?.success) {
+        throw new Error(res?.data?.error || 'No se pudo limpiar el ciclo actual');
+      }
+      return res.data;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['obras-certificacion'] });
+      setClearConfirmOpen(false);
+      onCambiarCiclo('activo');
+      toast.success(`Se eliminaron ${data.deleted} obra(s) del ciclo actual`);
+    },
+    onError: (err) => {
+      qc.invalidateQueries({ queryKey: ['obras-certificacion'] });
+      toast.error(err?.response?.data?.error || err?.message || 'Error al limpiar el ciclo actual');
     },
   });
 
   const esVistaCicloArchivado = cicloActivo !== 'activo';
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {/* Selector de ciclo */}
       <Select value={cicloActivo} onValueChange={onCambiarCiclo}>
         <SelectTrigger className="h-9 w-44 text-sm gap-2">
@@ -87,17 +114,28 @@ export default function CicloSelector({ cicloActivo, ciclosDisponibles, onCambia
         </SelectContent>
       </Select>
 
-      {/* Botón cerrar ciclo — solo admin y en ciclo activo */}
+      {/* Acciones de ciclo — solo admin y en ciclo activo */}
       {canClose && !esVistaCicloArchivado && obrasActivas.length > 0 && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 gap-2 text-xs shrink-0"
-          onClick={() => setConfirmOpen(true)}
-        >
-          <Archive className="h-3.5 w-3.5" />
-          Cerrar ciclo
-        </Button>
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-2 text-xs shrink-0"
+            onClick={() => setConfirmOpen(true)}
+          >
+            <Archive className="h-3.5 w-3.5" />
+            Cerrar ciclo
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-2 text-xs shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setClearConfirmOpen(true)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Limpiar ciclo actual ({obrasActivas.length})
+          </Button>
+        </>
       )}
 
       {/* Badge lectura solo */}
@@ -107,7 +145,7 @@ export default function CicloSelector({ cicloActivo, ciclosDisponibles, onCambia
         </Badge>
       )}
 
-      {/* Diálogo de confirmación */}
+      {/* Diálogo de confirmación de archivar ciclo */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -141,6 +179,54 @@ export default function CicloSelector({ cicloActivo, ciclosDisponibles, onCambia
             >
               <Archive className="h-4 w-4" />
               {cerrarCicloMutation.isPending ? 'Archivando...' : 'Archivar y cerrar ciclo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de confirmación de limpiar (eliminar) obras del ciclo actual */}
+      <Dialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Eliminar obras del ciclo actual
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive space-y-1">
+              <p className="font-semibold">Acción permanente e irreversible</p>
+              <p>
+                Se eliminarán <strong className="font-bold">{obrasActivas.length} obra{obrasActivas.length !== 1 ? 's' : ''}</strong> actuales
+                del ciclo activo en este sector.
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Los ciclos anteriores ya archivados ({ciclosDisponibles.length}) y los registros de otros sectores se mantendrán intactos.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setClearConfirmOpen(false)}
+              disabled={limpiarCicloMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => limpiarCicloMutation.mutate()}
+              disabled={limpiarCicloMutation.isPending || obrasActivas.length === 0}
+              className="gap-2"
+            >
+              {limpiarCicloMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              {limpiarCicloMutation.isPending
+                ? 'Eliminando obras...'
+                : `Sí, eliminar ${obrasActivas.length} obra${obrasActivas.length !== 1 ? 's' : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>

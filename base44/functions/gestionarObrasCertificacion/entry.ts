@@ -1,26 +1,26 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.57';
+import { createScopedClient, sectorErrorResponse } from '../../shared/sectorGuard.ts';
+import { resolveCallerSectorCanonical } from '../../shared/callerIdentity.ts';
 
 /**
- * Gestión de ObraCertificacion con matching tolerante de nombres.
- *
- * Permisos regidos por RolePermission (Control de Acceso) en lugar de
- * roles hardcodeados. Cualquier rol con create/update/delete habilitado
- * en RolePermission[CertificacionObras] puede operar.
+ * Gestión de ObraCertificacion con aislamiento por sector canónico
+ * y limpieza administrativa verificada del ciclo activo.
  */
-Deno.serve(async (req) => {
+export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const sb = base44.asServiceRole;
+    const rawSb = base44.asServiceRole;
 
-    // Fail closed en sector: sin sector → 403. NUNCA defaultear a 'escuela'.
-    const callerSector = user.data?.sector_id || user.sector_id;
+    // Resolver sector canónico desde la ficha Employee o plataforma, fail-closed
+    const { sector: callerSector, employee: canonicalEmp } = await resolveCallerSectorCanonical(rawSb, user);
     if (!callerSector) {
       return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
     }
 
+    const sb = createScopedClient(base44, callerSector);
     const body = await req.json();
     const { action } = body;
 
@@ -40,12 +40,11 @@ Deno.serve(async (req) => {
     };
 
     // ── Resolver empleado vinculado ──
-    let emp = null;
-    const byEmail = await sb.entities.Employee.filter({ email: user.email }).catch(() => []);
-    emp = byEmail.find(e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim());
-    if (!emp) {
-      const allEmps = await sb.entities.Employee.list('-created_date', 2000).catch(() => []);
-      emp = allEmps.find(e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim());
+    let emp = canonicalEmp;
+    if (!emp && user.email) {
+      const byEmail = await sb.entities.Employee.filter({ email: user.email }, '-created_date', 100).catch(() => []);
+      const emailItems = Array.isArray(byEmail) ? byEmail : (byEmail?.items || []);
+      emp = emailItems.find(e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim()) || null;
     }
 
     // Platform admin tiene acceso total
@@ -54,11 +53,13 @@ Deno.serve(async (req) => {
     // ── Resolver permisos desde RolePermission (Control de Acceso) ──
     let rolePerms = null;
     if (emp?.role) {
-      let roleCandidates = await sb.entities.RolePermission.filter({ role_name: emp.role }).catch(() => []);
-      if (!roleCandidates || roleCandidates.length === 0) {
-        roleCandidates = await sb.entities.RolePermission.list('-created_date', 500).catch(() => []);
+      let roleCandidates = await rawSb.entities.RolePermission.filter({ role_name: emp.role }, '-created_date', 100).catch(() => []);
+      let rcItems = Array.isArray(roleCandidates) ? roleCandidates : (roleCandidates?.items || []);
+      if (rcItems.length === 0) {
+        const allRoles = await rawSb.entities.RolePermission.list('-created_date', 500).catch(() => []);
+        rcItems = Array.isArray(allRoles) ? allRoles : (allRoles?.items || []);
       }
-      rolePerms = roleCandidates.find(
+      rolePerms = rcItems.find(
         rp => rp.role_name?.toLowerCase().trim() === emp.role.toLowerCase().trim()
       ) || null;
     }
@@ -88,7 +89,8 @@ Deno.serve(async (req) => {
 
     // ── LIST ──
     if (action === 'list') {
-      const all = await sb.entities.ObraCertificacion.filter({ sector_id: callerSector });
+      const res = await sb.entities.ObraCertificacion.filter({}, '-created_date', 5000);
+      const all = Array.isArray(res) ? res : (res?.items || []);
       const obras = canViewAll ? all : all.filter(canAccess);
       return Response.json({ obras });
     }
@@ -98,14 +100,9 @@ Deno.serve(async (req) => {
       const { id, data } = body;
       if (!id || !data) return Response.json({ error: 'id y data requeridos' }, { status: 400 });
 
-      const existing = await sb.entities.ObraCertificacion.filter({ id }).catch(() => []);
-      const obra = existing[0];
-      if (!obra) return Response.json({ error: 'Obra no encontrada' }, { status: 404 });
+      const obra = await sb.entities.ObraCertificacion.get(id).catch(() => null);
+      if (!obra) return Response.json({ error: 'Obra no encontrada o de otro sector' }, { status: 404 });
 
-      // Fail-closed: sector debe coincidir exactamente.
-      if (obra.sector_id !== callerSector) {
-        return Response.json({ error: 'Obra de otro sector. Cambiá de sector activo.' }, { status: 403 });
-      }
       if (obra.ciclo_archivado && !canViewAll) {
         return Response.json({ error: 'Obra archivada: solo administradores pueden modificarla' }, { status: 403 });
       }
@@ -128,7 +125,6 @@ Deno.serve(async (req) => {
       if (!hasPermission('create')) {
         return Response.json({ error: 'No tenés permiso para crear obras' }, { status: 403 });
       }
-      // Estampar sector_id del caller — asegura visibilidad tras el create
       const data = { ...body.data, sector_id: callerSector };
       const created = await sb.entities.ObraCertificacion.create(data);
       return Response.json({ obra: created });
@@ -141,19 +137,106 @@ Deno.serve(async (req) => {
       }
       const { id } = body;
       if (!id) return Response.json({ error: 'id requerido' }, { status: 400 });
-      const existing = await sb.entities.ObraCertificacion.filter({ id }).catch(() => []);
-      const obra = existing[0];
-      if (!obra) return Response.json({ error: 'Obra no encontrada' }, { status: 404 });
-      // Fail-closed: sector debe coincidir exactamente.
-      if (obra.sector_id !== callerSector) {
-        return Response.json({ error: 'Obra de otro sector. Cambiá de sector activo.' }, { status: 403 });
-      }
+      const obra = await sb.entities.ObraCertificacion.get(id).catch(() => null);
+      if (!obra) return Response.json({ error: 'Obra no encontrada o de otro sector' }, { status: 404 });
       await sb.entities.ObraCertificacion.delete(id);
       return Response.json({ success: true });
     }
 
+    // ── CLEAR ACTIVE CYCLE (Admin only, sector-scoped, non-archived only) ──
+    if (action === 'clearActiveCycle') {
+      if (!isPlatformAdmin) {
+        return Response.json({ error: 'Solo administradores pueden limpiar el ciclo activo' }, { status: 403 });
+      }
+      if (Object.prototype.hasOwnProperty.call(body, 'sector_id') && body.sector_id !== callerSector) {
+        return Response.json({ error: 'No se permite especificar un sector distinto al sector activo del usuario' }, { status: 403 });
+      }
+
+      const activeQuery = { ciclo_archivado: { $ne: true } };
+      const initialTotal = await sb.entities.ObraCertificacion.count(activeQuery);
+
+      if (body.dry_run === true) {
+        return Response.json({
+          success: true,
+          dry_run: true,
+          sector: callerSector,
+          candidatas: initialTotal,
+        });
+      }
+
+      if (initialTotal === 0) {
+        return Response.json({
+          success: true,
+          sector: callerSector,
+          deleted: 0,
+          remaining: 0,
+        });
+      }
+
+      // Cargar todas las obras activas del sector y verificar explícitamente que ninguna esté archivada
+      const res = await sb.entities.ObraCertificacion.filter(activeQuery, '-created_date', 5000);
+      const candidates = (Array.isArray(res) ? res : (res?.items || []))
+        .filter(o => o && o.sector_id === callerSector && o.ciclo_archivado !== true);
+
+      let deletedCount = 0;
+      const failed = [];
+
+      for (let i = 0; i < candidates.length; i += 6) {
+        const batch = candidates.slice(i, i + 6);
+        const results = await Promise.allSettled(
+          batch.map(o => sb.entities.ObraCertificacion.delete(o.id))
+        );
+        results.forEach((r, idx) => {
+          if (r.status === 'fulfilled') {
+            deletedCount++;
+          } else {
+            failed.push({
+              id: batch[idx].id,
+              titulo: batch[idx].titulo,
+              error: r.reason?.message || 'Error al eliminar',
+            });
+          }
+        });
+      }
+
+      const remaining = await sb.entities.ObraCertificacion.count(activeQuery);
+
+      if (deletedCount > 0) {
+        await sb.entities.AuditLog.create({
+          entity_type: 'ObraCertificacion',
+          entity_id: `sector:${callerSector}:ciclo_activo`,
+          action: 'delete',
+          user_email: user.email,
+          user_role: user.role,
+          timestamp: new Date().toISOString(),
+          notes: `Limpieza de ciclo actual en sector ${callerSector}: ${deletedCount} de ${initialTotal} obras actuales eliminadas (restantes: ${remaining}).`,
+        });
+      }
+
+      if (failed.length > 0 || remaining > 0) {
+        return Response.json(
+          {
+            success: false,
+            error: `La limpieza quedó incompleta: se eliminaron ${deletedCount} de ${initialTotal} obras (${remaining} aún activas).`,
+            sector: callerSector,
+            deleted: deletedCount,
+            remaining,
+            failed,
+          },
+          { status: 500 }
+        );
+      }
+
+      return Response.json({
+        success: true,
+        sector: callerSector,
+        deleted: deletedCount,
+        remaining: 0,
+      });
+    }
+
     return Response.json({ error: 'Acción no válida' }, { status: 400 });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return sectorErrorResponse(error);
   }
-});
+}
