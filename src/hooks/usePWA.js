@@ -20,13 +20,9 @@ export function usePWA() {
     // → React es null → "Cannot read properties of null (reading 'useState')".
     // En DEV nunca registramos SW; además purgamos cualquier SW/caches heredado.
     if (import.meta.env.DEV) {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then((regs) => {
-          regs.forEach((r) => r.unregister());
-        });
+      if ('caches' in window) {
         caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
       }
-      return;
     }
 
     // Registrar Service Worker (solo producción)

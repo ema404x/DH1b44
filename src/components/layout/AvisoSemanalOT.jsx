@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Bell, CheckCircle2, ClipboardList, Laptop, Loader2, Send, Smartphone, AlertCircle } from 'lucide-react';
+import { Bell, CheckCircle2, ClipboardList, Laptop, Loader2, Send, Smartphone, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -26,6 +26,15 @@ function isWebPushSupported() {
   );
 }
 
+function formatShortBrowser(ua = '') {
+  if (!ua) return 'Navegador';
+  if (/Edg\//i.test(ua)) return 'Microsoft Edge';
+  if (/Chrome\//i.test(ua) && !/Edg\//i.test(ua)) return 'Google Chrome';
+  if (/Firefox\//i.test(ua)) return 'Mozilla Firefox';
+  if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) return 'Safari';
+  return 'Navegador Web';
+}
+
 export default function AvisoSemanalOT() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -36,11 +45,47 @@ export default function AvisoSemanalOT() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribing, setSubscribing] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(false);
   const [lastTestResult, setLastTestResult] = useState(null);
   const [vapidPublicKey, setVapidPublicKey] = useState(null);
   const [deviceCount, setDeviceCount] = useState(0);
   const [totalActiveGlobal, setTotalActiveGlobal] = useState(null);
+  const [registeredDevices, setRegisteredDevices] = useState([]);
+  const [isIframe, setIsIframe] = useState(false);
   const checked = useRef(null);
+
+  useEffect(() => {
+    try {
+      setIsIframe(window.self !== window.top);
+    } catch (_) {
+      setIsIframe(true);
+    }
+  }, []);
+
+  const fetchStatus = useCallback(async () => {
+    setLoadingStatus(true);
+    try {
+      const statusRes = await base44.functions.invoke('gestionarPushSemanal', { action: 'status' });
+      const statusData = statusRes?.data || {};
+      if (statusData.publicKey) setVapidPublicKey(statusData.publicKey);
+      setDeviceCount(statusData.deviceCount || 0);
+      setIsSubscribed(Boolean(statusData.subscribed));
+      if (typeof statusData.totalActiveGlobal === 'number') {
+        setTotalActiveGlobal(statusData.totalActiveGlobal);
+      }
+      const list = Array.isArray(statusData.allDevices)
+        ? statusData.allDevices
+        : Array.isArray(statusData.devices)
+        ? statusData.devices
+        : [];
+      setRegisteredDevices(list);
+      return statusData;
+    } catch (_) {
+      return {};
+    } finally {
+      setLoadingStatus(false);
+    }
+  }, []);
 
   const registerBrowserPushSubscription = useCallback(async (pubKey) => {
     if (!isWebPushSupported() || !pubKey) return false;
@@ -67,10 +112,11 @@ export default function AvisoSemanalOT() {
     if (res?.data?.ok) {
       setIsSubscribed(true);
       setPermissionState(Notification.permission);
+      await fetchStatus();
       return true;
     }
     return false;
-  }, []);
+  }, [fetchStatus]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -99,15 +145,8 @@ export default function AvisoSemanalOT() {
     setDiaLabel(values.weekday === 'Fri' ? 'viernes' : 'miércoles');
 
     const initPushAndNotice = async () => {
-      const statusRes = await base44.functions.invoke('gestionarPushSemanal', { action: 'status' }).catch(() => null);
-      const statusData = statusRes?.data || {};
+      const statusData = await fetchStatus();
       const pubKey = statusData.publicKey || null;
-      setVapidPublicKey(pubKey);
-      setDeviceCount(statusData.deviceCount || 0);
-      if (typeof statusData.totalActiveGlobal === 'number') {
-        setTotalActiveGlobal(statusData.totalActiveGlobal);
-      }
-
       let deviceReady = Boolean(statusData.subscribed);
 
       // Si el usuario ya concedió permiso en este navegador, sincronizar su suscripción Web Push automáticamente
@@ -115,7 +154,6 @@ export default function AvisoSemanalOT() {
         const synced = await registerBrowserPushSubscription(pubKey).catch(() => false);
         if (synced) {
           deviceReady = true;
-          setDeviceCount((c) => Math.max(c, 1));
         }
       }
 
@@ -127,7 +165,6 @@ export default function AvisoSemanalOT() {
         user.ultimo_aviso_ot_miercoles === date ||
         user.data?.ultimo_aviso_ot_miercoles === date;
 
-      // Si aún no tiene ningún dispositivo registrado en Web Push, mostrar el diálogo para activar y probar
       if (!deviceReady) {
         setOpen(true);
       } else if (wedOrFri && !alreadyNotifiedToday) {
@@ -137,13 +174,16 @@ export default function AvisoSemanalOT() {
     };
 
     initPushAndNotice();
-  }, [user?.id, registerBrowserPushSubscription]);
+  }, [user?.id, fetchStatus, registerBrowserPushSubscription]);
 
   useEffect(() => {
-    const handleOpenPushConfig = () => setOpen(true);
+    const handleOpenPushConfig = () => {
+      setOpen(true);
+      fetchStatus();
+    };
     window.addEventListener('dh1:open-push-config', handleOpenPushConfig);
     return () => window.removeEventListener('dh1:open-push-config', handleOpenPushConfig);
-  }, []);
+  }, [fetchStatus]);
 
   const ensureCurrentDeviceSubscribed = async () => {
     if (!pushSupported) return false;
@@ -164,11 +204,7 @@ export default function AvisoSemanalOT() {
       setVapidPublicKey(pubKey);
     }
 
-    const ok = await registerBrowserPushSubscription(pubKey);
-    if (ok) {
-      setDeviceCount((c) => Math.max(c, 1));
-    }
-    return ok;
+    return await registerBrowserPushSubscription(pubKey);
   };
 
   const handleEnablePush = async () => {
@@ -180,12 +216,20 @@ export default function AvisoSemanalOT() {
     try {
       const ok = await ensureCurrentDeviceSubscribed();
       if (ok) {
-        toast.success('Notificaciones push activadas en este dispositivo (PC / móvil).');
+        toast.success('Dispositivo registrado correctamente para notificaciones push.');
       } else {
-        toast.error('Debés permitir las notificaciones en el navegador para recibir avisos con DH1 cerrada.');
+        toast.error(
+          isIframe
+            ? 'El visor de vista previa bloquea permisos del navegador. Abrí la app en una pestaña nueva para registrar este equipo.'
+            : 'Debés permitir las notificaciones en el navegador para registrar este dispositivo.'
+        );
       }
     } catch (err) {
-      toast.error(err?.message || 'Error al activar las notificaciones push.');
+      toast.error(
+        isIframe
+          ? 'El visor embebido restringe el registro Web Push. Abrí https://dh1m.com en una pestaña nueva para suscribir tu navegador.'
+          : err?.message || 'Error al activar las notificaciones push.'
+      );
     } finally {
       setSubscribing(false);
     }
@@ -195,13 +239,11 @@ export default function AvisoSemanalOT() {
     setSendingTest(true);
     setLastTestResult(null);
     try {
-      // 1. Si es prueba en mi dispositivo y el navegador soporta Web Push, asegurar suscripción activa primero
       let browserSubscribed = isSubscribed;
       if (onlySelf && pushSupported && (!isSubscribed || Notification.permission !== 'granted')) {
         browserSubscribed = await ensureCurrentDeviceSubscribed().catch(() => false);
       }
 
-      // 2. Disparar el envío push real desde el servidor (Web Push + Push Móvil Nativo)
       const res = await base44.functions.invoke('gestionarPushSemanal', {
         action: 'send_weekly_ot_push',
         force: true,
@@ -211,7 +253,6 @@ export default function AvisoSemanalOT() {
       const webSent = data.webPush?.sent ?? 0;
       const mobileSent = data.mobilePush?.sent ?? 0;
 
-      // 3. Si el navegador tiene permiso concedido pero está en un entorno (ej. visor embebido) donde Web Push aún no tenía suscripción, disparar también notificación local del sistema para verificar visualmente
       let localShown = false;
       if (onlySelf && webSent === 0 && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         try {
@@ -232,6 +273,8 @@ export default function AvisoSemanalOT() {
         } catch (_) {}
       }
 
+      await fetchStatus();
+
       setLastTestResult({
         webSent,
         mobileSent,
@@ -245,7 +288,7 @@ export default function AvisoSemanalOT() {
         );
       } else {
         toast.warning(
-          'Aún no hay dispositivos Web Push suscriptos. Hacé clic en "Activar notificaciones push" y aceptá el permiso del navegador.'
+          'Aún no hay dispositivos Web Push registrados. Activá primero las notificaciones en este dispositivo.'
         );
       }
     } catch (err) {
@@ -257,7 +300,7 @@ export default function AvisoSemanalOT() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-md w-[calc(100%-2rem)] rounded-2xl border-border bg-card text-card-foreground p-6 space-y-4">
+      <DialogContent className="max-w-lg w-[calc(100%-2rem)] rounded-2xl border-border bg-card text-card-foreground p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center gap-3 text-primary">
           <div className="rounded-xl bg-primary/10 p-3">
             <ClipboardList className="h-6 w-6" />
@@ -268,62 +311,98 @@ export default function AvisoSemanalOT() {
           </div>
         </div>
 
-        <DialogHeader className="text-left space-y-2">
-          <DialogTitle className="text-2xl leading-tight">
+        <DialogHeader className="text-left space-y-1.5">
+          <DialogTitle className="text-xl leading-tight">
             ¿Cómo vienen con las órdenes de trabajo?
           </DialogTitle>
-          <DialogDescription className="text-sm leading-relaxed">
+          <DialogDescription className="text-xs leading-relaxed">
             {isWedOrFri
               ? `Es ${diaLabel}: revisá el avance de las órdenes de trabajo y mantené sus estados actualizados.`
               : 'Activá las notificaciones push en tu dispositivo para recibir automáticamente los miércoles y viernes el recordatorio de avance de OTs aunque tengas DH1 cerrada.'}
           </DialogDescription>
         </DialogHeader>
 
+        {/* Estado y listado de dispositivos registrados */}
         <div className="rounded-xl border border-border bg-muted/30 p-3.5 space-y-2.5 text-xs">
-          <div className="flex items-start gap-2.5">
-            <Laptop className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="font-medium text-foreground flex items-center justify-between gap-2">
-                <span>PC y Navegador (Web Push)</span>
-                {isSubscribed && permissionState === 'granted' ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Activo ({deviceCount})
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-amber-400 font-semibold">
-                    <AlertCircle className="h-3.5 w-3.5" /> Requiere permiso
-                  </span>
-                )}
-              </div>
-              <p className="text-muted-foreground mt-0.5">
-                Llega en segundo plano con DH1 cerrada si aceptás permisos y tu navegador/sistema admite Web Push.
-              </p>
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-foreground">
+              Dispositivos Web Push registrados ({registeredDevices.length})
+            </span>
+            <button
+              type="button"
+              onClick={fetchStatus}
+              disabled={loadingStatus}
+              className="inline-flex items-center gap-1 text-primary hover:underline text-[11px]"
+            >
+              <RefreshCw className={`h-3 w-3 ${loadingStatus ? 'animate-spin' : ''}`} />
+              Actualizar
+            </button>
           </div>
 
-          <div className="flex items-start gap-2.5 pt-2 border-t border-border/60">
-            <Smartphone className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="font-medium text-foreground flex items-center justify-between gap-2">
-                <span>Móvil (App nativa / PWA)</span>
-                <span className="text-primary font-semibold">Mié y Vie · 09:00 hs</span>
+          {registeredDevices.length === 0 ? (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-300 space-y-1">
+              <div className="font-semibold flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                Ningún navegador/PC registrado todavía (0 dispositivos)
               </div>
-              <p className="text-muted-foreground mt-0.5">
-                En Android podés suscribir el navegador aquí mismo; el push nativo iOS/Android llega a quienes tengan la app móvil instalada con credenciales push habilitadas.
+              <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                Para que tu PC o celular Android quede registrado en la base de datos, pulsá <strong>"1. Activar notificaciones push en este dispositivo"</strong> y aceptá el permiso del navegador.
+                {isIframe && ' (Si estás dentro del panel de vista previa del editor, abrí primero la app en una pestaña nueva para que el navegador permita suscribir el Service Worker).'}
               </p>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              {registeredDevices.map((dev) => (
+                <div
+                  key={dev.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-background/60 px-2.5 py-2"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {dev.device_type === 'movil' ? (
+                      <Smartphone className="h-4 w-4 text-primary shrink-0" />
+                    ) : (
+                      <Laptop className="h-4 w-4 text-primary shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-medium text-foreground truncate">
+                        {dev.user_email || user?.email} · {dev.device_type === 'movil' ? 'Móvil' : 'PC'}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {formatShortBrowser(dev.user_agent)}
+                        {dev.ultimo_envio_fecha ? ` · Último envío: ${dev.ultimo_envio_fecha}` : ' · Listo para recibir'}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold text-[11px] shrink-0">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Activo
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
+        {isIframe && !isSubscribed && (
+          <a
+            href="https://dh1m.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Abrir dh1m.com en pestaña nueva para registrar este navegador sin bloqueo de iframe
+          </a>
+        )}
 
         {lastTestResult && (
           <div className="rounded-xl border border-primary/30 bg-primary/10 px-3.5 py-2.5 text-xs space-y-1">
-            <div className="font-semibold text-primary">Resultado de la prueba:</div>
+            <div className="font-semibold text-primary">Resultado del último envío de prueba:</div>
             <div className="text-foreground">
               • Web Push (PC / navegador móvil): <strong>{lastTestResult.webSent}</strong> enviado(s)
               {lastTestResult.localShown ? ' (notificación mostrada en este navegador)' : ''}
             </div>
             <div className="text-foreground">
-              • Push móvil nativo (app instalada): <strong>{lastTestResult.mobileSent}</strong> enviado(s)
+              • Push móvil nativo (usuarios con app nativa): <strong>{lastTestResult.mobileSent}</strong> enviado(s)
             </div>
           </div>
         )}
@@ -331,7 +410,7 @@ export default function AvisoSemanalOT() {
         <div className="space-y-2 pt-1">
           {pushSupported && (!isSubscribed || permissionState !== 'granted') && (
             <Button
-              className="min-h-12 w-full gap-2 font-semibold"
+              className="min-h-11 w-full gap-2 font-semibold"
               onClick={handleEnablePush}
               disabled={subscribing || sendingTest}
             >
@@ -362,7 +441,7 @@ export default function AvisoSemanalOT() {
                 disabled={sendingTest || subscribing}
               >
                 {sendingTest ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
-                Enviar a todos ({totalActiveGlobal ?? deviceCount})
+                Enviar a todos ({totalActiveGlobal ?? registeredDevices.length})
               </Button>
             )}
           </div>

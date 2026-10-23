@@ -205,7 +205,14 @@ self.addEventListener('activate', (event) => {
 });
 
 // ── Evento: FETCH (interceptar requests según estrategia) ────────────────────
+const IS_DEV_OR_PREVIEW =
+  self.location.hostname.includes('preview') ||
+  self.location.hostname.includes('sandbox') ||
+  self.location.hostname === 'localhost' ||
+  self.location.hostname === '127.0.0.1';
+
 self.addEventListener('fetch', (event) => {
+  if (IS_DEV_OR_PREVIEW) return;
   const { request } = event;
 
   // Solo GET. POST/PUT/DELETE pasan directo (cola offline los maneja).

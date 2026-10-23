@@ -175,8 +175,20 @@ export default async function (req) {
       const { dateStr, weekday, diaLabel, isWedOrFri } = getBuenosAiresDateParts();
 
       let totalActiveGlobal = undefined;
+      let allDevices = undefined;
       if (user.role === 'admin') {
-        totalActiveGlobal = await sb.entities.PushSubscription.count({ activo: true });
+        const allActive = await fetchAllActiveSubscriptions(sb);
+        totalActiveGlobal = allActive.length;
+        allDevices = allActive.map((s) => ({
+          id: s.id,
+          user_email: s.user_email || 'Sin email',
+          sector_id: s.sector_id || '',
+          device_type: s.device_type || 'pc',
+          user_agent: s.user_agent || '',
+          ultimo_envio_fecha: s.ultimo_envio_fecha || null,
+          ultimo_envio_timestamp: s.ultimo_envio_timestamp || null,
+          created_date: s.created_date || null,
+        }));
       }
 
       return Response.json({
@@ -186,9 +198,14 @@ export default async function (req) {
         deviceCount: userSubs.length,
         devices: userSubs.map((s) => ({
           id: s.id,
+          user_email: s.user_email || user.email || '',
           device_type: s.device_type || 'pc',
+          user_agent: s.user_agent || '',
           ultimo_envio_fecha: s.ultimo_envio_fecha || null,
+          ultimo_envio_timestamp: s.ultimo_envio_timestamp || null,
+          created_date: s.created_date || null,
         })),
+        allDevices,
         todayAr: dateStr,
         weekday,
         diaLabel,
