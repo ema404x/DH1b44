@@ -200,17 +200,17 @@ export default async function (req) {
     }
 
     if (action === 'send_weekly_ot_push') {
-      if (user.role !== 'admin') {
+      const now = new Date();
+      const { dateStr: todayAr, weekday, diaLabel, isWedOrFri } = getBuenosAiresDateParts(now);
+      const force = body?.force === true;
+      const onlySelf = body?.only_self === true;
+
+      if (user.role !== 'admin' && !onlySelf) {
         return Response.json(
           { error: 'Forbidden: solo administradores o el workflow programado pueden ejecutar el envío masivo' },
           { status: 403 }
         );
       }
-
-      const now = new Date();
-      const { dateStr: todayAr, weekday, diaLabel, isWedOrFri } = getBuenosAiresDateParts(now);
-      const force = body?.force === true;
-      const onlySelf = body?.only_self === true;
 
       if (!isWedOrFri && !force) {
         return Response.json({
