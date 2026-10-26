@@ -16,16 +16,16 @@ export default function ResumenTotalCard({ resumen, fmt }) {
           <span className="text-xs text-muted-foreground">{total} obra{total !== 1 ? 's' : ''}</span>
         </div>
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-x-2">
             <span className="text-xs text-muted-foreground">Monto total</span>
-            <span className="text-sm font-bold text-foreground">{fmt(montoTotal)}</span>
+            <span className="text-sm font-bold text-foreground tabular-nums break-all">{fmt(montoTotal)}</span>
           </div>
           <div className="w-full h-px bg-border" />
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-x-2">
             <span className="text-xs text-emerald-400 flex items-center gap-1">
               <CheckCircle2 className="h-3 w-3" /> Listo certificar ({cantListo})
             </span>
-            <span className="text-sm font-bold text-emerald-400">{fmt(montoParcial)}</span>
+            <span className="text-sm font-bold text-emerald-400 tabular-nums break-all">{fmt(montoParcial)}</span>
           </div>
           {montoTotal > 0 && (
             <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">

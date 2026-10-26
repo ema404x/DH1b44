@@ -24,11 +24,11 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
   return (
     <Card className="border-border/50 hover:border-primary/30 hover:shadow-md transition-all duration-200 card-lift">
       <CardContent className="p-4">
-        <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-start gap-3 min-w-0">
           {/* Info principal */}
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex flex-wrap items-start gap-2">
-              <h3 className="font-semibold text-foreground leading-tight">{obra.titulo}</h3>
+              <h3 className="font-semibold text-foreground leading-tight break-words min-w-0">{obra.titulo}</h3>
               <Badge className={`text-xs border ${estado.color}`}>{estado.label}</Badge>
               {obra.tramo_certificacion === 'primer_50' && (
                 <Badge className="text-xs bg-yellow-400/20 text-yellow-300 border border-yellow-400/40">🟡 1° 50%</Badge>
@@ -154,14 +154,14 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
           </div>
 
           {/* Acciones */}
-          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
             {!readOnly && (
               <>
                 <Select
                   value={obra.tramo_certificacion || 'sin_tramo'}
                   onValueChange={(v) => onTramoChange(obra.id, v === 'sin_tramo' ? null : v)}
                 >
-                  <SelectTrigger className="h-8 w-32 text-xs">
+                  <SelectTrigger className="h-10 lg:h-8 w-32 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -171,7 +171,7 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
                   </SelectContent>
                 </Select>
                 <Select value={obra.estado_cobro} onValueChange={(v) => onEstadoChange(obra.id, v)}>
-                  <SelectTrigger className="h-8 w-36 text-xs">
+                  <SelectTrigger className="h-10 lg:h-8 w-44 lg:w-36 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -184,15 +184,15 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
                 </Select>
               </>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpanded(!expanded)}>
+            <Button variant="ghost" size="icon" className="h-10 w-10 lg:h-8 lg:w-8" onClick={() => setExpanded(!expanded)}>
               {expanded ? <ChevronUp className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
             {!readOnly && (
               <>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(obra)}>
+                <Button variant="ghost" size="icon" className="h-10 w-10 lg:h-8 lg:w-8" onClick={() => onEdit(obra)}>
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={onDelete}>
+                <Button variant="ghost" size="icon" className="h-10 w-10 lg:h-8 lg:w-8 text-destructive hover:text-destructive" onClick={onDelete}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </>
@@ -202,7 +202,7 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
 
         {/* Detalle expandido */}
         {expanded && (
-          <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-muted-foreground">
+          <div className="mt-3 pt-3 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-muted-foreground">
             {obra.fecha_inicio && <p><span className="font-medium text-foreground">Acta Inicio:</span> {safeDate(obra.fecha_inicio)}</p>}
             {obra.fecha_fin_estimada && <p><span className="font-medium text-foreground">Acta Recepción:</span> {safeDate(obra.fecha_fin_estimada)}</p>}
             {obra.oc_numero && <p><span className="font-medium text-foreground">N° MTOM:</span> {obra.oc_numero}</p>}
