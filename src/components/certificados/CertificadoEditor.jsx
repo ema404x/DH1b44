@@ -404,7 +404,7 @@ export default function CertificadoEditor({ initialData, onDraft, onEmitir, onCa
                 Aplicar
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">% acumulado sobre el contrato; descuenta lo certificado anteriormente</p>
+            <p className="text-xs text-muted-foreground mt-1">% presente; descuenta lo certificado anteriormente</p>
           </Field>
           <Field label="Fecha del Certificado"><Input type="date" value={form.fecha_certificado} onChange={e => set('fecha_certificado', e.target.value)} /></Field>
           <Field label="N° de Recepción"><Input value={form.numero_recepcion} onChange={e => set('numero_recepcion', e.target.value)} /></Field>
