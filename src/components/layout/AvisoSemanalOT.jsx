@@ -64,7 +64,7 @@ export default function AvisoSemanalOT() {
       toast(e.data.title, {
         description: e.data.body,
         duration: 15000,
-        action: { label: 'Ver', onClick: () => { window.location.href = e.data.url || '/ordenes-trabajo'; } },
+        action: { label: 'Ver', onClick: () => { window.location.href = e.data.url === '/ordenes-trabajo' || !e.data.url ? '/ordenes' : e.data.url; } },
       });
     };
     navigator.serviceWorker.addEventListener('message', onMsg);

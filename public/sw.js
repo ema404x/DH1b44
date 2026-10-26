@@ -260,7 +260,7 @@ self.addEventListener('push', (event) => {
   let payload = {
     title: '📋 DH1 · ¿Cómo vienen con las órdenes de trabajo?',
     body: 'Revisá el avance de las órdenes de trabajo y mantené sus estados actualizados.',
-    url: '/ordenes-trabajo',
+    url: '/ordenes',
     tag: 'dh1-aviso-ot',
   };
 
@@ -287,7 +287,7 @@ self.addEventListener('push', (event) => {
       requireInteraction: true,
       vibrate: [300, 120, 300, 120, 400],
       data: {
-        url: payload.url || '/ordenes-trabajo',
+        url: payload.url || '/ordenes',
         date: payload.date || null,
       },
       actions: [
@@ -300,7 +300,7 @@ self.addEventListener('push', (event) => {
 // ── Evento: NOTIFICATIONCLICK (Abrir DH1 al tocar la notificación push) ──────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification?.data?.url || '/ordenes-trabajo';
+  const targetUrl = event.notification?.data?.url || '/ordenes';
 
   event.waitUntil(
     (async () => {

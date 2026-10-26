@@ -256,7 +256,7 @@ export default async function (req) {
 
       const defaultTitle = '📋 DH1 · ¿Cómo vienen con las órdenes de trabajo?';
       const defaultBody = 'Revisá el avance de las órdenes de trabajo y mantené sus estados actualizados.';
-      const actionUrl = '/ordenes-trabajo';
+      const actionUrl = '/ordenes';
 
       const { publicKey, privateKey } = await getOrCreateVapidKeys(sb);
       webpush.setVapidDetails('mailto:notificaciones@dh1m.com', publicKey, privateKey);
