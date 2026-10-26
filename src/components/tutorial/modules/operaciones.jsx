@@ -307,6 +307,43 @@ export const OPERACIONES_MODULES = [
         ],
         important: 'Las rutinas con "requiere_informe_matriculado" no se pueden marcar como ejecutadas sin cargar la matrícula profesional.',
       },
+      {
+        title: 'Generar una Orden de Trabajo desde una rutina',
+        duration: '3 min',
+        difficulty: 'Fácil',
+        description: 'Cualquier orden de rutina se puede convertir en una Orden de Trabajo para asignarla a la cuadrilla y seguirla en el módulo de Órdenes.',
+        instructions: [
+          'En el "Tablero" de Rutinas, abrí la orden de rutina que querés ejecutar',
+          'Tocá el botón para generar la OT: se abre "Nueva Orden de Trabajo"',
+          'Revisá el título (se completa como "[Rutina] objeto — edificio")',
+          'Elegí el tipo (por defecto Mantenimiento Preventivo) y la prioridad',
+          'Confirmá la ubicación, la fecha programada y el responsable',
+          'Revisá la descripción precargada desde la rutina y agregá notas si hace falta',
+          'Confirmá la creación: vas a ver el aviso "Orden de trabajo creada correctamente"',
+        ],
+        tips: [
+          'La OT queda vinculada a la rutina, así no se generan órdenes duplicadas',
+          'Podés dejar la OT "Sin asignar" y asignar al responsable más tarde',
+          'La nueva OT aparece en Órdenes de trabajo y sigue el flujo normal hasta la validación',
+        ],
+      },
+      {
+        title: 'Generar OTs en lote para los jefes de sitio',
+        duration: '3 min',
+        difficulty: 'Media',
+        description: 'Generá de una sola vez las OTs de todas las rutinas pendientes que todavía no tienen orden, agrupadas por jefe de sitio.',
+        instructions: [
+          'Abrí la sección "Generar OTs" dentro de Rutinas',
+          'Revisá el listado de rutinas pendientes sin orden de trabajo',
+          'Seleccioná las rutinas o jefes de sitio para los que querés generar OTs',
+          'Confirmá la generación y esperá a que termine el proceso',
+        ],
+        tips: [
+          'Si ves "Todas las rutinas tienen OT asignada", no queda nada pendiente por generar',
+          'Cada jefe de sitio recibe las OTs de sus edificios en su tablet',
+        ],
+        important: 'Revisá las rutinas antes de generar en lote: cada OT creada llega a la cuadrilla correspondiente.',
+      },
     ],
   },
   {
