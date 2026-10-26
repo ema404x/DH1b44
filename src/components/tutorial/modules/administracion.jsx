@@ -1,5 +1,97 @@
 export const ADMINISTRACION_MODULES = [
   {
+    id: 'notificaciones-push',
+    icon: '📲',
+    title: 'Notificaciones Push',
+    description: 'Recibí avisos de órdenes de trabajo en PC y celular',
+    color: '#0bb3d0',
+    category: 'administracion',
+    keywords: ['push', 'notificaciones', 'avisos', 'celular', 'ordenes'],
+    steps: [
+      {
+        title: 'Activar las notificaciones',
+        duration: '1 min',
+        difficulty: 'Fácil',
+        description: 'Cada persona activa las notificaciones una sola vez por dispositivo para recibir los avisos de su sector.',
+        instructions: [
+          'Entrá a la app desde el navegador de tu PC o celular',
+          'Tocá "Activar" en el cartel de notificaciones',
+          'Aceptá el permiso que pide el navegador',
+          'Listo: el dispositivo queda registrado automáticamente',
+        ],
+        tips: [
+          'Si tenés la app abierta, el aviso aparece también dentro de la app con el botón "Ver"',
+          'El botón "Ver" te lleva directo a Órdenes de trabajo',
+          'Si cambiás de dispositivo o navegador, tenés que volver a activarlas',
+        ],
+      },
+      {
+        title: 'Configurar los avisos del sector',
+        duration: '3 min',
+        difficulty: 'Media',
+        description: 'Administradores y gerentes definen qué días, a qué hora y con qué texto se envía el aviso semanal de su sector.',
+        instructions: [
+          'Andá a Alertas Proactivas en Administración',
+          'Buscá la configuración de Aviso Push de OT',
+          'Elegí los días y la hora de envío (hora Argentina)',
+          'Editá el título y el mensaje del aviso',
+          'Guardá los cambios o usá el envío manual para mandarlo ahora',
+        ],
+        tips: [
+          'Los avisos solo llegan a los usuarios de tu mismo sector',
+          'Cada dispositivo recibe un solo aviso por día, sin duplicados',
+        ],
+        important: 'Solo reciben el aviso las personas que activaron las notificaciones en su dispositivo.',
+      },
+    ],
+  },
+  {
+    id: 'fichaje-qr',
+    icon: '🕒',
+    title: 'Fichaje por QR y Asistencias',
+    description: 'Registrá entradas y salidas por ubicación y revisá las asistencias',
+    color: '#10b981',
+    category: 'administracion',
+    keywords: ['fichaje', 'qr', 'asistencia', 'entrada', 'salida', 'jornada'],
+    steps: [
+      {
+        title: 'Fichar entrada y salida',
+        duration: '2 min',
+        difficulty: 'Fácil',
+        description: 'Cada ubicación tiene su propio QR. El operario lo escanea para registrar su entrada y luego su salida.',
+        instructions: [
+          'Escaneá el QR de la ubicación con el celular',
+          'Ingresá tu nombre y DNI',
+          'Permití el acceso a la ubicación (GPS)',
+          'Firmá en pantalla y confirmá la entrada',
+          'Al terminar, escaneá el mismo QR para registrar la salida',
+        ],
+        tips: [
+          'La entrada y la salida se vinculan por DNI y ubicación',
+          'Si no fichás la salida, la jornada se cierra sola al cambio de día como "salida omitida"',
+        ],
+        important: 'El GPS es obligatorio para fichar: sin ubicación no se registra el fichaje.',
+      },
+      {
+        title: 'Revisar asistencias',
+        duration: '3 min',
+        difficulty: 'Media',
+        description: 'Desde el panel de asistencias podés controlar los fichajes, marcarlos como revisados o reportar incidencias.',
+        instructions: [
+          'Abrí el panel de Asistencias',
+          'Filtrá por ubicación, fecha o estado',
+          'Revisá horarios, firmas y ubicación GPS',
+          'Marcá cada fichaje como Revisado o Incidencia y agregá notas',
+          'Exportá los datos a Excel cuando lo necesites',
+        ],
+        tips: [
+          'Los jefes de sitio solo ven los fichajes de sus ubicaciones',
+          'Cambiar el estado administrativo no modifica horarios ni firmas',
+        ],
+      },
+    ],
+  },
+  {
     id: 'alertas',
     icon: '🔔',
     title: 'Alertas Proactivas',
