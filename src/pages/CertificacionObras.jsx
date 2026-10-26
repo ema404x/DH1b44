@@ -15,6 +15,7 @@ import ObraCertificacionDialog from '@/components/certificacion/ObraCertificacio
 import ObraCertificacionCard from '@/components/certificacion/ObraCertificacionCard';
 import ImportarObrasExcel from '@/components/certificacion/ImportarObrasExcel';
 import CicloSelector from '@/components/certificacion/CicloSelector';
+import ResumenTotalCard from '@/components/certificacion/ResumenTotalCard';
 import { exportarComunaPDF, exportarFiltradoPDF } from '@/components/certificacion/ExportarComunaPDF';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuth } from '@/lib/AuthContext';
@@ -301,7 +302,7 @@ export default function CertificacionObras() {
 
       {/* Resumen por Comuna */}
       {resumenPorComuna.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {resumenPorComuna.map(({ comuna, montoTotal, montoParcial, cantListo, total }) => (
             <Card key={comuna} className="border-border">
               <CardContent className="p-4 space-y-3">
@@ -347,6 +348,7 @@ export default function CertificacionObras() {
               </CardContent>
             </Card>
           ))}
+          <ResumenTotalCard resumen={resumenPorComuna} fmt={fmt} />
         </div>
       )}
 
