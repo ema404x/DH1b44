@@ -58,6 +58,20 @@ export default function AvisoSemanalOT() {
   }, [user?.id]);
 
   useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onMsg = (e) => {
+      if (e.data?.type !== 'dh1-push') return;
+      toast(e.data.title, {
+        description: e.data.body,
+        duration: 15000,
+        action: { label: 'Ver', onClick: () => { window.location.href = e.data.url || '/ordenes-trabajo'; } },
+      });
+    };
+    navigator.serviceWorker.addEventListener('message', onMsg);
+    return () => navigator.serviceWorker.removeEventListener('message', onMsg);
+  }, []);
+
+  useEffect(() => {
     const handler = () => {
       setOpen(true);
       registrarDispositivo().catch(() => {});

@@ -274,6 +274,11 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  // Avisar a las pestañas abiertas para mostrar el cartel dentro de la app
+  self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) =>
+    cs.forEach((c) => c.postMessage({ type: 'dh1-push', title: payload.title, body: payload.body, url: payload.url }))
+  );
+
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
