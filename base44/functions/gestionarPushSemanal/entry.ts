@@ -230,25 +230,32 @@ export default async function (req) {
       }
 
       // Configuración editable desde "Configuración de Alertas"
+      // Cada AlertaConfig pertenece a un sector: se envía solo a los usuarios de ese sector
       const cfgRes = await sb.entities.AlertaConfig.filter({ tipo: 'aviso_push_ot' });
-      const cfgList = Array.isArray(cfgRes) ? cfgRes : (cfgRes?.items || []);
-      const cfg = cfgList.find((c) => c.activo !== false) || null;
+      const cfgList = (Array.isArray(cfgRes) ? cfgRes : (cfgRes?.items || [])).filter((c) => c.activo !== false && c.sector_id);
+      const userSector = (u) => u?.sector_id || u?.data?.sector_id || null;
+      const callerSector = userSector(user);
 
-      if (!force) {
-        if (!cfg) {
-          return Response.json({ ok: true, skipped: true, reason: 'Aviso push desactivado o sin configurar.' });
-        }
+      let selectedCfgs;
+      if (force) {
+        // Envío manual / prueba: solo la alerta del sector de quien la dispara
+        selectedCfgs = cfgList.filter((c) => c.sector_id === callerSector);
+      } else {
         const dayIdx = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(weekday);
         const hourAr = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Buenos_Aires', hour: 'numeric', hourCycle: 'h23' }).format(now));
-        const dias = Array.isArray(cfg.dias_semana) ? cfg.dias_semana : [3, 5];
-        const hora = typeof cfg.hora_envio === 'number' ? cfg.hora_envio : 9;
-        if (!dias.includes(dayIdx) || hourAr < hora || cfg.ultimo_envio_push === todayAr) {
-          return Response.json({ ok: true, skipped: true, reason: 'Fuera del día/horario configurado o ya enviado hoy.' });
-        }
+        selectedCfgs = cfgList.filter((c) => {
+          const dias = Array.isArray(c.dias_semana) ? c.dias_semana : [3, 5];
+          const hora = typeof c.hora_envio === 'number' ? c.hora_envio : 9;
+          return dias.includes(dayIdx) && hourAr >= hora && c.ultimo_envio_push !== todayAr;
+        });
       }
+      if (!selectedCfgs.length && !onlySelf) {
+        return Response.json({ ok: true, skipped: true, reason: 'Sin alertas para enviar ahora (fuera de horario, ya enviadas o sin configurar para el sector).' });
+      }
+      const cfgBySector = new Map(selectedCfgs.map((c) => [c.sector_id, c]));
 
-      const title = cfg?.titulo_push || '📋 DH1 · ¿Cómo vienen con las órdenes de trabajo?';
-      const messageBody = cfg?.mensaje_push || 'Revisá el avance de las órdenes de trabajo y mantené sus estados actualizados.';
+      const defaultTitle = '📋 DH1 · ¿Cómo vienen con las órdenes de trabajo?';
+      const defaultBody = 'Revisá el avance de las órdenes de trabajo y mantené sus estados actualizados.';
       const actionUrl = '/ordenes-trabajo';
 
       const { publicKey, privateKey } = await getOrCreateVapidKeys(sb);
@@ -257,7 +264,9 @@ export default async function (req) {
       const allSubs = await fetchAllActiveSubscriptions(sb);
       const allUsersRes = await sb.entities.User.list();
       const userList = Array.isArray(allUsersRes) ? allUsersRes : (allUsersRes?.items || []);
-      const targetUsers = onlySelf ? userList.filter((u) => u.id === user.id) : userList;
+      const targetUsers = onlySelf
+        ? userList.filter((u) => u.id === user.id)
+        : userList.filter((u) => cfgBySector.has(userSector(u)));
 
       // Agrupar dispositivos por usuario (deduplicados por endpoint)
       const subsByUser = new Map();
@@ -270,18 +279,11 @@ export default async function (req) {
         subsByUser.get(sub.user_id).push(sub);
       }
 
-      const payloadStr = JSON.stringify({
-        title,
-        body: messageBody,
-        url: actionUrl,
-        tag: `dh1-aviso-ot-${todayAr}`,
-        date: todayAr,
-      });
-
       const stats = { sentWeb: 0, sentMobile: 0, alreadyNotified: 0, expiredRemoved: 0, failedRetryable: 0, noChannel: 0 };
+      const failedSectors = new Set();
 
       // Intenta Web Push en todos los dispositivos del usuario. Devuelve: 'sent' | 'failed' | 'none'
-      const sendWebToUser = async (subs) => {
+      const sendWebToUser = async (subs, payloadStr) => {
         let anySent = false;
         let anyFailed = false;
         for (const sub of subs) {
@@ -317,7 +319,17 @@ export default async function (req) {
         }
 
         // 1) Web Push primero; si llega a algún dispositivo, no se envía push nativo (evita duplicados entre canales)
-        const webResult = await sendWebToUser(subsByUser.get(u.id) || []);
+        const ucfg = cfgBySector.get(userSector(u)) || null;
+        const title = ucfg?.titulo_push || defaultTitle;
+        const messageBody = ucfg?.mensaje_push || defaultBody;
+        const payloadStr = JSON.stringify({
+          title,
+          body: messageBody,
+          url: actionUrl,
+          tag: `dh1-aviso-ot-${todayAr}`,
+          date: todayAr,
+        });
+        const webResult = await sendWebToUser(subsByUser.get(u.id) || [], payloadStr);
         let delivered = webResult === 'sent';
         if (delivered) stats.sentWeb++;
 
@@ -346,6 +358,7 @@ export default async function (req) {
           }).catch(() => {});
         } else if (webResult === 'failed') {
           stats.failedRetryable++;
+          failedSectors.add(userSector(u));
         } else {
           stats.noChannel++;
         }
@@ -358,10 +371,12 @@ export default async function (req) {
       // El día se marca como completado solo si no quedaron fallos reintentables;
       // si quedaron, la próxima ejecución horaria reintenta únicamente a esos usuarios.
       const completed = stats.failedRetryable === 0;
-      if (cfg?.id && !onlySelf) {
-        const upd = { ultima_notificacion: now.toISOString() };
-        if (completed) upd.ultimo_envio_push = todayAr;
-        await sb.entities.AlertaConfig.update(cfg.id, upd).catch(() => {});
+      if (!onlySelf) {
+        for (const c of selectedCfgs) {
+          const upd = { ultima_notificacion: now.toISOString() };
+          if (!failedSectors.has(c.sector_id)) upd.ultimo_envio_push = todayAr;
+          await sb.entities.AlertaConfig.update(c.id, upd).catch(() => {});
+        }
       }
 
       return Response.json({
