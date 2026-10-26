@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import ActivarNotificacionesBanner from '@/components/layout/ActivarNotificacionesBanner';
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -52,7 +53,8 @@ export default function AvisoSemanalOT() {
   useEffect(() => {
     if (!user?.id || done.current) return;
     done.current = true;
-    registrarDispositivo().catch(() => {});
+    // Solo re-registra si ya hay permiso; el pedido de permiso lo hace el cartel con un toque
+    if (pushSupported() && Notification.permission === 'granted') registrarDispositivo().catch(() => {});
   }, [user?.id]);
 
   useEffect(() => {
@@ -81,6 +83,8 @@ export default function AvisoSemanalOT() {
   };
 
   return (
+    <>
+    {user?.id && <ActivarNotificacionesBanner onActivar={registrarDispositivo} />}
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-sm w-[calc(100%-2rem)] rounded-2xl bg-card p-6 space-y-4">
         <div className="flex items-center gap-3 text-primary">
@@ -102,5 +106,6 @@ export default function AvisoSemanalOT() {
         <Button variant="secondary" className="w-full" onClick={() => setOpen(false)}>Cerrar</Button>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
