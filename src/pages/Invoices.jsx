@@ -11,7 +11,6 @@ import {
 import CertificacionObrasPanel from '@/components/invoices/CertificacionObrasPanel';
 import DashboardFinanciero from '@/components/finanzas/DashboardFinanciero';
 import ReportesFacturacion from '@/components/invoices/ReportesFacturacion';
-import RentabilidadProyectos from '@/components/finanzas/RentabilidadProyectos';
 import AbonosFinancieros from '@/components/finanzas/AbonosFinancieros';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
@@ -48,7 +47,6 @@ function HeroKpi({ label, value, sub, icon: Icon, color, border, bg, trend, tren
 const TABS = [
   { key: 'dashboard',    label: 'Dashboard',    icon: Activity  },
   { key: 'abonos',      label: 'Abonos',       icon: RefreshCw },
-  { key: 'rentabilidad', label: 'Rentabilidad', icon: TrendingUp },
   { key: 'reportes',     label: 'Reportes',     icon: BarChart3  },
   { key: 'certificacion',label: 'Certificación',icon: FileCheck  },
 ];
@@ -105,7 +103,7 @@ export default function Invoices() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-foreground tracking-tight leading-none">Centro Financiero</h1>
-                <p className="text-xs text-muted-foreground mt-0.5">Rentabilidad · Reportes · Certificación de Obras</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Abonos · Reportes · Certificación de Obras</p>
               </div>
             </div>
             {/* Periodo selector + Quick stat badge */}
@@ -164,7 +162,6 @@ export default function Invoices() {
       <div className="page-enter" key={activeTab}>
         {activeTab === 'dashboard'    && <DashboardFinanciero />}
         {activeTab === 'abonos'       && <AbonosFinancieros abonos={abonos} certificados={certificados} />}
-        {activeTab === 'rentabilidad' && <RentabilidadProyectos projects={projects} certificados={certificados} />}
         {activeTab === 'reportes'     && <ReportesFacturacion />}
         {activeTab === 'certificacion'&& <CertificacionObrasPanel />}
       </div>
