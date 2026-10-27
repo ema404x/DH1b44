@@ -100,7 +100,7 @@ export default function DashboardFinanciero() {
   const STALE = 2 * 60 * 1000;
   const [periodo, setPeriodo] = useState('all');
 
-  const { data: invoices    = [] } = useQuery({ queryKey: ['invoices'],           queryFn: () => base44.entities.Invoice.list('-created_date', 2000),                          staleTime: STALE });
+  const { data: invoices    = [], isLoading } = useQuery({ queryKey: ['invoices'],           queryFn: () => base44.entities.Invoice.list('-created_date', 2000),                          staleTime: STALE });
   const { data: certificates = [] } = useQuery({ queryKey: ['certificados'],      queryFn: () => base44.entities.Certificado.list('-created_date', 2000),                      staleTime: STALE });
   const { data: obras        = [] } = useQuery({ queryKey: ['obras-certificacion'],queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 1000), staleTime: STALE });
   const { data: projects     = [] } = useQuery({ queryKey: ['projects'],          queryFn: () => base44.entities.Project.list('-updated_date', 300),      staleTime: STALE });
@@ -164,13 +164,14 @@ export default function DashboardFinanciero() {
     filtered.forEach(inv => {
       if (!inv.issue_date) return;
       try {
-        const key = format(startOfMonth(parseISO(inv.issue_date)), 'MMM yy', { locale: es });
-        if (!map[key]) map[key] = { mes: key, facturado: 0, cobrado: 0 };
+        const d = startOfMonth(parseISO(inv.issue_date));
+        const key = format(d, 'yyyy-MM');
+        if (!map[key]) map[key] = { key, mes: format(d, 'MMM yy', { locale: es }), facturado: 0, cobrado: 0 };
         map[key].facturado += (inv.total || 0);
         if (inv.status === 'pagada') map[key].cobrado += (inv.total || 0);
       } catch {}
     });
-    return Object.values(map).slice(-10);
+    return Object.values(map).sort((a, b) => a.key.localeCompare(b.key)).slice(-10);
   }, [filtered]);
 
   // Distribución por estado
@@ -206,13 +207,18 @@ export default function DashboardFinanciero() {
     return Object.values(map).sort((a, b) => b.monto - a.monto);
   }, [obras]);
 
+  if (isLoading) {
+    return <div className="py-16 text-center text-sm text-muted-foreground">Cargando datos financieros…</div>;
+  }
+
   const maxMonto = obrasEstado.reduce((m, d) => Math.max(m, d.monto), 0);
   const maxCliente = topClientes[0]?.total || 0;
 
   return (
     <div className="space-y-8">
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <span className="text-[11px] text-muted-foreground">El período aplica a facturas</span>
         <div className="flex items-center gap-1 p-1 rounded-xl border border-border/40 bg-card/40">
           {PERIODOS.map(p => (
             <button key={p.key} onClick={() => setPeriodo(p.key)}

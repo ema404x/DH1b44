@@ -104,7 +104,7 @@ export default function AbonosContratosTable({ abonos, certificadosAbono }) {
                       <TableCell colSpan={9} className="py-3 px-8">
                         <div className="space-y-1">
                           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Certificados mensuales generados ({certs.length})</p>
-                          {certs.sort((a, b) => (a.mes_periodo || '').localeCompare(b.mes_periodo || '')).map((c) => (
+                          {[...certs].sort((a, b) => (a.mes_periodo || '').localeCompare(b.mes_periodo || '')).map((c) => (
                             <div key={c.id} className="flex items-center justify-between text-xs py-1">
                               <span className="text-muted-foreground">{c.mes_periodo || '—'} · N°{c.numero || '—'}</span>
                               <div className="flex items-center gap-3">

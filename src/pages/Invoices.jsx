@@ -8,7 +8,6 @@ import {
   ArrowUpRight, ArrowDownRight, Activity, Layers, PieChart, Calendar,
   RefreshCw
 } from 'lucide-react';
-import { parseISO, subDays, subYears, startOfYear } from 'date-fns';
 import CertificacionObrasPanel from '@/components/invoices/CertificacionObrasPanel';
 import DashboardFinanciero from '@/components/finanzas/DashboardFinanciero';
 import ReportesFacturacion from '@/components/invoices/ReportesFacturacion';

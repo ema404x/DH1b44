@@ -32,7 +32,7 @@ function AbonosReporte({ certs, periodo, contratista, estado }) {
   const porMes = useMemo(() => {
     const map = {};
     data.forEach(c => {
-      const f = c.fecha_certificado || c.mes_periodo; if (!f) return;
+      const f = c.mes_periodo || c.fecha_certificado; if (!f) return;
       const d = new Date(f); if (isNaN(d)) return;
       const k = format(startOfMonth(d), 'MMM yy', { locale: es });
       const ts = startOfMonth(d).getTime();
