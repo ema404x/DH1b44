@@ -106,12 +106,13 @@ export default function DashboardFinanciero() {
   const { data: projects     = [] } = useQuery({ queryKey: ['projects'],          queryFn: () => base44.entities.Project.list('-updated_date', 300),      staleTime: STALE });
 
   // ── Filtrado por período (solo facturas) + ventana anterior para deltas ──
-  const { filtered, prevFiltered } = useMemo(() => {
+  const { filtered, prevFiltered, certsPeriodo } = useMemo(() => {
     const now = new Date();
-    const inRange = (inv, desde, hasta) => {
-      if (!inv.issue_date) return false;
-      let d;
-      try { d = parseISO(inv.issue_date); } catch { return false; }
+    const inRange = (inv, desde, hasta, field = 'issue_date') => {
+      const v = field === 'cert' ? (inv.fecha_aprobacion || inv.fecha_certificado) : inv[field];
+      if (!v) return false;
+      const d = parseISO(v);
+      if (isNaN(d)) return false;
       if (hasta && d >= hasta) return false;
       return !desde || d >= desde;
     };
@@ -120,14 +121,16 @@ export default function DashboardFinanciero() {
     else if (periodo === '90') { desde = subDays(now, 90); hasta = now; prevHasta = desde; prevDesde = subDays(now, 180); }
     else if (periodo === 'ytd') { desde = startOfYear(now); hasta = now; prevHasta = desde; prevDesde = subYears(startOfYear(now), 1); }
     // 'all' → sin filtro
+    const aprobados = certificates.filter(c => c.estado === 'aprobado');
     if (!desde) {
-      return { filtered: invoices, prevFiltered: [] };
+      return { filtered: invoices, prevFiltered: [], certsPeriodo: aprobados };
     }
     return {
       filtered: invoices.filter(i => inRange(i, desde, hasta)),
       prevFiltered: invoices.filter(i => inRange(i, prevDesde, prevHasta)),
+      certsPeriodo: aprobados.filter(c => inRange(c, desde, hasta, 'cert')),
     };
-  }, [invoices, periodo]);
+  }, [invoices, certificates, periodo]);
 
   const deltaPct = (curr, prev) => {
     if (!prev || prev === 0) return null;
@@ -142,7 +145,7 @@ export default function DashboardFinanciero() {
     const obrasActivas   = obras.filter(o => !o.ciclo_archivado);
     const montoACobrar   = obrasActivas.reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
     const montoListo     = obrasActivas.filter(o => o.estado_cobro === 'listo_certificar').reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
-    const certsAprobados = certificates.filter(c => c.estado === 'aprobado');
+    const certsAprobados = certsPeriodo;
     const montoCerts     = certsAprobados.reduce((s, c) => s + (c.subtotal || 0), 0);
     const totalPresup    = projects.reduce((s, p) => s + (p.estimated_budget || 0), 0);
     const ejecucionProm  = projects.length > 0 ? Math.round(projects.reduce((s, p) => s + (p.progress || 0), 0) / projects.length) : 0;
@@ -156,7 +159,7 @@ export default function DashboardFinanciero() {
       dTotal: deltaPct(totalFacturado, prevTotal),
       dCobrado: deltaPct(cobrado, prevCobrado),
     };
-  }, [filtered, prevFiltered, obras, certificates, projects]);
+  }, [filtered, prevFiltered, obras, certsPeriodo, projects]);
 
   // Evolución mensual
   const monthlyData = useMemo(() => {
@@ -218,7 +221,7 @@ export default function DashboardFinanciero() {
     <div className="space-y-8">
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <span className="text-[11px] text-muted-foreground">El período aplica a facturas</span>
+        <span className="text-[11px] text-muted-foreground">El período aplica a facturas y certificados aprobados · obras y proyectos muestran el estado actual</span>
         <div className="flex items-center gap-1 p-1 rounded-xl border border-border/40 bg-card/40">
           {PERIODOS.map(p => (
             <button key={p.key} onClick={() => setPeriodo(p.key)}
@@ -247,7 +250,7 @@ export default function DashboardFinanciero() {
           <StatCard title="A Cobrar — Obras"     value={fmt(kpis.montoACobrar)}  sub={`${kpis.nActivas} obras activas`}         icon={Building2}  color="text-sky-400"    glow={false} />
           <StatCard title="Listo para Certificar" value={fmt(kpis.montoListo)}   sub="Estado: listo_certificar"                 icon={FileCheck}  color="text-emerald-400" glow={false} />
           <StatCard title="Presupuesto Proyectos" value={fmt(kpis.totalPresup)}  sub={`${projects.length} proy. · ${kpis.ejecucionProm}% ejec.`} icon={TrendingUp} color="text-purple-400" glow={false} />
-          <StatCard title="Certs. Aprobados"      value={fmt(kpis.montoCerts)}   sub={`${kpis.cntCerts} certificados`}          icon={CheckCircle2} color="text-blue-400" glow={false} />
+          <StatCard title="Certs. Aprobados"      value={fmt(kpis.montoCerts)}   sub={`${kpis.cntCerts} certificados en el período`}          icon={CheckCircle2} color="text-blue-400" glow={false} />
         </div>
       </div>
 
