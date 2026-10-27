@@ -269,11 +269,15 @@ export default function ChatbotSoporte() {
   // Alertas críticas — solo una vez, solo con usuario válido
   useEffect(() => {
     if (!currentUser?.id) return;
-    base44.entities.AlertaLog.filter({ leida: false, nivel: 'critical' }, '-fecha_alerta', 5)
-      .then(alertas => {
-        if (alertas.length > 0) { setCriticalAlerts(alertas.length); setUnread(alertas.length); }
+    const refresh = () => base44.entities.AlertaLog.count({ leida: false, nivel: 'critical' })
+      .then(n => {
+        setCriticalAlerts(n);
+        if (!openRef.current) setUnread(n);
       })
       .catch(() => {});
+    refresh();
+    const unsub = base44.entities.AlertaLog.subscribe(() => refresh());
+    return unsub;
   }, [currentUser?.id]);
 
   // ── Inicialización de conversación ───────────────────────────────────────
