@@ -80,12 +80,6 @@
       ]
     },
     {
-      "entity_name": "PresupuestoObraEnhanced",
-      "allowed_operations": [
-        "read"
-      ]
-    },
-    {
       "entity_name": "LocationData",
       "allowed_operations": [
         "read"
