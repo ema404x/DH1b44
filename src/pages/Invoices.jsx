@@ -84,7 +84,7 @@ export default function Invoices() {
   const [periodo, setPeriodo] = useState('all');
   const STALE = 2 * 60 * 1000;
 
-  const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],  queryFn: () => base44.entities.Invoice.list('-created_date'),    staleTime: STALE });
+  const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],  queryFn: () => base44.entities.Invoice.list('-created_date', 2000), staleTime: STALE });
   const { data: projects  = [] } = useQuery({ queryKey: ['projects'],  queryFn: () => base44.entities.Project.list('-updated_date', 300), staleTime: STALE });
   const { data: obras     = [] } = useQuery({ queryKey: ['obras-certificacion'], queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 1000), staleTime: STALE });
   const { data: abonos    = [] } = useQuery({ queryKey: ['abonos-maestro'], queryFn: () => base44.entities.AbonoMaestro.list('-created_date', 500), staleTime: STALE });

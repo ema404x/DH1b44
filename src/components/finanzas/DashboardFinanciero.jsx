@@ -92,8 +92,8 @@ function StatCard({ title, value, sub, icon: Icon, color, glow, delta }) {
 export default function DashboardFinanciero({ periodo = 'all' }) {
   const STALE = 2 * 60 * 1000;
 
-  const { data: invoices    = [] } = useQuery({ queryKey: ['invoices'],           queryFn: () => base44.entities.Invoice.list(),                          staleTime: STALE });
-  const { data: certificates = [] } = useQuery({ queryKey: ['certificados'],      queryFn: () => base44.entities.Certificado.list(),                      staleTime: STALE });
+  const { data: invoices    = [] } = useQuery({ queryKey: ['invoices'],           queryFn: () => base44.entities.Invoice.list('-created_date', 2000),                          staleTime: STALE });
+  const { data: certificates = [] } = useQuery({ queryKey: ['certificados'],      queryFn: () => base44.entities.Certificado.list('-created_date', 2000),                      staleTime: STALE });
   const { data: obras        = [] } = useQuery({ queryKey: ['obras-certificacion'],queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 1000), staleTime: STALE });
   const { data: projects     = [] } = useQuery({ queryKey: ['projects'],          queryFn: () => base44.entities.Project.list('-updated_date', 300),      staleTime: STALE });
 
