@@ -14,6 +14,7 @@ const ESTADO_CFG = {
   observado:        { label: 'Observado',    cls: 'bg-slate-500/12 text-slate-400'     },
   faltan_actas:     { label: 'Faltan actas', cls: 'bg-amber-500/12 text-amber-400'     },
   falta_aprobar_mein: { label: 'Falta MEIN', cls: 'bg-orange-500/12 text-orange-400'  },
+  sin_estado:       { label: 'Sin estado',   cls: 'bg-muted/40 text-muted-foreground'  },
 };
 
 export default function ReporteMensualComparativo() {
@@ -49,18 +50,18 @@ export default function ReporteMensualComparativo() {
     const map = new Map();
     certsMes.forEach(c => {
       const k = c.obra_servicio || c.ada_numero || 'Sin especificar';
-      if (!map.has(k)) map.set(k, { obra: k, certificado: 0, facturado: 0, cQty: 0, fQty: 0, estado_cobro: 'pendiente', avance: 0 });
+      if (!map.has(k)) map.set(k, { obra: k, certificado: 0, facturado: 0, cQty: 0, fQty: 0, estado_cobro: 'sin_estado', avance: 0 });
       const r = map.get(k); r.certificado += c.subtotal || 0; r.cQty++;
     });
     facsMes.forEach(f => {
       const k = f.project_name || 'Sin especificar';
-      if (!map.has(k)) map.set(k, { obra: k, certificado: 0, facturado: 0, cQty: 0, fQty: 0, estado_cobro: 'pendiente', avance: 0 });
+      if (!map.has(k)) map.set(k, { obra: k, certificado: 0, facturado: 0, cQty: 0, fQty: 0, estado_cobro: 'sin_estado', avance: 0 });
       const r = map.get(k); r.facturado += f.total || 0; r.fQty++;
     });
     obras.forEach(o => {
       if (map.has(o.titulo)) {
         const r = map.get(o.titulo);
-        r.estado_cobro = o.estado_cobro; r.avance = o.porcentaje_avance || 0;
+        r.estado_cobro = o.estado_cobro || 'sin_estado'; r.avance = o.porcentaje_avance || 0;
       }
     });
     let list = Array.from(map.values()).map(r => ({ ...r, diferencia: r.certificado - r.facturado, compliance: r.certificado > 0 ? Math.round((r.facturado / r.certificado) * 100) : 0 }));
@@ -173,7 +174,7 @@ export default function ReporteMensualComparativo() {
                   </thead>
                   <tbody className="divide-y divide-border/10">
                     {sortedRows.map((row, i) => {
-                      const cfg = ESTADO_CFG[row.estado_cobro] || ESTADO_CFG.pendiente;
+                      const cfg = ESTADO_CFG[row.estado_cobro] || ESTADO_CFG.sin_estado;
                       const compCls = row.compliance >= 100 ? 'text-emerald-400' : row.compliance >= 75 ? 'text-blue-400' : 'text-amber-400';
                       return (
                         <tr key={i} className="hover:bg-muted/10 transition-colors">
