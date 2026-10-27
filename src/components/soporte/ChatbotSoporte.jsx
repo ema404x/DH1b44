@@ -420,17 +420,6 @@ export default function ChatbotSoporte() {
     }
   }, [currentUser]);
 
-  const handlePhotoUpload = useCallback(async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 8 * 1024 * 1024) { alert('La imagen supera el límite de 8 MB.'); e.target.value = ''; return; }
-    setUploadingPhoto(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await handleSend('(foto adjunta para consulta)', [file_url]);
-    } catch { alert('No se pudo subir la imagen. Intentá de nuevo.'); }
-    finally { setUploadingPhoto(false); e.target.value = ''; }
-  }, [handleSend]);
 
   // FIX: reset completo y limpio — resetea todos los guards
   const handleReset = useCallback(() => {
@@ -677,12 +666,6 @@ export default function ChatbotSoporte() {
             {/* Input */}
             <div className="px-3 pb-3 pt-1 border-t border-border flex-shrink-0">
               <div className="flex gap-2 items-end">
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-                <button onClick={() => fileInputRef.current?.click()} disabled={!conversation || uploadingPhoto || initError}
-                  title="Adjuntar foto"
-                  className="h-9 w-9 rounded-xl flex-shrink-0 flex items-center justify-center border border-border hover:bg-muted transition-colors disabled:opacity-40">
-                  {uploadingPhoto ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : <ImageIcon className="h-4 w-4 text-muted-foreground" />}
-                </button>
                 <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                   placeholder={initError ? 'Error de conexión — reintentá' : 'Escribí tu pregunta...'}
@@ -696,7 +679,7 @@ export default function ChatbotSoporte() {
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
-              <p className="text-[10px] text-muted-foreground/50 text-center mt-1.5">Enter para enviar · 📷 podés adjuntar fotos</p>
+              <p className="text-[10px] text-muted-foreground/50 text-center mt-1.5">Enter para enviar</p>
             </div>
           </motion.div>
         )}
