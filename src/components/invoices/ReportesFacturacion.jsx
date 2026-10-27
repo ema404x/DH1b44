@@ -24,7 +24,7 @@ function AbonosReporte({ certs, periodo, contratista, estado }) {
     if (contratista !== 'todos') list = list.filter(c => c.contratista === contratista);
     if (periodo !== 'todo') {
       const cutoff = subMonths(new Date(), parseInt(periodo));
-      list = list.filter(c => { const f = c.fecha_certificado || c.mes_periodo; return f && new Date(f) >= cutoff; });
+      list = list.filter(c => { const f = c.mes_periodo || c.fecha_certificado; return f && new Date(f) >= startOfMonth(cutoff); });
     }
     return list;
   }, [certs, periodo, contratista, estado]);
@@ -221,7 +221,7 @@ export default function ReportesFacturacion() {
 
   const { data: certs = [], isLoading } = useQuery({
     queryKey: ['certificados-financiero'],
-    queryFn:  () => base44.entities.Certificado.list('-fecha_certificado', 500),
+    queryFn:  () => base44.entities.Certificado.list('-fecha_certificado', 2000),
     staleTime: 2 * 60 * 1000,
   });
 
@@ -239,7 +239,7 @@ export default function ReportesFacturacion() {
             <p className="text-sm font-bold text-foreground leading-tight">Reportes Financieros</p>
             <p className="text-xs text-muted-foreground">Filtros en tiempo real · {isLoading ? 'cargando…' : `${certs.length} certificados cargados`}</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          {tab === 'abonos' && <div className="flex items-center gap-2 flex-wrap">
             <Filter className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
             <Select value={periodo} onValueChange={setPeriodo}>
               <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
@@ -268,7 +268,7 @@ export default function ReportesFacturacion() {
                 </SelectContent>
               </Select>
             )}
-          </div>
+          </div>}
         </div>
 
         {/* Sub-tabs */}

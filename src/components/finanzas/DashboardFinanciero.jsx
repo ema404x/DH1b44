@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
@@ -89,8 +89,16 @@ function StatCard({ title, value, sub, icon: Icon, color, glow, delta }) {
   );
 }
 
-export default function DashboardFinanciero({ periodo = 'all' }) {
+const PERIODOS = [
+  { key: '30',  label: '30 días' },
+  { key: '90',  label: '90 días' },
+  { key: 'ytd', label: 'Año actual' },
+  { key: 'all', label: 'Histórico' },
+];
+
+export default function DashboardFinanciero() {
   const STALE = 2 * 60 * 1000;
+  const [periodo, setPeriodo] = useState('all');
 
   const { data: invoices    = [] } = useQuery({ queryKey: ['invoices'],           queryFn: () => base44.entities.Invoice.list('-created_date', 2000),                          staleTime: STALE });
   const { data: certificates = [] } = useQuery({ queryKey: ['certificados'],      queryFn: () => base44.entities.Certificado.list('-created_date', 2000),                      staleTime: STALE });
@@ -203,6 +211,17 @@ export default function DashboardFinanciero({ periodo = 'all' }) {
 
   return (
     <div className="space-y-8">
+
+      <div className="flex justify-end">
+        <div className="flex items-center gap-1 p-1 rounded-xl border border-border/40 bg-card/40">
+          {PERIODOS.map(p => (
+            <button key={p.key} onClick={() => setPeriodo(p.key)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${periodo === p.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* ── Fila 1: KPIs financieros principales ──────────────────────── */}
       <div>

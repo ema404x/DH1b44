@@ -17,31 +17,6 @@ import AbonosFinancieros from '@/components/finanzas/AbonosFinancieros';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
-const PERIODOS = [
-  { key: '30',  label: '30 días' },
-  { key: '90',  label: '90 días' },
-  { key: 'ytd', label: 'Año actual' },
-  { key: 'all', label: 'Histórico' },
-];
-
-function filtrarPorPeriodo(invoices, periodo) {
-  if (periodo === 'all') return { curr: invoices, prev: [] };
-  const now = new Date();
-  let desde, hasta, prevDesde, prevHasta;
-  if (periodo === '30') { desde = subDays(now, 30); hasta = now; prevHasta = desde; prevDesde = subDays(now, 60); }
-  else if (periodo === '90') { desde = subDays(now, 90); hasta = now; prevHasta = desde; prevDesde = subDays(now, 180); }
-  else if (periodo === 'ytd') { desde = startOfYear(now); hasta = now; prevHasta = desde; prevDesde = subYears(startOfYear(now), 1); }
-  const inRange = (inv, d, h) => {
-    if (!inv.issue_date) return false;
-    let dt; try { dt = parseISO(inv.issue_date); } catch { return false; }
-    if (h && dt >= h) return false;
-    return !d || dt >= d;
-  };
-  return {
-    curr: invoices.filter(i => inRange(i, desde, hasta)),
-    prev: invoices.filter(i => inRange(i, prevDesde, prevHasta)),
-  };
-}
 
 function HeroKpi({ label, value, sub, icon: Icon, color, border, bg, trend, trendUp, delta }) {
   return (
@@ -81,7 +56,6 @@ const TABS = [
 
 export default function Invoices() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [periodo, setPeriodo] = useState('all');
   const STALE = 2 * 60 * 1000;
 
   const { data: invoices  = [] } = useQuery({ queryKey: ['invoices'],  queryFn: () => base44.entities.Invoice.list('-created_date', 2000), staleTime: STALE });
@@ -90,9 +64,7 @@ export default function Invoices() {
   const { data: abonos    = [] } = useQuery({ queryKey: ['abonos-maestro'], queryFn: () => base44.entities.AbonoMaestro.list('-created_date', 500), staleTime: STALE });
   const { data: certificados = [] } = useQuery({ queryKey: ['certificados'], queryFn: () => base44.entities.Certificado.list('-created_date', 2000), staleTime: STALE });
 
-  const { curr: fInvoices, prev: prevInvoices } = useMemo(() => filtrarPorPeriodo(invoices, periodo), [invoices, periodo]);
-
-  const deltaPct = (c, p) => (!p || p === 0 ? null : Math.round(((c - p) / p) * 100));
+  const fInvoices = invoices;
 
   const kpis = useMemo(() => {
     const total   = fInvoices.reduce((s, i) => s + (i.total || 0), 0);
@@ -101,8 +73,6 @@ export default function Invoices() {
     const overdue = fInvoices.filter(i => i.status === 'vencida').reduce((s, i) => s + (i.total || 0), 0);
     const cobPct  = total > 0 ? Math.round((cobrado / total) * 100) : 0;
     const montoACobrar = obras.filter(o => !o.ciclo_archivado).reduce((s, o) => s + (o.monto_a_cobrar || 0), 0);
-    const prevTotal = prevInvoices.reduce((s, i) => s + (i.total || 0), 0);
-    const prevCobrado = prevInvoices.filter(i => i.status === 'pagada').reduce((s, i) => s + (i.total || 0), 0);
     return {
       total, cobrado, pending, overdue, cobPct,
       nPending: fInvoices.filter(i => i.status === 'pendiente').length,
@@ -111,11 +81,8 @@ export default function Invoices() {
       count:    fInvoices.length,
       montoACobrar,
       nObras:   obras.filter(o => !o.ciclo_archivado).length,
-      dTotal: deltaPct(total, prevTotal),
-      dCobrado: deltaPct(cobrado, prevCobrado),
-      dPending: deltaPct(pending, prevInvoices.filter(i => i.status === 'pendiente').reduce((s, i) => s + (i.total || 0), 0)),
     };
-  }, [fInvoices, prevInvoices, obras]);
+  }, [fInvoices, obras]);
 
   return (
     <div className="pb-12 space-y-0">
@@ -144,20 +111,6 @@ export default function Invoices() {
             </div>
             {/* Periodo selector + Quick stat badge */}
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 p-1 rounded-xl border border-border/40 bg-card/40 backdrop-blur-sm">
-                <Calendar className="h-3.5 w-3.5 text-muted-foreground ml-1.5" />
-                {PERIODOS.map(p => (
-                  <button
-                    key={p.key}
-                    onClick={() => setPeriodo(p.key)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-                      periodo === p.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
               <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/8 text-xs text-emerald-400 font-semibold">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 {kpis.cobPct}% cobrado
@@ -170,17 +123,14 @@ export default function Invoices() {
             <HeroKpi
               label="Total Facturado" value={fmt(kpis.total)} sub={`${kpis.count} facturas en total`}
               icon={Wallet} color="text-primary" border="border-primary/20" bg="rgba(59,130,246,0.06)"
-              delta={kpis.dTotal}
             />
             <HeroKpi
               label="Cobrado" value={fmt(kpis.cobrado)} sub={`${kpis.nPaid} facturas pagadas`}
               icon={CheckCircle2} color="text-emerald-400" border="border-emerald-500/20" bg="rgba(16,185,129,0.06)"
-              delta={kpis.dCobrado}
             />
             <HeroKpi
               label="Pendiente" value={fmt(kpis.pending)} sub={`${kpis.nPending} facturas`}
               icon={Clock} color="text-amber-400" border="border-amber-500/20" bg="rgba(245,158,11,0.06)"
-              delta={kpis.dPending}
             />
             <HeroKpi
               label="Obras — A Cobrar" value={fmt(kpis.montoACobrar)} sub={`${kpis.nObras} obras activas`}
@@ -213,9 +163,9 @@ export default function Invoices() {
 
       {/* ── Content ──────────────────────────────────────────────────── */}
       <div className="page-enter" key={activeTab}>
-        {activeTab === 'dashboard'    && <DashboardFinanciero periodo={periodo} />}
+        {activeTab === 'dashboard'    && <DashboardFinanciero />}
         {activeTab === 'abonos'       && <AbonosFinancieros abonos={abonos} certificados={certificados} />}
-        {activeTab === 'rentabilidad' && <RentabilidadProyectos projects={projects} invoices={invoices} />}
+        {activeTab === 'rentabilidad' && <RentabilidadProyectos projects={projects} certificados={certificados} />}
         {activeTab === 'reportes'     && <ReportesFacturacion />}
         {activeTab === 'certificacion'&& <CertificacionObrasPanel />}
       </div>
