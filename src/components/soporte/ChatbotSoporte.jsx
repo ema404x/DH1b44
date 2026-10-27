@@ -298,7 +298,8 @@ export default function ChatbotSoporte() {
         pendingPromptRef.current = null;
         await base44.agents.addMessage(conv, { role: 'user', content: prompt });
       }
-    } catch {
+    } catch (err) {
+      console.error('[Alice] Error iniciando conversación:', err);
       setInitError(true);
       initInProgress.current = false; // permite reintentar
     }
@@ -378,6 +379,10 @@ export default function ChatbotSoporte() {
         content: msg || '(imagen adjunta)',
         ...(fileUrls ? { file_urls: fileUrls } : {}),
       });
+    } catch (err) {
+      console.error('[Alice] Error enviando mensaje:', err);
+      if (!fileUrls) setInput(msg);
+      alert('Alice no pudo recibir el mensaje. Intentá de nuevo.');
     } finally {
       setSending(false);
     }
