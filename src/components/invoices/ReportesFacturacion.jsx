@@ -15,6 +15,12 @@ const SC = {
   borrador: { label: 'Borrador', cls: 'bg-muted/50 text-muted-foreground' },
 };
 
+// Mes 'yyyy-MM' del certificado sin desfase de zona horaria (prioriza mes_periodo)
+const monthKey = (c) => {
+  const f = c.mes_periodo || c.fecha_certificado;
+  return f && /^\d{4}-\d{2}/.test(f) ? f.slice(0, 7) : null;
+};
+
 // ─── Reporte de Abonos ──────────────────────────────────────────────────────
 function AbonosReporte({ certs, periodo, contratista, estado }) {
   const data = useMemo(() => {
@@ -23,8 +29,9 @@ function AbonosReporte({ certs, periodo, contratista, estado }) {
     else list = list.filter(c => ['emitido', 'aprobado'].includes(c.estado));
     if (contratista !== 'todos') list = list.filter(c => c.contratista === contratista);
     if (periodo !== 'todo') {
-      const cutoff = subMonths(new Date(), parseInt(periodo));
-      list = list.filter(c => { const f = c.mes_periodo || c.fecha_certificado; return f && new Date(f) >= startOfMonth(cutoff); });
+      // Exactamente N meses calendario, incluyendo el mes actual
+      const desde = format(subMonths(startOfMonth(new Date()), parseInt(periodo) - 1), 'yyyy-MM');
+      list = list.filter(c => { const k = monthKey(c); return k && k >= desde; });
     }
     return list;
   }, [certs, periodo, contratista, estado]);
@@ -32,11 +39,11 @@ function AbonosReporte({ certs, periodo, contratista, estado }) {
   const porMes = useMemo(() => {
     const map = {};
     data.forEach(c => {
-      const f = c.mes_periodo || c.fecha_certificado; if (!f) return;
-      const d = new Date(f); if (isNaN(d)) return;
-      const k = format(startOfMonth(d), 'MMM yy', { locale: es });
-      const ts = startOfMonth(d).getTime();
-      if (!map[k]) map[k] = { mes: k, ts, total: 0, aprobado: 0, emitido: 0, qty: 0 };
+      const key = monthKey(c); if (!key) return;
+      const d = new Date(`${key}-01T12:00:00`);
+      const k = format(d, 'MMM yy', { locale: es });
+      const ts = d.getTime();
+      if (!map[k]) map[k] = { mes: k, key, ts, total: 0, aprobado: 0, emitido: 0, qty: 0 };
       map[k].total     += c.subtotal || 0;
       map[k][c.estado]  = (map[k][c.estado] || 0) + (c.subtotal || 0);
       map[k].qty++;
@@ -63,8 +70,11 @@ function AbonosReporte({ certs, periodo, contratista, estado }) {
   const maxC     = porContratista[0]?.total || 1;
 
   // Delta vs mes anterior
-  const ultimo   = porMes[porMes.length - 1]?.total || 0;
-  const penult   = porMes[porMes.length - 2]?.total || 0;
+  // Último mes calendario del período (mes actual) vs el inmediatamente anterior
+  const keyActual = format(new Date(), 'yyyy-MM');
+  const keyPrev   = format(subMonths(startOfMonth(new Date()), 1), 'yyyy-MM');
+  const ultimo   = porMes.find(m => m.key === keyActual)?.total || 0;
+  const penult   = porMes.find(m => m.key === keyPrev)?.total || 0;
   const deltaMes = penult > 0 ? Math.round(((ultimo - penult) / penult) * 100) : null;
 
   // Tabla ordenable — ordena TODO el dataset, luego pagina en render (precisión del top)
@@ -105,7 +115,7 @@ function AbonosReporte({ certs, periodo, contratista, estado }) {
                 <p className="text-[11px] text-muted-foreground">Emitidos + aprobados</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] text-muted-foreground uppercase">Último mes</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Mes actual</p>
                 <p className="text-sm font-bold text-foreground tabular-nums">{fmt(ultimo)}</p>
               </div>
             </div>
@@ -257,6 +267,7 @@ export default function ReportesFacturacion() {
                 {contratistas.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
+            <span className="text-[10px] text-muted-foreground">Aplica a certificados de abono mensual</span>
             {tab === 'abonos' && (
               <Select value={estado} onValueChange={setEstado}>
                 <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>

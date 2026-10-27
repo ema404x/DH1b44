@@ -20,9 +20,9 @@ export default function ReporteMensualComparativo() {
   const [mes,           setMes]           = useState(format(new Date(), 'yyyy-MM'));
   const [filtroEstado,  setFiltroEstado]  = useState('todos');
 
-  const { data: certificados = [], isLoading: loadingC } = useQuery({ queryKey: ['certificados-financiero'], queryFn: () => base44.entities.Certificado.list('-fecha_certificado', 500),  staleTime: 2*60*1000 });
-  const { data: facturas = [],     isLoading: loadingF } = useQuery({ queryKey: ['invoices'],                queryFn: () => base44.entities.Invoice.list('-issue_date', 500),              staleTime: 2*60*1000 });
-  const { data: obras = [],        isLoading: loadingO } = useQuery({ queryKey: ['obras-certificacion'],      queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 500),  staleTime: 2*60*1000 });
+  const { data: certificados = [], isLoading: loadingC } = useQuery({ queryKey: ['certificados-financiero'], queryFn: () => base44.entities.Certificado.list('-fecha_certificado', 2000), staleTime: 2*60*1000 });
+  const { data: facturas = [],     isLoading: loadingF } = useQuery({ queryKey: ['invoices'],                queryFn: () => base44.entities.Invoice.list('-created_date', 2000),          staleTime: 2*60*1000 });
+  const { data: obras = [],        isLoading: loadingO } = useQuery({ queryKey: ['obras-certificacion'],      queryFn: () => base44.entities.ObraCertificacion.list('-created_date', 1000), staleTime: 2*60*1000 });
   const loading = loadingC || loadingF || loadingO;
 
   const mesesDisponibles = useMemo(() => {
@@ -37,11 +37,11 @@ export default function ReporteMensualComparativo() {
   }, []);
 
   const certsMes = useMemo(() =>
-    certificados.filter(c => c.fecha_certificado && c.estado === 'aprobado' && format(new Date(c.fecha_certificado), 'yyyy-MM') === mes),
+    certificados.filter(c => c.tipo !== 'abono_mensual' && c.estado === 'aprobado' && (c.mes_periodo || c.fecha_certificado || '').slice(0, 7) === mes),
   [certificados, mes]);
 
   const facsMes = useMemo(() =>
-    facturas.filter(f => f.issue_date && format(new Date(f.issue_date), 'yyyy-MM') === mes),
+    facturas.filter(f => f.status !== 'cancelada' && (f.issue_date || '').slice(0, 7) === mes),
   [facturas, mes]);
 
   // Tabla por obra — cruza certs + facturas + obras
@@ -72,6 +72,8 @@ export default function ReporteMensualComparativo() {
   const totalFac  = rows.reduce((s, r) => s + r.facturado, 0);
   const diff      = totalCert - totalFac;
   const obrasOk   = rows.filter(r => Math.abs(r.diferencia) < 1).length;
+  const nCerts    = rows.reduce((s, r) => s + r.cQty, 0);
+  const nFacs     = rows.reduce((s, r) => s + r.fQty, 0);
 
   const chartData = [...rows].sort((a, b) => b.certificado - a.certificado).slice(0, 8).map(r => ({
     name: r.obra.length > 14 ? r.obra.slice(0, 14) + '…' : r.obra,
@@ -98,7 +100,7 @@ export default function ReporteMensualComparativo() {
         </Select>
         {loading
           ? <span className="text-[10px] text-muted-foreground ml-1">cargando…</span>
-          : <span className="text-[10px] text-muted-foreground ml-1">{rows.length} obras · {certsMes.length} certificados · {facsMes.length} facturas</span>}
+          : <span className="text-[10px] text-muted-foreground ml-1">{rows.length} obras · {nCerts} certificados aprobados · {nFacs} facturas · aplica a certificados de obra (no abonos)</span>}
       </div>
 
       {loading ? (
@@ -116,8 +118,8 @@ export default function ReporteMensualComparativo() {
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard label="Certificado"      value={fmt(totalCert)}           sub={`${certsMes.length} certificados`}                              icon={CircleCheck}   accent="emerald" />
-            <KpiCard label="Facturado"        value={fmt(totalFac)}            sub={`${facsMes.length} facturas`}                                     icon={BadgeDollarSign} accent="blue"   />
+            <KpiCard label="Certificado"      value={fmt(totalCert)}           sub={`${nCerts} certificados`}                              icon={CircleCheck}   accent="emerald" />
+            <KpiCard label="Facturado"        value={fmt(totalFac)}            sub={`${nFacs} facturas`}                                     icon={BadgeDollarSign} accent="blue"   />
             <KpiCard label={diff >= 0 ? 'Saldo a favor' : 'Saldo en contra'} value={fmt(Math.abs(diff))} sub={diff > 0 ? 'Certificación adelantada' : diff < 0 ? 'Facturación adelantada' : 'Balanceado'} icon={Scale} accent={diff >= 0 ? 'emerald' : 'red'} />
             <KpiCard label="Obras alineadas"  value={obrasOk} sub={`de ${rows.length} · ${pct(obrasOk/Math.max(rows.length,1)*100)} concordancia`} icon={CircleAlert} accent="purple" />
           </div>
