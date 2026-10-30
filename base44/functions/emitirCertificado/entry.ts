@@ -44,20 +44,41 @@ export default async function(req) {
     // Cadena de firmas: si viene configurada, el cert arranca en
     // 'pendiente_firmas' (espera firmas intermedias antes de llegar al
     // gerente). Sin cadena → directo a 'emitido' como hoy.
+    // Certificado existente (mismo id) → se actualiza, nunca se duplica.
+    let existing = null;
+    if (editing_id) {
+      existing = await base44.asServiceRole.entities.Certificado.get(editing_id).catch(() => null);
+      if (existing && existing.sector_id && existing.sector_id !== callerSector) {
+        return Response.json({ error: 'Forbidden — certificado de otro sector' }, { status: 403 });
+      }
+    }
+    // Conservar firmas ya completadas (por email) al re-emitir.
+    const firmadosPrevios = new Map(
+      (Array.isArray(existing?.cadena_firmas) ? existing.cadena_firmas : [])
+        .filter(f => f?.estado === 'firmado' && f.email)
+        .map(f => [f.email.toLowerCase().trim(), f])
+    );
     const cadenaFirmas = Array.isArray(cadenaRaw)
-      ? cadenaRaw.filter(f => f && f.email).map(f => ({
-          user_id: f.user_id || null,
-          email: (f.email || '').toLowerCase().trim(),
-          full_name: f.full_name || '',
-          firma_url: null,
-          firmado_por: null,
-          fecha_firma: null,
-          estado: 'pendiente',
-        }))
+      ? cadenaRaw.filter(f => f && f.email).map(f => {
+          const email = (f.email || '').toLowerCase().trim();
+          const previo = firmadosPrevios.get(email) || (f.estado === 'firmado' ? f : null);
+          if (previo) return { ...previo, email };
+          return { user_id: f.user_id || null, email, full_name: f.full_name || '', estado: 'pendiente' };
+        })
       : [];
-    const estadoInicial = cadenaFirmas.length > 0 ? 'pendiente_firmas' : 'emitido';
-    const certPayload = { ...rest, estado: estadoInicial, sector_id: callerSector, creado_por_email: userEmail, cadena_firmas: cadenaFirmas };
-    const cert = await base44.asServiceRole.entities.Certificado.create(certPayload);
+    const hayPendientes = cadenaFirmas.some(f => f.estado === 'pendiente');
+    const estadoInicial = hayPendientes ? 'pendiente_firmas' : 'emitido';
+    const certPayload = { ...rest, estado: estadoInicial, sector_id: callerSector, creado_por_email: existing?.creado_por_email || userEmail, cadena_firmas: cadenaFirmas };
+    const cert = existing
+      ? await base44.asServiceRole.entities.Certificado.update(existing.id, certPayload)
+      : await base44.asServiceRole.entities.Certificado.create(certPayload);
+    if (existing) {
+      // Limpiar solicitudes previas del mismo cert para no duplicar la bandeja.
+      const viejas = await base44.asServiceRole.entities.SolicitudCertificado.filter({ certificado_id: existing.id });
+      for (const sol of viejas) {
+        await base44.asServiceRole.entities.SolicitudCertificado.delete(sol.id).catch(() => {});
+      }
+    }
 
     // 2) Crear la solicitud de aprobación (vinculada al nuevo cert).
     //    Solo si el certificado va directo al gerente (sin cadena de firmas).
@@ -99,7 +120,7 @@ export default async function(req) {
     // 3) Solo si el nuevo cert + solicitud OK, limpiar el borrador/aprobado previo
     //    (y sus solicitudes asociadas). Best-effort: no bloquea el éxito.
     //    Guard de sector: nunca borrar un cert de otro sector.
-    if (solicitudCreada && editing_id && (editing_estado === 'borrador' || editing_estado === 'aprobado')) {
+    if (!existing && solicitudCreada && editing_id && (editing_estado === 'borrador' || editing_estado === 'aprobado')) {
       try {
         let oldCert = null;
         try { oldCert = await base44.asServiceRole.entities.Certificado.get(editing_id); } catch (_) {}

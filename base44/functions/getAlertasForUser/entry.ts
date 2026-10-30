@@ -184,6 +184,23 @@ export default async function (req) {
       }
     }
 
+    // Certificados donde el usuario es el firmante actual de la cadena
+    const certsFirma = await fetchAll(sb, 'Certificado', { sector_id: sector, estado: 'pendiente_firmas' });
+    for (const c of certsFirma) {
+      const actual = (c.cadena_firmas || []).find(f => f.estado === 'pendiente');
+      if (!actual || (actual.email || '').toLowerCase().trim() !== userEmail) continue;
+      alertas.push({
+        tipo: 'firma_certificado',
+        nivel: 'warning',
+        titulo: `Firma pendiente: Certificado N°${c.numero || ''}`,
+        mensaje: `Te toca firmar el certificado de "${c.contratista || c.emprendimiento || 'sin contratista'}".`,
+        entidad_tipo: 'Certificado',
+        entidad_id: c.id,
+        entidad_nombre: `N°${c.numero || c.id}`,
+        fecha_alerta: ahora.toISOString(),
+      });
+    }
+
     // Orden: críticas primero, luego warning, luego info
     const orden = { critical: 0, warning: 1, info: 2 };
     alertas.sort((a, b) => (orden[a.nivel] ?? 3) - (orden[b.nivel] ?? 3));

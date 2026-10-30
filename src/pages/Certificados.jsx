@@ -139,7 +139,7 @@ export default function Certificados() {
   const handleEdit = (certificado) => {
     // Si está aprobado, avisar que editar genera nuevo ID y pierde la aprobación
     if (certificado.estado === 'aprobado') {
-      if (!window.confirm('Este certificado ya fue aprobado. Editarlo generará un nuevo certificado con nuevo ID y perderá la aprobación actual. ¿Continuar?')) return;
+      if (!window.confirm('Este certificado ya fue aprobado. Editarlo y volver a emitirlo perderá la aprobación actual. ¿Continuar?')) return;
     }
     setEditing(certificado);
     setExtracted(certificado);

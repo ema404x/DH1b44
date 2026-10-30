@@ -19,6 +19,7 @@
       "type": "string",
       "enum": [
         "borrador",
+        "pendiente_firmas",
         "emitido",
         "aprobado"
       ],
@@ -30,7 +31,46 @@
     },
     "creado_por_email": {
       "type": "string",
-      "description": "Email del usuario que emiti\u00f3 el certificado. Se estampa en emitirCertificado (el cert se crea via service role, que deja created_by_id en null). Permite que el creador siga viendo su certificado mientras est\u00e1 pendiente de aprobaci\u00f3n (estado 'emitido'), a\u00fan sin aprobado_por_email."
+      "description": "Email del usuario que emiti\u00f3 el certificado. Se estampa en emitirCertificado (el cert se crea via service role, que deja created_by_id en null). Permite que el creador siga viendo su certificado mientras est\u00e1 pendiente de aprobaci\u00f3n."
+    },
+    "cadena_firmas": {
+      "type": "array",
+      "description": "Cadena secuencial de firmantes previa a la aprobaci\u00f3n gerencial, en orden de firma.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "pendiente",
+              "firmado",
+              "rechazado"
+            ]
+          },
+          "fecha_firma": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "firma_url": {
+            "type": "string"
+          },
+          "firmado_por": {
+            "type": "string"
+          },
+          "motivo_rechazo": {
+            "type": "string"
+          }
+        }
+      }
     },
     "emprendimiento": {
       "type": "string"
@@ -187,7 +227,7 @@
     },
     "firma_jefe_sitio_url": {
       "type": "string",
-      "description": "URL de la firma digital del jefe de sitio (solo certificados de obra)"
+      "description": "URL de la firma digital del jefe de sitio"
     },
     "firmado_por_jefe": {
       "type": "string",
