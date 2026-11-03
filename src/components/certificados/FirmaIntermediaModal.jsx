@@ -7,6 +7,7 @@ import { Loader2, PenTool, Trash2, CheckCircle2, RefreshCw, XCircle, FileText, C
 import { toast } from 'sonner';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 import TipsFirmaPanel from './TipsFirmaPanel';
+import { firmantesHabilitados, esFirmanteFinal } from '@/lib/cadenaFirmas';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -180,7 +181,8 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
   if (!cert) return null;
 
   const cadena = cert.cadena_firmas || [];
-  const idxActual = cadena.findIndex(f => f.estado === 'pendiente');
+  const habilitados = firmantesHabilitados(cadena);
+  const idxActual = cadena.findIndex(f => f.estado === 'pendiente' && (f.email || '').toLowerCase() === (user?.email || '').toLowerCase());
   const firmanteActual = idxActual >= 0 ? cadena[idxActual] : null;
 
   return (
@@ -216,9 +218,10 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
           <div className="flex items-center gap-2 text-xs">
             {cadena.map((f, i) => (
               <React.Fragment key={i}>
-                <div className={`flex items-center gap-1 px-2 py-1 rounded-full border ${f.estado === 'firmado' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : i === idxActual ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' : 'bg-muted text-muted-foreground border-border'}`}>
-                  {f.estado === 'firmado' ? <CheckCircle2 className="h-3 w-3" /> : i === idxActual ? <PenTool className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-full border ${f.estado === 'firmado' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : habilitados.includes(f) ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' : 'bg-muted text-muted-foreground border-border'}`}>
+                  {f.estado === 'firmado' ? <CheckCircle2 className="h-3 w-3" /> : habilitados.includes(f) ? <PenTool className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                   <span className="max-w-[80px] truncate">{f.full_name}</span>
+                  {esFirmanteFinal(f) && <span className="text-[9px] uppercase">· final</span>}
                 </div>
                 {i < cadena.length - 1 && <span className="text-muted-foreground">→</span>}
               </React.Fragment>
@@ -234,7 +237,7 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{nombreFirmante}</p>
             <p className="text-xs text-muted-foreground">
-              {idxActual + 1}° de {cadena.length} · Te toca firmar
+              {cadena.filter(f => f.estado === 'firmado').length} de {cadena.length} firmadas · Podés firmar ahora · Juan Pablo firma último
             </p>
           </div>
         </div>

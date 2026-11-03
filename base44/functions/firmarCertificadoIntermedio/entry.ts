@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
+import { puedeFirmar } from '../../shared/cadenaFirmas.ts';
 
 // Firma/rechazo intermedio en la cadena de firmas de un certificado.
 // Valida que el caller sea el firmante actual (el primer 'pendiente' de
@@ -45,14 +46,14 @@ export default async function(req: Request): Promise<Response> {
     }
 
     const cadena = Array.isArray(cert.cadena_firmas) ? [...cert.cadena_firmas] : [];
-    const idxActual = cadena.findIndex(f => f.estado === 'pendiente');
+    const idxActual = cadena.findIndex(f => f.estado === 'pendiente' && (f.email || '').toLowerCase().trim() === userEmail);
     if (idxActual === -1) {
-      return Response.json({ error: 'No hay firmante pendiente en la cadena' }, { status: 400 });
+      return Response.json({ error: 'No tenés una firma pendiente en este certificado' }, { status: 403 });
     }
 
     const firmanteActual = cadena[idxActual];
-    if ((firmanteActual.email || '').toLowerCase().trim() !== userEmail) {
-      return Response.json({ error: 'No es tu turno para firmar este certificado' }, { status: 403 });
+    if (!puedeFirmar(cadena, userEmail)) {
+      return Response.json({ error: 'Juan Pablo firma último: esperá a que firmen los demás' }, { status: 403 });
     }
 
     // ── Firmar ──
@@ -78,7 +79,8 @@ export default async function(req: Request): Promise<Response> {
         firmado_por: firmanteActual.full_name || user.full_name || userEmail,
       };
 
-      const esUltimo = idxActual === cadena.length - 1;
+      const restantes = cadena.filter(f => f.estado === 'pendiente').length;
+      const esUltimo = restantes === 0;
       const nuevoEstado = esUltimo ? 'emitido' : 'pendiente_firmas';
 
       await sb.entities.Certificado.update(cert_id, {
@@ -134,7 +136,7 @@ export default async function(req: Request): Promise<Response> {
         solicitud_creada: solicitudCreada,
         solicitud_error: solicitudError,
         mensaje: !esUltimo
-          ? `Firma aplicada. Pendiente ${cadena.length - idxActual - 1} firmante(s) más.`
+          ? `Firma aplicada. Pendiente ${restantes} firmante(s) más.`
           : !solicitudCreada
             ? 'Cadena completada, pero no se pudo enviar al gerente. Reintenta desde Aprobación de Certificados.'
             : 'Cadena de firmas completada — certificado enviado a aprobación gerencial',

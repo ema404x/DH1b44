@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { resolveAndReconcileSector } from '../../shared/callerIdentity.ts';
 import { fetchAll } from '../../shared/fetchAllSector.ts';
+import { puedeFirmar } from '../../shared/cadenaFirmas.ts';
 import { esOtVencida } from '../../shared/otVencimiento.ts';
 import {
   resolveAdminView,
@@ -187,8 +188,7 @@ export default async function (req) {
     // Certificados donde el usuario es el firmante actual de la cadena
     const certsFirma = await fetchAll(sb, 'Certificado', { sector_id: sector, estado: 'pendiente_firmas' });
     for (const c of certsFirma) {
-      const actual = (c.cadena_firmas || []).find(f => f.estado === 'pendiente');
-      if (!actual || (actual.email || '').toLowerCase().trim() !== userEmail) continue;
+      if (!puedeFirmar(c.cadena_firmas || [], userEmail)) continue;
       alertas.push({
         tipo: 'firma_certificado',
         nivel: 'warning',

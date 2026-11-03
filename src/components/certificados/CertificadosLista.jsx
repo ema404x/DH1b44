@@ -17,6 +17,8 @@ const estadoStyle = {
   aprobado:         { label: 'Aprobado', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
 };
 
+import { puedeFirmar } from '@/lib/cadenaFirmas';
+
 const tipoStyle = {
   abono_mensual: { label: 'Abono Mensual', color: 'bg-violet-500/15 text-violet-300 border-violet-500/30' },
   obra:          { label: 'Obra',           color: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
@@ -26,8 +28,7 @@ const tipoStyle = {
 export default function CertificadosLista({ certificados, isLoading, onNew, onEdit, onDelete, emptyLabel, userEmail, onFirmaIntermedia, onAuditoria }) {
   const isCurrentSigner = (c) => {
     if (c.estado !== 'pendiente_firmas' || !Array.isArray(c.cadena_firmas)) return false;
-    const actual = c.cadena_firmas.find(f => f.estado === 'pendiente');
-    return actual && (actual.email || '').toLowerCase() === (userEmail || '').toLowerCase();
+    return puedeFirmar(c.cadena_firmas, userEmail);
   };
 
   const firmaProgress = (c) => {
