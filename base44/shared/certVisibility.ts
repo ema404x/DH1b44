@@ -29,6 +29,17 @@
 //   certs de su sector para aprobar — la restricción "solo los propios"
 //   aplica a jefes/users, no a aprobadores.
 
+import { puedeFirmar } from './cadenaFirmas.ts';
+
+export const normEmail = (e?: string) => (e || '').toLowerCase().trim();
+
+/** ¿El usuario tiene una firma pendiente habilitada en este cert? */
+export function esFirmanteHabilitado(cert: CertLike, email?: string): boolean {
+  const e = normEmail(email);
+  if (!e || cert.estado !== 'pendiente_firmas' || !Array.isArray(cert.cadena_firmas)) return false;
+  return puedeFirmar(cert.cadena_firmas, e);
+}
+
 export interface CertLike {
   id?: string;
   sector_id?: string;
@@ -70,25 +81,22 @@ export function certVisibleToUser(
   // Admin: oversight de todo su sector.
   if (user.role === 'admin') return true;
 
-  const userEmail = (user.email || '').toLowerCase().trim();
+  const userEmail = normEmail(user.email);
+  if (!userEmail && !user.id) return false;
   // Creador directo (frontend/borrador — created_by_id es un usuario real).
   if (cert.created_by_id && cert.created_by_id === user.id) return true;
   // Creador vía emitirCertificado (service role estampa creado_por_email).
-  if (userEmail && (cert.creado_por_email || '').toLowerCase() === userEmail) return true;
+  if (userEmail && normEmail(cert.creado_por_email) === userEmail) return true;
   // Aprobador.
-  if (userEmail && (cert.aprobado_por_email || '').toLowerCase() === userEmail) return true;
-  // Firmante actual de una cadena de firmas (pendiente_firmas): el primer
-  // firmante con estado 'pendiente' debe poder ver el cert para firmarlo.
-  if (cert.estado === 'pendiente_firmas' && Array.isArray(cert.cadena_firmas)) {
-    const firmanteActual = cert.cadena_firmas.find(f => f.estado === 'pendiente');
-    if (firmanteActual && userEmail && (firmanteActual.email || '').toLowerCase().trim() === userEmail) {
-      return true;
-    }
-  }
-  // Dueño real vía solicitud vinculada (jefe_sitio_email) — caso Gastón Massa:
-  // certs de service-role cuyo creador real solo está en la solicitud.
-  if (userEmail && solicitudesForCert.some(
-    s => (s.jefe_sitio_email || '').toLowerCase() === userEmail
+  if (userEmail && normEmail(cert.aprobado_por_email) === userEmail) return true;
+  // Firmante habilitado de la cadena (misma regla que la firma y las alertas):
+  // cualquier pendiente puede firmar; Juan Pablo solo al final.
+  if (esFirmanteHabilitado(cert, userEmail)) return true;
+  // Legacy: certs sin creado_por_email cuyo dueño solo figura en la solicitud.
+  // Si el cert ya tiene creador, la solicitud NO otorga acceso (evita que
+  // certificados ajenos aparezcan por una asociación de solicitud).
+  if (!cert.creado_por_email && userEmail && solicitudesForCert.some(
+    s => normEmail(s.jefe_sitio_email) === userEmail
   )) return true;
 
   return false;

@@ -96,15 +96,16 @@ export default async function(req: Request): Promise<Response> {
       let solicitudError = null;
       if (esUltimo) {
         try {
-          const creadorEmail = (cert.creado_por_email || userEmail).toLowerCase().trim();
-          let creadorNombre = creadorEmail;
-          try {
-            const empCreador = (await sb.entities.Employee.filter({ email: creadorEmail }).catch(() => []))[0];
-            if (empCreador?.full_name) creadorNombre = empCreador.full_name;
-          } catch (_) { /* best-effort */ }
-
           // Evitar duplicados en la bandeja del gerente
           const previas = await sb.entities.SolicitudCertificado.filter({ certificado_id: cert.id }).catch(() => []);
+          // El dueño de la solicitud es el creador del cert — nunca el último
+          // firmante (eso le daba acceso a certificados ajenos).
+          const creadorEmail = (cert.creado_por_email || previas[0]?.jefe_sitio_email || '').toLowerCase().trim();
+          let creadorNombre = creadorEmail;
+          try {
+            const empCreador = creadorEmail ? (await sb.entities.Employee.filter({ email: creadorEmail }).catch(() => []))[0] : null;
+            if (empCreador?.full_name) creadorNombre = empCreador.full_name;
+          } catch (_) { /* best-effort */ }
           for (const s of previas) await sb.entities.SolicitudCertificado.delete(s.id).catch(() => {});
           const numero = `CERT-${cert.id.slice(-6).toUpperCase()}`;
           await sb.entities.SolicitudCertificado.create({

@@ -9,7 +9,11 @@ Deno.serve(async (req) => {
 
     const sb = base44.asServiceRole;
     // Fail closed en sector: sin sector → 403. NUNCA defaultear a 'escuela'.
-    const callerSector = user.data?.sector_id || user.sector_id;
+    let callerSector = user.data?.sector_id || user.sector_id || null;
+    if (!callerSector && user.email) {
+      const emp = (await sb.entities.Employee.filter({ email: user.email.toLowerCase().trim() }).catch(() => []))[0];
+      callerSector = emp?.sector_id || null;
+    }
     if (!callerSector) {
       return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
     }
@@ -18,7 +22,7 @@ Deno.serve(async (req) => {
     // Verificar si el usuario es gerencia/admin
     let isGerencia = user.role === 'admin';
     if (!isGerencia) {
-      const employees = await sb.entities.Employee.filter({ email: user.email }).catch(() => []);
+      const employees = await sb.entities.Employee.filter({ email: (user.email || '').toLowerCase().trim() }).catch(() => []);
       const emp = employees.find(e => e.email?.toLowerCase().trim() === user.email?.toLowerCase().trim());
       if (emp?.role && ADMIN_EMPLOYEE_ROLES.includes(emp.role.toLowerCase().trim())) {
         isGerencia = true;

@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { certVisibleToUser } from "../../shared/certVisibility.ts";
+import { fetchAll } from "../../shared/fetchAllSector.ts";
 
 // Visibilidad de certificados por propietario (regla de oro: backend-first
 // cuando el RLS no resuelve de forma confiable quién es el dueño de cada registro).
@@ -55,7 +56,7 @@ Deno.serve(async (req) => {
 
     // ── Admin: ve todo su sector ──
     if (user.role === 'admin') {
-      const all = await sb.entities.Certificado.filter({ sector_id: callerSector }, '-created_date', 500);
+      const all = await fetchAll(sb, 'Certificado', { sector_id: callerSector }, '-created_date', true);
       return Response.json({ certificados: all, isAdmin: true });
     }
 
@@ -64,9 +65,9 @@ Deno.serve(async (req) => {
     // jefe (jefe_sitio_email). Se agrupan por certificado_id y se pasa cada
     // cert por certVisibleToUser — fuente única de verdad de propiedad.
     const [allCerts, mySols] = await Promise.all([
-      sb.entities.Certificado.filter({ sector_id: callerSector }, '-created_date', 500).catch(() => []),
+      fetchAll(sb, 'Certificado', { sector_id: callerSector }, '-created_date', true),
       userEmail
-        ? sb.entities.SolicitudCertificado.filter({ sector_id: callerSector, jefe_sitio_email: userEmail }).catch(() => [])
+        ? fetchAll(sb, 'SolicitudCertificado', { sector_id: callerSector, jefe_sitio_email: userEmail })
         : [],
     ]);
 
