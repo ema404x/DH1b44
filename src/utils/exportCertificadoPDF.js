@@ -30,7 +30,6 @@ const fmtC = (v) => { const n = round0(v); if (n === 0) return '0,00'; return n.
 const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d || '—'; } };
 
 const MEJORES_LOGO_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/b6844473f_mejores_cover.jpg';
-const FIRMA_RAUL_GARCIA_URL = 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/3f708fc7a_firmaRaul2_page-0001.jpg';
 
 function getImageDimensions(base64) {
   return new Promise((resolve) => {
@@ -73,7 +72,8 @@ export async function exportCertificadoPDF(form) {
 
   const montoContratado = Math.round(parseMonto(form.monto_contratado) * 100) / 100;
 
-  const firmaGerenteUrl = form.firma_gerente_url || (form.estado === 'aprobado' ? FIRMA_RAUL_GARCIA_URL : null);
+  // Solo firmas realmente registradas — nunca una imagen sustituta.
+  const firmaGerenteUrl = form.firma_gerente_url || null;
   const firmaJefeUrl = form.firma_jefe_sitio_url || null;
   const [logoBase64, firmaGerenteBase64, firmaJefeBase64, ...cadenaBase64sRaw] = await Promise.all([
     loadImageAsBase64(MEJORES_LOGO_URL),
@@ -376,7 +376,7 @@ export async function exportCertificadoPDF(form) {
   // Cada entrada lleva su base64 + metadata. Así el layout no depende de 3
   // bloques if separados y el wrap a múltiples filas es trivial.
   const firmas = [];
-  if (firmaJefeBase64) {
+  if (firmaJefeUrl) {
     const fechaJefe = form.fecha_firma_jefe
       ? new Date(form.fecha_firma_jefe).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
       : null;
@@ -389,8 +389,7 @@ export async function exportCertificadoPDF(form) {
     });
   }
   for (let ci = 0; ci < cadenaFirmadas.length; ci++) {
-    const base64 = cadenaBase64s[ci];
-    if (!base64) continue;
+    const base64 = cadenaBase64s[ci] || null;
     const f = cadenaFirmadas[ci];
     const fechaFirma = f.fecha_firma
       ? new Date(f.fecha_firma).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -403,7 +402,7 @@ export async function exportCertificadoPDF(form) {
       sello: '✓ Conforme',
     });
   }
-  if (firmaBase64) {
+  if (firmaGerenteUrl) {
     const fechaGerente = form.fecha_aprobacion
       ? new Date(form.fecha_aprobacion).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
       : null;
@@ -441,7 +440,7 @@ export async function exportCertificadoPDF(form) {
     y += 10;
 
     // Pre-calcular dimensiones de cada imagen (aspect ratio) UNA vez.
-    const firmaDims = await Promise.all(firmas.map(f => getImageDimensions(f.base64)));
+    const firmaDims = await Promise.all(firmas.map(f => f.base64 ? getImageDimensions(f.base64) : null));
 
     // Línea separadora
     doc.setDrawColor(200, 212, 228);
@@ -470,8 +469,13 @@ export async function exportCertificadoPDF(form) {
       }
       const imgX = bx + (BLOCK_W - drawW) / 2;
       const imgY = by + (maxH - drawH) / 2;
-      const imgFmt = f.base64.startsWith('data:image/jpeg') || f.base64.startsWith('data:image/jpg') ? 'JPEG' : 'PNG';
-      doc.addImage(f.base64, imgFmt, imgX, imgY, drawW, drawH, undefined, 'NONE');
+      if (f.base64) {
+        const imgFmt = f.base64.startsWith('data:image/jpeg') || f.base64.startsWith('data:image/jpg') ? 'JPEG' : 'PNG';
+        doc.addImage(f.base64, imgFmt, imgX, imgY, drawW, drawH, undefined, 'NONE');
+      } else {
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(6.5); doc.setTextColor(150, 150, 150);
+        doc.text('Firma registrada (imagen no disponible)', bx + BLOCK_W / 2, by + IMG_H / 2, { align: 'center' });
+      }
 
       // Línea divisoria bajo la imagen
       const lineY = by + IMG_H;

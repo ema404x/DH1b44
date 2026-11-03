@@ -4,6 +4,7 @@ import { ArrowLeft, Download, Send, Loader2 } from 'lucide-react';
 import { exportCertificadoPDF } from '@/utils/exportCertificadoPDF';
 import { toast } from 'sonner';
 import { calcularTotales } from './acumulacionUtils';
+import FirmaCard from './FirmaCard';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.round((n || 0) * 100) / 100);
 const fmtDate = (d) => { try { if (!d) return '—'; const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; } catch { return d || '—'; } };
@@ -29,6 +30,7 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
   const fondoReparo = T.fondoReparo;
   const pagadoAnteriormente = T.pagadoAnteriormente;
   const totalNeto = T.totalNeto;
+  const cadenaFirmadas = (form.cadena_firmas || []).filter(f => f.estado === 'firmado' && f.firma_url);
 
   const handleExportPDF = async () => {
     setExporting(true);
@@ -168,7 +170,7 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
         )}
 
         {/* Firmas — jefe de sitio (obra) + gerente (aprobación) */}
-        {(form.firma_jefe_sitio_url || form.firma_gerente_url || form.estado === 'aprobado') && (
+        {(form.firma_jefe_sitio_url || form.firma_gerente_url || cadenaFirmadas.length > 0) && (
           <div className="border-t pt-6 mt-4">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground text-center mb-5">
               Firmas y Aprobación
@@ -196,12 +198,15 @@ export default function CertificadoPreview({ form, onBack, onEmitir, saving }) {
                   </div>
                 </div>
               )}
+              {cadenaFirmadas.map((f, i) => (
+                <FirmaCard key={i} url={f.firma_url} nombre={f.firmado_por || f.full_name} cargo="Firmante de cadena" fecha={f.fecha_firma} />
+              ))}
               {/* Firma del gerente */}
-              {(form.firma_gerente_url || form.estado === 'aprobado') && (
+              {form.firma_gerente_url && (
                 <div className="flex flex-col rounded-xl border border-border overflow-hidden bg-card shadow-sm">
                   <div className="bg-muted/30 flex items-center justify-center px-4 py-3" style={{ minHeight: 88 }}>
                     <img
-                      src={form.firma_gerente_url || 'https://media.base44.com/images/public/69bc7d2a6f0e7ed160c90003/3f708fc7a_firmaRaul2_page-0001.jpg'}
+                      src={form.firma_gerente_url}
                       alt="Firma Gerente"
                       className="max-h-16 max-w-full object-contain"
                     />

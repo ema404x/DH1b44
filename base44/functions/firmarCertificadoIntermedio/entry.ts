@@ -103,6 +103,9 @@ export default async function(req: Request): Promise<Response> {
             if (empCreador?.full_name) creadorNombre = empCreador.full_name;
           } catch (_) { /* best-effort */ }
 
+          // Evitar duplicados en la bandeja del gerente
+          const previas = await sb.entities.SolicitudCertificado.filter({ certificado_id: cert.id }).catch(() => []);
+          for (const s of previas) await sb.entities.SolicitudCertificado.delete(s.id).catch(() => {});
           const numero = `CERT-${cert.id.slice(-6).toUpperCase()}`;
           await sb.entities.SolicitudCertificado.create({
             numero,
