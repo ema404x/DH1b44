@@ -26,6 +26,7 @@ const TIPO_UI = {
   garantia_activo:   { icon: Wrench,        path: '/activos',     single: 'Garantía por vencer',  plural: 'Garantías por vencer' },
   stock_material:    { icon: Package,       path: '/inventario',  single: 'Material con stock bajo', plural: 'Materiales con stock bajo' },
   firma_certificado: { icon: Receipt,       path: '/certificados', single: 'Certificado para firmar', plural: 'Certificados para firmar' },
+  aprobacion_certificado: { icon: CheckCircle2, path: '/aprobacion-certificados', single: 'Certificado para aprobar', plural: 'Certificados para aprobar' },
   factura_vencida:   { icon: Receipt,       path: '/facturacion', single: 'Factura vencida',       plural: 'Facturas vencidas' },
 };
 

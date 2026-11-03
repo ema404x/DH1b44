@@ -201,6 +201,24 @@ export default async function (req) {
       });
     }
 
+    // Certificados pendientes de aprobación gerencial (gerente/admin)
+    const rolAprob = String(employee?.role || user.role || '').toLowerCase();
+    if (['admin', 'gerente'].includes(rolAprob)) {
+      const sols = await fetchAll(sb, 'SolicitudCertificado', { sector_id: sector, estado: { $in: ['enviada', 'en_revision'] } });
+      for (const s of sols) {
+        alertas.push({
+          tipo: 'aprobacion_certificado',
+          nivel: 'warning',
+          titulo: `Pendiente de aprobar: ${s.numero || ''}`,
+          mensaje: `"${s.titulo || s.establecimiento || 'Certificado'}" espera tu aprobación.`,
+          entidad_tipo: 'SolicitudCertificado',
+          entidad_id: s.id,
+          entidad_nombre: s.numero || s.id,
+          fecha_alerta: ahora.toISOString(),
+        });
+      }
+    }
+
     // Orden: críticas primero, luego warning, luego info
     const orden = { critical: 0, warning: 1, info: 2 };
     alertas.sort((a, b) => (orden[a.nivel] ?? 3) - (orden[b.nivel] ?? 3));
