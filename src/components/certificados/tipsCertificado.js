@@ -81,4 +81,5 @@ export const TIPS_POR_TIPO = {
   ],
 };
 
-export const getTips = (tipoCertificado) => TIPS_POR_TIPO[tipoCertificado] || [];
+// Los tipos sin tips propios usan los requisitos vigentes (informe).
+export const getTips = (tipoCertificado) => TIPS_POR_TIPO[tipoCertificado] || TIPS_POR_TIPO.informe;
