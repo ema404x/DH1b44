@@ -187,7 +187,7 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PenTool className="h-4 w-4 text-primary" /> Firma de Certificado
@@ -203,7 +203,7 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">{cert.contratista || '—'}</p>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {cert.emprendimiento && <span>{cert.emprendimiento}</span>}
             {cert.ada_numero && <span>ADA: {cert.ada_numero}</span>}
           </div>
@@ -215,7 +215,7 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
 
         {/* Progreso de la cadena */}
         {cadena.length > 0 && (
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             {cadena.map((f, i) => (
               <React.Fragment key={i}>
                 <div className={`flex items-center gap-1 px-2 py-1 rounded-full border ${f.estado === 'firmado' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : habilitados.includes(f) ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' : 'bg-muted text-muted-foreground border-border'}`}>
@@ -332,7 +332,7 @@ export default function FirmaIntermediaModal({ open, onClose, cert, user, displa
               </div>
             )}
 
-            <DialogFooter className="gap-2">
+            <DialogFooter className="gap-2 sticky bottom-0 bg-background pt-3 -mx-6 px-6 border-t border-border">
               <Button variant="outline" onClick={() => setMode('rejecting')} disabled={uploading} className="gap-2 text-destructive hover:text-destructive">
                 <XCircle className="h-4 w-4" /> Rechazar
               </Button>
