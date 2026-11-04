@@ -82,6 +82,4 @@ export const TIPS_POR_TIPO = {
 };
 
 // Los tipos sin tips propios usan los requisitos vigentes (informe).
-// Los certificados de obra no llevan checklist.
-export const getTips = (tipoCertificado) =>
-  tipoCertificado === 'obra' ? [] : (TIPS_POR_TIPO[tipoCertificado] || TIPS_POR_TIPO.informe);
+export const getTips = (tipoCertificado) => TIPS_POR_TIPO[tipoCertificado] || [];
