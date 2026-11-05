@@ -340,12 +340,6 @@ export async function exportCertificadoPDF(form) {
   doc.text(fmt(pdfSubtotal), W - M - 1, y + 5.5, { align: 'right' });
   y += 10;
 
-  if (pctCertificado > 0) {
-    doc.setFont('helvetica', 'italic'); doc.setFontSize(6.5); doc.setTextColor(140, 150, 165);
-    doc.text(`Representa el ${pctCertificado.toFixed(1)}% del total del contrato`, W - M, y, { align: 'right' });
-    y += 6;
-  }
-
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(90, 90, 90);
   if (pdfAnticipo > 0) {
     const antiLabel = form.anticipo_monto_manual != null
