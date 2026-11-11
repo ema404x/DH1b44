@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { diasVencimientoOt } from '../../shared/otVencimiento.ts';
 import { fetchAll } from '../../shared/fetchAllSector.ts';
+import { finDiaLocal } from '../../shared/fechaLocal.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -221,7 +222,7 @@ Deno.serve(async (req) => {
         for (const p of scopedPendientes) {
           if (!p.fecha_limite) continue;
           if (keyExistente('pendiente_vencido', p.id)) continue;
-          const diasVencidos = Math.ceil((ahora - new Date(p.fecha_limite)) / 86400000);
+          const diasVencidos = Math.ceil((ahora - finDiaLocal(p.fecha_limite)) / 86400000);
           if (diasVencidos >= diasLimite) {
             const nivel = diasVencidos >= diasLimite * 2 ? 'critical' : 'warning';
             

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { finDiaLocal } from '../../shared/fechaLocal.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -57,7 +58,7 @@ Deno.serve(async (req) => {
 
     const resumenGlobal = {
       totalPendientes: pendientes.filter(p => p.estado !== 'resuelto' && p.estado !== 'cancelado').length,
-      vencidos: pendientes.filter(p => p.fecha_limite && new Date(p.fecha_limite) < ahora && p.estado !== 'resuelto' && p.estado !== 'cancelado').length,
+      vencidos: pendientes.filter(p => p.fecha_limite && finDiaLocal(p.fecha_limite) < ahora && p.estado !== 'resuelto' && p.estado !== 'cancelado').length,
       resueltosSemana: pendientes.filter(p => p.fecha_resolucion && new Date(p.fecha_resolucion) >= hace7dias).length,
       otsCompletadasSemana: ots.filter(o => o.status === 'completada' && o.completed_date && new Date(o.completed_date) >= hace7dias).length,
       otsNuevasSemana: ots.filter(o => new Date(o.created_date) >= hace7dias).length,

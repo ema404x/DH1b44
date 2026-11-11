@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { parseFechaLocal, diasParaVencer } from '@/lib/fechaLocal';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Search, Pencil, Trash2, FileText, CheckCircle2, StickyNote } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
 import StatusBadge from '@/components/shared/StatusBadge';
 import EmptyState from '@/components/shared/EmptyState';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -30,12 +31,12 @@ export default function InformesTabla({ informes, onEdit, onDelete, isLoading, h
 
   const getDaysChip = (informe) => {
     if (!informe.fecha_limite || ['enviado', 'aprobado'].includes(informe.estado)) return null;
-    const days = differenceInDays(new Date(informe.fecha_limite), today);
-    if (days < 0) return <span className="text-xs font-semibold text-red-600">{format(new Date(informe.fecha_limite), 'dd/MM/yy')}</span>;
+    const days = diasParaVencer(informe.fecha_limite, today);
+    if (days < 0) return <span className="text-xs font-semibold text-red-600">{format(parseFechaLocal(informe.fecha_limite), 'dd/MM/yy')}</span>;
     if (days === 0) return <span className="text-xs font-semibold text-red-500">Hoy</span>;
     if (days <= 3) return <span className="text-xs font-semibold text-orange-500">{days}d</span>;
     if (days <= 7) return <span className="text-xs font-semibold text-amber-500">{days}d</span>;
-    return <span className="text-xs text-muted-foreground">{format(new Date(informe.fecha_limite), 'dd/MM/yy')}</span>;
+    return <span className="text-xs text-muted-foreground">{format(parseFechaLocal(informe.fecha_limite), 'dd/MM/yy')}</span>;
   };
 
   if (filtered.length === 0 && !isLoading) {
@@ -103,7 +104,7 @@ export default function InformesTabla({ informes, onEdit, onDelete, isLoading, h
                   <TableCell className="hidden lg:table-cell text-sm">{informe.responsable || '-'}</TableCell>
                   <TableCell>{getDaysChip(informe)}</TableCell>
                   <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
-                    {informe.fecha_envio ? format(new Date(informe.fecha_envio), 'dd/MM/yy') : '-'}
+                    {informe.fecha_envio ? format(parseFechaLocal(informe.fecha_envio), 'dd/MM/yy') : '-'}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

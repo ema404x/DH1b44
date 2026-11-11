@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { parseFechaLocal } from '@/lib/fechaLocal';
 import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -67,7 +68,7 @@ export default function ProjectDetailPanel({ project, onClose, onEdit }) {
     toast.success('Archivo eliminado');
   };
 
-  const formatDate = (d) => d ? format(new Date(d), 'dd MMM yyyy', { locale: es }) : '—';
+  const formatDate = (d) => d ? format(parseFechaLocal(d), 'dd MMM yyyy', { locale: es }) : '—';
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">

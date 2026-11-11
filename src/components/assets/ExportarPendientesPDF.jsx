@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { parseFechaLocal } from '@/lib/fechaLocal';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -147,8 +148,8 @@ function generarExcel(pendientes, agrupacion) {
     'Clase Orden':     p.clase_orden || '',
     'Estado':          estadoLabelsLocal[p.estado] || p.estado || '',
     'Comuna':          p.comuna || '',
-    'F. Inicio':       p.fecha_emision_sap ? format(new Date(p.fecha_emision_sap), 'dd/MM/yyyy') : '',
-    'F. Límite':       p.fecha_limite ? format(new Date(p.fecha_limite), 'dd/MM/yyyy') : '',
+    'F. Inicio':       p.fecha_emision_sap ? format(parseFechaLocal(p.fecha_emision_sap), 'dd/MM/yyyy') : '',
+    'F. Límite':       p.fecha_limite ? format(parseFechaLocal(p.fecha_limite), 'dd/MM/yyyy') : '',
     'Vencido':         p.fecha_limite && isPast(new Date(p.fecha_limite)) && p.estado !== 'resuelto' && p.estado !== 'cancelado' ? 'Sí' : 'No',
     'Prioridad':       p.prioridad || '',
     'N° SAP Desaprobado': p.numero_sap_desaprobado || '',
@@ -290,8 +291,8 @@ export default function ExportarPendientesPDF({ pendientes, filterInfo }) {
             establecimiento: p.establecimiento || '—',
             descripcion:     p.descripcion || '—',
             sitio:           p.sitio || '—',
-            fecha_inicio:    p.fecha_emision_sap ? format(new Date(p.fecha_emision_sap), 'dd/MM/yy') : '—',
-            fecha_limite:    p.fecha_limite ? format(new Date(p.fecha_limite), 'dd/MM/yy') + (isVencido ? ' ⚠' : '') : '—',
+            fecha_inicio:    p.fecha_emision_sap ? format(parseFechaLocal(p.fecha_emision_sap), 'dd/MM/yy') : '—',
+            fecha_limite:    p.fecha_limite ? format(parseFechaLocal(p.fecha_limite), 'dd/MM/yy') + (isVencido ? ' ⚠' : '') : '—',
             clase_orden:     p.clase_orden || '—',
             estado:          estadoLabels[p.estado] || p.estado,
             _estado:         p.estado,

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { parseFechaLocal } from '@/lib/fechaLocal';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from 'react-leaflet';
@@ -186,7 +187,7 @@ export default function MapaOTsCompletadas() {
                     )}
                     {wo.completed_date && (
                       <p className="text-slate-500 text-xs">
-                        ✅ Completada: {new Date(wo.completed_date).toLocaleDateString('es-AR')}
+                        ✅ Completada: {parseFechaLocal(wo.completed_date).toLocaleDateString('es-AR')}
                       </p>
                     )}
                     <span

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { parseFechaLocal } from '@/lib/fechaLocal';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -156,7 +157,7 @@ function TimelineView({ logs }) {
           <div className="flex items-center gap-3 mb-3">
             <div className="h-px flex-1 bg-slate-800" />
             <span className="text-xs font-semibold text-slate-500 px-2 py-1 bg-slate-800/60 rounded-full">
-              {format(new Date(day), "EEEE d 'de' MMMM", { locale: es })}
+              {format(parseFechaLocal(day), "EEEE d 'de' MMMM", { locale: es })}
               <span className="ml-2 text-slate-600">({dayLogs.length})</span>
             </span>
             <div className="h-px flex-1 bg-slate-800" />

@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { resolveAndReconcileSector } from '../../shared/callerIdentity.ts';
 import { fetchAll } from '../../shared/fetchAllSector.ts';
 import { round2 } from '../../shared/round2.ts';
+import { finDiaLocal } from '../../shared/fechaLocal.ts';
 
 /**
  * Reportes Gerenciales — backend-first.
@@ -278,7 +279,7 @@ export default async function (req) {
     const pendResueltos = filteredPendientes.filter((p) => p.estado === 'resuelto');
     const tasaResolucion = filteredPendientes.length > 0 ? Math.round((pendResueltos.length / filteredPendientes.length) * 100) : 0;
     const hoy = new Date();
-    const pendVencidos = pendActivos.filter((p) => p.fecha_limite && new Date(p.fecha_limite) < hoy);
+    const pendVencidos = pendActivos.filter((p) => p.fecha_limite && finDiaLocal(p.fecha_limite) < hoy);
     const pendSinAsignar = filteredPendientes.filter((p) => !p.jefe_sitio && !['resuelto', 'cancelado'].includes(p.estado)).length;
 
     // MTTR
@@ -332,7 +333,7 @@ export default async function (req) {
       if (d.allCaps && !isAllCaps) { d.label = raw; d.allCaps = false; }
       d.total++;
       if (p.estado === 'resuelto') d.resueltos++;
-      if (!['resuelto', 'cancelado'].includes(p.estado) && p.fecha_limite && new Date(p.fecha_limite) < hoy) d.vencidos++;
+      if (!['resuelto', 'cancelado'].includes(p.estado) && p.fecha_limite && finDiaLocal(p.fecha_limite) < hoy) d.vencidos++;
     });
     const pendPorJefe = [...pjMap.entries()]
       .map(([, d]) => ({ jefe: d.label, total: d.total, resueltos: d.resueltos, vencidos: d.vencidos, eficiencia: d.total > 0 ? Math.round((d.resueltos / d.total) * 100) : 0 }))

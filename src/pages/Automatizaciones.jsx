@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { fechaVencida } from '@/lib/fechaLocal';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -89,7 +90,7 @@ export default function Automatizaciones() {
     },
     {
       label: 'Mant. vencidos',
-      value: assets.filter(a => a.next_maintenance && isPast(new Date(a.next_maintenance))).length,
+      value: assets.filter(a => fechaVencida(a.next_maintenance)).length,
       icon: Wrench, color: 'text-purple-400', bg: 'bg-purple-500/10', href: '/activos',
     },
     {

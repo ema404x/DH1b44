@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
 import { esOtVencida } from '../../shared/otVencimiento.ts';
 import { fetchAll } from '../../shared/fetchAllSector.ts';
 import { round2 } from '../../shared/round2.ts';
+import { finDiaLocal } from '../../shared/fechaLocal.ts';
 import { resolveAdminView, loadRolePermissions, norm } from '../../shared/visibilityResolver.ts';
 import { buildOtVisibilityContext, otEsVisiblePara } from '../../shared/workOrderVisibility.ts';
 
@@ -229,7 +230,7 @@ export default async function (req) {
     // ── Asset ──
     let overdueAssets = null;
     if (loaded.assets) {
-      overdueAssets = loaded.assets.filter((a) => a.next_maintenance && new Date(a.next_maintenance) < now).length;
+      overdueAssets = loaded.assets.filter((a) => a.next_maintenance && finDiaLocal(a.next_maintenance) < now).length;
     }
 
     // ── Pendientes ──

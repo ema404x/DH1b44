@@ -1,4 +1,5 @@
 import React from 'react';
+import { parseFechaLocal } from '@/lib/fechaLocal';
 import { Building2, CheckCircle2, Loader2, Wrench, PlusCircle, ArrowRightLeft, PowerOff, DollarSign } from 'lucide-react';
 
 const typeLabels = {
@@ -105,7 +106,7 @@ export default function AssetCardRevision({ asset, onMarcar, marking }) {
                 <div key={i} className="text-[11px] text-slate-600 flex items-center gap-2 flex-wrap">
                   <span className={`px-1.5 py-0.5 rounded font-medium ${otStatusStyles[o.status] || 'bg-slate-100 text-slate-600'}`}>{otStatusLabels[o.status] || o.status}</span>
                   <span className="font-medium text-slate-700">{o.title}</span>
-                  {o.completed_date && <span className="text-slate-400">· {new Date(o.completed_date).toLocaleDateString('es-AR')}</span>}
+                  {o.completed_date && <span className="text-slate-400">· {parseFechaLocal(o.completed_date).toLocaleDateString('es-AR')}</span>}
                 </div>
               ))}
             </div>

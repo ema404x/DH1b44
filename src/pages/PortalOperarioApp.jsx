@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { parseFechaLocal } from '@/lib/fechaLocal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
@@ -813,7 +814,7 @@ function ConfirmDialog({ ot, accion, onConfirm, onCancel, processing, offline })
 const formatFecha = (d) => {
   try {
     if (!d) return '';
-    return new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return parseFechaLocal(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   } catch {
     return d || '';
   }

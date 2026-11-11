@@ -1,18 +1,19 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertTriangle, Clock, Bell } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
+import { parseFechaLocal, finDiaLocal, diasParaVencer } from '@/lib/fechaLocal';
 
 export default function InformesAlertas({ informes }) {
   const today = new Date();
 
   const vencidos = informes.filter(i =>
-    i.fecha_limite && new Date(i.fecha_limite) < today && !['enviado', 'aprobado'].includes(i.estado)
+    i.fecha_limite && finDiaLocal(i.fecha_limite) < today && !['enviado', 'aprobado'].includes(i.estado)
   );
 
   const proximosAVencer = informes.filter(i => {
     if (!i.fecha_limite || ['enviado', 'aprobado'].includes(i.estado)) return false;
-    const days = differenceInDays(new Date(i.fecha_limite), today);
+    const days = diasParaVencer(i.fecha_limite, today);
     return days >= 0 && days <= 5;
   });
 
@@ -34,7 +35,7 @@ export default function InformesAlertas({ informes }) {
                 <div className="mt-1 flex flex-wrap gap-2">
                   {vencidos.map(i => (
                     <span key={i.id} className="text-xs bg-red-500/15 text-red-400 px-2 py-0.5 rounded-full">
-                      {i.titulo} · venció {format(new Date(i.fecha_limite), 'dd/MM/yy')}
+                      {i.titulo} · venció {format(parseFechaLocal(i.fecha_limite), 'dd/MM/yy')}
                     </span>
                   ))}
                 </div>
@@ -55,7 +56,7 @@ export default function InformesAlertas({ informes }) {
                 </p>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {proximosAVencer.map(i => {
-                    const days = differenceInDays(new Date(i.fecha_limite), today);
+                    const days = diasParaVencer(i.fecha_limite, today);
                     return (
                       <span key={i.id} className="text-xs bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-full">
                         {i.titulo} · {days === 0 ? 'hoy' : `en ${days}d`}

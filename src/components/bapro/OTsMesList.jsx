@@ -1,4 +1,5 @@
 import React from 'react';
+import { parseFechaLocal } from '@/lib/fechaLocal';
 import { Wrench, Calendar, MapPin } from 'lucide-react';
 
 const otStatusLabels = {
@@ -57,7 +58,7 @@ export default function OTsMesList({ ots }) {
           <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500 flex-wrap">
             {o.asset_name && <span className="flex items-center gap-1"><Wrench className="h-3 w-3" />{o.asset_name}</span>}
             {o.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{o.location}</span>}
-            {o.completed_date && <span>· Completada {new Date(o.completed_date).toLocaleDateString('es-AR')}</span>}
+            {o.completed_date && <span>· Completada {parseFechaLocal(o.completed_date).toLocaleDateString('es-AR')}</span>}
           </div>
         </div>
       ))}

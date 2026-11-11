@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { parseFechaLocal, finDiaLocal } from '@/lib/fechaLocal';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,7 +42,7 @@ function calcStats(obras) {
   const tasaMonto      = pctOf(montoListo, montoCobrar);
   const obrasConFecha  = obras.filter(o => o.fecha_fin_estimada);
   const vencidas       = obrasConFecha.filter(o => {
-    const d = new Date(o.fecha_fin_estimada);
+    const d = finDiaLocal(o.fecha_fin_estimada);
     return d < new Date() && o.estado_cobro !== 'listo_certificar';
   });
   return { totalObras, montoContrato, montoCobrar, montoListo, cntListo, urgentes, tasaCertif, tasaMonto, vencidas };
@@ -352,7 +353,7 @@ export default function CertificacionObrasPanel() {
                       {o.comuna && <Badge className="text-xs px-1 py-0 bg-muted text-muted-foreground border-border">C.{o.comuna}</Badge>}
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-muted-foreground">{new Date(o.fecha_fin_estimada).toLocaleDateString('es-AR')}</span>
+                      <span className="text-muted-foreground">{parseFechaLocal(o.fecha_fin_estimada).toLocaleDateString('es-AR')}</span>
                       <span className="font-semibold text-orange-300">{fmt(o.monto_a_cobrar)}</span>
                     </div>
                   </div>
@@ -419,7 +420,7 @@ export default function CertificacionObrasPanel() {
               {/* Filas */}
               {sortObras(filtered).map((obra, idx) => {
                 const cfg = ESTADO[obra.estado_cobro] || ESTADO.pendiente;
-                const isVencida = obra.fecha_fin_estimada && new Date(obra.fecha_fin_estimada) < new Date() && obra.estado_cobro !== 'listo_certificar';
+                const isVencida = obra.fecha_fin_estimada && finDiaLocal(obra.fecha_fin_estimada) < new Date() && obra.estado_cobro !== 'listo_certificar';
                 return (
                   <div key={obra.id}
                     className={`flex flex-col md:grid md:grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] items-start md:items-center gap-2 md:gap-0 px-4 md:px-0 py-3 md:py-0 border-b border-border/40 last:border-0 hover:bg-muted/20 transition-colors ${idx % 2 === 0 ? '' : 'bg-muted/10'}`}>

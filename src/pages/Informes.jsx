@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { finDiaLocal } from '@/lib/fechaLocal';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -49,7 +50,7 @@ export default function Informes() {
   // Auto-detect vencidos
   const today = new Date();
   const vencidos = informes.filter(i =>
-    i.fecha_limite && new Date(i.fecha_limite) < today && !['enviado', 'aprobado'].includes(i.estado)
+    i.fecha_limite && finDiaLocal(i.fecha_limite) < today && !['enviado', 'aprobado'].includes(i.estado)
   );
 
   return (
