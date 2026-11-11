@@ -105,6 +105,7 @@ export default async function(req) {
         action: 'rollback',
         user_email: user.email,
         user_role: user.role || 'user',
+        sector_id: callerSector,
         timestamp: new Date().toISOString(),
         notes: `Rollback importación "${registro.file_name}": ${borrados} borrados, ${restaurados} restaurados, ${sedes_borradas} sedes borradas`,
       });

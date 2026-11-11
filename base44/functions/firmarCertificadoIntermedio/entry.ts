@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
-import { marcarActor } from '../../shared/auditActor.ts';
+import { marcarActor, crearConActor } from '../../shared/auditActor.ts';
 import { puedeFirmar } from '../../shared/cadenaFirmas.ts';
 
 // Firma/rechazo intermedio en la cadena de firmas de un certificado.

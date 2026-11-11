@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.53';
 import { verificarClaveOperario } from "../../shared/operarioAuth.ts";
+import { marcarOperarioPortal } from "../../shared/auditActor.ts";
 import { resolvePublicRecordScope } from '../../shared/publicSectorScope.ts';
 import { sectorErrorResponse } from '../../shared/sectorGuard.ts';
 
@@ -212,6 +213,7 @@ export default async function(req) {
         for (const key of ALLOWED_FIELDS) {
           if (key in updates) safeUpdates[key] = updates[key];
         }
+        await marcarOperarioPortal(base44, 'WorkOrder', workOrderId, 'update', workOrder.operario_sesion);
         const updated = await sb.entities.WorkOrder.update(workOrderId, safeUpdates);
         return Response.json({ success: true, workOrder: updated });
       }

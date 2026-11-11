@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { createScopedClient, resolveCallerSector, sectorErrorResponse, SectorError } from "../../shared/sectorGuard.ts";
+import { marcarActor } from "../../shared/auditActor.ts";
 
 /**
  * guardarAsset — Crea/actualiza un Asset con validación de jerarquía UpKeep-style
@@ -65,9 +66,11 @@ Deno.serve(async (req) => {
     // ── 3) Crear o actualizar (scoped: estampa/verifica sector) ──
     let saved;
     if (id) {
+      await marcarActor(base44, 'Asset', id, 'update');
       saved = await sb.entities.Asset.update(id, data);
     } else {
       saved = await sb.entities.Asset.create(data);
+      await marcarActor(base44, 'Asset', saved?.id, 'create');
     }
 
     // ── 4) Registrar eventos en AssetHistory ──

@@ -1,0 +1,46 @@
+{
+  "name": "Audit - Pendiente",
+  "description": "Registra en Auditor\u00eda los cambios de Pendientes hechos por usuarios",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "entity",
+      "entity_name": "Pendiente",
+      "events": [
+        "create",
+        "update",
+        "delete"
+      ]
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "audit_pendiente",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "registrar_auditoria": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "autoLogAudit",
+            "args": {
+              "event_type": "${ .trigger.event_type }",
+              "entity_name": "${ .trigger.entity_name }",
+              "entity_id": "${ .trigger.entity_id }",
+              "data": "${ .trigger.data }",
+              "old_data": "${ .trigger.old_data }",
+              "changed_fields": "${ .trigger.changed_fields }"
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Registrar en Auditor\u00eda"
+          }
+        }
+      }
+    ]
+  }
+}

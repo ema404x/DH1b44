@@ -33,9 +33,14 @@ const objeto = (v) => {
   try { return JSON.parse(v); } catch (_) { return null; }
 };
 
+// Las fechas de la plataforma vienen en UTC sin indicador de zona.
+const ms = (f) => new Date(/Z$|[+-]\d\d:?\d\d$/.test(String(f)) ? f : `${f}Z`).getTime();
+
 // Toma la marca vigente más antigua del evento (los eventos llegan en orden)
-// y la borra, junto con las vencidas.
-async function tomarMarca(sb, event) {
+// y la borra, junto con las vencidas. `hasta` es el momento del cambio: una
+// marca posterior pertenece a una edición siguiente y no se toca (así un
+// estampado automático no se queda con la marca de quien editó después).
+async function tomarMarca(sb, event, hasta) {
   const marcas = lista(await sb.entities.AuditoriaActor.filter(
     { entity_type: event.entity_name, entity_id: event.entity_id, action: event.type },
     'created_date', 20,
@@ -43,7 +48,9 @@ async function tomarMarca(sb, event) {
   const limite = Date.now() - VENTANA_MS;
   let marca = null;
   for (const m of marcas) {
-    const vigente = new Date(m.created_date).getTime() >= limite;
+    const creada = ms(m.created_date);
+    if (hasta && creada > hasta + 2000) continue;
+    const vigente = creada >= limite;
     if (vigente && marca) continue;
     if (vigente) marca = m;
     await sb.entities.AuditoriaActor.delete(m.id).catch(() => {});
@@ -102,7 +109,8 @@ export default async function(req) {
     const creadorId = data?.created_by_id;
     const creadorReal = event.type === 'create' && esUsuario(creadorId);
 
-    let marca = await tomarMarca(sb, event);
+    const hasta = event.type === 'update' && data?.updated_date ? ms(data.updated_date) : null;
+    let marca = await tomarMarca(sb, event, hasta);
     // Creaciones hechas por una función del servidor: la marca se deja apenas
     // se conoce el id, y puede llegar un instante después que este evento.
     if (!marca && event.type === 'create' && !creadorReal) {
