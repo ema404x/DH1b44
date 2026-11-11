@@ -53,8 +53,11 @@ export default async function (req) {
       base44.asServiceRole.entities.Employee.filter({ sector_id: callerSector }),
       base44.asServiceRole.entities.User.list('-created_date', 200),
     ]);
+    // `todos` (Auditoría): incluye cualquier cuenta del sector sin ficha, no solo
+    // las de rol 'user'. Sin el flag el resultado es el de siempre.
+    const { todos } = await req.json().catch(() => ({}));
     const sectorUsers = users.filter(
-      (u) => u.role === 'user' && (u.data?.sector_id || u.sector_id) === callerSector
+      (u) => (todos || u.role === 'user') && (u.data?.sector_id || u.sector_id) === callerSector
     );
 
     const operarios = [];
@@ -82,7 +85,7 @@ export default async function (req) {
         full_name: u.full_name || '',
         email: (u.email || '').toLowerCase().trim(),
         user_id: u.id,
-        role: 'user',
+        role: u.role || 'user',
         is_jefe: false,
         has_ficha: false,
         has_account: true,

@@ -71,12 +71,20 @@ export function useAuditoria(filtros) {
     },
   });
 
-  // Todas las personas con actividad en el sector (para el filtro por usuario).
+  // Filtro por usuario: todas las personas vinculadas al sector (tengan o no
+  // actividad) más quienes figuran en el historial (operarios del portal, "sistema").
   const { data: usuarios = [] } = useQuery({
     queryKey: ['auditUsuarios'],
     queryFn: async () => {
-      const { rows } = await Log.aggregate({ query: {}, groupBy: 'user_email' });
-      return rows.map(r => r.user_email).filter(Boolean).sort((a, b) => a.localeCompare(b));
+      const [{ rows }, sector] = await Promise.all([
+        Log.aggregate({ query: {}, groupBy: 'user_email' }),
+        base44.functions.invoke('getOperariosSector', { todos: true }),
+      ]);
+      // El correo del historial tiene prioridad: es el valor exacto por el que se filtra.
+      const porCorreo = new Map();
+      for (const o of sector.data?.operarios || []) if (o.email) porCorreo.set(o.email.toLowerCase(), o.email);
+      for (const r of rows) if (r.user_email) porCorreo.set(r.user_email.toLowerCase(), r.user_email);
+      return [...porCorreo.values()].sort((a, b) => a.localeCompare(b));
     },
     staleTime: 5 * 60 * 1000,
   });
