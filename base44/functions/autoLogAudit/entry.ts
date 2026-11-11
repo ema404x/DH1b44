@@ -15,7 +15,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
  */
 
 const VENTANA_MS = 15 * 60 * 1000;
-const IGNORE_FIELDS = ['updated_date', 'created_date'];
+const IGNORE_FIELDS = ['id', 'updated_date', 'created_date', 'created_by', 'created_by_id', 'is_sample'];
 // Módulos donde también quedan registrados los procesos automáticos ("sistema").
 // En el resto solo se registra lo que hizo una persona, para no llenar la
 // auditoría con sincronizaciones e importaciones.
@@ -87,8 +87,9 @@ export default async function(req) {
 
     const sb = base44.asServiceRole;
 
-    // Registros muy grandes llegan sin datos: se vuelven a leer.
-    if (event.type !== 'delete' && !data?.created_by_id) {
+    // Registros muy grandes llegan sin datos, y las creaciones pueden llegar
+    // sin su creador: se vuelven a leer.
+    if (event.type !== 'delete' && (!data || (event.type === 'create' && !data.created_by_id))) {
       const actual = await sb.entities[event.entity_name].get(event.entity_id).catch(() => null);
       data = data ? { ...data, created_by_id: actual?.created_by_id } : actual;
     }
