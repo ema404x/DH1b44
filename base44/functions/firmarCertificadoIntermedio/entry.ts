@@ -107,9 +107,9 @@ export default async function(req: Request): Promise<Response> {
             const empCreador = creadorEmail ? (await sb.entities.Employee.filter({ email: creadorEmail }).catch(() => []))[0] : null;
             if (empCreador?.full_name) creadorNombre = empCreador.full_name;
           } catch (_) { /* best-effort */ }
-          for (const s of previas) await sb.entities.SolicitudCertificado.delete(s.id).catch(() => {});
+          for (const s of previas) { await marcarActor(base44, 'SolicitudCertificado', s.id, 'delete'); await sb.entities.SolicitudCertificado.delete(s.id).catch(() => {}); }
           const numero = `CERT-${cert.id.slice(-6).toUpperCase()}`;
-          await sb.entities.SolicitudCertificado.create({
+          await crearConActor(base44, 'SolicitudCertificado', {
             numero,
             titulo: `Certificado N°${cert.numero} — ${cert.contratista || cert.emprendimiento || ''}`,
             establecimiento: cert.emprendimiento || cert.obra_servicio || '',

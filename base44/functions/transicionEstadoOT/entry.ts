@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
-import { marcarActor } from "../../shared/auditActor.ts";
+import { marcarActor, marcarOperarioPortal } from "../../shared/auditActor.ts";
 import { isAdminLevelRole } from "../../shared/roles.ts";
 import { resolveOtPermissions } from "../../shared/otPermissions.ts";
 import { verificarClaveOperario } from "../../shared/operarioAuth.ts";
@@ -262,6 +262,7 @@ Deno.serve(async (req) => {
     }
 
     if (user) await marcarActor(base44, 'WorkOrder', ot_id, 'update');
+    else await marcarOperarioPortal(base44, 'WorkOrder', ot_id, 'update', operario_sesion || ot.operario_sesion);
     const actualizada = await base44.asServiceRole.entities.WorkOrder.update(ot_id, updateData);
 
     // ── Registro de historial del activo (lifecycle) ──

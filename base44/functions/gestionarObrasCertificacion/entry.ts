@@ -205,6 +205,7 @@ export default async function(req) {
         await sb.entities.AuditLog.create({
           entity_type: 'ObraCertificacion',
           entity_id: `sector:${callerSector}:ciclo_activo`,
+          sector_id: callerSector,
           action: 'delete',
           user_email: user.email,
           user_role: user.role,

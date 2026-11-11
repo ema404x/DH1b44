@@ -55,7 +55,7 @@ export default async function(req) {
       // También borrar la solicitud vinculada si existe
       const sols = await sb.entities.SolicitudCertificado.filter({ certificado_id }).catch(() => []);
       for (const s of (sols || [])) {
-        await sb.entities.SolicitudCertificado.delete(s.id).catch(() => {});
+        await marcarActor(base44, 'SolicitudCertificado', s.id, 'delete'); await sb.entities.SolicitudCertificado.delete(s.id).catch(() => {});
       }
       await marcarActor(base44, 'Certificado', certificado_id, 'delete'); await sb.entities.Certificado.delete(certificado_id);
       return Response.json({ success: true, mensaje: 'Certificado eliminado correctamente' });
@@ -92,7 +92,7 @@ export default async function(req) {
     // Borrar solicitud vinculada si existe (cleanup)
     const sols = await sb.entities.SolicitudCertificado.filter({ certificado_id }).catch(() => []);
     for (const s of (sols || [])) {
-      await sb.entities.SolicitudCertificado.delete(s.id).catch(() => {});
+      await marcarActor(base44, 'SolicitudCertificado', s.id, 'delete'); await sb.entities.SolicitudCertificado.delete(s.id).catch(() => {});
     }
 
     await marcarActor(base44, 'Certificado', certificado_id, 'delete'); await sb.entities.Certificado.delete(certificado_id);

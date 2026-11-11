@@ -98,6 +98,7 @@ export default async function (req) {
           await sb.entities.AuditLog.create({
             entity_type: 'FichajeUbicacion',
             entity_id: `sector:${sector}`,
+            sector_id: sector,
             action: 'update',
             user_email: user.email,
             user_role: user.role,

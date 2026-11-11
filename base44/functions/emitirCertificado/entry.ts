@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
-import { marcarActor } from "../../shared/auditActor.ts";
+import { marcarActor, crearConActor } from "../../shared/auditActor.ts";
 
 // Emisión robusta de certificados: crea el Certificado (estado 'emitido') con
 // sector_id garantizado, crea la SolicitudCertificado de aprobación, y solo
@@ -79,7 +79,7 @@ export default async function(req) {
       // Limpiar solicitudes previas del mismo cert para no duplicar la bandeja.
       const viejas = await base44.asServiceRole.entities.SolicitudCertificado.filter({ certificado_id: existing.id });
       for (const sol of viejas) {
-        await base44.asServiceRole.entities.SolicitudCertificado.delete(sol.id).catch(() => {});
+        await marcarActor(base44, 'SolicitudCertificado', sol.id, 'delete'); await base44.asServiceRole.entities.SolicitudCertificado.delete(sol.id).catch(() => {});
       }
     }
 
@@ -94,7 +94,7 @@ export default async function(req) {
     if (estadoInicial === 'emitido') {
       try {
         const numero = `CERT-${cert.id.slice(-6).toUpperCase()}`;
-        await base44.asServiceRole.entities.SolicitudCertificado.create({
+        await crearConActor(base44, 'SolicitudCertificado', {
           numero,
           titulo: `Certificado N°${cert.numero} — ${cert.contratista || cert.emprendimiento || ''}`,
           establecimiento: cert.emprendimiento || cert.obra_servicio || '',
@@ -131,8 +131,9 @@ export default async function(req) {
           // Borrar solicitudes viejas vinculadas al cert anterior
           const viejasSolicitudes = await base44.asServiceRole.entities.SolicitudCertificado.filter({ certificado_id: editing_id });
           for (const sol of viejasSolicitudes) {
-            await base44.asServiceRole.entities.SolicitudCertificado.delete(sol.id).catch(() => {});
+            await marcarActor(base44, 'SolicitudCertificado', sol.id, 'delete'); await base44.asServiceRole.entities.SolicitudCertificado.delete(sol.id).catch(() => {});
           }
+          await marcarActor(base44, 'Certificado', editing_id, 'delete');
           await base44.asServiceRole.entities.Certificado.delete(editing_id).catch(() => {});
         }
       } catch (_) { /* no bloquear el flujo si falla la limpieza */ }

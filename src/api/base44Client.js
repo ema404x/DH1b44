@@ -22,6 +22,8 @@ export const base44 = createClient({
 const ENTIDADES_AUDITADAS = new Set([
   'WorkOrder', 'Certificado', 'SolicitudCertificado', 'Client',
   'Project', 'Employee', 'Emergencia', 'RolePermission',
+  'Asset', 'Material', 'Pendiente', 'AbonoMaestro', 'Informe',
+  'RequerimientoCompra', 'OrdenRutina', 'LocationQR', 'EquipamientoCalefaccion',
 ]);
 const entidades = base44.entities;
 

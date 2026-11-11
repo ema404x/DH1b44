@@ -1,34 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { parseFechaLocal } from '@/lib/fechaLocal';
-import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { useAuditoria, traerTodos, TOPE_EXPORT } from '@/hooks/useAuditoria';
+import AuditStats from '@/components/audit/AuditStats';
+import { ACTION_CONFIG, ENTITY_LABELS } from '@/components/audit/auditConfig';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Download, FileText, TrendingUp, Users, Database, Trash2, Plus, Edit3, Eye, Shield, Clock, ChevronDown, ChevronRight, Activity, BarChart3, X } from 'lucide-react';
-import { format, formatDistanceToNow, subDays, isAfter } from 'date-fns';
+import { Search, Download, FileText, TrendingUp, Users, Trash2, Plus, Edit3, Shield, Clock, ChevronDown, ChevronRight, X, Loader2 } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-
-const ACTION_CONFIG = {
-  create: { label: 'Creación', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', dot: 'bg-emerald-400', icon: Plus },
-  update: { label: 'Edición', color: 'bg-blue-500/15 text-blue-400 border-blue-500/30', dot: 'bg-blue-400', icon: Edit3 },
-  delete: { label: 'Eliminación', color: 'bg-red-500/15 text-red-400 border-red-500/30', dot: 'bg-red-400', icon: Trash2 },
-  view:   { label: 'Vista', color: 'bg-slate-500/15 text-slate-400 border-slate-500/30', dot: 'bg-slate-400', icon: Eye },
-  sign:   { label: 'Firma', color: 'bg-purple-500/15 text-purple-400 border-purple-500/30', dot: 'bg-purple-400', icon: Shield },
-};
-
-const ENTITY_LABELS = {
-  WorkOrder: 'Orden de Trabajo', Certificado: 'Certificado', Employee: 'Empleado',
-  Client: 'Proveedor', Project: 'Proyecto', SolicitudCertificado: 'Solicitud de Certificado',
-  Emergencia: 'Emergencia', RolePermission: 'Permiso de Rol', AbonoMaestro: 'Abono Maestro',
-  Material: 'Material', Asset: 'Activo', InspeccionColegio: 'Inspección',
-};
-
-const PIE_COLORS = ['#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#94a3b8'];
 
 function FieldDiff({ field, oldVal, newVal }) {
   const fmt = (v) => {
@@ -171,196 +155,27 @@ function TimelineView({ logs }) {
   );
 }
 
-function StatsView({ logs }) {
-  const byAction = useMemo(() => {
-    const map = {};
-    logs.forEach(l => { map[l.action] = (map[l.action] || 0) + 1; });
-    return Object.entries(map).map(([name, value]) => ({ name: ACTION_CONFIG[name]?.label || name, value }));
-  }, [logs]);
-
-  const byEntity = useMemo(() => {
-    const map = {};
-    logs.forEach(l => { map[l.entity_type] = (map[l.entity_type] || 0) + 1; });
-    return Object.entries(map).sort(([,a],[,b]) => b - a).slice(0, 8).map(([name, value]) => ({
-      name: ENTITY_LABELS[name] || name, value
-    }));
-  }, [logs]);
-
-  const byUser = useMemo(() => {
-    const map = {};
-    logs.forEach(l => { map[l.user_email] = (map[l.user_email] || 0) + 1; });
-    return Object.entries(map).sort(([,a],[,b]) => b - a).slice(0, 5);
-  }, [logs]);
-
-  const byDay = useMemo(() => {
-    const map = {};
-    for (let i = 6; i >= 0; i--) {
-      const d = format(subDays(new Date(), i), 'dd/MM');
-      map[d] = 0;
-    }
-    logs.forEach(l => {
-      if (isAfter(new Date(l.timestamp), subDays(new Date(), 7))) {
-        const d = format(new Date(l.timestamp), 'dd/MM');
-        if (map[d] !== undefined) map[d]++;
-      }
-    });
-    return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [logs]);
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-5 bg-slate-800/40 border-slate-700/50">
-          <h3 className="font-semibold text-sm mb-4 flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /> Actividad últimos 7 días</h3>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={byDay}>
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-              <Bar dataKey="value" fill="#3b82f6" radius={[4,4,0,0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card className="p-5 bg-slate-800/40 border-slate-700/50">
-          <h3 className="font-semibold text-sm mb-4 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" /> Distribución por tipo de acción</h3>
-          <div className="flex items-center gap-4">
-            <ResponsiveContainer width={140} height={140}>
-              <PieChart>
-                <Pie data={byAction} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={2}>
-                  {byAction.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex-1 space-y-2">
-              {byAction.map((item, i) => (
-                <div key={item.name} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                    <span className="text-slate-300">{item.name}</span>
-                  </div>
-                  <span className="font-bold text-white">{item.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-5 bg-slate-800/40 border-slate-700/50">
-          <h3 className="font-semibold text-sm mb-4 flex items-center gap-2"><Database className="h-4 w-4 text-primary" /> Módulos más activos</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={byEntity} layout="vertical">
-              <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={110} />
-              <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-              <Bar dataKey="value" fill="#10b981" radius={[0,4,4,0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card className="p-5 bg-slate-800/40 border-slate-700/50">
-          <h3 className="font-semibold text-sm mb-4 flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Usuarios más activos</h3>
-          <div className="space-y-3">
-            {byUser.map(([email, count], i) => (
-              <div key={email} className="flex items-center gap-3">
-                <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                  {i + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-200 truncate">{email}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full"
-                        style={{ width: `${(count / (byUser[0]?.[1] || 1)) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-slate-400 flex-shrink-0">{count}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {byUser.length === 0 && <p className="text-sm text-slate-500 text-center py-4">Sin datos</p>}
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
 export default function Auditoria() {
   const [filters, setFilters] = useState({ entity_type: '', action: '', user_email: '' });
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [search, setSearch] = useState('');
+  const [exportando, setExportando] = useState(false);
 
-  const { data: logs = [], isLoading } = useQuery({
-    queryKey: ['auditLogs', filters],
-    queryFn: async () => {
-      const query = {};
-      if (filters.entity_type) query.entity_type = filters.entity_type;
-      if (filters.action) query.action = filters.action;
-      if (filters.user_email) query.user_email = filters.user_email;
-      return await base44.entities.AuditLog.filter(query, '-timestamp', 500);
-    }
-  });
-
-  // Usuarios distintos sobre TODO el historial que coincide con los filtros
-  // (la lista de arriba solo trae los 500 registros más recientes).
-  const { data: totalUsuarios } = useQuery({
-    queryKey: ['auditLogUsuarios', filters, dateFrom, dateTo, search],
-    queryFn: async () => {
-      const query = {};
-      if (filters.entity_type) query.entity_type = filters.entity_type;
-      if (filters.action) query.action = filters.action;
-      if (filters.user_email) query.user_email = filters.user_email;
-      if (dateFrom || dateTo) {
-        query.timestamp = {};
-        if (dateFrom) query.timestamp.$gte = new Date(dateFrom).toISOString();
-        if (dateTo) query.timestamp.$lte = new Date(dateTo + 'T23:59:59').toISOString();
-      }
-      if (search) {
-        const texto = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
-        query.$or = ['entity_id', 'entity_type', 'user_email', 'changed_fields'].map(campo => ({ [campo]: texto }));
-      }
-      const { rows } = await base44.entities.AuditLog.aggregate({ query, groupBy: 'user_email' });
-      return rows.length;
-    }
-  });
-
-  const filteredLogs = useMemo(() => {
-    return logs.filter(log => {
-      if (dateFrom && new Date(log.timestamp) < new Date(dateFrom)) return false;
-      if (dateTo && new Date(log.timestamp) > new Date(dateTo + 'T23:59:59')) return false;
-      if (search) {
-        const s = search.toLowerCase();
-        const matchId = log.entity_id?.toLowerCase().includes(s);
-        const matchType = log.entity_type?.toLowerCase().includes(s);
-        const matchUser = log.user_email?.toLowerCase().includes(s);
-        const matchFields = log.changed_fields?.some(f => f.toLowerCase().includes(s));
-        if (!matchId && !matchType && !matchUser && !matchFields) return false;
-      }
-      return true;
-    });
-  }, [logs, dateFrom, dateTo, search]);
-
-  const stats = useMemo(() => ({
-    total: filteredLogs.length,
-    creates: filteredLogs.filter(l => l.action === 'create').length,
-    updates: filteredLogs.filter(l => l.action === 'update').length,
-    deletes: filteredLogs.filter(l => l.action === 'delete').length,
-    users: totalUsuarios ?? new Set(filteredLogs.map(l => l.user_email)).size,
-  }), [filteredLogs, totalUsuarios]);
+  const { query, logs, stats, resumen, usuarios, cargando, hayMas, cargarMas, cargandoMas } =
+    useAuditoria({ filters, dateFrom, dateTo, search });
 
   const hasFilters = filters.entity_type || filters.action || filters.user_email || dateFrom || dateTo || search;
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
+    setExportando(true);
+    const filas = await traerTodos(query).finally(() => setExportando(false));
+    if (filas.length >= TOPE_EXPORT) {
+      toast.info(`Se exportaron los ${TOPE_EXPORT} registros más recientes. Acotá las fechas para exportar el resto.`);
+    }
     const csv = [
       ['Fecha', 'Usuario', 'Rol', 'Entidad', 'ID', 'Acción', 'Campos Modificados', 'Notas'].join(','),
-      ...filteredLogs.map(log => [
+      ...filas.map(log => [
         format(new Date(log.timestamp), 'dd/MM/yyyy HH:mm:ss', { locale: es }),
         log.user_email,
         log.user_role,
@@ -390,10 +205,10 @@ export default function Auditoria() {
             </div>
             Auditoría
           </h1>
-          <p className="text-slate-400 mt-1">Registro completo de todas las acciones del sistema</p>
+          <p className="text-slate-400 mt-1">Cambios de datos hechos por todas las personas de tu sector</p>
         </div>
-        <Button onClick={exportCSV} variant="outline" className="gap-2 border-slate-700/50 bg-slate-800/50 text-white hover:bg-slate-700/50">
-          <Download className="h-4 w-4" /> Exportar CSV
+        <Button onClick={exportCSV} disabled={exportando} variant="outline" className="gap-2 border-slate-700/50 bg-slate-800/50 text-white hover:bg-slate-700/50">
+          {exportando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Exportar CSV
         </Button>
       </div>
 
@@ -427,7 +242,7 @@ export default function Auditoria() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
             <Input placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-8 text-sm bg-slate-900/50 border-slate-700" />
@@ -443,13 +258,20 @@ export default function Auditoria() {
               <SelectItem value="sign">Firma</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={filters.user_email || 'all'} onValueChange={v => setFilters({...filters, user_email: v === 'all' ? '' : v})}>
+            <SelectTrigger className="h-8 text-sm bg-slate-900/50 border-slate-700"><SelectValue placeholder="Usuario" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los usuarios</SelectItem>
+              {usuarios.map(email => <SelectItem key={email} value={email}>{email}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-sm bg-slate-900/50 border-slate-700" />
           <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-sm bg-slate-900/50 border-slate-700" />
         </div>
       </Card>
 
       {/* Tabs */}
-      {isLoading ? (
+      {cargando ? (
         <div className="text-center py-16 text-slate-500">
           <div className="w-6 h-6 border-2 border-slate-600 border-t-slate-300 rounded-full animate-spin mx-auto mb-3" />
           Cargando registros...
@@ -458,17 +280,25 @@ export default function Auditoria() {
         <Tabs defaultValue="timeline">
           <TabsList className="bg-slate-800/60 border border-slate-700/50">
             <TabsTrigger value="timeline" className="gap-2 data-[state=active]:bg-slate-700">
-              <Clock className="h-3.5 w-3.5" /> Timeline ({filteredLogs.length})
+              <Clock className="h-3.5 w-3.5" /> Timeline ({stats.total})
             </TabsTrigger>
             <TabsTrigger value="stats" className="gap-2 data-[state=active]:bg-slate-700">
               <TrendingUp className="h-3.5 w-3.5" /> Estadísticas
             </TabsTrigger>
           </TabsList>
           <TabsContent value="timeline" className="mt-4">
-            <TimelineView logs={filteredLogs} />
+            <TimelineView logs={logs} />
+            {hayMas && (
+              <div className="flex justify-center mt-6">
+                <Button onClick={cargarMas} disabled={cargandoMas} variant="outline" className="gap-2 border-slate-700/50 bg-slate-800/50 text-white hover:bg-slate-700/50">
+                  {cargandoMas && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Cargar más ({logs.length} de {stats.total})
+                </Button>
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="stats" className="mt-4">
-            <StatsView logs={filteredLogs} />
+            <AuditStats resumen={resumen} query={query} />
           </TabsContent>
         </Tabs>
       )}

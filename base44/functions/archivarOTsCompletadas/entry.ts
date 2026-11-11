@@ -55,7 +55,7 @@ export default async function (req) {
     if (archivadas) {
       await sb.entities.AuditLog.create({
         entity_type: 'WorkOrder', entity_id: `sector:${sector}`, action: 'update',
-        user_email: user.email, user_role: user.role, timestamp: now.toISOString(),
+        user_email: user.email, user_role: user.role, sector_id: sector, timestamp: now.toISOString(),
         changed_fields: ['archivada', 'fecha_archivado'],
         notes: `Archivado del sector ${sector}: ${archivadas} OTs (cutoff ${cutoff}).`,
       });

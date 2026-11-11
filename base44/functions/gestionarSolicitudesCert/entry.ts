@@ -150,6 +150,7 @@ Deno.serve(async (req) => {
       for (const s of huerfanas) {
         if (s.sector_id !== callerSector) continue;
         try {
+          await marcarActor(base44, 'SolicitudCertificado', s.id, 'delete');
           await base44.asServiceRole.entities.SolicitudCertificado.delete(s.id);
           ids_eliminados.push(s.id);
         } catch (e) {

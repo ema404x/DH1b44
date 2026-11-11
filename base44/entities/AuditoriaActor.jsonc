@@ -23,6 +23,10 @@
         "red"
       ],
       "description": "Acci\u00f3n que realiza. El autor es created_by_id (lo estampa la plataforma, no se puede falsear). El registro de auditor\u00eda consume y borra esta marca."
+    },
+    "actor_nombre": {
+      "type": "string",
+      "description": "Solo portal sin login: nombre del operario que actu\u00f3. Lo escribe el servidor despu\u00e9s de validar la clave de operario. Se ignora si la marca la cre\u00f3 un usuario con sesi\u00f3n (ah\u00ed el autor es created_by_id)."
     }
   },
   "required": [

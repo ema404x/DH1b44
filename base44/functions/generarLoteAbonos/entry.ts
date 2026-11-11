@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { marcarActor, crearConActor } from "../../shared/auditActor.ts";
 
 const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -89,7 +90,7 @@ async function generateOneCertificate(base44, abono, mesInfo, currentNum) {
     sector_id: abono.sector_id || '',
   };
 
-  const created = await base44.asServiceRole.entities.Certificado.create(newCert);
+  const created = await crearConActor(base44, 'Certificado', newCert);
 
   return {
     generated: true,
@@ -230,9 +231,11 @@ Deno.serve(async (req) => {
             try {
               const sols = await base44.asServiceRole.entities.SolicitudCertificado.filter({ certificado_id: c.id });
               for (const sol of sols) {
+                await marcarActor(base44, 'SolicitudCertificado', sol.id, 'delete');
                 await base44.asServiceRole.entities.SolicitudCertificado.delete(sol.id);
               }
             } catch (_) { /* no bloquear si falla */ }
+            await marcarActor(base44, 'Certificado', c.id, 'delete');
             await base44.asServiceRole.entities.Certificado.delete(c.id);
           }
         }
@@ -254,7 +257,7 @@ Deno.serve(async (req) => {
         const sectorId = abono.sector_id || callerSector;
         const numeroSol = `CERT-${res.id.slice(-6).toUpperCase()}`;
         try {
-          await base44.asServiceRole.entities.SolicitudCertificado.create({
+          await crearConActor(base44, 'SolicitudCertificado', {
             numero: numeroSol,
             titulo: `Certificado N°${res.numero} — ${abono.contratista || abono.emprendimiento || ''} (${abono.comuna || ''})`,
             establecimiento: abono.emprendimiento || abono.obra_servicio || '',

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { marcarActores } from "../../shared/auditActor.ts";
 
 Deno.serve(async (req) => {
   try {
@@ -57,6 +58,7 @@ Deno.serve(async (req) => {
     }
 
     // Borrado real, en lotes (mantiene shape deleted/errors que usa el llamador).
+    await marcarActores(base44, 'Project', toDeleteIds, 'delete');
     let deleted = 0;
     let errors = 0;
     const BATCH = 20;

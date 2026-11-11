@@ -163,6 +163,7 @@ export async function heredarPorUbicacion(sb: any, payload: any, dry_run = false
         action: 'update',
         user_email: 'automacion',
         user_role: 'sistema',
+        sector_id: sector || null,
         timestamp: new Date().toISOString(),
         changed_fields: ['jefe_sitio', 'jefe_sitio_email'],
         notes: `Heredencia automática por reasignación de ubicación: ${old_jefe} → ${new_jefe} (sector ${sector}). Resuelto: ${JSON.stringify(resuelto)}. ${warnings.join(' ')}`,
