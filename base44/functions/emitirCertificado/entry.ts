@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { marcarActor } from "../../shared/auditActor.ts";
 
 // Emisión robusta de certificados: crea el Certificado (estado 'emitido') con
 // sector_id garantizado, crea la SolicitudCertificado de aprobación, y solo
@@ -69,9 +70,11 @@ export default async function(req) {
     const hayPendientes = cadenaFirmas.some(f => f.estado === 'pendiente');
     const estadoInicial = hayPendientes ? 'pendiente_firmas' : 'emitido';
     const certPayload = { ...rest, estado: estadoInicial, sector_id: callerSector, creado_por_email: existing?.creado_por_email || userEmail, cadena_firmas: cadenaFirmas };
+    if (existing) await marcarActor(base44, 'Certificado', existing.id, 'update');
     const cert = existing
       ? await base44.asServiceRole.entities.Certificado.update(existing.id, certPayload)
       : await base44.asServiceRole.entities.Certificado.create(certPayload);
+    if (!existing) await marcarActor(base44, 'Certificado', cert.id, 'create');
     if (existing) {
       // Limpiar solicitudes previas del mismo cert para no duplicar la bandeja.
       const viejas = await base44.asServiceRole.entities.SolicitudCertificado.filter({ certificado_id: existing.id });

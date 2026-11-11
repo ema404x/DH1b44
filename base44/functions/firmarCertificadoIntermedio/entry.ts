@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.49';
+import { marcarActor } from '../../shared/auditActor.ts';
 import { puedeFirmar } from '../../shared/cadenaFirmas.ts';
 
 // Firma/rechazo intermedio en la cadena de firmas de un certificado.
@@ -83,7 +84,7 @@ export default async function(req: Request): Promise<Response> {
       const esUltimo = restantes === 0;
       const nuevoEstado = esUltimo ? 'emitido' : 'pendiente_firmas';
 
-      await sb.entities.Certificado.update(cert_id, {
+      await marcarActor(base44, 'Certificado', cert_id, 'update'); await sb.entities.Certificado.update(cert_id, {
         cadena_firmas: cadena,
         estado: nuevoEstado,
       });
@@ -155,7 +156,7 @@ export default async function(req: Request): Promise<Response> {
       motivo_rechazo: motivo.trim(),
     };
 
-    await sb.entities.Certificado.update(cert_id, {
+    await marcarActor(base44, 'Certificado', cert_id, 'update'); await sb.entities.Certificado.update(cert_id, {
       cadena_firmas: cadena,
       estado: 'borrador',
     });

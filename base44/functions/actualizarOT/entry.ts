@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { marcarActor } from "../../shared/auditActor.ts";
 import { resolveOtPermissions } from "../../shared/otPermissions.ts";
 
 // Actualiza campos de una OT de forma robusta, sin depender del RLS directo
@@ -97,6 +98,7 @@ export default async function (req) {
       return Response.json({ success: true, ot, mensaje: 'Sin cambios' });
     }
 
+    await marcarActor(base44, 'WorkOrder', ot_id, 'update');
     const updated = await base44.asServiceRole.entities.WorkOrder.update(ot_id, cleanPatch);
     return Response.json({ success: true, ot: updated, mensaje: 'OT actualizada' });
   } catch (error) {

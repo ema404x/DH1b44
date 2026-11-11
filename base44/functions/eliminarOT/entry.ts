@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { marcarActor } from "../../shared/auditActor.ts";
 import { resolveOtPermissions, explicitOrLegacy } from "../../shared/otPermissions.ts";
 import { normalizeRole } from "../../shared/roles.ts";
 
@@ -57,6 +58,7 @@ export default async function(req) {
       return Response.json({ error: 'No tenés permiso para eliminar esta OT' }, { status: 403 });
     }
 
+    await marcarActor(base44, 'WorkOrder', ot_id, 'delete');
     await base44.asServiceRole.entities.WorkOrder.delete(ot_id);
     return Response.json({ success: true, mensaje: 'OT eliminada correctamente' });
   } catch (error) {

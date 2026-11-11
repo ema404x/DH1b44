@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { marcarActor } from "../../shared/auditActor.ts";
 import { resolveAndReconcileSector } from "../../shared/callerIdentity.ts";
 import { resolveAdminView, norm, loadRolePermissions } from "../../shared/visibilityResolver.ts";
 import { certVisibleToUser } from "../../shared/certVisibility.ts";
@@ -56,7 +57,7 @@ export default async function(req) {
       for (const s of (sols || [])) {
         await sb.entities.SolicitudCertificado.delete(s.id).catch(() => {});
       }
-      await sb.entities.Certificado.delete(certificado_id);
+      await marcarActor(base44, 'Certificado', certificado_id, 'delete'); await sb.entities.Certificado.delete(certificado_id);
       return Response.json({ success: true, mensaje: 'Certificado eliminado correctamente' });
     }
 
@@ -94,7 +95,7 @@ export default async function(req) {
       await sb.entities.SolicitudCertificado.delete(s.id).catch(() => {});
     }
 
-    await sb.entities.Certificado.delete(certificado_id);
+    await marcarActor(base44, 'Certificado', certificado_id, 'delete'); await sb.entities.Certificado.delete(certificado_id);
     return Response.json({ success: true, mensaje: 'Certificado eliminado correctamente' });
   } catch (error) {
     return Response.json({ error: error.message || 'Error al eliminar el certificado' }, { status: 500 });

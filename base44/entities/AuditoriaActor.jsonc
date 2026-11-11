@@ -1,0 +1,67 @@
+{
+  "name": "AuditoriaActor",
+  "type": "object",
+  "properties": {
+    "entity_type": {
+      "type": "string",
+      "description": "Entidad auditada sobre la que el usuario est\u00e1 por actuar (WorkOrder, Certificado, etc.)"
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "ID del registro sobre el que act\u00faa"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "create",
+        "update",
+        "delete"
+      ],
+      "enumColors": [
+        "green",
+        "blue",
+        "red"
+      ],
+      "description": "Acci\u00f3n que realiza. El autor es created_by_id (lo estampa la plataforma, no se puede falsear). El registro de auditor\u00eda consume y borra esta marca."
+    }
+  },
+  "required": [
+    "entity_type",
+    "entity_id",
+    "action"
+  ],
+  "rls": {
+    "create": {
+      "created_by_id": "{{user.id}}"
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

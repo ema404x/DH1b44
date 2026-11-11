@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { marcarActor } from "../../shared/auditActor.ts";
 
 // Roles de empleado con visibilidad total (pueden ver/aprobar todas las solicitudes)
 const ADMIN_EMPLOYEE_ROLES = ['gerente', 'gerencia', 'admin', 'administrativo'];
@@ -83,11 +84,13 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'Forbidden: sin permisos para modificar esta solicitud' }, { status: 403 });
       }
 
+      await marcarActor(base44, 'SolicitudCertificado', id, 'update');
       const updated = await base44.asServiceRole.entities.SolicitudCertificado.update(id, data);
 
       // Actualizar certificado vinculado si se proporciona
       if (certificado_id && certificado_data) {
         try {
+          await marcarActor(base44, 'Certificado', certificado_id, 'update');
           await base44.asServiceRole.entities.Certificado.update(certificado_id, certificado_data);
         } catch (e) {
           console.log('Error updating certificado:', e.message);
@@ -116,6 +119,7 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'Forbidden: sin permisos para eliminar esta solicitud' }, { status: 403 });
       }
 
+      await marcarActor(base44, 'SolicitudCertificado', id, 'delete');
       await base44.asServiceRole.entities.SolicitudCertificado.delete(id);
       return Response.json({ success: true });
     }

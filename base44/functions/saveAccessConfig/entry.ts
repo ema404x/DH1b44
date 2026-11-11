@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { marcarActor } from "../../shared/auditActor.ts";
 import { syncAllPlatformRoles } from "../../shared/syncPlatformRoles.ts";
 
 /**
@@ -47,11 +48,13 @@ Deno.serve(async (req) => {
 
       if (id) {
         // Actualizar existente
+        await marcarActor(base44, 'RolePermission', id, 'update');
         const updated = await base44.asServiceRole.entities.RolePermission.update(id, payload);
         results.push({ action: 'updated', id, role_name });
       } else {
         // Crear nuevo
         const created = await base44.asServiceRole.entities.RolePermission.create(payload);
+        await marcarActor(base44, 'RolePermission', created.id, 'create');
         results.push({ action: 'created', id: created.id, role_name });
       }
     }

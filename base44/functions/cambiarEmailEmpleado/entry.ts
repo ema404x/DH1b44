@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { marcarActor } from "../../shared/auditActor.ts";
 import { resolveCallerSector, isValidEmail, linkOrInvitePlatformUser } from "../../shared/empleadoLink.ts";
 
 // Cambio de email de empleado PREMIUM y atómico — traslada TODA la información
@@ -115,6 +116,7 @@ Deno.serve(async (req) => {
 
     // ── 1) Actualizar email de la ficha (si cambió) ──
     if (empEmailNorm !== newEmail) {
+      await marcarActor(base44, 'Employee', emp.id, 'update');
       tasks.push(sb.entities.Employee.update(emp.id, { email: newEmail }).catch(() => {}));
     }
 
