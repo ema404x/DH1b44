@@ -7,7 +7,7 @@ import {
   Pencil, Trash2, Building2, User, DollarSign, Calendar, Hash, ChevronDown, ChevronUp,
   MapPin, UserCheck, Clock, Eye, MessageSquare
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export default function ObraCertificacionCard({ obra, estadoConfig, prioridadConfig, onEdit, onDelete, onEstadoChange, onTramoChange, onNotasChange, fmt, readOnly = false }) {
@@ -18,7 +18,7 @@ export default function ObraCertificacionCard({ obra, estadoConfig, prioridadCon
   const prioridad = prioridadConfig[obra.prioridad] || prioridadConfig.normal;
 
   const safeDate = (d) => {
-    try { return format(new Date(d), 'dd MMM yyyy', { locale: es }); } catch { return d; }
+    try { return format(parseISO(d), 'dd MMM yyyy', { locale: es }); } catch { return d; }
   };
 
   return (
