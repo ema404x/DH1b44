@@ -308,6 +308,29 @@ export default function Auditoria() {
     }
   });
 
+  // Usuarios distintos sobre TODO el historial que coincide con los filtros
+  // (la lista de arriba solo trae los 500 registros más recientes).
+  const { data: totalUsuarios } = useQuery({
+    queryKey: ['auditLogUsuarios', filters, dateFrom, dateTo, search],
+    queryFn: async () => {
+      const query = {};
+      if (filters.entity_type) query.entity_type = filters.entity_type;
+      if (filters.action) query.action = filters.action;
+      if (filters.user_email) query.user_email = filters.user_email;
+      if (dateFrom || dateTo) {
+        query.timestamp = {};
+        if (dateFrom) query.timestamp.$gte = new Date(dateFrom).toISOString();
+        if (dateTo) query.timestamp.$lte = new Date(dateTo + 'T23:59:59').toISOString();
+      }
+      if (search) {
+        const texto = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+        query.$or = ['entity_id', 'entity_type', 'user_email', 'changed_fields'].map(campo => ({ [campo]: texto }));
+      }
+      const { rows } = await base44.entities.AuditLog.aggregate({ query, groupBy: 'user_email' });
+      return rows.length;
+    }
+  });
+
   const filteredLogs = useMemo(() => {
     return logs.filter(log => {
       if (dateFrom && new Date(log.timestamp) < new Date(dateFrom)) return false;
@@ -329,8 +352,8 @@ export default function Auditoria() {
     creates: filteredLogs.filter(l => l.action === 'create').length,
     updates: filteredLogs.filter(l => l.action === 'update').length,
     deletes: filteredLogs.filter(l => l.action === 'delete').length,
-    users: new Set(filteredLogs.map(l => l.user_email)).size,
-  }), [filteredLogs]);
+    users: totalUsuarios ?? new Set(filteredLogs.map(l => l.user_email)).size,
+  }), [filteredLogs, totalUsuarios]);
 
   const hasFilters = filters.entity_type || filters.action || filters.user_email || dateFrom || dateTo || search;
 
