@@ -17,6 +17,7 @@ import EjecutarOTSimplePublic from '@/pages/EjecutarOTSimple';
 import PortalOperario from '@/pages/PortalOperario';
 import PortalTablet from '@/pages/PortalTablet';
 import RevisionBapro from '@/pages/RevisionBapro';
+import Privacidad from '@/pages/Privacidad';
 
 // Páginas autenticadas — lazy loading con prefetch en idle
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
@@ -286,6 +287,7 @@ function App() {
             <Route path="/PortalTablet" element={<LegacyRouteRedirect to="/tablet" />} />
 
             <Route path="/revision-bapro/:token" element={<RevisionBapro />} />
+            <Route path="/privacidad" element={<Privacidad />} />
             {/* Rutas autenticadas */}
             <Route path="/*" element={
               <AuthProvider>
