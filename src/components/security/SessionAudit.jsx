@@ -15,7 +15,7 @@ export default function SessionAudit() {
         return [];
       }
     },
-    refetchInterval: 30000,
+    refetchInterval: 120000,
   });
 
   // Extraer sesiones únicas

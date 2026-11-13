@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { compressImage } from '@/lib/compressImage';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,7 +65,8 @@ export default function OrdenDetalleModal({ orden, onClose, onUpdated }) {
     if (!file) return;
     setUploadingFile(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const subir = file.type?.startsWith('image/') ? await compressImage(file).catch(() => file) : file;
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: subir });
       const newAdj = [...adjuntos, { nombre: file.name, url: file_url, tipo: file.type }];
       setAdjuntos(newAdj);
       // Guardar adjunto + estado y matrícula actuales para no perder cambios en curso

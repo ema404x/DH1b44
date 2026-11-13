@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { compressImage } from '@/lib/compressImage';
 import { X, Loader2, Package, AlertTriangle, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import BodyPortal from '@/components/operario/BodyPortal';
@@ -57,7 +58,8 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
     if (!file) return;
     setUploadingPhoto(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const subir = file.type?.startsWith('image/') ? await compressImage(file).catch(() => file) : file;
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: subir });
       setPhotos(prev => [...prev, file_url]);
     } catch (err) {
       toast.error(!navigator.onLine

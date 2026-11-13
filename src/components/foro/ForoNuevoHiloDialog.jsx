@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { base44 } from "@/api/base44Client";
+import { compressImage } from "@/lib/compressImage";
 import { Plus, Trash2, BarChart3, Image, Paperclip, X, Loader2 } from "lucide-react";
 const genId = () => Math.random().toString(36).slice(2, 10);
 
@@ -35,7 +36,8 @@ function EditorConAdjuntos({ texto, setTexto, adjuntos, setAdjuntos, usuarios })
     const file = e.target.files?.[0];
     if (!file) return;
     setSubiendo(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    const subir = file.type?.startsWith('image/') ? await compressImage(file).catch(() => file) : file;
+    const { file_url } = await base44.integrations.Core.UploadFile({ file: subir });
     setAdjuntos(prev => [...prev, { nombre: file.name, url: file_url, tipo }]);
     setSubiendo(false);
     e.target.value = '';

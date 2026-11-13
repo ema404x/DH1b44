@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
+import { compressImage } from '@/lib/compressImage';
 import { Input } from '@/components/ui/input';
 import { Plus, Trash2, Camera, Image, X, Loader2, CheckCircle2, Circle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -33,7 +34,8 @@ export default function WorkOrderChecklist({ checklist = [], onChange }) {
     if (!file) return;
     setUploadingId(id);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const subir = file.type?.startsWith('image/') ? await compressImage(file).catch(() => file) : file;
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: subir });
       onChange(checklist.map(t => t.id === id ? { ...t, photo_url: file_url } : t));
     } catch (e) {
       toast.error('No se pudo subir la foto. Intentalo de nuevo.');

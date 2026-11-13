@@ -97,7 +97,7 @@ export default function ForoHiloDetalle({ hilo, user, onVolver, onEliminarHilo, 
   const { data: respuestas = [] } = useQuery({
     queryKey: ["foro-respuestas", hilo.id],
     queryFn: () => base44.entities.ForoRespuesta.filter({ hilo_id: hilo.id }, "created_date", 200),
-    refetchInterval: 15000,
+    refetchInterval: 60000,
     staleTime: 10000,
   });
 

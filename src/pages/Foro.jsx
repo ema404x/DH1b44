@@ -34,7 +34,7 @@ export default function Foro() {
   const { data: hilos = [], isLoading } = useQuery({
     queryKey: ["foro-hilos"],
     queryFn: () => base44.entities.ForoHilo.list("-created_date", 200),
-    refetchInterval: 15000,
+    refetchInterval: 60000,
   });
 
   const { data: categorias = [] } = useQuery({

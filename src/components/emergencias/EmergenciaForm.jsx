@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
+import { compressImage } from '@/lib/compressImage';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,7 +88,8 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
     if (!file) return;
     setUploadingPhoto(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const subir = file.type?.startsWith('image/') ? await compressImage(file).catch(() => file) : file;
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: subir });
       setForm(f => ({ ...f, fotos: [...f.fotos, file_url] }));
     } catch (err) {
       toast.error('No se pudo subir la foto: ' + (err?.message || 'error de conexión'));

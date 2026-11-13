@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { base44 } from "@/api/base44Client";
+import { compressImage } from "@/lib/compressImage";
 import { Image, Paperclip, X, AtSign, Loader2 } from "lucide-react";
 
 export default function ForoEditorMensaje({ placeholder = "Escribí tu mensaje...", onSubmit, usuarios = [], loading = false, minHeight = "h-24" }) {
@@ -36,7 +37,8 @@ export default function ForoEditorMensaje({ placeholder = "Escribí tu mensaje..
     const file = e.target.files?.[0];
     if (!file) return;
     setSubiendo(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    const subir = file.type?.startsWith('image/') ? await compressImage(file).catch(() => file) : file;
+    const { file_url } = await base44.integrations.Core.UploadFile({ file: subir });
     setAdjuntos(prev => [...prev, { nombre: file.name, url: file_url, tipo }]);
     setSubiendo(false);
     e.target.value = '';

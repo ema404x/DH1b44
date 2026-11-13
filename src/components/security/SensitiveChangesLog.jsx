@@ -17,7 +17,7 @@ export default function SensitiveChangesLog() {
         return [];
       }
     },
-    refetchInterval: 30000,
+    refetchInterval: 120000,
   });
 
   const actionIcons = {

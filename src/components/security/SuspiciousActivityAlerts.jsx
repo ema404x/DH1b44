@@ -14,7 +14,7 @@ export default function SuspiciousActivityAlerts() {
         return [];
       }
     },
-    refetchInterval: 30000,
+    refetchInterval: 120000,
   });
 
   // Detectar patrones sospechosos
