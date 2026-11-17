@@ -170,6 +170,14 @@ export async function pruneCacheDB() {
   } catch (_) { /* silencioso */ }
 }
 
+// ── Vaciar toda la caché local (cierre de sesión con modo sin conexión) ─────
+export async function clearCacheDB() {
+  try {
+    const db = await openCacheDB();
+    db.transaction(STORE, 'readwrite').objectStore(STORE).clear();
+  } catch (_) { /* silencioso */ }
+}
+
 // ── Leer TODAS las entradas (para hydration inicial) ─────────────────────────
 // Shape-safe: filtra las entradas cuyo shape no coincide con el declarado,
 // para no inyectar un dato incorrecto en el QueryClient al arrancar.

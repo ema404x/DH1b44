@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { base44 } from '@/api/base44Client';
+import { AuthContext } from '@/lib/AuthContext';
 import { compressImage } from '@/lib/compressImage';
 import { X, Loader2, Package, AlertTriangle, Camera } from 'lucide-react';
 import { toast } from 'sonner';
@@ -26,6 +27,8 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
   const [usados, setUsados] = useState(ot.materials_used || []);
   const [photos, setPhotos] = useState(ot.photos || []);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // Modo sin conexión (beta): siempre false con el interruptor apagado.
+  const offlineMode = useContext(AuthContext)?.offlineMode;
 
   const addUsado = () => {
     if (!material.trim()) return;
@@ -56,6 +59,11 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (offlineMode) {
+      toast.error('Necesita conexión para subir fotos. Podés enviar el reporte sin fotos y se sincroniza al volver la señal.');
+      e.target.value = '';
+      return;
+    }
     setUploadingPhoto(true);
     try {
       const subir = file.type?.startsWith('image/') ? await compressImage(file).catch(() => file) : file;

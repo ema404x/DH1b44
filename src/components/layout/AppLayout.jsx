@@ -12,6 +12,8 @@ import AvisoSemanalOT from '@/components/layout/AvisoSemanalOT';
 import UserMenu from './UserMenu';
 import SectorSwitcher from './SectorSwitcher';
 import OfflineBar from '@/components/pwa/OfflineBar';
+import OfflineModeBanner from '@/components/pwa/OfflineModeBanner';
+import { useAuth } from '@/lib/AuthContext';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { toast } from 'sonner';
 import ChatbotSoporte from '@/components/soporte/ChatbotSoporte';
@@ -42,6 +44,8 @@ export default function AppLayout() {
   const queryClient = useQueryClient();
   const { isOnline, pendingCount, isSyncing, syncPending } = useOfflineQueue(onSyncCallback);
   const { currentUser } = useCurrentUser();
+  // Modo sin conexión (beta): ambos son siempre false con el interruptor apagado.
+  const { offlineMode, offlineSavedAt, reconnected } = useAuth();
   useAppUsageTracker(currentUser);
   const location = useLocation();
   const navigationType = useNavigationType();
@@ -93,13 +97,17 @@ export default function AppLayout() {
 
   // Clase del contenido principal — memoizada para evitar string recalc en cada render
   const mainPaddingClass = useMemo(
-    () => !isOnline || isSyncing || pendingCount > 0 ? 'pt-8' : '',
-    [isOnline, isSyncing, pendingCount]
+    () => !isOnline || isSyncing || pendingCount > 0 || offlineMode || reconnected ? 'pt-8' : '',
+    [isOnline, isSyncing, pendingCount, offlineMode, reconnected]
   );
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0f1e34 55%, #091422 100%)' }}>
-      <OfflineBar isOnline={isOnline} pendingCount={pendingCount} isSyncing={isSyncing} onSync={syncPending} />
+      {offlineMode || reconnected ? (
+        <OfflineModeBanner offlineMode={offlineMode} savedAt={offlineSavedAt} userId={currentUser?.id} pendingCount={pendingCount} />
+      ) : (
+        <OfflineBar isOnline={isOnline} pendingCount={pendingCount} isSyncing={isSyncing} onSync={syncPending} />
+      )}
       <Sidebar open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
       <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${mainPaddingClass}`}>
         <MobileHeader />

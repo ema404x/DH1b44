@@ -98,6 +98,7 @@ Deno.serve(async (req) => {
         employee_sector: empSector,
         employee_permissions: employeePermissions,
         employee_firma_url: emp.firma_url || null,
+      employee_offline_habilitado: emp.offline_habilitado === true,
         role_matched: employeePermissions !== null,
       });
     }
@@ -202,6 +203,7 @@ Deno.serve(async (req) => {
       employee_sector: empSector,
       employee_permissions: employeePermissions,
       employee_firma_url: emp.firma_url || null,
+      employee_offline_habilitado: emp.offline_habilitado === true,
       role_matched: employeePermissions !== null,
     });
   } catch (error) {

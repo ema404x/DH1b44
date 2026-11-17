@@ -126,13 +126,23 @@ export default function Employees() {
     const sectorOptions = sectors
       .filter(s => s.activo !== false)
       .map(s => ({ value: s.clave, label: s.nombre || s.clave }));
-    return employeeFields.map(f => {
+    const campos = employeeFields.map(f => {
       if (f.key === 'sector_id') return { ...f, options: sectorOptions };
       if (f.key === 'role') return { ...f, options: roleOptions };
       if (f.key === 'assigned_jefe_sitio') return { ...f, type: 'select', options: jefesSitio };
       return f;
     });
-  }, [rolePermissions, jefesSitio, sectors]);
+    // Interruptor del modo sin conexión: solo lo ven los administradores.
+    if (currentUser?.role === 'admin') {
+      campos.push({
+        key: 'offline_habilitado',
+        label: 'Modo sin conexión (beta)',
+        type: 'switch',
+        description: 'Permite abrir la app sin señal con los últimos datos guardados.',
+      });
+    }
+    return campos;
+  }, [rolePermissions, jefesSitio, sectors, currentUser?.role]);
 
   // Resuelve el label legible del rol
   const getRoleLabel = (roleKey) => {
