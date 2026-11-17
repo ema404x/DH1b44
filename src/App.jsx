@@ -58,6 +58,7 @@ const Rutinas = lazy(() => import('@/pages/Rutinas'));
 const PortalOperarioApp = lazy(() => import('@/pages/PortalOperarioApp'));
 import ProtectedPage from '@/components/shared/ProtectedPage';
 import DesktopOnlyGate from '@/components/shared/DesktopOnlyGate';
+import { isChunkLoadError, tryChunkReload } from '@/lib/chunkReload';
 
 // Spinner de carga mientras se descarga la página lazy
 const PageLoader = () => (
@@ -66,42 +67,15 @@ const PageLoader = () => (
   </div>
 );
 
-const CHUNK_RELOAD_KEY = 'base44_chunk_reload';
-
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
-  componentDidMount() {
-    // Limpieza DELAYED del flag anti-loop. El import lazy de una página
-    // (ej. Employees.jsx) falla 1–2s DESPUÉS de montar el ErrorBoundary
-    // (cuando Suspense intenta resolver el chunk). Si limpiáramos el flag
-    // inmediatamente, siempre estaría limpio cuando componentDidCatch lo
-    // verifique → recarga infinita → el navegador la frena → usuario
-    // trabado en la pantalla de error para siempre.
-    //
-    // Con 5s de delay:
-    //  • Si la app carga sana → a los 5s el flag se limpia (listo para futuros errores).
-    //  • Si el import falla en ese lapso → el flag sigue seteado → no hay auto-recarga
-    //    → se muestra la pantalla de error con el botón de recuperación manual.
-    this._cleanupTimer = setTimeout(() => {
-      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
-    }, 5000);
-  }
-
-  componentWillUnmount() {
-    if (this._cleanupTimer) clearTimeout(this._cleanupTimer);
-  }
   componentDidCatch(error) {
-    // Auto-recargar en errores de "chunk stale" — pasan cuando se redeploya la app
-    // y el navegador tiene referencias cacheadas a módulos que ya no existen.
-    const isChunkError =
-      error?.message?.includes('Failed to fetch dynamically imported module') ||
-      error?.message?.includes('Importing a module script failed');
-    // Anti-loop: un solo auto-reload por sesión. Si no alcanza, queda el botón
-    // manual "Recargar página" para que el usuario fuerce la recarga.
-    if (isChunkError && !sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
-      sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
-      window.location.reload();
+    // Auto-recargar SOLO en errores de "chunk stale" (redeploy con módulos que
+    // ya no existen) y como máximo una vez cada 60 s. Si no se permite, queda
+    // la pantalla de error con el botón manual. Otros errores nunca recargan solos.
+    if (isChunkLoadError(error)) {
+      tryChunkReload();
     }
   }
   render() {
@@ -118,7 +92,6 @@ class ErrorBoundary extends React.Component {
                 // El query param ?t=timestamp fuerza al navegador a pedir
                 // módulos frescos (bypassa chunks stale cacheados por el
                 // dev server tras un redeploy).
-                sessionStorage.removeItem(CHUNK_RELOAD_KEY);
                 window.location.href = window.location.pathname + '?t=' + Date.now();
               }}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium"
@@ -134,12 +107,23 @@ class ErrorBoundary extends React.Component {
 }
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, isSlowConnection, checkAppState } = useAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center">
+      <div className="fixed inset-0 flex flex-col items-center justify-center gap-4">
         <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+        {isSlowConnection && (
+          <>
+            <p className="text-sm text-muted-foreground">La conexión está lenta…</p>
+            <button
+              onClick={() => checkAppState()}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium"
+            >
+              Reintentar
+            </button>
+          </>
+        )}
       </div>
     );
   }

@@ -3,12 +3,18 @@
  */
 import { useState, useEffect } from 'react';
 
+// Bandera compartida: la recarga por cambio de Service Worker ocurre una sola vez.
+let refreshing = false;
+
 export function usePWA() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [swRegistered, setSwRegistered] = useState(false);
 
   useEffect(() => {
+    let onControllerChange = null;
+    let onHidden = null;
+
     // Detectar si ya está instalada (modo standalone)
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstalled(true);
@@ -46,16 +52,30 @@ export function usePWA() {
 
       // Recargar cuando el nuevo SW tome control (salvo en rutas públicas de QR para no interrumpir firmas o fichajes)
       if (navigator.serviceWorker.controller) {
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
+        const reloadOnce = () => {
           if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
+        };
+        onControllerChange = () => {
+          if (refreshing || onHidden) return;
           const p = window.location.pathname;
           if (p.startsWith('/fichar') || p.startsWith('/portal-operario') || p.startsWith('/ejecutar-ot') || p.startsWith('/orden-trabajo')) {
             return;
           }
-          refreshing = true;
-          window.location.reload();
-        });
+          // Si el usuario está escribiendo, no interrumpir: recargar recién
+          // cuando la pestaña quede oculta.
+          const tag = document.activeElement?.tagName;
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+            onHidden = () => {
+              if (document.visibilityState === 'hidden') reloadOnce();
+            };
+            document.addEventListener('visibilitychange', onHidden);
+            return;
+          }
+          reloadOnce();
+        };
+        navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
       }
     }
 
@@ -73,6 +93,12 @@ export function usePWA() {
     });
 
     return () => {
+      if (onControllerChange) {
+        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      }
+      if (onHidden) {
+        document.removeEventListener('visibilitychange', onHidden);
+      }
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
     };
   }, []);

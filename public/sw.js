@@ -47,7 +47,17 @@
  *   para no interrumpir formularios en progreso.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'dh1-erp-v5';
+const CACHE_NAME = 'dh1-erp-v6';
+
+// Caché ESTABLE (sin número de versión) para /assets/* (JS/CSS con hash).
+// No se borra al activar una versión nueva: una pestaña abierta con la versión
+// anterior sigue encontrando sus archivos. Solo se poda por antigüedad/cantidad.
+const ASSETS_CACHE = 'dh1-assets';
+const ASSETS_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+const ASSETS_MAX_ENTRIES = 300;
+const ASSETS_TOUCH_MS = 24 * 60 * 60 * 1000;
+const ASSETS_PRUNE_EVERY_MS = 60 * 60 * 1000;
+const STAMP_HEADER = 'X-DH1-Cached-At';
 const OFFLINE_URL = '/offline.html';
 
 // Recursos estáticos que se precachean en install. Solo los esenciales
@@ -135,13 +145,19 @@ async function handleNavigation(request) {
 }
 
 // ── Estrategia: Stale-While-Revalidate (para JS/CSS/fuentes/imágenes) ────────
-async function handleStaleWhileRevalidate(request) {
+// noHtml=true (peticiones de JS/CSS): nunca se cachea ni se responde HTML.
+async function handleStaleWhileRevalidate(request, noHtml = false) {
   const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
+  let cached = await cache.match(request);
+  if (cached && noHtml && isHtmlResponse(cached)) {
+    cache.delete(request).catch(() => {});
+    cached = undefined;
+  }
 
   // Fetch en background para actualizar el caché (sin bloquear la respuesta).
   const networkFetch = fetch(request)
     .then((networkResponse) => {
+      if (noHtml && isHtmlResponse(networkResponse)) return null;
       if (isCacheable(networkResponse)) {
         cache.put(request, networkResponse.clone()).catch(() => {});
       }
@@ -155,17 +171,94 @@ async function handleStaleWhileRevalidate(request) {
     return cached;
   }
 
-  // Sin caché: esperar la red. Si la red también falla, 504 controlado.
+  // Sin caché: esperar la red. Si la red también falla, error controlado.
   const networkResponse = await networkFetch;
   if (networkResponse && isCacheable(networkResponse)) {
     return networkResponse;
   }
+
+  // JS/CSS sin red ni caché: error de red normal (nunca HTML).
+  if (noHtml) return Response.error();
 
   return new Response('', {
     status: 504,
     statusText: 'Gateway Timeout (offline, sin caché)',
     headers: { 'Content-Type': 'text/plain' },
   });
+}
+
+// ── Caché estable de /assets/* ───────────────────────────────────────────────
+
+function isHtmlResponse(response) {
+  const type = (response && response.headers.get('Content-Type')) || '';
+  return type.includes('text/html');
+}
+
+function isHashedAsset(url) {
+  return isSameOrigin(url) && url.pathname.startsWith('/assets/');
+}
+
+// Guarda una copia con la fecha de guardado en un header (para podar por antigüedad).
+async function putStamped(cache, request, response) {
+  try {
+    const headers = new Headers(response.headers);
+    headers.set(STAMP_HEADER, String(Date.now()));
+    const body = await response.blob();
+    await cache.put(request, new Response(body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    }));
+  } catch (_) {}
+}
+
+// Cache-first: los archivos con hash son inmutables. Si no está en caché ni en
+// red se devuelve el error normal; nunca index.html ni offline.html.
+async function handleHashedAsset(request) {
+  const cache = await caches.open(ASSETS_CACHE);
+  const cached = await cache.match(request);
+  if (cached && !isHtmlResponse(cached)) {
+    // Renovar la fecha (como mucho una vez por día) para no podar archivos en uso.
+    const at = Number(cached.headers.get(STAMP_HEADER)) || 0;
+    if (Date.now() - at > ASSETS_TOUCH_MS) putStamped(cache, request, cached.clone());
+    return cached;
+  }
+  if (cached) cache.delete(request).catch(() => {});
+
+  const networkResponse = await fetch(request);
+  if (isHtmlResponse(networkResponse)) {
+    return new Response('', { status: 404, statusText: 'Not Found' });
+  }
+  if (networkResponse.ok) putStamped(cache, request, networkResponse.clone());
+  return networkResponse;
+}
+
+// Poda: borra los de más de 14 días y, si hay más de 300, los más viejos primero.
+async function pruneAssets() {
+  const cache = await caches.open(ASSETS_CACHE);
+  const requests = await cache.keys();
+  const entries = [];
+  for (const req of requests) {
+    const res = await cache.match(req);
+    entries.push({ req, at: Number(res && res.headers.get(STAMP_HEADER)) || 0 });
+  }
+  entries.sort((a, b) => a.at - b.at);
+  const excess = entries.length - ASSETS_MAX_ENTRIES;
+  const now = Date.now();
+  await Promise.all(
+    entries.map((entry, i) =>
+      i < excess || now - entry.at > ASSETS_MAX_AGE_MS
+        ? cache.delete(entry.req).catch(() => {})
+        : null
+    )
+  );
+}
+
+let lastPruneAt = 0;
+function maybePruneAssets() {
+  if (Date.now() - lastPruneAt < ASSETS_PRUNE_EVERY_MS) return Promise.resolve();
+  lastPruneAt = Date.now();
+  return pruneAssets().catch(() => {});
 }
 
 // ── Evento: INSTALL (precache mínimo del app shell) ──────────────────────────
@@ -188,13 +281,24 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      // Limpiar TODOS los cachés que no sean el actual (v2 → v3, etc.)
+      // Limpiar los cachés de shell de versiones anteriores, pero SIN perder
+      // sus /assets/* (JS/CSS con hash): se pasan al caché estable antes de borrar.
       const allCaches = await caches.keys();
-      await Promise.all(
-        allCaches
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name).catch(() => {}))
-      );
+      const assetsCache = await caches.open(ASSETS_CACHE);
+      for (const name of allCaches) {
+        if (name === CACHE_NAME || name === ASSETS_CACHE) continue;
+        try {
+          const oldCache = await caches.open(name);
+          for (const req of await oldCache.keys()) {
+            if (!isHashedAsset(new URL(req.url))) continue;
+            if (await assetsCache.match(req)) continue;
+            const res = await oldCache.match(req);
+            if (res && res.ok && !isHtmlResponse(res)) await putStamped(assetsCache, req, res);
+          }
+        } catch (_) {}
+        await caches.delete(name).catch(() => {});
+      }
+      await pruneAssets().catch(() => {});
       // clients.claim() toma control de las pestañas existentes para que
       // controllerchange dispare en usePWA.js (que hace el reload con flag
       // anti-doble). NO se usa client.navigate() para no interrumpir
@@ -233,12 +337,19 @@ self.addEventListener('fetch', (event) => {
   // 1. Navegación (HTML) → Network-First con fallback a caché
   if (request.mode === 'navigate') {
     event.respondWith(handleNavigation(request));
+    event.waitUntil(maybePruneAssets());
     return;
   }
 
-  // 2. JS/CSS de mismo origen → SWR
+  // 2a. /assets/* (JS/CSS con hash) → caché estable, cache-first, nunca HTML
+  if (isHashedAsset(url)) {
+    event.respondWith(handleHashedAsset(request));
+    return;
+  }
+
+  // 2b. Otros JS/CSS de mismo origen → SWR, nunca HTML
   if (isStaticAsset(url, request)) {
-    event.respondWith(handleStaleWhileRevalidate(request));
+    event.respondWith(handleStaleWhileRevalidate(request, true));
     return;
   }
 
