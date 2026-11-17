@@ -8,9 +8,9 @@ import { useOfflineMode } from '@/hooks/useOfflineMode';
  * En modo sin conexión, si no hay datos guardados muestra el panel
  * "No disponible sin conexión". En cualquier otro caso devuelve children.
  */
-export default function OfflineGuard({ hasData = false, children = null }) {
+export default function OfflineGuard({ hasData = false, children = null, force = false, message }) {
   const offlineMode = useOfflineMode();
-  if (!offlineMode || hasData) return children;
+  if (!force && (!offlineMode || hasData)) return children;
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-6">
       <div className="h-16 w-16 rounded-2xl bg-amber-500/10 flex items-center justify-center">
@@ -19,7 +19,7 @@ export default function OfflineGuard({ hasData = false, children = null }) {
       <div>
         <h2 className="text-xl font-bold">No disponible sin conexión</h2>
         <p className="text-muted-foreground mt-1 text-sm max-w-sm">
-          Esta información no se guardó en este dispositivo.
+          {message || 'Esta información no se guardó en este dispositivo.'}
         </p>
       </div>
       <Button asChild variant="outline">

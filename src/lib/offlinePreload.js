@@ -6,6 +6,7 @@
  */
 import { base44 } from '@/api/base44Client';
 import { queryClientInstance } from '@/lib/query-client';
+import { pageLoaders } from '@/lib/lazyPages';
 
 let started = false;
 
@@ -15,16 +16,40 @@ export function scheduleOfflinePreload({ user, userPermissions }) {
   setTimeout(() => { runPreload(user, userPermissions).catch(() => {}); }, 10000);
 }
 
+// Al pedir cada pantalla, el Service Worker guarda sus archivos. Se hace de a 3,
+// con una pausa entre tandas, y una sola vez por versión publicada: la URL de
+// este archivo ya compilado cambia con cada publicación.
+const PRELOADED_KEY = 'dh1_offline_pages_preloaded';
+const BUNDLE_ID = import.meta.url;
+const BATCH_SIZE = 3;
+const BATCH_PAUSE_MS = 1500;
+
+async function preloadPages() {
+  try {
+    if (localStorage.getItem(PRELOADED_KEY) === BUNDLE_ID) return;
+  } catch (_) { /* silencioso */ }
+
+  const loaders = [
+    ...Object.values(pageLoaders),
+    () => import('@/components/workorders/WorkOrderDetailPanel'),
+  ];
+  let allOk = true;
+  for (let i = 0; i < loaders.length; i += BATCH_SIZE) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    const results = await Promise.allSettled(loaders.slice(i, i + BATCH_SIZE).map((load) => load()));
+    if (results.some((r) => r.status === 'rejected')) allOk = false;
+    await new Promise((resolve) => setTimeout(resolve, BATCH_PAUSE_MS));
+  }
+  // Si alguna falló, no se marca: se reintenta en la próxima apertura con red.
+  if (!allOk) return;
+  try { localStorage.setItem(PRELOADED_KEY, BUNDLE_ID); } catch (_) { /* silencioso */ }
+}
+
 async function runPreload(user, userPermissions) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
 
-  // 1) Código de las páginas: al pedirlas, el Service Worker guarda sus archivos.
-  [
-    () => import('@/pages/PortalOperarioApp'),
-    () => import('@/pages/WorkOrders'),
-    () => import('@/components/workorders/WorkOrderDetailPanel'),
-    () => import('@/pages/Dashboard'),
-  ].forEach((load) => { load().catch(() => {}); });
+  // 1) Código de TODAS las pantallas (en segundo plano, no bloquea lo demás).
+  preloadPages().catch(() => {});
 
   // 2) OTs del usuario: misma consulta y misma clave que usa /ordenes, así
   //    queda en el caché persistido existente ('workorders-board').

@@ -1,10 +1,11 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "@/components/ui/sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
+import { lazyPages } from '@/lib/lazyPages';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AppLayout from '@/components/layout/AppLayout';
@@ -20,42 +21,16 @@ import RevisionBapro from '@/pages/RevisionBapro';
 import Privacidad from '@/pages/Privacidad';
 
 // Páginas autenticadas — lazy loading con prefetch en idle
-const Dashboard = lazy(() => import('@/pages/Dashboard'));
-const Projects = lazy(() => import('@/pages/Projects'));
-const WorkOrders = lazy(() => import('@/pages/WorkOrders'));
-const Clients = lazy(() => import('@/pages/Clients'));
-const Employees = lazy(() => import('@/pages/Employees'));
-const Inventory = lazy(() => import('@/pages/Inventory'));
-const Invoices = lazy(() => import('@/pages/Invoices'));
-const Presupuestos = lazy(() => import('@/pages/Presupuestos'));
-const Informes = lazy(() => import('@/pages/Informes'));
-const Assets = lazy(() => import('@/pages/Assets'));
-const ActivoFicha = lazy(() => import('@/pages/ActivoFicha'));
-const Calendario = lazy(() => import('@/pages/Calendario'));
-const Reportes = lazy(() => import('@/pages/Reportes'));
-const Automatizaciones = lazy(() => import('@/pages/Automatizaciones'));
-const Certificados = lazy(() => import('@/pages/Certificados'));
-const Auditoria = lazy(() => import('@/pages/Auditoria'));
-const Permisos = lazy(() => import('@/pages/Permisos'));
-const Seguridad = lazy(() => import('@/pages/Seguridad'));
-const Mapa = lazy(() => import('@/pages/Mapa'));
-const Tutorial = lazy(() => import('@/pages/Tutorial'));
-const ImportarDatos = lazy(() => import('@/pages/ImportarDatos'));
-const ConfigAlertas = lazy(() => import('@/pages/ConfigAlertas'));
-const InformacionGeneral = lazy(() => import('@/pages/InformacionGeneral'));
-const Emergencias = lazy(() => import('@/pages/Emergencias'));
-const MapaJefes = lazy(() => import('@/pages/MapaJefes'));
-const InspeccionColegio = lazy(() => import('@/pages/InspeccionColegio'));
-const AprobacionCertificados = lazy(() => import('@/pages/AprobacionCertificados'));
-const ControlRiesgo = lazy(() => import('@/pages/ControlRiesgo'));
-const CertificacionObras = lazy(() => import('@/pages/CertificacionObras'));
-const CalendarioInformes = lazy(() => import('@/pages/CalendarioInformes'));
-const CrearOT = lazy(() => import('@/pages/CrearOT'));
-const Foro = lazy(() => import('@/pages/Foro'));
-const Calefaccion = lazy(() => import('@/pages/Calefaccion'));
-const Sectores = lazy(() => import('@/pages/Sectores'));
-const Rutinas = lazy(() => import('@/pages/Rutinas'));
-const PortalOperarioApp = lazy(() => import('@/pages/PortalOperarioApp'));
+// El mapa de pantallas vive en lib/lazyPages.js (lo comparte la precarga offline).
+const {
+  Dashboard, Projects, WorkOrders, Clients, Employees, Inventory, Invoices,
+  Presupuestos, Informes, Assets, ActivoFicha, Calendario, Reportes,
+  Automatizaciones, Certificados, Auditoria, Permisos, Seguridad, Mapa,
+  Tutorial, ImportarDatos, ConfigAlertas, InformacionGeneral, Emergencias,
+  MapaJefes, InspeccionColegio, AprobacionCertificados, ControlRiesgo,
+  CertificacionObras, CalendarioInformes, CrearOT, Foro, Calefaccion,
+  Sectores, Rutinas, PortalOperarioApp,
+} = lazyPages;
 import ProtectedPage from '@/components/shared/ProtectedPage';
 import DesktopOnlyGate from '@/components/shared/DesktopOnlyGate';
 import { isChunkLoadError, tryChunkReload } from '@/lib/chunkReload';
