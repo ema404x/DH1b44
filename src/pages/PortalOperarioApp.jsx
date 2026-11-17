@@ -15,12 +15,9 @@ import BodyPortal from '@/components/operario/BodyPortal';
 import MisOrdenesFiltros from '@/components/operario/MisOrdenesFiltros';
 import { useOperarioOfflineActions } from '@/hooks/useOperarioOfflineActions';
 import { canActOn } from '@/lib/workOrderActions';
-import { useAuth } from '@/lib/AuthContext';
 
 export default function PortalOperarioApp() {
   const { currentUser, displayName } = useCurrentUser();
-  // Modo sin conexión (beta): siempre false con el interruptor apagado.
-  const { offlineMode } = useAuth();
   const [reporteOT, setReporteOT] = useState(null);
   const [processing, setProcessing] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // { ot, accion }
@@ -31,9 +28,7 @@ export default function PortalOperarioApp() {
   const { capturar } = useGeolocalizacion();
   const queryClient = useQueryClient();
 
-  const [navegadorOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  // En modo sin conexión se trabaja como offline aunque el navegador diga lo contrario.
-  const isOnline = navegadorOnline && !offlineMode;
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   useEffect(() => {
     const on = () => setIsOnline(true);
     const off = () => setIsOnline(false);
@@ -70,9 +65,6 @@ export default function PortalOperarioApp() {
     },
     staleTime: 1000 * 60 * 5,
     retry: false,
-    // Modo sin conexión: se muestran las OT guardadas y no se pide nada al
-    // servidor hasta que vuelva la red.
-    enabled: !offlineMode,
   });
 
   // Cola de transiciones offline (iniciar/finalizar sin conexión).
@@ -261,10 +253,6 @@ export default function PortalOperarioApp() {
 
     // Tipo 'fichaje' — redirigir siempre al dominio público dh1m.com
     if (result.type === 'fichaje') {
-      if (offlineMode) {
-        toast.error('Necesita conexión: el fichaje no se puede registrar sin señal.');
-        return;
-      }
       window.location.href = `https://dh1m.com/fichar-ubicacion?loc=${encodeURIComponent(result.value)}`;
       return;
     }
@@ -272,7 +260,7 @@ export default function PortalOperarioApp() {
     // Tipo 'loc' — buscar OTs de la ubicación via backend (service role, sin RLS)
     if (result.type === 'loc') {
       // Sin conexión: resolver desde el cache (solo lectura)
-      if (offlineMode || !navigator.onLine) {
+      if (!navigator.onLine) {
         const { orders, name } = otsDesdeCacheParaUbicacion(result.value);
         setLocOTs({ orders, name, loading: false, locId: result.value, error: false, offline: true });
         return;
@@ -297,10 +285,6 @@ export default function PortalOperarioApp() {
     // Tipo 'asset' — buscar OTs del activo via backend (service role, sin RLS).
     // Reusa el mismo modal de lista que las ubicaciones (LocationOTListModal).
     if (result.type === 'asset') {
-      if (offlineMode) {
-        toast.error('Necesita conexión para buscar las órdenes de un activo.');
-        return;
-      }
       setLocOTs({ orders: [], name: 'Cargando…', loading: true, locId: null, assetId: result.value, error: false });
       try {
         const res = await base44.functions.invoke('publicFichar', {
@@ -319,14 +303,6 @@ export default function PortalOperarioApp() {
     const otId = result.value;
     if (!otId) {
       toast.error('Código QR no reconocido');
-      return;
-    }
-
-    if (offlineMode) {
-      // Sin conexión: solo se puede abrir una OT que ya esté guardada.
-      const guardada = allOTs.find(o => o.id === otId);
-      if (guardada) actOnOT(guardada);
-      else toast.error('Necesita conexión: esa orden no está entre tus órdenes guardadas.');
       return;
     }
 

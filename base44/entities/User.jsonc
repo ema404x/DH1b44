@@ -33,11 +33,6 @@
       "type": "string",
       "format": "date",
       "description": "Fecha local de Buenos Aires del \u00faltimo env\u00edo push semanal de OTs al usuario. Evita duplicados por fecha."
-    },
-    "offline_habilitado": {
-      "type": "boolean",
-      "default": false,
-      "description": "Modo sin conexi\u00f3n (beta). Solo se usa para administradores de plataforma SIN ficha de Employee; quien tiene ficha usa Employee.offline_habilitado."
     }
   },
   "required": [],

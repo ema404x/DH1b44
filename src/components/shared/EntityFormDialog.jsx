@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 
@@ -50,15 +49,6 @@ export default function EntityFormDialog({ open, onOpenChange, title, fields, in
                     ))}
                   </SelectContent>
                 </Select>
-              ) : field.type === 'switch' ? (
-                <div className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2">
-                  <span className="text-xs text-muted-foreground">{field.description}</span>
-                  <Switch
-                    id={field.key}
-                    checked={form[field.key] === true}
-                    onCheckedChange={(v) => handleChange(field.key, v)}
-                  />
-                </div>
               ) : field.type === 'textarea' ? (
                 <Textarea
                   id={field.key}

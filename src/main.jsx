@@ -19,13 +19,6 @@ import { loadAllCacheEntries, validateShape } from '@/lib/persistCache'
 // KEY_SHAPES. Una entrada envenenada (shape distinto al declarado) se descarta
 // y el QueryClient refetchea fresco — nunca se inyecta un shape incorrecto en
 // un consumidor. Cierra el TypeError: orders.filter is not a function.
-// Registrar el Service Worker al iniciar (solo producción), sin esperar al
-// layout autenticado: así el shell queda guardado aunque el arranque no termine.
-// Misma URL y scope que usePWA/AvisoSemanalOT → es el mismo registro.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
-}
-
 async function bootstrap() {
   try {
     const entries = await loadAllCacheEntries();
