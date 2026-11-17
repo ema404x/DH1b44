@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { hasOfflineProfileFor, clearOfflineSession } from '@/lib/offlineProfile';
+import OfflineModeSwitch from '@/components/layout/OfflineModeSwitch';
 
 export default function UserMenu() {
   const [open, setOpen] = useState(false);
@@ -65,6 +66,7 @@ export default function UserMenu() {
               <Bell className="h-4 w-4 text-muted-foreground" />
               Notificaciones Push
             </button>
+            <OfflineModeSwitch />
             <button
               onClick={() => { setShowDeleteDialog(true); setOpen(false); }}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-left text-popover-foreground"
