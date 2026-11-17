@@ -47,8 +47,13 @@
  *   para no interrumpir formularios en progreso.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME = 'dh1-erp-v5';
+// Nombre de caché versionado: al cambiarlo, 'activate' borra todas las cachés
+// anteriores. Además, cada publicación nueva se detecta sola (ver syncShell):
+// cuando el HTML fresco referencia otros JS/CSS, se guardan los nuevos y se
+// borran los del build anterior, sin tocar este archivo.
+const CACHE_NAME = 'dh1-erp-v6';
 const OFFLINE_URL = '/offline.html';
+const BUILD_MARK_URL = '/__dh1_build__';
 
 // Recursos estáticos que se precachean en install. Solo los esenciales
 // para que la app monte offline: HTML raíz y página offline.
@@ -110,13 +115,71 @@ function isCacheable(response) {
   return response.ok || response.type === 'opaque';
 }
 
+// ── Shell del build: JS/CSS que referencia index.html ───────────────────────
+function isBuildFilePath(pathname) {
+  return /\.(js|mjs|css)$/i.test(pathname) &&
+    !pathname.startsWith('/src/') &&
+    !pathname.startsWith('/node_modules/') &&
+    !pathname.startsWith('/@');
+}
+
+function extractBuildAssets(html) {
+  const found = new Set();
+  const re = /(?:src|href)=["']([^"']+\.(?:js|mjs|css))["']/gi;
+  let match;
+  while ((match = re.exec(html))) {
+    try {
+      const url = new URL(match[1], self.location.origin);
+      if (isSameOrigin(url) && isBuildFilePath(url.pathname)) found.add(url.href);
+    } catch (_) {}
+  }
+  return [...found].sort();
+}
+
+// Compara los JS/CSS del HTML recibido con los del último build guardado.
+// Si cambió (publicación nueva): borra los JS/CSS del build anterior y
+// devuelve una promesa que precachea los nuevos. Si no cambió, devuelve null.
+async function syncShell(cache, htmlResponse) {
+  const assets = extractBuildAssets(await htmlResponse.text());
+  if (assets.length === 0) return null;
+  const signature = assets.join('|');
+  const stored = await cache.match(BUILD_MARK_URL);
+  const previous = stored ? await stored.text() : null;
+  if (previous === signature) return null;
+
+  if (previous) {
+    const keep = new Set(assets);
+    const keys = await cache.keys();
+    await Promise.all(
+      keys
+        .filter((req) => {
+          const url = new URL(req.url);
+          return isSameOrigin(url) && isBuildFilePath(url.pathname) && !keep.has(url.href);
+        })
+        .map((req) => cache.delete(req).catch(() => {}))
+    );
+  }
+  await cache.put(BUILD_MARK_URL, new Response(signature));
+  return Promise.all(assets.map((url) => cache.add(url).catch(() => {})));
+}
+
 // ── Estrategia: Network-First (para navegación HTML) ─────────────────────────
-async function handleNavigation(request) {
+async function handleNavigation(request, event) {
   try {
     const networkResponse = await fetch(request);
     if (networkResponse && networkResponse.ok) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone()).catch(() => {});
+      // El HTML es el mismo shell para todas las rutas: se guarda también como
+      // '/' (fallback sin red) y se sincronizan los JS/CSS que referencia.
+      const contentType = networkResponse.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        try {
+          cache.put('/', networkResponse.clone()).catch(() => {});
+          const pending = await syncShell(cache, networkResponse.clone());
+          if (pending && event) event.waitUntil(pending);
+        } catch (_) {}
+      }
     }
     return networkResponse;
   } catch (_) {
@@ -179,6 +242,15 @@ self.addEventListener('install', (event) => {
           try { await cache.add(url); } catch (_) {}
         })
       );
+      // Precachear los JS/CSS del build que referencia index.html, para que
+      // el shell abra sin red aunque esos archivos no hayan pasado por el SW.
+      try {
+        const root = await cache.match('/');
+        if (root) {
+          const pending = await syncShell(cache, root.clone());
+          if (pending) await pending;
+        }
+      } catch (_) {}
       await self.skipWaiting();
     })()
   );
@@ -232,7 +304,7 @@ self.addEventListener('fetch', (event) => {
 
   // 1. Navegación (HTML) → Network-First con fallback a caché
   if (request.mode === 'navigate') {
-    event.respondWith(handleNavigation(request));
+    event.respondWith(handleNavigation(request, event));
     return;
   }
 
@@ -253,6 +325,27 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(handleStaleWhileRevalidate(request));
     return;
   }
+});
+
+// ── Evento: MESSAGE (precache de JS/CSS pedido por la app) ───────────────────
+// La app (solo usuarios con modo sin conexión) envía la lista de JS/CSS que ya
+// cargó, para guardarlos aunque se hayan descargado antes de que el SW tomara
+// control. Solo se aceptan archivos del build de mismo origen; nunca la API.
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (IS_DEV_OR_PREVIEW || !data || data.type !== 'dh1-precache' || !Array.isArray(data.urls)) return;
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      for (const raw of data.urls.slice(0, 300)) {
+        try {
+          const url = new URL(raw, self.location.origin);
+          if (!isSameOrigin(url) || isBackendApi(url) || !isBuildFilePath(url.pathname)) continue;
+          if (!(await cache.match(url.href))) await cache.add(url.href);
+        } catch (_) {}
+      }
+    })()
+  );
 });
 
 // ── Evento: PUSH (Web Push en PC y móvil aun con navegador cerrado) ──────────

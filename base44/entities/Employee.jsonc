@@ -84,6 +84,11 @@
       "type": "string",
       "description": "URL de la firma digital guardada del empleado"
     },
+    "offline_habilitado": {
+      "type": "boolean",
+      "default": false,
+      "description": "Modo sin conexi\u00f3n (beta). Si es true, la app guarda un perfil local del usuario y puede abrir sin se\u00f1al con los \u00faltimos datos guardados. Apagado por defecto."
+    },
     "notes": {
       "type": "string"
     }

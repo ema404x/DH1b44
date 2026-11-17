@@ -8,6 +8,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { hasOfflineProfileFor, clearOfflineSession } from '@/lib/offlineProfile';
 
 export default function UserMenu() {
   const [open, setOpen] = useState(false);
@@ -15,6 +16,13 @@ export default function UserMenu() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { displayName } = useCurrentUser();
+
+  // Con perfil offline guardado se borra junto con la caché local antes de
+  // salir. Sin perfil (interruptor apagado) es el cierre de sesión de siempre.
+  const handleLogout = async () => {
+    if (hasOfflineProfileFor(user?.id)) await clearOfflineSession(user.id);
+    base44.auth.logout();
+  };
 
   // Bug fix: guard para string vacío — n[0] de '' es undefined, causando '?' inesperado
   const initials = displayName?.trim()
@@ -66,7 +74,7 @@ export default function UserMenu() {
             </button>
             <div className="mx-2 my-1 border-t border-border" />
             <button
-              onClick={() => { base44.auth.logout(); setOpen(false); }}
+              onClick={() => { handleLogout(); setOpen(false); }}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-left text-popover-foreground"
             >
               <LogOut className="h-4 w-4 text-muted-foreground" />
@@ -87,7 +95,7 @@ export default function UserMenu() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => { base44.auth.logout(); setShowDeleteDialog(false); }}
+              onClick={() => { handleLogout(); setShowDeleteDialog(false); }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Eliminar cuenta
