@@ -1,6 +1,10 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { isChunkLoadError, tryChunkReload } from '@/lib/chunkReload';
+import { AuthContext } from '@/lib/AuthContext';
+import { isOfflineEnabled } from '@/lib/offlineSession';
+import { resetFailedLazyPages } from '@/lib/lazyPages';
+import OfflineGuard from '@/components/pwa/OfflineGuard';
 
 // ErrorBoundary a nivel de página/ruta — aisla el fallo de UNA página para que
 // un error en un módulo no blancoee toda la app. Muestra un panel de reintento
@@ -10,28 +14,70 @@ import { isChunkLoadError, tryChunkReload } from '@/lib/chunkReload';
 //
 // Auto-recarga en errores de chunk stale (redeploy) igual que el raíz.
 class PageErrorBoundary extends React.Component {
+  static contextType = AuthContext;
+
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, offlineChunk: false };
   }
 
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error) {
-    // Solo errores de chunk stale recargan, y como máximo una vez cada 60 s.
-    // Cualquier otro error muestra el panel con recarga manual.
-    if (isChunkLoadError(error)) {
-      tryChunkReload();
-    }
+  // Sin conexión solo para usuarios con el modo sin conexión habilitado.
+  isOffline() {
+    const ctx = this.context;
+    if (ctx?.offlineMode === true) return true;
+    return typeof navigator !== 'undefined' && navigator.onLine === false && isOfflineEnabled(ctx?.user);
   }
 
+  componentDidMount() {
+    this._wasOffline = this.isOffline();
+    window.addEventListener('online', this.handleBackOnline);
+  }
+
+  componentDidUpdate() {
+    const offline = this.isOffline();
+    if (this._wasOffline && !offline) this.handleBackOnline();
+    this._wasOffline = offline;
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('online', this.handleBackOnline);
+  }
+
+  componentDidCatch(error) {
+    if (!isChunkLoadError(error)) return;
+    // Sin conexión: la pantalla no está guardada en el dispositivo. No se
+    // recarga ni se muestra el error técnico; se espera a que vuelva la red.
+    if (this.isOffline()) {
+      this.setState({ offlineChunk: true });
+      return;
+    }
+    // Chunk stale (redeploy): recarga como máximo una vez cada 60 s.
+    tryChunkReload();
+  }
+
+  // Volvió la red: reintenta mostrar la sección una vez.
+  handleBackOnline = () => {
+    if (this.state.offlineChunk) this.handleRetry();
+  };
+
   handleRetry = () => {
-    this.setState({ hasError: false, error: null });
+    resetFailedLazyPages();
+    this.setState({ hasError: false, error: null, offlineChunk: false });
   };
 
   render() {
+    if (this.state.hasError && this.state.offlineChunk) {
+      return (
+        <OfflineGuard
+          force
+          message="Esta sección no se guardó en este dispositivo. Abrila una vez con señal para tenerla disponible."
+        />
+      );
+    }
     if (this.state.hasError) {
       return (
         <div className="min-h-[60vh] flex items-center justify-center p-6">

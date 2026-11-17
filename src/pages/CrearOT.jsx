@@ -7,6 +7,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { useOfflineMode } from '@/hooks/useOfflineMode';
 import { isJefeSitioRole } from '@/lib/roles';
 import { compressImage } from '@/lib/compressImage';
 import { toast } from 'sonner';
@@ -107,6 +108,7 @@ export default function CrearOT() {
   const navigate = useNavigate();
   const { isSuperAdmin, employeeSector, employeeRole, displayName } = useCurrentUser();
   const { isOnline, queueCreate } = useOfflineQueue();
+  const offlineMode = useOfflineMode();
   // Un jefe de sitio que crea una OT solo debe ver sus direcciones vinculadas (no
   // las de todos los jefes). Aplica solo en escuela, donde existe el vínculo
   // Direccion.jefe_sitio → asset.name/location. Admins/gerentes y otros sectores
@@ -298,7 +300,7 @@ export default function CrearOT() {
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      if (isOnline) return await base44.entities.WorkOrder.create(data);
+      if (isOnline && !offlineMode) return await base44.entities.WorkOrder.create(data);
       // Offline: encola en IndexedDB y devuelve la OT local (con _offline).
       return await queueCreate(data);
     },
@@ -306,7 +308,9 @@ export default function CrearOT() {
       if (ot?._offline) {
         setCreatedOT(ot);
         setStep(5);
-        toast.success('OT guardada sin conexión. Se sincronizará al reconectar.');
+        toast.success(offlineMode
+          ? 'Guardada sin conexión, se enviará al volver la señal'
+          : 'OT guardada sin conexión. Se sincronizará al reconectar.');
       } else {
         queryClient.invalidateQueries({ queryKey: ['workorders'] });
         queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
@@ -469,6 +473,13 @@ export default function CrearOT() {
   const handlePhotos = async (files) => {
     const selectedFiles = Array.from(files || []);
     if (!selectedFiles.length) return;
+    // Modo sin conexión: las fotos no se pueden encolar (necesitan subirse).
+    if (offlineMode) {
+      toast.info('Las fotos se pueden agregar cuando vuelva la señal');
+      if (cameraRef.current) cameraRef.current.value = '';
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
     setUploadingPhoto(true);
     try {
       for (const file of selectedFiles) {
@@ -497,6 +508,11 @@ export default function CrearOT() {
       ? (selectedLocation.address?.trim() || selectedLocation.name?.trim() || '')
       : '';
 
+    if (modoGuardado === 'futura_obra' && offlineMode) {
+      // La cola sin conexión solo guarda OTs; una futura obra necesita conexión.
+      toast.error('Registrar una futura obra necesita conexión');
+      return;
+    }
     if (modoGuardado === 'futura_obra') {
       createFuturaObraMutation.mutate({
         descripcion: title.trim(),
