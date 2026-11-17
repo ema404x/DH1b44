@@ -316,7 +316,8 @@ export const AuthProvider = ({ children }) => {
           _employeeFirmaUrl: data.employee_firma_url || null,
         });
       } else {
-        setOfflineEnabled(false);
+        // Admin de plataforma sin ficha Employee: el interruptor vive en User.
+        setOfflineEnabled(currentUser?.offline_habilitado === true);
         setHasEmployeeRecord(false);
         setUserPermissions({
           _employeeSector: currentUser?.data?.sector_id || currentUser?.sector_id || null,
@@ -428,6 +429,15 @@ export const AuthProvider = ({ children }) => {
     base44.auth.logout(window.location.href);
   };
 
+  // Interruptor propio del modo sin conexión — solo para admins de plataforma
+  // sin ficha Employee. Al apagarlo, el efecto de arriba borra el perfil local.
+  const setOwnOfflineEnabled = async (value) => {
+    if (user?.role !== 'admin' || hasEmployeeRecord !== false || offlineMode) return;
+    await base44.auth.updateMe({ offline_habilitado: value });
+    setUser(prev => ({ ...prev, offline_habilitado: value }));
+    setOfflineEnabled(value);
+  };
+
   const navigateToLogin = () => {
     base44.auth.redirectToLogin(window.location.href);
   };
@@ -480,6 +490,8 @@ export const AuthProvider = ({ children }) => {
       offlineMode,
       offlineSavedAt,
       reconnected,
+      offlineEnabled,
+      setOwnOfflineEnabled,
       logout,
       navigateToLogin,
       retryVinculation,
