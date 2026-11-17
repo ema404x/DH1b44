@@ -37,6 +37,8 @@ import { isJefeSitioRole } from '@/lib/roles';
 import { esOtVencida } from '@/lib/otVencimiento';
 import { useWorkOrderRealtime } from '@/hooks/useWorkOrderRealtime';
 import WorkOrdersLoadState from '@/components/workorders/WorkOrdersLoadState';
+import WorkOrdersOfflineNotice from '@/components/workorders/WorkOrdersOfflineNotice';
+import { useAuth } from '@/lib/AuthContext';
 
 
 
@@ -72,6 +74,8 @@ export default function WorkOrders() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { currentUser, isAdmin, isSuperAdmin, employeeRole, employeeSector, loading } = useCurrentUser();
+  // Modo sin conexión (perfil guardado): el tablero no consulta ni se suscribe.
+  const { offlineMode } = useAuth();
   const activeSector = currentUser?.data?.sector_id || employeeSector || currentUser?.sector_id || null;
   const boardQueryKey = useMemo(() => ['workorders-board', currentUser?.id || null, activeSector, employeeRole], [currentUser?.id, activeSector, employeeRole]);
   const isGerente = isAdmin || currentUser?.role === 'gerente';
@@ -131,7 +135,7 @@ export default function WorkOrders() {
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: boardQueryKey,
-    enabled: !loading && !!currentUser?.id,
+    enabled: !loading && !!currentUser?.id && !offlineMode,
     initialData: () => {
       const saved = queryClient.getQueryData(['workorders-board']);
       // Reusar el respaldo offline solo si pertenece al mismo usuario y sector.
@@ -165,7 +169,7 @@ export default function WorkOrders() {
 
   // ── Realtime: suscribe a eventos de WorkOrder y aplica al cache en vivo ──
   // Offline: no suscribe (el tablero queda en modo lectura con el snapshot).
-  useWorkOrderRealtime(ctx, isOnline && !loading, boardQueryKey);
+  useWorkOrderRealtime(ctx, isOnline && !loading && !offlineMode, boardQueryKey);
 
   // Direcciones — fuente canónica de jefes de sitio.
   // Se usa para resolver el jefe_sitio de OTs que no lo tienen poblado,
@@ -176,6 +180,7 @@ export default function WorkOrders() {
   const { data: direcciones = [] } = useQuery({
     queryKey: ['direcciones-jefes'],
     queryFn: () => fetchAllList('Direccion', '-created_date'),
+    enabled: !offlineMode,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -183,6 +188,7 @@ export default function WorkOrders() {
   const { data: employees = [] } = useQuery({
     queryKey: ['employees-filter-lookup'],
     queryFn: () => fetchAllList('Employee', '-updated_date'),
+    enabled: !offlineMode,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -498,6 +504,10 @@ export default function WorkOrders() {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: Math.min(0.05, 2 / Math.max(filtered.length, 1)) } }
   }), [filtered.length]);
+
+  // Aviso fijo, sin reintentos: al volver la conexión AuthContext apaga
+  // offlineMode y el tablero carga normalmente.
+  if (offlineMode) return <WorkOrdersOfflineNotice />;
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>

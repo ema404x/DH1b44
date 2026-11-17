@@ -14,10 +14,21 @@ import { warmOfflineShell } from '@/lib/offlineShell';
 export const AuthContext = createContext();
 
 // ── Modo sin conexión (beta, por usuario, apagado por defecto) ──────────────
-const ME_TIMEOUT_MS = 15000;      // una red lenta no activa el modo antes de 15 s
-const RECONNECT_EVERY_MS = 20000; // reintento en segundo plano
-const TIMED_OUT = Symbol('timed-out');
+const RECONNECT_ATTEMPT_TIMEOUT_MS = 15000;          // abandona UN reintento colgado; nunca activa el modo offline
+const RECONNECT_DELAYS_MS = [20000, 40000, 60000];  // espera creciente entre reintentos en segundo plano
 const isSessionInvalid = (error) => error?.status === 401 || error?.status === 403;
+// Error de red REAL: la petición no obtuvo respuesta del servidor (fetch failed /
+// Network Error). Una respuesta con status (5xx, etc.) o una demora NO cuentan.
+const isNetworkError = (error) => {
+  if (!error) return false;
+  const original = error.originalError || error;
+  if (error.status || error.response?.status || original.response?.status) return false;
+  const code = original.code || error.code;
+  if (code === 'ECONNABORTED' || code === 'ETIMEDOUT') return false; // lentitud, no caída
+  const message = `${error.message || ''} ${original.message || ''}`;
+  return code === 'ERR_NETWORK' || error.name === 'TypeError' || original.name === 'TypeError' ||
+    /network error|failed to fetch|fetch failed|load failed/i.test(message);
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -98,21 +109,15 @@ export const AuthProvider = ({ children }) => {
     const profile = await loadOfflineProfile(); // lectura local, en paralelo a auth.me()
     if (!profile) return mePromise;
 
-    if (!navigator.onLine) {
+    if (navigator.onLine === false) {
       enterOfflineMode(profile);
       return null;
     }
 
-    let timer;
-    const timeout = new Promise((resolve) => {
-      timer = setTimeout(() => resolve(TIMED_OUT), ME_TIMEOUT_MS);
-    });
+    // Con red: se espera auth.me() el tiempo que tarde (mismo spinner de siempre).
+    // La lentitud NUNCA activa el modo sin conexión.
     try {
-      const result = await Promise.race([mePromise, timeout]);
-      if (result === TIMED_OUT) {
-        enterOfflineMode(profile);
-        return null;
-      }
+      const result = await mePromise;
       // La sesión es de otro usuario: el perfil guardado ya no corresponde.
       if (result?.id !== profile.id) clearOfflineProfile();
       return result;
@@ -121,10 +126,11 @@ export const AuthProvider = ({ children }) => {
         clearOfflineSession(profile.id);
         throw error; // login normal
       }
-      enterOfflineMode(profile); // sin respuesta del servidor
-      return null;
-    } finally {
-      clearTimeout(timer);
+      if (isNetworkError(error)) {
+        enterOfflineMode(profile); // sin respuesta del servidor
+        return null;
+      }
+      throw error; // 5xx u otros: mismo camino que sin perfil offline
     }
   };
 
@@ -163,7 +169,7 @@ export const AuthProvider = ({ children }) => {
       const liveUser = await Promise.race([
         mePromise,
         new Promise((_, reject) => {
-          timer = setTimeout(() => reject(new Error('timeout')), ME_TIMEOUT_MS);
+          timer = setTimeout(() => reject(new Error('timeout')), RECONNECT_ATTEMPT_TIMEOUT_MS);
         }),
       ]);
       // Volvió la red: salir del modo offline y refrescar datos en vivo,
@@ -193,11 +199,28 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (!offlineMode) return;
-    const interval = setInterval(tryReconnect, RECONNECT_EVERY_MS);
-    window.addEventListener('online', tryReconnect);
+    // Reintentos con espera creciente (20 s, 40 s, 60 s…). Un reintento fallido
+    // no cambia de estado ni refresca nada: se sigue en modo sin conexión.
+    // La salida (y la única invalidación de consultas) ocurre en tryReconnect
+    // cuando auth.me() responde; ahí este efecto se desmonta y deja de reintentar.
+    let timer;
+    let attempt = 0;
+    let cancelled = false;
+    const schedule = () => {
+      const delay = RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
+      timer = setTimeout(async () => {
+        attempt += 1;
+        await tryReconnect();
+        if (!cancelled) schedule();
+      }, delay);
+    };
+    const onOnline = () => { tryReconnect(); };
+    schedule();
+    window.addEventListener('online', onOnline);
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('online', tryReconnect);
+      cancelled = true;
+      clearTimeout(timer);
+      window.removeEventListener('online', onOnline);
     };
   }, [offlineMode]);
 
