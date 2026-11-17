@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { queryClientInstance } from '@/lib/query-client';
 import { saveCacheEntry } from '@/lib/persistCache';
@@ -14,16 +14,38 @@ export const AuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null);
   const [vinculationFailed, setVinculationFailed] = useState(false);
   const [hasEmployeeRecord, setHasEmployeeRecord] = useState(null);
+  const [isSlowConnection, setIsSlowConnection] = useState(false);
+  const authBatchRef = useRef(null);
 
   useEffect(() => {
     checkAppState();
   }, []);
 
   const checkAppState = async () => {
+    // Intentos simultáneos (el original + "Reintentar") comparten un lote:
+    // el primero que responde bien gana y los demás se ignoran; un fallo solo
+    // cuenta si no queda ningún otro intento en curso.
+    let batch = authBatchRef.current;
+    if (!batch || batch.done) {
+      batch = { done: false, pending: 0 };
+      authBatchRef.current = batch;
+    }
+    batch.pending += 1;
+    let owner = false;
+    // Conexión lenta: a los 20 s solo se avisa en la pantalla de carga.
+    // No se marca no autenticado ni se redirige; la petición sigue en curso.
+    setIsSlowConnection(false);
+    const slowTimer = setTimeout(() => {
+      if (!batch.done) setIsSlowConnection(true);
+    }, 20000);
     try {
       setIsLoadingAuth(true);
       setAuthError(null);
       const currentUser = await base44.auth.me();
+      if (batch.done) return;
+      batch.done = true;
+      owner = true;
+      setIsSlowConnection(false);
       setUser(currentUser);
       setIsAuthenticated(true);
 
@@ -51,6 +73,12 @@ export const AuthProvider = ({ children }) => {
       // Vincular ficha de empleado y cargar permisos reales según su rol
       await linkEmployee(currentUser);
     } catch (error) {
+      if (!owner) {
+        // Otro intento ya resolvió o sigue en curso: este fallo no decide nada.
+        if (batch.done || batch.pending > 1) return;
+        batch.done = true;
+        owner = true;
+      }
       setIsAuthenticated(false);
       setUser(null);
       if (error?.status === 403 && error?.data?.extra_data?.reason === 'user_not_registered') {
@@ -61,7 +89,12 @@ export const AuthProvider = ({ children }) => {
         setAuthError({ type: 'auth_required', message: 'Authentication required' });
       }
     } finally {
-      setIsLoadingAuth(false);
+      clearTimeout(slowTimer);
+      batch.pending -= 1;
+      if (owner) {
+        setIsSlowConnection(false);
+        setIsLoadingAuth(false);
+      }
     }
   };
 
@@ -294,6 +327,7 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated,
       isLoadingAuth,
       isLoadingPublicSettings,
+      isSlowConnection,
       authError,
       vinculationFailed,
       hasEmployeeRecord,

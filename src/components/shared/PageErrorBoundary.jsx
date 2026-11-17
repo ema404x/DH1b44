@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { isChunkLoadError, tryChunkReload } from '@/lib/chunkReload';
 
 // ErrorBoundary a nivel de página/ruta — aisla el fallo de UNA página para que
 // un error en un módulo no blancoee toda la app. Muestra un panel de reintento
@@ -19,9 +20,10 @@ class PageErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error) {
-    if (error?.message?.includes('Failed to fetch dynamically imported module') ||
-        error?.message?.includes('Importing a module script failed')) {
-      window.location.reload();
+    // Solo errores de chunk stale recargan, y como máximo una vez cada 60 s.
+    // Cualquier otro error muestra el panel con recarga manual.
+    if (isChunkLoadError(error)) {
+      tryChunkReload();
     }
   }
 
