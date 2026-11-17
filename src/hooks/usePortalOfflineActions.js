@@ -9,26 +9,53 @@
  * primero y se reemplazan por URL antes de la transición.
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 import { getClave, getNombre } from '@/lib/operarioClave';
-import { loadQueue, saveQueue, replayQueue } from '@/lib/offlineSync';
+import { loadQueue, saveQueue, replayQueue, uploadPortalPhoto } from '@/lib/offlineSync';
+import { useOfflineEnabled, useOfflineOps } from '@/hooks/useOfflineOps';
+import { enqueueTransition, onSyncEvent, requestSync } from '@/lib/offlineSyncEngine';
 
 const QUEUE_KEY = 'portal-pending-transitions';
 
-// Subida de fotos del portal vía publicFichar (backend público sin sesión).
-const uploadPortalPhoto = async (base64, fileName, mimeType) => {
-  const res = await base44.functions.invoke('publicFichar', {
-    action: 'uploadFile',
-    fileBase64: base64,
-    fileName,
-    mimeType,
-  });
-  if (!res.data?.file_url) throw new Error('upload_sin_url');
-  return res.data.file_url;
-};
+// Con offline_habilitado en este dispositivo: cola durable (IndexedDB) y
+// sincronizador único. Sin él: la cola de siempre (useLegacyPortal), sin cambios.
+export function usePortalOfflineActions(opts) {
+  const enabled = useOfflineEnabled();
+  const legacy = useLegacyPortal(opts, !enabled);
+  const durable = useDurablePortal(opts, enabled);
+  return enabled ? durable : legacy;
+}
 
-export function usePortalOfflineActions({ onOptimisticUpdate, onSyncComplete }) {
+function useDurablePortal({ onOptimisticUpdate, onSyncComplete }, active) {
+  const { ops, syncing } = useOfflineOps(active);
+  const mine = ops.filter((o) => o.kind === 'transition' && o.auth === 'portal');
+  const pendingOtIds = new Set(mine.map((o) => o.ot_id));
+
+  const onOptimisticUpdateRef = useRef(onOptimisticUpdate);
+  const onSyncCompleteRef = useRef(onSyncComplete);
+  useEffect(() => { onOptimisticUpdateRef.current = onOptimisticUpdate; }, [onOptimisticUpdate]);
+  useEffect(() => { onSyncCompleteRef.current = onSyncComplete; }, [onSyncComplete]);
+
+  const queueTransition = useCallback(async (ot, accion, extraData, optimisticOT) => {
+    const id = await enqueueTransition({ auth: 'portal', ot, accion, extra_data: extraData });
+    if (optimisticOT && onOptimisticUpdateRef.current) onOptimisticUpdateRef.current(optimisticOT);
+    return id;
+  }, []);
+
+  useEffect(() => {
+    if (!active) return undefined;
+    return onSyncEvent((e) => {
+      if (e.op?.kind !== 'transition' || e.op.auth !== 'portal') return;
+      if (e.type === 'success' && e.result && onOptimisticUpdateRef.current) onOptimisticUpdateRef.current(e.result);
+      if (e.type === 'attention' && onSyncCompleteRef.current) onSyncCompleteRef.current({ synced: 0, conflicts: 1 });
+    });
+  }, [active]);
+
+  const syncPending = useCallback(() => requestSync({ force: true }), []);
+  return { pendingCount: mine.length, syncing, pendingOtIds, queueTransition, syncPending };
+}
+
+function useLegacyPortal({ onOptimisticUpdate, onSyncComplete }, active) {
   const [pending, setPending] = useState(() => loadQueue(QUEUE_KEY));
   const [syncing, setSyncing] = useState(false);
   const runningRef = useRef(false);
@@ -105,11 +132,12 @@ export function usePortalOfflineActions({ onOptimisticUpdate, onSyncComplete }) 
   }, []);
 
   useEffect(() => {
+    if (!active) return undefined;
     const onOnline = () => syncPending();
     window.addEventListener('online', onOnline);
     if (navigator.onLine && loadQueue(QUEUE_KEY).length) syncPending();
     return () => window.removeEventListener('online', onOnline);
-  }, [syncPending]);
+  }, [syncPending, active]);
 
   return { pendingCount: pending.length, syncing, pendingOtIds, queueTransition, syncPending };
 }

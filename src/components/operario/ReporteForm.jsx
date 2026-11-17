@@ -4,6 +4,9 @@ import { compressImage } from '@/lib/compressImage';
 import { X, Loader2, Package, AlertTriangle, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import BodyPortal from '@/components/operario/BodyPortal';
+import { useOfflineMode } from '@/hooks/useOfflineMode';
+import { prepareOfflinePhoto } from '@/lib/offlinePhotos';
+import PendingPhotoThumb from '@/components/pwa/PendingPhotoThumb';
 
 const MOTIVOS_PREDEFINIDOS = [
   'Sin stock en pañol',
@@ -26,6 +29,9 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
   const [usados, setUsados] = useState(ot.materials_used || []);
   const [photos, setPhotos] = useState(ot.photos || []);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // Fotos tomadas en modo sin conexión: { id, blob, name }. Se suben al sincronizar.
+  const offlineMode = useOfflineMode();
+  const [pendingPhotos, setPendingPhotos] = useState([]);
 
   const addUsado = () => {
     if (!material.trim()) return;
@@ -56,6 +62,21 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (offlineMode) {
+      setUploadingPhoto(true);
+      try {
+        const prepared = await prepareOfflinePhoto(file);
+        if (prepared) {
+          setPendingPhotos(prev => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, ...prepared }]);
+        }
+      } catch (err) {
+        toast.error(err?.message || 'No se pudo guardar la foto');
+      } finally {
+        setUploadingPhoto(false);
+        e.target.value = '';
+      }
+      return;
+    }
     setUploadingPhoto(true);
     try {
       const subir = file.type?.startsWith('image/') ? await compressImage(file).catch(() => file) : file;
@@ -87,12 +108,29 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
 
     setSaving(true);
     try {
+      // Fotos tomadas sin conexión: si ya volvió la señal se suben ahora; si no,
+      // viajan con el reporte a la cola y se suben al sincronizar.
+      let finalPhotos = photos;
+      let pendingBlobs = null;
+      if (pendingPhotos.length) {
+        if (!offlineMode && navigator.onLine) {
+          const urls = [];
+          for (const p of pendingPhotos) {
+            const { file_url } = await base44.integrations.Core.UploadPublicFile({ file: p.blob });
+            urls.push(file_url);
+          }
+          finalPhotos = [...photos, ...urls];
+        } else {
+          pendingBlobs = pendingPhotos.map(p => ({ blob: p.blob, name: p.name }));
+        }
+      }
       // Devolver los datos al portal — la transición de estado la hace el backend
       await onSaved({
         materials_used: usados,
         materiales_faltantes: faltantes,
         notes: notas,
-        photos,
+        photos: finalPhotos,
+        ...(pendingBlobs ? { pending_blobs: pendingBlobs } : {}),
       });
     } catch (err) {
       toast.error('Error: ' + (err.message || 'intente nuevamente'));
@@ -139,6 +177,18 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
                       <X className="h-3 w-3" />
                     </button>
                   </div>
+                ))}
+              </div>
+            )}
+            {pendingPhotos.length > 0 && (
+              <div className="flex gap-2 flex-wrap mb-2">
+                {pendingPhotos.map((p) => (
+                  <PendingPhotoThumb
+                    key={p.id}
+                    blob={p.blob}
+                    className="w-20 h-20 rounded-lg border border-slate-700"
+                    onRemove={() => setPendingPhotos(prev => prev.filter(x => x.id !== p.id))}
+                  />
                 ))}
               </div>
             )}

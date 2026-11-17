@@ -4,24 +4,46 @@ import { compressImage } from '@/lib/compressImage';
 import { Input } from '@/components/ui/input';
 import { Plus, Trash2, Camera, Image, X, Loader2, CheckCircle2, Circle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useOfflineMode } from '@/hooks/useOfflineMode';
+import { useOfflineEnabled, useOfflineOps } from '@/hooks/useOfflineOps';
+import { enqueuePhoto } from '@/lib/offlineSyncEngine';
+import { prepareOfflinePhoto } from '@/lib/offlinePhotos';
+import PendingPhotoThumb from '@/components/pwa/PendingPhotoThumb';
 
-export default function WorkOrderChecklist({ checklist = [], onChange }) {
+export default function WorkOrderChecklist({ checklist = [], onChange, otId, otTitle }) {
   const [newTask, setNewTask] = useState('');
   const [uploadingId, setUploadingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const fileRefs = useRef({});
+  // Modo sin conexión: solo se puede sacar la foto de cada tarea (queda guardada
+  // en el dispositivo y se sube al volver la señal); el resto necesita conexión.
+  const offlineMode = useOfflineMode();
+  const offlineEnabled = useOfflineEnabled();
+  const { ops } = useOfflineOps(offlineEnabled && !!otId);
+  const pendingByItem = {};
+  ops.forEach((o) => {
+    if (o.kind === 'photo' && o.target === 'checklist' && o.ot_id === otId) pendingByItem[o.checklist_item_id] = o;
+  });
+  const blockedOffline = () => {
+    if (!offlineMode) return false;
+    toast.info('Necesita conexión');
+    return true;
+  };
 
   const addTask = () => {
+    if (blockedOffline()) return;
     if (!newTask.trim()) return;
     onChange([...checklist, { id: Date.now().toString(), task: newTask.trim(), completed: false, notes: '', photo_url: null }]);
     setNewTask('');
   };
 
   const toggleTask = (id) => {
+    if (blockedOffline()) return;
     onChange(checklist.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
   };
 
   const removeTask = (id) => {
+    if (blockedOffline()) return;
     onChange(checklist.filter(t => t.id !== id));
     if (expandedId === id) setExpandedId(null);
   };
@@ -32,6 +54,21 @@ export default function WorkOrderChecklist({ checklist = [], onChange }) {
 
   const uploadPhoto = async (id, file) => {
     if (!file) return;
+    if (offlineMode) {
+      if (!otId || String(otId).startsWith('offline')) { toast.info('Necesita conexión'); return; }
+      setUploadingId(id);
+      try {
+        const prepared = await prepareOfflinePhoto(file);
+        if (prepared) {
+          await enqueuePhoto({ ot_id: otId, ot_title: otTitle, target: 'checklist', checklist_item_id: id, base_checklist: checklist, ...prepared });
+        }
+      } catch (e) {
+        toast.error(e?.message || 'No se pudo guardar la foto en el dispositivo');
+      } finally {
+        setUploadingId(null);
+      }
+      return;
+    }
     setUploadingId(id);
     try {
       const subir = file.type?.startsWith('image/') ? await compressImage(file).catch(() => file) : file;
@@ -45,6 +82,7 @@ export default function WorkOrderChecklist({ checklist = [], onChange }) {
   };
 
   const removePhoto = (id) => {
+    if (blockedOffline()) return;
     onChange(checklist.map(t => t.id === id ? { ...t, photo_url: null } : t));
   };
 
@@ -132,12 +170,15 @@ export default function WorkOrderChecklist({ checklist = [], onChange }) {
                     placeholder="Nota de esta tarea (opcional)..."
                     value={task.notes || ''}
                     onChange={e => updateNotes(task.id, e.target.value)}
+                    disabled={offlineMode}
                     className="h-9 text-xs bg-slate-900/60 border-slate-700/50 text-slate-200 placeholder:text-slate-600"
                   />
 
                   {/* Photo row */}
                   <div className="flex items-center gap-2">
-                    {task.photo_url ? (
+                    {pendingByItem[task.id] ? (
+                      <PendingPhotoThumb blobId={pendingByItem[task.id].blob_id} className="h-20 w-28 rounded-lg border border-slate-600" />
+                    ) : task.photo_url ? (
                       <div className="relative">
                         <img src={task.photo_url} alt="" className="h-20 w-28 rounded-lg object-cover border border-slate-600" />
                         <button
