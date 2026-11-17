@@ -3,16 +3,53 @@ import { base44 } from '@/api/base44Client';
 import { compressImage } from '@/lib/compressImage';
 import { toast } from 'sonner';
 import { Camera, Image, X, Loader2, ZoomIn } from 'lucide-react';
+import { useOfflineMode } from '@/hooks/useOfflineMode';
+import { useOfflineEnabled, useOfflineOps } from '@/hooks/useOfflineOps';
+import { enqueuePhoto } from '@/lib/offlineSyncEngine';
+import { prepareOfflinePhoto } from '@/lib/offlinePhotos';
+import PendingPhotoThumb from '@/components/pwa/PendingPhotoThumb';
 
-export default function WorkOrderPhotos({ photos = [], onChange }) {
+export default function WorkOrderPhotos({ photos = [], onChange, otId, otTitle }) {
   const fileRef = useRef();
   const cameraRef = useRef();
   const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState(null); // url
+  const offlineMode = useOfflineMode();
+  const offlineEnabled = useOfflineEnabled();
+  // Fotos de esta OT guardadas en el dispositivo que todavía no se subieron.
+  const { ops } = useOfflineOps(offlineEnabled && !!otId);
+  const pending = ops.filter((o) => o.kind === 'photo' && o.target === 'photos' && o.ot_id === otId);
+
+  const resetInputs = () => {
+    if (cameraRef.current) cameraRef.current.value = '';
+    if (fileRef.current) fileRef.current.value = '';
+  };
 
   const handleFiles = async (files) => {
     const selectedFiles = Array.from(files || []);
     if (!selectedFiles.length) return;
+    // Modo sin conexión: comprimir, guardar en el dispositivo y subir al volver la señal.
+    if (offlineMode) {
+      if (!otId || String(otId).startsWith('offline')) {
+        toast.info('Necesita conexión');
+        resetInputs();
+        return;
+      }
+      setUploading(true);
+      try {
+        for (const file of selectedFiles) {
+          const prepared = await prepareOfflinePhoto(file);
+          if (!prepared) break;
+          await enqueuePhoto({ ot_id: otId, ot_title: otTitle, target: 'photos', base_photos: photos, ...prepared });
+        }
+      } catch (err) {
+        toast.error(err?.message || 'No se pudo guardar la foto en el dispositivo');
+      } finally {
+        setUploading(false);
+        resetInputs();
+      }
+      return;
+    }
     setUploading(true);
     try {
       const uploaded = [];
@@ -42,6 +79,7 @@ export default function WorkOrderPhotos({ photos = [], onChange }) {
   };
 
   const removePhoto = (idx) => {
+    if (offlineMode) { toast.info('Necesita conexión'); return; }
     onChange(photos.filter((_, i) => i !== idx));
   };
 
@@ -49,7 +87,7 @@ export default function WorkOrderPhotos({ photos = [], onChange }) {
     <>
       <div className="space-y-3">
         {/* Grid of photos */}
-        {photos.length > 0 && (
+        {(photos.length > 0 || pending.length > 0) && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {photos.map((url, idx) => (
               <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-700/50 bg-slate-800/40">
@@ -78,7 +116,9 @@ export default function WorkOrderPhotos({ photos = [], onChange }) {
                 </button>
               </div>
             ))}
-
+            {pending.map((op) => (
+              <PendingPhotoThumb key={op.id} blobId={op.blob_id} className="aspect-square rounded-xl border border-slate-700/50" />
+            ))}
           </div>
         )}
 

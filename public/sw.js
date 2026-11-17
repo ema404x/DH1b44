@@ -408,6 +408,18 @@ self.addEventListener('push', (event) => {
   );
 });
 
+// ── Evento: SYNC "dh1-sync" (Background Sync, si el navegador lo soporta) ────
+// Avisa a las pestañas abiertas para que envíen los cambios pendientes. Si no
+// hay ninguna abierta, se envían la próxima vez que se abra la app.
+self.addEventListener('sync', (event) => {
+  if (event.tag !== 'dh1-sync') return;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) =>
+      cs.forEach((c) => c.postMessage({ type: 'dh1-sync' }))
+    )
+  );
+});
+
 // ── Evento: NOTIFICATIONCLICK (Abrir DH1 al tocar la notificación push) ──────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();

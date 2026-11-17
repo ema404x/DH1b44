@@ -4,6 +4,7 @@ import { LogOut, ChevronDown, UserCircle, Trash2, Bell, WifiOff } from 'lucide-r
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { isOfflineEnabled, clearOfflineSession } from '@/lib/offlineSession';
+import { useOfflineEnabled, useOfflineOps } from '@/hooks/useOfflineOps';
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction
@@ -19,6 +20,11 @@ export default function UserMenu() {
   const { user, offlineMode, setOfflineHabilitado } = useAuth();
   const { displayName } = useCurrentUser();
   const [savingOffline, setSavingOffline] = useState(false);
+  // Con offline_habilitado: avisar antes de cerrar sesión si hay cambios sin enviar.
+  const offlineEnabled = useOfflineEnabled();
+  const { ops: pendingOps } = useOfflineOps(offlineEnabled);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const doLogout = () => { clearOfflineSession(); base44.auth.logout(); };
 
   const handleOfflineToggle = async (value) => {
     setSavingOffline(true);
@@ -95,7 +101,11 @@ export default function UserMenu() {
             </button>
             <div className="mx-2 my-1 border-t border-border" />
             <button
-              onClick={() => { clearOfflineSession(); base44.auth.logout(); setOpen(false); }}
+              onClick={() => {
+                setOpen(false);
+                if (offlineEnabled && pendingOps.length > 0) setShowLogoutConfirm(true);
+                else doLogout();
+              }}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-left text-popover-foreground"
             >
               <LogOut className="h-4 w-4 text-muted-foreground" />
@@ -104,6 +114,26 @@ export default function UserMenu() {
           </div>
         </>
       )}
+
+      <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cerrar sesión?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tenés {pendingOps.length} cambio{pendingOps.length !== 1 ? 's' : ''} sin enviar. Si cerrás sesión se pierden. ¿Cerrar igual?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { setShowLogoutConfirm(false); doLogout(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Cerrar igual
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

@@ -4,6 +4,8 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useOfflineEnabled, useOfflineOps } from '@/hooks/useOfflineOps';
+import { enqueueCreateOT, enqueueUpdateOT, requestSync } from '@/lib/offlineSyncEngine';
 
 const DB_NAME = 'dh1-offline-queue';
 const DB_VERSION = 1;
@@ -55,7 +57,44 @@ async function deleteFromDB(id) {
 }
 
 // ── Hook principal ───────────────────────────────────────────────────────────
+// Con offline_habilitado: cola durable (offlineStore) y sincronizador único.
+// Sin él: la cola de siempre (useLegacyOfflineQueue), sin cambios.
 export function useOfflineQueue(onSyncSuccess) {
+  const enabled = useOfflineEnabled();
+  const legacy = useLegacyOfflineQueue(onSyncSuccess, !enabled);
+  const durable = useDurableOfflineQueue(enabled);
+  return enabled ? durable : legacy;
+}
+
+function useDurableOfflineQueue(active) {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const { ops, syncing } = useOfflineOps(active);
+
+  useEffect(() => {
+    if (!active) return undefined;
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    setIsOnline(navigator.onLine);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, [active]);
+
+  // photos: fotos tomadas sin conexión ({ blob, name }) que se suben después de crear la OT.
+  const queueCreate = useCallback(async (data, photos = []) => {
+    const id = await enqueueCreateOT(data, photos);
+    return { id: `offline-${id}`, ...data, _offline: true };
+  }, []);
+  const queueUpdate = useCallback((entityId, data) => enqueueUpdateOT(entityId, data), []);
+  const syncPending = useCallback(() => requestSync({ force: true }), []);
+
+  return { isOnline, pendingCount: ops.length, isSyncing: syncing, lastSynced: null, queueCreate, queueUpdate, syncPending };
+}
+
+function useLegacyOfflineQueue(onSyncSuccess, active) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -109,6 +148,7 @@ export function useOfflineQueue(onSyncSuccess) {
 
   // Listeners de conectividad
   useEffect(() => {
+    if (!active) return undefined;
     const handleOnline = () => {
       setIsOnline(true);
       syncPending();
@@ -136,7 +176,7 @@ export function useOfflineQueue(onSyncSuccess) {
     };
   // onSyncSuccess is intentionally excluded to avoid re-registering listeners on every render
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncPending, refreshCount]);
+  }, [syncPending, refreshCount, active]);
 
   // Guardar OT en cola offline
   const queueCreate = useCallback(async (data) => {

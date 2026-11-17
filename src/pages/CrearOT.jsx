@@ -10,6 +10,8 @@ import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { useOfflineMode } from '@/hooks/useOfflineMode';
 import { isJefeSitioRole } from '@/lib/roles';
 import { compressImage } from '@/lib/compressImage';
+import { prepareOfflinePhoto } from '@/lib/offlinePhotos';
+import PendingPhotoThumb from '@/components/pwa/PendingPhotoThumb';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -142,6 +144,8 @@ export default function CrearOT() {
   const [scheduledDate, setScheduledDate] = useState('');
   const [materials, setMaterials] = useState([]);
   const [photos, setPhotos] = useState([]);
+  // Fotos tomadas en modo sin conexión: { id, blob, name }. Se suben al sincronizar.
+  const [offlinePhotos, setOfflinePhotos] = useState([]);
   const [requirePhotos, setRequirePhotos] = useState(false);
   const [autoJefeSitio, setAutoJefeSitio] = useState('');
   const [modoGuardado, setModoGuardado] = useState('ot'); // 'ot' | 'futura_obra'
@@ -300,9 +304,19 @@ export default function CrearOT() {
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      if (isOnline && !offlineMode) return await base44.entities.WorkOrder.create(data);
-      // Offline: encola en IndexedDB y devuelve la OT local (con _offline).
-      return await queueCreate(data);
+      if (isOnline && !offlineMode) {
+        if (!offlinePhotos.length) return await base44.entities.WorkOrder.create(data);
+        // Fotos tomadas sin conexión pero ya volvió la señal: se suben antes de crear.
+        const urls = [];
+        for (const p of offlinePhotos) {
+          const res = await base44.integrations.Core.UploadPublicFile({ file: p.blob });
+          if (!res?.file_url) throw new Error('No se recibió la URL de la foto subida');
+          urls.push(res.file_url);
+        }
+        return await base44.entities.WorkOrder.create({ ...data, photos: [...(data.photos || []), ...urls] });
+      }
+      // Offline: encola en IndexedDB (con sus fotos) y devuelve la OT local (con _offline).
+      return await queueCreate(data, offlinePhotos);
     },
     onSuccess: (ot) => {
       if (ot?._offline) {
@@ -473,11 +487,21 @@ export default function CrearOT() {
   const handlePhotos = async (files) => {
     const selectedFiles = Array.from(files || []);
     if (!selectedFiles.length) return;
-    // Modo sin conexión: las fotos no se pueden encolar (necesitan subirse).
+    // Modo sin conexión: la foto se comprime y queda guardada en el dispositivo
+    // junto con la OT; se sube sola al volver la señal.
     if (offlineMode) {
-      toast.info('Las fotos se pueden agregar cuando vuelva la señal');
-      if (cameraRef.current) cameraRef.current.value = '';
-      if (fileRef.current) fileRef.current.value = '';
+      try {
+        for (const file of selectedFiles) {
+          const prepared = await prepareOfflinePhoto(file);
+          if (!prepared) break;
+          setOfflinePhotos(prev => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, ...prepared }]);
+        }
+      } catch (err) {
+        toast.error(err?.message || 'No se pudo guardar la foto');
+      } finally {
+        if (cameraRef.current) cameraRef.current.value = '';
+        if (fileRef.current) fileRef.current.value = '';
+      }
       return;
     }
     setUploadingPhoto(true);
@@ -575,6 +599,7 @@ export default function CrearOT() {
     setScheduledDate('');
     setMaterials([]);
     setPhotos([]);
+    setOfflinePhotos([]);
     setRequirePhotos(false);
     setAutoJefeSitio('');
     setDismissedReglasOro(false);
@@ -952,6 +977,18 @@ export default function CrearOT() {
                   ))}
                 </div>
               )}
+              {offlinePhotos.length > 0 && (
+                <div className="grid grid-cols-4 gap-2 mb-2">
+                  {offlinePhotos.map((p) => (
+                    <PendingPhotoThumb
+                      key={p.id}
+                      blob={p.blob}
+                      className="aspect-square rounded-xl border border-border"
+                      onRemove={() => setOfflinePhotos(prev => prev.filter(x => x.id !== p.id))}
+                    />
+                  ))}
+                </div>
+              )}
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handlePhotos(e.target.files)} />
               <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handlePhotos(e.target.files)} />
               <div className="grid grid-cols-2 gap-2">
@@ -1087,7 +1124,7 @@ export default function CrearOT() {
               {materials.filter(m => m.material_name.trim()).length > 0 && (
                 <SummaryRow label="Materiales" value={`${materials.filter(m => m.material_name.trim()).length} ítem(s)`} />
               )}
-              {photos.length > 0 && <SummaryRow label="Fotos adjuntas" value={`${photos.length} foto(s)`} />}
+              {photos.length + offlinePhotos.length > 0 && <SummaryRow label="Fotos adjuntas" value={`${photos.length + offlinePhotos.length} foto(s)`} />}
               {requirePhotos && <SummaryRow label="Requiere fotos" value="Sí" />}
             </div>
           </div>

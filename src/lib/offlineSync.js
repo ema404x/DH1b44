@@ -32,6 +32,18 @@ export function saveQueue(key, items) {
   } catch {}
 }
 
+// Subida de fotos del portal vía publicFichar (backend público sin sesión).
+export const uploadPortalPhoto = async (base64, fileName, mimeType) => {
+  const res = await base44.functions.invoke('publicFichar', {
+    action: 'uploadFile',
+    fileBase64: base64,
+    fileName,
+    mimeType,
+  });
+  if (!res.data?.file_url) throw new Error('upload_sin_url');
+  return res.data.file_url;
+};
+
 // ── Subida de fotos pendientes ───────────────────────────────────────────────
 // Si extra_data lleva pending_photos (base64), las sube primero y reemplaza
 // por URLs en extra_data.photos. Si la subida falla, lanza → la transición

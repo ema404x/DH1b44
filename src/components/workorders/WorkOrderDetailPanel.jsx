@@ -687,7 +687,6 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             <CollapseSection
               icon={CheckSquare}
               title="Checklist"
-              lockOffline
               badge={checklist.length > 0 ? `${doneCount}/${checklist.length}` : null}
               defaultOpen
             >
@@ -700,7 +699,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                   </div>
                 </div>
               )}
-              <WorkOrderChecklist checklist={checklist} onChange={val => saveField('checklist', val)} />
+              <WorkOrderChecklist checklist={checklist} onChange={val => saveField('checklist', val)} otId={order.id} otTitle={data.title} />
             </CollapseSection>
 
             {/* ── GPS ── */}
@@ -747,12 +746,12 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             <CollapseSection
               icon={Camera}
               title="Fotos & Firma"
-              lockOffline
               badge={(data.photos || []).length || null}
               defaultOpen={false}
             >
               <div className="space-y-4">
-                <WorkOrderPhotos photos={data.photos || []} onChange={val => saveField('photos', val)} />
+                <WorkOrderPhotos photos={data.photos || []} onChange={val => saveField('photos', val)} otId={order.id} otTitle={data.title} />
+                <NecesitaConexion>
                 <div className="border-t border-slate-700/50 pt-4">
                   <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Firma de conformidad</p>
                   <WorkOrderSignature
@@ -762,6 +761,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                       saveFields({ signature_url: signatureUrl, signature_name: signatureName })}
                   />
                 </div>
+                </NecesitaConexion>
               </div>
             </CollapseSection>
 

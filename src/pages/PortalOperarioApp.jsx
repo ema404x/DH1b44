@@ -200,7 +200,13 @@ export default function PortalOperarioApp() {
         gps_status: gps.gps_status,
         _pending_sync: true,
       };
-      queueTransition(ot, 'iniciar', extraData, optimistic);
+      try {
+        await queueTransition(ot, 'iniciar', extraData, optimistic);
+      } catch {
+        toast.error('No se pudo guardar en el dispositivo. Intentá de nuevo.');
+        setProcessing(null);
+        return;
+      }
       toast.success('OT iniciada (sin conexión). Se sincronizará al volver online.');
       setProcessing(null);
       setConfirmAction(null);
@@ -227,7 +233,7 @@ export default function PortalOperarioApp() {
         photos: reporteData.photos,
         _pending_sync: true,
       };
-      queueTransition(ot, 'finalizar', reporteData, optimistic);
+      await queueTransition(ot, 'finalizar', reporteData, optimistic);
       toast.success('Reporte guardado (sin conexión). Se enviará al jefe al volver online.');
       setReporteOT(null);
       return;

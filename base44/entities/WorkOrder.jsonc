@@ -254,6 +254,10 @@
     },
     "notes": {
       "type": "string"
+    },
+    "client_op_id": {
+      "type": "string",
+      "description": "Identificador \u00fanico generado en el dispositivo al crear la OT sin conexi\u00f3n. Evita duplicados: al sincronizar, si ya existe una OT con este valor no se crea otra."
     }
   },
   "required": [

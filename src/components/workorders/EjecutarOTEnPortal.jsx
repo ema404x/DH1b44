@@ -170,7 +170,7 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
 
         if (offline && onQueueOffline) {
           const optimistic = { ...order, status: 'en_progreso', operario_sesion, assigned_name: operario_sesion, fecha_inicio_real: new Date().toISOString(), _pending_sync: true };
-          onQueueOffline(order, 'iniciar', extraData, optimistic);
+          await onQueueOffline(order, 'iniciar', extraData, optimistic);
           setOtStarted(true);
           if (onCompleted) onCompleted(optimistic);
           return;
@@ -224,7 +224,7 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
         if (!otStarted && !isAlreadyInProgress) {
           if (offline && onQueueOffline) {
             const optimisticInit = { ...order, status: 'en_progreso', operario_sesion, assigned_name: operario_sesion, fecha_inicio_real: new Date().toISOString(), _pending_sync: true };
-            onQueueOffline(order, 'iniciar', iniciarExtra, optimisticInit);
+            await onQueueOffline(order, 'iniciar', iniciarExtra, optimisticInit);
           } else {
             const initRes = await runTransition('iniciar', iniciarExtra);
             if (initRes.error) { setGpsStatus(null); return; }
@@ -233,7 +233,7 @@ export default function EjecutarOTEnPortal({ order, locationName, onBack, onComp
 
         if (offline && onQueueOffline) {
           const optimistic = { ...order, status: 'pendiente_validacion', ...finalizarExtra, _pending_sync: true };
-          onQueueOffline(order, 'finalizar', finalizarExtra, optimistic);
+          await onQueueOffline(order, 'finalizar', finalizarExtra, optimistic);
           if (onCompleted) onCompleted(optimistic);
           return;
         }

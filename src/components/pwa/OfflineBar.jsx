@@ -1,92 +1,131 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { WifiOff, RefreshCw, Download, CloudOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePWA } from '@/hooks/usePWA';
+import { useOfflineEnabled } from '@/hooks/useOfflineOps';
+import PendientesPanel from '@/components/pwa/PendientesPanel';
 import { format } from 'date-fns';
 
 export function OfflineBar({ isOnline, pendingCount, isSyncing, lastSynced, onSync, onInstall, offlineMode, offlineSavedAt, justReconnected }) {
   const { canInstall, triggerInstall } = usePWA();
+  // Solo con offline_habilitado: "N pendientes de enviar" + panel con la lista.
+  const enabled = useOfflineEnabled();
+  const [panelOpen, setPanelOpen] = useState(false);
+  const showPendientes = enabled && pendingCount > 0;
+  const pendientesBtn = showPendientes ? (
+    <button type="button" onClick={() => setPanelOpen(true)} className="underline underline-offset-2 font-bold">
+      {pendingCount} pendiente{pendingCount !== 1 ? 's' : ''} de enviar
+    </button>
+  ) : null;
 
-  // Modo sin conexión (beta): lectura de datos guardados
-  if (offlineMode) {
-    return (
-      <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-amber-500 text-white text-xs font-semibold py-2 px-4 shadow-lg">
-        <WifiOff className="h-3.5 w-3.5 flex-shrink-0" />
-        <span>
-          Sin conexión · mostrando datos guardados
-          {offlineSavedAt ? ` · Última sincronización: ${format(new Date(offlineSavedAt), 'dd/MM HH:mm')}` : ''}
-          {pendingCount > 0 && ` · ${pendingCount} OT${pendingCount !== 1 ? 's' : ''} en cola`}
-        </span>
-      </div>
-    );
-  }
-
-  // Recién reconectado desde el modo sin conexión
-  if (justReconnected) {
-    return (
-      <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-emerald-600 text-white text-xs font-semibold py-2 px-4 shadow-lg">
-        <RefreshCw className="h-3.5 w-3.5 flex-shrink-0 animate-spin" />
-        <span>Conectado · actualizando…</span>
-      </div>
-    );
-  }
-
-  // Barra de offline
-  if (!isOnline) {
-    return (
-      <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-amber-500 text-white text-xs font-semibold py-2 px-4 shadow-lg">
-        <WifiOff className="h-3.5 w-3.5 flex-shrink-0" />
-        <span>
-          Sin conexión — Modo offline activo.
-          {pendingCount > 0 && ` ${pendingCount} OT${pendingCount !== 1 ? 's' : ''} en cola de sincronización.`}
-        </span>
-      </div>
-    );
-  }
-
-  // Sincronización de OTs pendientes — indicador pequeño no intrusivo (esquina)
-  if (isSyncing) {
-    return (
-      <div className="fixed bottom-4 right-4 z-[100] flex items-center gap-2 bg-slate-800/90 backdrop-blur border border-slate-700 text-white text-xs font-medium py-2 px-3 rounded-lg shadow-xl">
-        <Loader2 className="h-3 w-3 animate-spin text-blue-400 flex-shrink-0" />
-        <span className="text-slate-300">Sincronizando en segundo plano...</span>
-      </div>
-    );
-  }
-
-  // Pendientes sin sincronizar (volvió online pero aún hay cola)
-  if (pendingCount > 0 && isOnline) {
-    return (
-      <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-3 bg-indigo-600 text-white text-xs font-semibold py-2 px-4 shadow-lg">
-        <CloudOff className="h-3.5 w-3.5 flex-shrink-0" />
-        <span>{pendingCount} OT{pendingCount !== 1 ? 's' : ''} pendiente{pendingCount !== 1 ? 's' : ''} de sincronizar</span>
-        <Button size="sm" variant="ghost" className="h-6 px-2 text-white hover:bg-white/20 text-xs gap-1"
-          onClick={onSync}>
-          <RefreshCw className="h-3 w-3" /> Sincronizar ahora
-        </Button>
-      </div>
-    );
-  }
-
-  // Prompt de instalación PWA
-  if (canInstall) {
-    return (
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 bg-card border border-border shadow-xl rounded-xl px-4 py-3 max-w-sm w-[calc(100%-32px)]">
-        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Download className="h-4 w-4 text-primary" />
+  const renderBar = () => {
+    // Modo sin conexión (beta): lectura de datos guardados
+    if (offlineMode) {
+      return (
+        <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-amber-500 text-white text-xs font-semibold py-2 px-4 shadow-lg">
+          <WifiOff className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>
+            Sin conexión · mostrando datos guardados
+            {offlineSavedAt ? ` · Última sincronización: ${format(new Date(offlineSavedAt), 'dd/MM HH:mm')}` : ''}
+            {!enabled && pendingCount > 0 && ` · ${pendingCount} OT${pendingCount !== 1 ? 's' : ''} en cola`}
+            {pendientesBtn && <> · {pendientesBtn}</>}
+          </span>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold">Instalar DH1 ERP</p>
-          <p className="text-[11px] text-muted-foreground">Acceso rápido y soporte offline</p>
-        </div>
-        <Button size="sm" className="h-8 text-xs flex-shrink-0" onClick={triggerInstall}>
-          Instalar
-        </Button>
-      </div>
-    );
-  }
+      );
+    }
 
-  return null;
+    // Recién reconectado desde el modo sin conexión
+    if (justReconnected) {
+      return (
+        <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-emerald-600 text-white text-xs font-semibold py-2 px-4 shadow-lg">
+          <RefreshCw className="h-3.5 w-3.5 flex-shrink-0 animate-spin" />
+          <span>Conectado · actualizando…{pendientesBtn && <> · {pendientesBtn}</>}</span>
+        </div>
+      );
+    }
+
+    // Pendientes a la vista (también con señal, mientras se envían)
+    if (showPendientes) {
+      return (
+        <div className={`fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 text-white text-xs font-semibold py-2 px-4 shadow-lg ${isOnline ? 'bg-indigo-600' : 'bg-amber-500'}`}>
+          {isSyncing
+            ? <Loader2 className="h-3.5 w-3.5 flex-shrink-0 animate-spin" />
+            : isOnline ? <CloudOff className="h-3.5 w-3.5 flex-shrink-0" /> : <WifiOff className="h-3.5 w-3.5 flex-shrink-0" />}
+          <span>
+            {!isOnline && 'Sin conexión · '}
+            {pendientesBtn}
+            {isSyncing && ' · Enviando…'}
+          </span>
+        </div>
+      );
+    }
+
+    // Barra de offline
+    if (!isOnline) {
+      return (
+        <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-amber-500 text-white text-xs font-semibold py-2 px-4 shadow-lg">
+          <WifiOff className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>
+            Sin conexión — Modo offline activo.
+            {pendingCount > 0 && ` ${pendingCount} OT${pendingCount !== 1 ? 's' : ''} en cola de sincronización.`}
+          </span>
+        </div>
+      );
+    }
+
+    // Sincronización de OTs pendientes — indicador pequeño no intrusivo (esquina)
+    if (isSyncing) {
+      return (
+        <div className="fixed bottom-4 right-4 z-[100] flex items-center gap-2 bg-slate-800/90 backdrop-blur border border-slate-700 text-white text-xs font-medium py-2 px-3 rounded-lg shadow-xl">
+          <Loader2 className="h-3 w-3 animate-spin text-blue-400 flex-shrink-0" />
+          <span className="text-slate-300">Sincronizando en segundo plano...</span>
+        </div>
+      );
+    }
+
+    // Pendientes sin sincronizar (volvió online pero aún hay cola)
+    if (pendingCount > 0 && isOnline) {
+      return (
+        <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-3 bg-indigo-600 text-white text-xs font-semibold py-2 px-4 shadow-lg">
+          <CloudOff className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>{pendingCount} OT{pendingCount !== 1 ? 's' : ''} pendiente{pendingCount !== 1 ? 's' : ''} de sincronizar</span>
+          <Button size="sm" variant="ghost" className="h-6 px-2 text-white hover:bg-white/20 text-xs gap-1"
+            onClick={onSync}>
+            <RefreshCw className="h-3 w-3" /> Sincronizar ahora
+          </Button>
+        </div>
+      );
+    }
+
+    // Prompt de instalación PWA
+    if (canInstall) {
+      return (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 bg-card border border-border shadow-xl rounded-xl px-4 py-3 max-w-sm w-[calc(100%-32px)]">
+          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Download className="h-4 w-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold">Instalar DH1 ERP</p>
+            <p className="text-[11px] text-muted-foreground">Acceso rápido y soporte offline</p>
+          </div>
+          <Button size="sm" className="h-8 text-xs flex-shrink-0" onClick={triggerInstall}>
+            Instalar
+          </Button>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  const bar = renderBar();
+  if (!enabled) return bar;
+  return (
+    <>
+      {bar}
+      <PendientesPanel open={panelOpen} onOpenChange={setPanelOpen} />
+    </>
+  );
 }
 
 export default OfflineBar;
