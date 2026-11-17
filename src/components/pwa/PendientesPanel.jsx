@@ -23,6 +23,11 @@ export default function PendientesPanel({ open, onOpenChange }) {
               Están guardados en este dispositivo y se envían solos cuando hay señal.
             </DialogDescription>
           </DialogHeader>
+          {ops.some((o) => o.auth_required) && (
+            <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+              Iniciá sesión para enviar los pendientes
+            </p>
+          )}
           {ops.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">No hay pendientes.</p>
           ) : (

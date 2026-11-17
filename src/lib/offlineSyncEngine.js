@@ -67,7 +67,7 @@ function classify(err) {
   const status = err?.response?.status ?? err?.status ?? err?.statusCode;
   const message = err?.response?.data?.error || err?.data?.error || err?.message || 'El servidor rechazó el cambio';
   if (!status) return { retry: true, stop: true, message: 'Sin conexión con el servidor' };
-  if (status === 401) return { retry: true, stop: true, message: 'Sesión vencida: iniciá sesión de nuevo' };
+  if (status === 401) return { retry: true, stop: true, auth: true, message: 'Iniciá sesión para enviar los pendientes' };
   if (status >= 500 || status === 408 || status === 429) return { retry: true, message };
   if (status >= 400) return { retry: false, message };
   return { retry: true, message };
@@ -90,6 +90,54 @@ async function invokeChecked(name, payload) {
   const res = await base44.functions.invoke(name, payload);
   if (res?.data?.error) throw rejected(res.data.error);
   return res?.data?.ot;
+}
+
+// ── Idempotencia de Iniciar / Finalizar ─────────────────────────────────────
+// Antes de enviar se compara con el estado actual de la OT en el servidor.
+const OT_GONE = 'La OT fue cancelada/eliminada; el cambio no se aplicó';
+const ALREADY_DONE = {
+  iniciar: ['en_progreso', 'pendiente_validacion', 'completada'],
+  finalizar: ['pendiente_validacion', 'completada'],
+};
+const normName = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+const statusOf = (err) => err?.response?.status ?? err?.status ?? err?.statusCode;
+
+let visibleCache = { at: 0, orders: [] };
+
+// Devuelve la OT actual, o null si no se pudo determinar (en ese caso decide el
+// servidor al enviar). Sin red o sin sesión el error sube y el ítem se reintenta.
+async function readServerOT(op) {
+  try {
+    if (op.auth === 'portal') {
+      const res = await base44.functions.invoke('publicFichar', { action: 'getWorkOrder', workOrderId: op.ot_id });
+      return res?.data?.workOrder || null;
+    }
+    const direct = firstOf(await base44.entities.WorkOrder.filter({ id: op.ot_id }));
+    if (direct) return direct;
+    // El operario no siempre puede leer la OT directo: se usa su lista visible.
+    if (Date.now() - visibleCache.at > 30000) {
+      const res = await base44.functions.invoke('getWorkOrdersForUser', { includeArchived: true });
+      visibleCache = { at: Date.now(), orders: res?.data?.orders || [] };
+    }
+    return visibleCache.orders.find((o) => o.id === op.ot_id) || null;
+  } catch (err) {
+    const status = statusOf(err);
+    if (!status || status === 401) throw err;
+    return null;
+  }
+}
+
+// true si la OT ya está en el estado al que lleva la acción (o uno posterior).
+function alreadyApplied(op, ot) {
+  if (!ALREADY_DONE[op.accion]?.includes(ot.status)) return false;
+  if (op.accion !== 'finalizar') return true;
+  // Finalizar lleva el reporte: si la OT la cerró otra persona, no se da por
+  // enviado en silencio; decide el servidor y queda a la vista.
+  if (op.auth === 'portal') {
+    const mine = normName(getNombre());
+    return !ot.operario_sesion || !mine || normName(ot.operario_sesion) === mine;
+  }
+  return !ot.assigned_to || !op.user_id || ot.assigned_to === op.user_id;
 }
 
 // ── Qué hace cada tipo de operación ─────────────────────────────────────────
@@ -130,6 +178,21 @@ const HANDLERS = {
   },
 
   async transition(op) {
+    if (ALREADY_DONE[op.accion]) {
+      const current = await readServerOT(op);
+      if (current?.status === 'cancelada') throw rejected(OT_GONE);
+      if (current && alreadyApplied(op, current)) return current; // ya aplicado: no se reenvía
+    }
+    try {
+      return await sendTransition(op);
+    } catch (err) {
+      if (statusOf(err) === 404) throw rejected(OT_GONE);
+      throw err;
+    }
+  },
+};
+
+async function sendTransition(op) {
     let extra = op.extra_data || {};
     if (op.blob_ids?.length) {
       for (const id of op.blob_ids) {
@@ -157,8 +220,7 @@ const HANDLERS = {
       operario_password: getClave(),
       operario_sesion: getNombre(),
     });
-  },
-};
+}
 
 // ── Una pasada por la cola ──────────────────────────────────────────────────
 let migrated = false;
@@ -200,8 +262,8 @@ async function runOnce(force) {
       const c = classify(err);
       const attempts = (op.attempts || 0) + 1;
       const next = c.retry
-        ? { ...op, status: 'pending', attempts, error: c.message, next_at: Date.now() + BACKOFF_MS[Math.min(attempts - 1, BACKOFF_MS.length - 1)] }
-        : { ...op, status: 'attention', attempts, error: c.message, next_at: 0 };
+        ? { ...op, status: 'pending', attempts, error: c.message, auth_required: !!c.auth && op.auth !== 'portal', next_at: Date.now() + BACKOFF_MS[Math.min(attempts - 1, BACKOFF_MS.length - 1)] }
+        : { ...op, status: 'attention', attempts, error: c.message, auth_required: false, next_at: 0 };
       await store.putOp(next);
       block(next);
       if (!c.retry) {
@@ -346,7 +408,7 @@ export async function enqueueTransition({ auth, ot, accion, extra_data, blobs = 
 // ── Acciones del panel de pendientes ────────────────────────────────────────
 export async function retryOp(id) {
   const op = await store.getOp(id);
-  if (op) await store.putOp({ ...op, status: 'pending', attempts: 0, next_at: 0, error: null });
+  if (op) await store.putOp({ ...op, status: 'pending', attempts: 0, next_at: 0, error: null, auth_required: false });
   requestSync({ force: true });
 }
 
