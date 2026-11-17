@@ -19,7 +19,7 @@ function fmtFecha(fecha) {
   }
 }
 
-export default function ReporteOperarioResumen({ ot, onAprobar, onRechazar, loading }) {
+export default function ReporteOperarioResumen({ ot, onAprobar, onRechazar, loading, soloLectura = false }) {
   const checklist = ot.checklist || [];
   const done = checklist.filter(t => t.completed).length;
   const total = checklist.length;
@@ -196,12 +196,12 @@ export default function ReporteOperarioResumen({ ot, onAprobar, onRechazar, load
 
         {/* Botones de decisión */}
         <div className="flex gap-2 pt-1">
-          <button onClick={onRechazar} disabled={loading}
+          <button onClick={onRechazar} disabled={loading || soloLectura} title={soloLectura ? 'Necesita conexión' : undefined}
             className="flex-1 h-11 rounded-lg bg-red-600/15 border border-red-500/40 text-red-300 text-sm font-bold hover:bg-red-600/25 transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
             Rechazar y devolver
           </button>
-          <button onClick={onAprobar} disabled={loading}
+          <button onClick={onAprobar} disabled={loading || soloLectura} title={soloLectura ? 'Necesita conexión' : undefined}
             className="flex-[1.4] h-11 rounded-lg bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-emerald-950/40">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
             Aprobar y completar

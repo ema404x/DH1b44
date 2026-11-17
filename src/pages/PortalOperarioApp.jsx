@@ -15,6 +15,8 @@ import BodyPortal from '@/components/operario/BodyPortal';
 import MisOrdenesFiltros from '@/components/operario/MisOrdenesFiltros';
 import { useOperarioOfflineActions } from '@/hooks/useOperarioOfflineActions';
 import { canActOn } from '@/lib/workOrderActions';
+import OfflineGuard from '@/components/pwa/OfflineGuard';
+import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
 
 export default function PortalOperarioApp() {
   const { currentUser, displayName } = useCurrentUser();
@@ -27,6 +29,7 @@ export default function PortalOperarioApp() {
   const [vista, setVista] = useState('activas'); // 'activas' | 'historial'
   const { capturar } = useGeolocalizacion();
   const queryClient = useQueryClient();
+  const offlineMode = useOfflineMode();
 
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   useEffect(() => {
@@ -65,6 +68,7 @@ export default function PortalOperarioApp() {
     },
     staleTime: 1000 * 60 * 5,
     retry: false,
+    ...offlineQueryOptions(offlineMode),
   });
 
   // Cola de transiciones offline (iniciar/finalizar sin conexión).
@@ -181,7 +185,7 @@ export default function PortalOperarioApp() {
     } else {
       extraData.gps_status = gps.gps_status;
     }
-    if (!isOnline) {
+    if (!isOnline || offlineMode) {
       // Offline: encolar la transición y aplicar el cambio al cache (UX inmediata).
       // El GPS se captura igual (offline); solo falla el envío al servidor.
       const optimistic = {
@@ -212,7 +216,7 @@ export default function PortalOperarioApp() {
   };
 
   const handleReporteSaved = async (ot, reporteData) => {
-    if (!isOnline) {
+    if (!isOnline || offlineMode) {
       // Offline: encolar el reporte y marcar la OT como enviada a validación.
       const optimistic = {
         ...ot,
@@ -390,6 +394,13 @@ export default function PortalOperarioApp() {
     }
     return true;
   };
+
+  // Modo sin conexión sin OTs guardadas en este dispositivo
+  if (offlineMode && allOTs.length === 0) {
+    let guardado = false;
+    try { guardado = !!localStorage.getItem(CACHE_KEY); } catch {}
+    if (!guardado) return <OfflineGuard />;
+  }
 
   // Skeleton shimmer solo en la primera carga real (sin data previa en cache).
   // Con initialData, las cargas siguientes muestran las OTs cacheadas de inmediato.
@@ -579,7 +590,7 @@ export default function PortalOperarioApp() {
           }}
           onCancel={() => setConfirmAction(null)}
           processing={processing === confirmAction.ot.id}
-          offline={!isOnline}
+          offline={!isOnline || offlineMode}
         />
       )}
 

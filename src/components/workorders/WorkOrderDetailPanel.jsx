@@ -25,6 +25,8 @@ import CancelarOTModal from './CancelarOTModal';
 import { getAvailableActions, getTransitionAction, ACTION_VARIANTS } from '@/lib/workorder-transitions';
 import { useResolveCreator } from '@/hooks/useResolveCreator';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
+import NecesitaConexion from '@/components/pwa/NecesitaConexion';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -55,7 +57,7 @@ const TYPE_LABELS = {
 };
 
 // ── Collapsible section ──────────────────────────────────────────────────────
-function CollapseSection({ icon: Icon, title, badge, defaultOpen = true, accent, children }) {
+function CollapseSection({ icon: Icon, title, badge, defaultOpen = true, accent, lockOffline = false, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className={`rounded-xl border overflow-hidden transition-all ${accent ? 'border-orange-700/40' : 'border-slate-700/50'}`}>
@@ -76,7 +78,11 @@ function CollapseSection({ icon: Icon, title, badge, defaultOpen = true, accent,
         </div>
         <ChevronDown className={`h-3.5 w-3.5 text-slate-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div className="bg-slate-900/40 px-4 py-3">{children}</div>}
+      {open && (
+        <div className="bg-slate-900/40 px-4 py-3">
+          {lockOffline ? <NecesitaConexion>{children}</NecesitaConexion> : children}
+        </div>
+      )}
     </div>
   );
 }
@@ -115,6 +121,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
   const { resolveOTOwner } = useResolveCreator();
   const { name: creadorPor, label: creadorLabel } = resolveOTOwner(order);
   const { isSuperAdmin } = useCurrentUser();
+  const offlineMode = useOfflineMode();
 
   const { data: freshOrder, isLoading: loadingFresh, refetch } = useQuery({
     queryKey: ['workorder-detail', order.id],
@@ -124,6 +131,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
     },
     staleTime: 0,
     refetchOnMount: 'always',
+    ...offlineQueryOptions(offlineMode),
   });
   // dirtyRef rastrea qué campos fueron modificados localmente y aún no persistieron.
   // Al sincronizar con freshOrder (refetch), solo sobrescribimos si NO hay edits pendientes —
@@ -576,6 +584,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
           </div>
 
           {/* ── QUICK CONTROLS ───────────────────────────────────────────── */}
+          <NecesitaConexion className="flex-shrink-0 [&>p]:px-4 [&>p]:pb-1">
           <div className="flex-shrink-0 grid grid-cols-3 gap-2 px-4 py-3 bg-slate-900/80 border-b border-white/6">
             <div>
               <p className="text-[9px] uppercase tracking-widest text-slate-500 mb-1.5">Estado</p>
@@ -610,6 +619,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             </div>
           </div>
 
+          </NecesitaConexion>
           {/* ── STATE MACHINE ACTIONS ────────────────────────────────────── */}
           {getAvailableActions(data.status).length > 0 && data.status !== 'pendiente_validacion' && (
             <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-slate-900/80 border-b border-white/6">
@@ -617,7 +627,8 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                 <button
                   key={act.accion}
                   onClick={() => handleStateAction(act.accion)}
-                  disabled={stateActionLoading}
+                  disabled={stateActionLoading || offlineMode}
+                  title={offlineMode ? 'Necesita conexión' : undefined}
                   className={`flex-1 h-8 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 ${ACTION_VARIANTS[act.variant]}`}
                 >
                   {stateActionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
@@ -639,6 +650,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                 onAprobar={() => handleStateAction('aprobar')}
                 onRechazar={() => setRechazoOpen(true)}
                 loading={stateActionLoading}
+                soloLectura={offlineMode}
               />
             )}
 
@@ -650,6 +662,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                   <span className="text-xs font-semibold uppercase tracking-wider text-amber-300">Asignar ubicación</span>
                 </div>
                 <div className="px-4 py-3">
+                  <NecesitaConexion>
                   <LocationEditor
                     currentLocation={data.location || ''}
                     currentAssigned={data.assigned_name || ''}
@@ -658,6 +671,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                       toast.success('Ubicación asignada correctamente');
                     }}
                   />
+                  </NecesitaConexion>
                 </div>
               </div>
             )}
@@ -673,6 +687,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             <CollapseSection
               icon={CheckSquare}
               title="Checklist"
+              lockOffline
               badge={checklist.length > 0 ? `${doneCount}/${checklist.length}` : null}
               defaultOpen
             >
@@ -716,6 +731,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             <CollapseSection
               icon={Package}
               title="Materiales"
+              lockOffline
               badge={(data.materials_used || []).length || null}
               defaultOpen={false}
             >
@@ -731,6 +747,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             <CollapseSection
               icon={Camera}
               title="Fotos & Firma"
+              lockOffline
               badge={(data.photos || []).length || null}
               defaultOpen={false}
             >
@@ -749,7 +766,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             </CollapseSection>
 
             {/* ── Notas ── */}
-            <CollapseSection icon={Zap} title="Notas" defaultOpen={false}>
+            <CollapseSection icon={Zap} title="Notas" defaultOpen={false} lockOffline>
               <textarea
                 className="w-full bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500/50 min-h-[90px]"
                 placeholder="Agregar observaciones..."
@@ -759,7 +776,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
             </CollapseSection>
 
             {/* ── Incompleto ── */}
-            <CollapseSection icon={ClipboardX} title="Motivos Incompleto" accent defaultOpen={false}>
+            <CollapseSection icon={ClipboardX} title="Motivos Incompleto" accent defaultOpen={false} lockOffline>
               <WorkOrderIncompleteReason
                 motivos={data.motivos_incompleto || []}
                 onChange={val => saveField('motivos_incompleto', val)}
@@ -777,7 +794,7 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                   className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors">
                   <Download className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={handleSaveAsTemplate} disabled={savingTemplate} title="Guardar plantilla"
+                <button onClick={handleSaveAsTemplate} disabled={savingTemplate || offlineMode} title={offlineMode ? 'Necesita conexión' : 'Guardar plantilla'}
                   className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors disabled:opacity-40">
                   {savingTemplate ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />}
                 </button>
@@ -785,12 +802,12 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                   className="h-8 w-8 flex items-center justify-center rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors">
                   <QrCode className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={handleConvertToObra} disabled={convertingToObra} title="Convertir a Futura Obra"
+                <button onClick={handleConvertToObra} disabled={convertingToObra || offlineMode} title={offlineMode ? 'Necesita conexión' : 'Convertir a Futura Obra'}
                   className="h-8 px-2 flex items-center gap-1 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/60 transition-colors disabled:opacity-40 text-[10px] font-semibold">
                   {convertingToObra ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
                   Obra
                 </button>
-                {onDelete && <DeleteWorkOrderButton order={data} onDelete={onDelete} />}
+                {onDelete && <NecesitaConexion compact><DeleteWorkOrderButton order={data} onDelete={onDelete} /></NecesitaConexion>}
               </div>
 
               {/* Save */}
@@ -800,7 +817,8 @@ export default function WorkOrderDetailPanel({ order, onClose, onDelete }) {
                   Cerrar
                 </button>
                 <button onClick={save}
-                  disabled={saveMutation.isPending}
+                  disabled={saveMutation.isPending || offlineMode}
+                  title={offlineMode ? 'Necesita conexión' : undefined}
                   className="flex items-center gap-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-lg px-4 py-2 transition-all disabled:opacity-50 shadow-lg shadow-indigo-950/50">
                   {saveMutation.isPending
                     ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Guardando</>

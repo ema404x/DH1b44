@@ -25,6 +25,8 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { es } from 'date-fns/locale';
 import { esOtVencida } from '@/lib/otVencimiento';
 import { fetchAllList } from '@/lib/fetchAllList';
+import OfflineGuard from '@/components/pwa/OfflineGuard';
+import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -186,6 +188,7 @@ const QuickActionCard = React.memo(function QuickActionCard({ icon: Icon, label,
 export default function Dashboard() {
   const { userPermissions, user, displayName, isAdmin } = useCurrentUser();
   const [dashFilters, setDashFilters] = React.useState({ dateRange: 'all', jefeSitio: '', priority: '' });
+  const offlineMode = useOfflineMode();
 
   const canRead = useCallback((moduleKey) => {
     if (user?.role === 'admin') return true;
@@ -210,6 +213,7 @@ export default function Dashboard() {
     queryKey: ['dashboard-metrics', dashScope],
     queryFn: async () => (await base44.functions.invoke('getDashboardMetrics', { scope: dashScope })).data,
     staleTime: STALE_3MIN, retry: 1,
+    ...offlineQueryOptions(offlineMode, 'dashboard-metrics'),
   });
 
   // Direcciones — fuente canónica de jefes de sitio (igual que WorkOrders).
@@ -413,6 +417,9 @@ export default function Dashboard() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
   const firstName = (displayName || '').split(' ')[0] || '';
+
+  // Modo sin conexión sin datos guardados en este dispositivo
+  if (offlineMode && !dash) return <OfflineGuard />;
 
   return (
     <div className="min-h-screen bg-background space-y-7 pb-4 lg:pb-10 acero-rise">
