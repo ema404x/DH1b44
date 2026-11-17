@@ -2,8 +2,29 @@ import React, { createContext, useState, useContext, useEffect, useRef } from 'r
 import { base44 } from '@/api/base44Client';
 import { queryClientInstance } from '@/lib/query-client';
 import { saveCacheEntry } from '@/lib/persistCache';
+import {
+  isOfflineEnabled, saveOfflineSession, readOfflineSession, clearOfflineSession, isNetworkError,
+} from '@/lib/offlineSession';
+import { scheduleOfflinePreload } from '@/lib/offlinePreload';
 
 export const AuthContext = createContext();
+
+// Modo sin conexión (beta): mientras dura, las consultas no piden nada al
+// servidor ni reintentan (muestran el caché). Al salir se restauran los
+// valores originales. Nunca se ejecuta si no se entra en modo sin conexión.
+let onlineQueryDefaults = null;
+const setQueriesOffline = (off) => {
+  if (off) {
+    if (!onlineQueryDefaults) onlineQueryDefaults = queryClientInstance.getDefaultOptions();
+    queryClientInstance.setDefaultOptions({
+      ...onlineQueryDefaults,
+      queries: { ...onlineQueryDefaults.queries, enabled: false, retry: false },
+    });
+  } else if (onlineQueryDefaults) {
+    queryClientInstance.setDefaultOptions(onlineQueryDefaults);
+    onlineQueryDefaults = null;
+  }
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -16,10 +37,78 @@ export const AuthProvider = ({ children }) => {
   const [hasEmployeeRecord, setHasEmployeeRecord] = useState(null);
   const [isSlowConnection, setIsSlowConnection] = useState(false);
   const authBatchRef = useRef(null);
+  const [offlineMode, setOfflineMode] = useState(false);
+  const [offlineSavedAt, setOfflineSavedAt] = useState(null);
+  const [justReconnected, setJustReconnected] = useState(false);
 
   useEffect(() => {
     checkAppState();
   }, []);
+
+  // Sesión guardada para el modo sin conexión: se guarda solo si el usuario
+  // tiene offline_habilitado y hay red; si el campo es false, se borra.
+  useEffect(() => {
+    if (isLoadingAuth || offlineMode || !isAuthenticated || !user) return;
+    if (!isOfflineEnabled(user)) { clearOfflineSession(); return; }
+    if (navigator.onLine === false) return;
+    saveOfflineSession({ user, userPermissions, hasEmployeeRecord });
+    scheduleOfflinePreload({ user, userPermissions });
+  }, [user, userPermissions, hasEmployeeRecord, isLoadingAuth, isAuthenticated, offlineMode]);
+
+  // Salida del modo sin conexión: al volver la red (evento online) o cada 30 s
+  // se consulta la sesión en silencio. Un solo intervalo, sin recargar la página.
+  useEffect(() => {
+    if (!offlineMode) return;
+    let busy = false;
+    let cancelled = false;
+    const tryReconnect = async () => {
+      if (busy || cancelled) return;
+      busy = true;
+      try {
+        const currentUser = await base44.auth.me();
+        if (cancelled) return;
+        setUser(currentUser);
+        await linkEmployee(currentUser);
+        setQueriesOffline(false);
+        setIsAuthenticated(true);
+        setOfflineMode(false);
+        setJustReconnected(true);
+        queryClientInstance.invalidateQueries();
+      } catch (error) {
+        if (cancelled) return;
+        // 401/403: flujo normal de login. Cualquier otro error: seguimos sin conexión.
+        if (error?.status === 401 || error?.status === 403) {
+          clearOfflineSession();
+          setQueriesOffline(false);
+          setOfflineMode(false);
+          setIsAuthenticated(false);
+          setUser(null);
+          setAuthError(
+            error.status === 403 && error?.data?.extra_data?.reason === 'user_not_registered'
+              ? { type: 'user_not_registered', message: 'User not registered for this app' }
+              : { type: 'auth_required', message: 'Authentication required' }
+          );
+        }
+      } finally {
+        busy = false;
+      }
+    };
+    window.addEventListener('online', tryReconnect);
+    const interval = setInterval(tryReconnect, 30000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('online', tryReconnect);
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offlineMode]);
+
+  // Aviso "Conectado · actualizando…" durante unos segundos tras reconectar.
+  useEffect(() => {
+    if (!justReconnected) return;
+    const t = setTimeout(() => setJustReconnected(false), 4000);
+    return () => clearTimeout(t);
+  }, [justReconnected]);
 
   const checkAppState = async () => {
     // Intentos simultáneos (el original + "Reintentar") comparten un lote:
@@ -79,6 +168,23 @@ export const AuthProvider = ({ children }) => {
         batch.done = true;
         owner = true;
       }
+      // Modo sin conexión (beta): SOLO si hay sesión guardada habilitada y con
+      // menos de 7 días (readOfflineSession) Y el fallo fue un error de red real.
+      // Nunca por timeout/lentitud ni con 401/403. Sin sesión guardada (interruptor
+      // apagado) este bloque no hace nada y el flujo sigue igual que siempre.
+      const savedSession = readOfflineSession();
+      if (savedSession && isNetworkError(error)) {
+        setQueriesOffline(true);
+        setUser(savedSession.user);
+        setUserPermissions(savedSession.userPermissions);
+        setHasEmployeeRecord(savedSession.hasEmployeeRecord);
+        setVinculationFailed(false);
+        setIsAuthenticated(true);
+        setOfflineSavedAt(savedSession.savedAt);
+        setOfflineMode(true);
+        return;
+      }
+      if (savedSession && (error?.status === 401 || error?.status === 403)) clearOfflineSession();
       setIsAuthenticated(false);
       setUser(null);
       if (error?.status === 403 && error?.data?.extra_data?.reason === 'user_not_registered') {
@@ -276,7 +382,19 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(false);
   };
 
+  // Interruptor "Modo sin conexión (beta)" de la propia cuenta.
+  const setOfflineHabilitado = async (value) => {
+    const v = !!value;
+    await base44.auth.updateMe({ offline_habilitado: v });
+    setUser(prev => prev ? {
+      ...prev,
+      offline_habilitado: v,
+      ...(prev.data ? { data: { ...prev.data, offline_habilitado: v } } : {}),
+    } : prev);
+  };
+
   const logout = () => {
+    clearOfflineSession();
     setUser(null);
     setIsAuthenticated(false);
     base44.auth.logout(window.location.href);
@@ -336,7 +454,11 @@ export const AuthProvider = ({ children }) => {
       navigateToLogin,
       retryVinculation,
       checkAppState,
-      switchSector
+      switchSector,
+      offlineMode,
+      offlineSavedAt,
+      justReconnected,
+      setOfflineHabilitado
     }}>
       {children}
     </AuthContext.Provider>

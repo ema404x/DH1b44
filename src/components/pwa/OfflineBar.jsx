@@ -2,9 +2,34 @@ import React from 'react';
 import { WifiOff, RefreshCw, Download, CloudOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePWA } from '@/hooks/usePWA';
+import { format } from 'date-fns';
 
-export function OfflineBar({ isOnline, pendingCount, isSyncing, lastSynced, onSync, onInstall }) {
+export function OfflineBar({ isOnline, pendingCount, isSyncing, lastSynced, onSync, onInstall, offlineMode, offlineSavedAt, justReconnected }) {
   const { canInstall, triggerInstall } = usePWA();
+
+  // Modo sin conexión (beta): lectura de datos guardados
+  if (offlineMode) {
+    return (
+      <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-amber-500 text-white text-xs font-semibold py-2 px-4 shadow-lg">
+        <WifiOff className="h-3.5 w-3.5 flex-shrink-0" />
+        <span>
+          Sin conexión · mostrando datos guardados
+          {offlineSavedAt ? ` · Última sincronización: ${format(new Date(offlineSavedAt), 'dd/MM HH:mm')}` : ''}
+          {pendingCount > 0 && ` · ${pendingCount} OT${pendingCount !== 1 ? 's' : ''} en cola`}
+        </span>
+      </div>
+    );
+  }
+
+  // Recién reconectado desde el modo sin conexión
+  if (justReconnected) {
+    return (
+      <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-emerald-600 text-white text-xs font-semibold py-2 px-4 shadow-lg">
+        <RefreshCw className="h-3.5 w-3.5 flex-shrink-0 animate-spin" />
+        <span>Conectado · actualizando…</span>
+      </div>
+    );
+  }
 
   // Barra de offline
   if (!isOnline) {

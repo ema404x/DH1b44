@@ -23,11 +23,20 @@
  *   Esto elimina la CLASE de bug completa, no sólo el caso reportado.
  */
 
+import { readOfflineSession } from '@/lib/offlineSession';
+
 const DB_NAME = 'dh1-query-cache';
 const DB_VERSION = 3;  // v3: wipe poisoned entries (shape collision fix)
 const STORE = 'queries';
 const MAX_CACHE_AGE_MS = 1000 * 60 * 60 * 4;  // 4 horas máximo
 const MAX_ENTRIES = 40;                         // tope de entradas en storage
+// Modo sin conexión (beta): mientras exista una sesión offline válida en el
+// dispositivo, el caché se conserva 7 días (igual que la sesión). Sin esa
+// sesión (interruptor apagado) el límite sigue siendo 4 horas.
+const OFFLINE_CACHE_AGE_MS = 1000 * 60 * 60 * 24 * 7;
+function maxCacheAge() {
+  return readOfflineSession() ? OFFLINE_CACHE_AGE_MS : MAX_CACHE_AGE_MS;
+}
 
 // ── Shape canónico por clave ─────────────────────────────────────────────────
 // Cada clave declarada produce el shape indicado. La validación impide
@@ -122,7 +131,7 @@ export async function loadCacheEntry(queryKey) {
         const entry = req.result;
         if (!entry) return resolve(null);
         // Descartar entradas demasiado viejas
-        if (Date.now() - entry.savedAt > MAX_CACHE_AGE_MS) return resolve(null);
+        if (Date.now() - entry.savedAt > maxCacheAge()) return resolve(null);
         // Shape-safe: descartar si el shape no coincide con el declarado
         if (!validateShape(queryKey, entry.data)) return resolve(null);
         resolve(entry);
@@ -149,7 +158,7 @@ export async function pruneCacheDB() {
 
     if (allEntries.length === 0) return;
 
-    const cutoff = Date.now() - MAX_CACHE_AGE_MS;
+    const cutoff = Date.now() - maxCacheAge();
     const toDelete = new Set();
 
     for (const e of allEntries) {
@@ -181,8 +190,9 @@ export async function loadAllCacheEntries() {
     return await new Promise((resolve, reject) => {
       req.onsuccess = () => {
         const now = Date.now();
+        const maxAge = maxCacheAge();
         resolve((req.result || []).filter(e =>
-          now - e.savedAt < MAX_CACHE_AGE_MS &&
+          now - e.savedAt < maxAge &&
           validateShape(e.queryKey, e.data)
         ));
       };

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { LogOut, ChevronDown, UserCircle, Trash2, Bell } from 'lucide-react';
+import { LogOut, ChevronDown, UserCircle, Trash2, Bell, WifiOff } from 'lucide-react';
+import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
+import { isOfflineEnabled, clearOfflineSession } from '@/lib/offlineSession';
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction
@@ -13,8 +16,20 @@ export default function UserMenu() {
   const [open, setOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, offlineMode, setOfflineHabilitado } = useAuth();
   const { displayName } = useCurrentUser();
+  const [savingOffline, setSavingOffline] = useState(false);
+
+  const handleOfflineToggle = async (value) => {
+    setSavingOffline(true);
+    try {
+      await setOfflineHabilitado(value);
+    } catch {
+      toast.error('No se pudo cambiar el modo sin conexión');
+    } finally {
+      setSavingOffline(false);
+    }
+  };
 
   // Bug fix: guard para string vacío — n[0] de '' es undefined, causando '?' inesperado
   const initials = displayName?.trim()
@@ -57,6 +72,20 @@ export default function UserMenu() {
               <Bell className="h-4 w-4 text-muted-foreground" />
               Notificaciones Push
             </button>
+            {user?.role === 'admin' && (
+              <div
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground"
+                title={offlineMode ? 'Necesita conexión' : undefined}
+              >
+                <WifiOff className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1">Modo sin conexión (beta)</span>
+                <Switch
+                  checked={isOfflineEnabled(user)}
+                  disabled={savingOffline || offlineMode}
+                  onCheckedChange={handleOfflineToggle}
+                />
+              </div>
+            )}
             <button
               onClick={() => { setShowDeleteDialog(true); setOpen(false); }}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-left text-popover-foreground"
@@ -66,7 +95,7 @@ export default function UserMenu() {
             </button>
             <div className="mx-2 my-1 border-t border-border" />
             <button
-              onClick={() => { base44.auth.logout(); setOpen(false); }}
+              onClick={() => { clearOfflineSession(); base44.auth.logout(); setOpen(false); }}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-left text-popover-foreground"
             >
               <LogOut className="h-4 w-4 text-muted-foreground" />
@@ -87,7 +116,7 @@ export default function UserMenu() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => { base44.auth.logout(); setShowDeleteDialog(false); }}
+              onClick={() => { clearOfflineSession(); base44.auth.logout(); setShowDeleteDialog(false); }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Eliminar cuenta

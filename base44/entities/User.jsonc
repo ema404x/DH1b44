@@ -33,6 +33,11 @@
       "type": "string",
       "format": "date",
       "description": "Fecha local de Buenos Aires del \u00faltimo env\u00edo push semanal de OTs al usuario. Evita duplicados por fecha."
+    },
+    "offline_habilitado": {
+      "type": "boolean",
+      "default": false,
+      "description": "Modo sin conexi\u00f3n (beta). Si es true, el dispositivo guarda la sesi\u00f3n y los datos para leerlos sin red. Apagado por defecto: la app se comporta igual que siempre."
     }
   },
   "required": [],

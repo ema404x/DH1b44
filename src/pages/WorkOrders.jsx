@@ -37,6 +37,8 @@ import { isJefeSitioRole } from '@/lib/roles';
 import { esOtVencida } from '@/lib/otVencimiento';
 import { useWorkOrderRealtime } from '@/hooks/useWorkOrderRealtime';
 import WorkOrdersLoadState from '@/components/workorders/WorkOrdersLoadState';
+import OfflineGuard from '@/components/pwa/OfflineGuard';
+import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
 
 
 
@@ -70,6 +72,7 @@ export default function WorkOrders() {
     date_from: '', date_to: '', overdue_only: false,
   });
   const queryClient = useQueryClient();
+  const offlineMode = useOfflineMode();
   const navigate = useNavigate();
   const { currentUser, isAdmin, isSuperAdmin, employeeRole, employeeSector, loading } = useCurrentUser();
   const activeSector = currentUser?.data?.sector_id || employeeSector || currentUser?.sector_id || null;
@@ -158,6 +161,7 @@ export default function WorkOrders() {
     staleTime: 30 * 1000,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    ...offlineQueryOptions(offlineMode),
   });
 
   const orders = data?.orders || [];
@@ -165,7 +169,7 @@ export default function WorkOrders() {
 
   // ── Realtime: suscribe a eventos de WorkOrder y aplica al cache en vivo ──
   // Offline: no suscribe (el tablero queda en modo lectura con el snapshot).
-  useWorkOrderRealtime(ctx, isOnline && !loading, boardQueryKey);
+  useWorkOrderRealtime(ctx, isOnline && !offlineMode && !loading, boardQueryKey);
 
   // Direcciones — fuente canónica de jefes de sitio.
   // Se usa para resolver el jefe_sitio de OTs que no lo tienen poblado,
@@ -499,6 +503,9 @@ export default function WorkOrders() {
     show: { opacity: 1, transition: { staggerChildren: Math.min(0.05, 2 / Math.max(filtered.length, 1)) } }
   }), [filtered.length]);
 
+  // Modo sin conexión sin datos guardados en este dispositivo
+  if (offlineMode && !data) return <OfflineGuard />;
+
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 space-y-6">
@@ -658,7 +665,7 @@ export default function WorkOrders() {
               onOpen={setSelectedOrder}
               onShowQR={setQrOrder}
               onStatusChange={handleStatusChange}
-              readOnly={!isOnline}
+              readOnly={!isOnline || offlineMode}
             />
           )}
         </motion.div>
@@ -678,7 +685,7 @@ export default function WorkOrders() {
               onShowQR={setQrOrder}
               onComplete={handleComplete}
               onStart={handleStart}
-              canComplete={canCompleteOT && isOnline}
+              canComplete={canCompleteOT && isOnline && !offlineMode}
             />
           ))}
         </motion.div>

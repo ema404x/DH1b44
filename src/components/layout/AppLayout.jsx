@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import ChatbotSoporte from '@/components/soporte/ChatbotSoporte';
 import BugReportBubble from '@/components/shared/BugReportBubble';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useAuth } from '@/lib/AuthContext';
 import { useEmergencyNotifications } from '@/hooks/useEmergencyNotifications';
 import EmergencyAlert from '@/components/emergencias/EmergencyAlert';
 import { useSmartCache } from '@/hooks/useSmartCache';
@@ -42,6 +43,7 @@ export default function AppLayout() {
   const queryClient = useQueryClient();
   const { isOnline, pendingCount, isSyncing, syncPending } = useOfflineQueue(onSyncCallback);
   const { currentUser } = useCurrentUser();
+  const { offlineMode, offlineSavedAt, justReconnected } = useAuth();
   useAppUsageTracker(currentUser);
   const location = useLocation();
   const navigationType = useNavigationType();
@@ -93,13 +95,13 @@ export default function AppLayout() {
 
   // Clase del contenido principal — memoizada para evitar string recalc en cada render
   const mainPaddingClass = useMemo(
-    () => !isOnline || isSyncing || pendingCount > 0 ? 'pt-8' : '',
-    [isOnline, isSyncing, pendingCount]
+    () => !isOnline || isSyncing || pendingCount > 0 || offlineMode || justReconnected ? 'pt-8' : '',
+    [isOnline, isSyncing, pendingCount, offlineMode, justReconnected]
   );
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0f1e34 55%, #091422 100%)' }}>
-      <OfflineBar isOnline={isOnline} pendingCount={pendingCount} isSyncing={isSyncing} onSync={syncPending} />
+      <OfflineBar isOnline={isOnline} pendingCount={pendingCount} isSyncing={isSyncing} onSync={syncPending} offlineMode={offlineMode} offlineSavedAt={offlineSavedAt} justReconnected={justReconnected} />
       <Sidebar open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
       <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${mainPaddingClass}`}>
         <MobileHeader />
