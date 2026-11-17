@@ -8,6 +8,8 @@ const FILAS = [
   ['DNI', 'Identificar a la persona que registra un fichaje.'],
   ['Firma dibujada', 'Confirmar el registro de un fichaje.'],
   ['Fotos', 'Documentar el estado de los trabajos realizados en las OT. Solo se toman cuando el usuario las saca o adjunta.'],
+  ['Grabaciones de voz', 'Dictar por voz descripciones y observaciones de las OT, que se transcriben a texto. Solo se graba cuando el usuario activa el dictado.'],
+  ['Mensajes y adjuntos del foro', 'Comunicarse dentro de la plataforma entre los usuarios de la Organización (por ejemplo, consultas y avisos sobre trabajos).'],
 ];
 
 export default function TablaDatos() {

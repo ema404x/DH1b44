@@ -13,7 +13,7 @@ export default function Privacidad() {
         <article className="bg-card border border-border rounded-xl p-5 sm:p-8 space-y-4 text-[15px] leading-relaxed">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Política de Privacidad de DH1</h1>
 
-          <p><B>Última actualización:</B> 12 de noviembre de 2026</p>
+          <p><B>Última actualización:</B> 17 de noviembre de 2026</p>
 
           <p>
             Esta Política de Privacidad explica cómo <B>DH1 Software</B>, proyecto a cargo de <B>Andres Emanuel Benitez</B>, de Argentina (en adelante, "DH1 Software" o "nosotros"), trata los datos personales de las personas que usan la aplicación <B>DH1</B> y la plataforma web <B>dh1m.com</B> (en adelante, "DH1").
@@ -25,14 +25,14 @@ export default function Privacidad() {
           <H2>1. Datos que recopilamos</H2>
           <TablaDatos />
           <p>
-            DH1 <B>no</B> recopila datos financieros, de salud, contactos, mensajes privados ni el historial de navegación, y <B>no</B> muestra publicidad.
+            DH1 <B>no</B> recopila datos financieros, de salud, contactos ni el historial de navegación, y <B>no</B> muestra publicidad.
           </p>
 
           <H2>2. Para qué usamos los datos</H2>
           <p>Usamos los datos únicamente para el funcionamiento de DH1:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li>gestionar y asignar órdenes de trabajo;</li>
-            <li>registrar el avance y el resultado de cada trabajo;</li>
+            <li>registrar el avance y el resultado de cada trabajo, incluidas las descripciones dictadas por voz;</li>
             <li>registrar fichajes de entrada y salida;</li>
             <li>administrar las cuentas de los usuarios;</li>
             <li>mantener la seguridad de la plataforma.</li>
