@@ -55,6 +55,42 @@ export const AuthProvider = ({ children }) => {
     scheduleOfflinePreload({ user, userPermissions });
   }, [user, userPermissions, hasEmployeeRecord, isLoadingAuth, isAuthenticated, offlineMode]);
 
+  // Entrada al modo sin conexión con la app YA abierta (solo offline_habilitado
+  // true y con sesión guardada válida): (a) evento offline del navegador, o
+  // (b) dos consultas seguidas fallan por error de red real en menos de 60 s.
+  // No toca la sesión ni el usuario, no recarga ni redirige.
+  const offlineEnabled = isOfflineEnabled(user);
+  useEffect(() => {
+    if (isLoadingAuth || offlineMode || !isAuthenticated || !offlineEnabled) return;
+    const enterOffline = () => {
+      const saved = readOfflineSession();
+      if (!saved) return;
+      setQueriesOffline(true);
+      setOfflineSavedAt(saved.savedAt);
+      setOfflineMode(true);
+    };
+    let lastFailAt = 0;
+    const unsubscribe = queryClientInstance.getQueryCache().subscribe((event) => {
+      if (event.type !== 'updated') return;
+      const action = event.action;
+      // Una respuesta real del servidor corta la racha de fallos.
+      if (action?.type === 'success' && !action.manual) { lastFailAt = 0; return; }
+      if (action?.type !== 'error') return;
+      const err = action.error;
+      // Un TypeError que no viene de la red (error de código) no cuenta.
+      const codeError = err instanceof TypeError && !/fetch|network|load failed/i.test(err.message || '');
+      if (codeError || !isNetworkError(err)) { lastFailAt = 0; return; }
+      const now = Date.now();
+      if (lastFailAt && now - lastFailAt < 60000) enterOffline();
+      else lastFailAt = now;
+    });
+    window.addEventListener('offline', enterOffline);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('offline', enterOffline);
+    };
+  }, [isLoadingAuth, offlineMode, isAuthenticated, offlineEnabled]);
+
   // Salida del modo sin conexión: al volver la red (evento online) o cada 30 s
   // se consulta la sesión en silencio. Un solo intervalo, sin recargar la página.
   useEffect(() => {
@@ -74,6 +110,9 @@ export const AuthProvider = ({ children }) => {
         setOfflineMode(false);
         setJustReconnected(true);
         queryClientInstance.invalidateQueries();
+        // Si el navegador nunca se declaró sin red, no hubo evento online real:
+        // se avisa a las colas offline existentes para que sincronicen ahora.
+        if (navigator.onLine !== false) window.dispatchEvent(new Event('online'));
       } catch (error) {
         if (cancelled) return;
         // 401/403: flujo normal de login. Cualquier otro error: seguimos sin conexión.

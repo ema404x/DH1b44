@@ -185,7 +185,7 @@ export default function PortalOperarioApp() {
     } else {
       extraData.gps_status = gps.gps_status;
     }
-    if (!isOnline) {
+    if (!isOnline || offlineMode) {
       // Offline: encolar la transición y aplicar el cambio al cache (UX inmediata).
       // El GPS se captura igual (offline); solo falla el envío al servidor.
       const optimistic = {
@@ -216,7 +216,7 @@ export default function PortalOperarioApp() {
   };
 
   const handleReporteSaved = async (ot, reporteData) => {
-    if (!isOnline) {
+    if (!isOnline || offlineMode) {
       // Offline: encolar el reporte y marcar la OT como enviada a validación.
       const optimistic = {
         ...ot,
@@ -590,7 +590,7 @@ export default function PortalOperarioApp() {
           }}
           onCancel={() => setConfirmAction(null)}
           processing={processing === confirmAction.ot.id}
-          offline={!isOnline}
+          offline={!isOnline || offlineMode}
         />
       )}
 

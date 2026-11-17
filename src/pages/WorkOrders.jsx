@@ -243,7 +243,7 @@ export default function WorkOrders() {
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      if (isOnline) return await base44.entities.WorkOrder.create(data);
+      if (isOnline && !offlineMode) return await base44.entities.WorkOrder.create(data);
       // Offline: encola en IndexedDB y devuelve la OT local (con _offline).
       return await queueCreate(data);
     },
