@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { LogOut, ChevronDown, UserCircle, Trash2, Bell, WifiOff, Gauge, Zap } from 'lucide-react';
+import { LogOut, ChevronDown, UserCircle, Trash2, Bell, WifiOff, Gauge, Zap, Rocket } from 'lucide-react';
+import { tieneArranqueRapido } from '@/lib/arranqueRapido';
+import { useArranqueVerificacion } from '@/hooks/useArranqueVerificacion';
+import ArranqueRapidoEstado from '@/components/layout/ArranqueRapidoEstado';
+import ArranqueRapidoDiferencias from '@/components/layout/ArranqueRapidoDiferencias';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { isOfflineEnabled, clearOfflineSession } from '@/lib/offlineSession';
@@ -17,7 +21,20 @@ export default function UserMenu() {
   const [open, setOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const navigate = useNavigate();
-  const { user, offlineMode, setOfflineHabilitado, setPanelRapido, setOrdenesRapidas } = useAuth();
+  const { user, offlineMode, setOfflineHabilitado, setPanelRapido, setOrdenesRapidas, setArranqueRapido } = useAuth();
+  const verificacionArranque = useArranqueVerificacion();
+  const [showArranqueDifs, setShowArranqueDifs] = useState(false);
+  const [savingArranque, setSavingArranque] = useState(false);
+  const handleArranqueRapidoToggle = async (value) => {
+    setSavingArranque(true);
+    try {
+      await setArranqueRapido(value);
+    } catch {
+      toast.error('No se pudo cambiar el Arranque rápido');
+    } finally {
+      setSavingArranque(false);
+    }
+  };
   const [savingOrdenes, setSavingOrdenes] = useState(false);
   const handleOrdenesRapidasToggle = async (value) => {
     setSavingOrdenes(true);
@@ -142,6 +159,24 @@ export default function UserMenu() {
                 />
               </div>
             )}
+            {user?.role === 'admin' && (
+              <div
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground"
+                title={offlineMode ? 'Necesita conexión' : undefined}
+              >
+                <Rocket className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1">Arranque rápido (beta)</span>
+                <Switch
+                  checked={tieneArranqueRapido(user)}
+                  disabled={savingArranque || offlineMode}
+                  onCheckedChange={handleArranqueRapidoToggle}
+                />
+              </div>
+            )}
+            <ArranqueRapidoEstado
+              verificacion={verificacionArranque}
+              onVer={() => { setShowArranqueDifs(true); setOpen(false); }}
+            />
             <button
               onClick={() => { setShowDeleteDialog(true); setOpen(false); }}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-left text-popover-foreground"
@@ -164,6 +199,12 @@ export default function UserMenu() {
           </div>
         </>
       )}
+
+      <ArranqueRapidoDiferencias
+        open={showArranqueDifs}
+        onOpenChange={setShowArranqueDifs}
+        diferencias={verificacionArranque?.diferencias}
+      />
 
       <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
         <AlertDialogContent>

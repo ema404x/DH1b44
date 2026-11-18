@@ -6,6 +6,10 @@ import {
   isOfflineEnabled, saveOfflineSession, readOfflineSession, clearOfflineSession, isNetworkError,
 } from '@/lib/offlineSession';
 import { scheduleOfflinePreload } from '@/lib/offlinePreload';
+import {
+  tieneArranqueRapido, usaRapido, compartirMe, obtenerVinculo, borrarVinculo,
+  precargarEmpleados, limpiarArranqueRapido,
+} from '@/lib/arranqueRapido';
 
 export const AuthContext = createContext();
 
@@ -176,6 +180,8 @@ export const AuthProvider = ({ children }) => {
       setIsSlowConnection(false);
       setUser(currentUser);
       setIsAuthenticated(true);
+      // Arranque rápido (beta): la respuesta queda compartida para el resto.
+      if (tieneArranqueRapido(currentUser)) compartirMe(currentUser);
 
       // Pre-fetch silencioso en idle — no compite con el primer render
       const schedulePrefetch = (key, fetcher) => {
@@ -195,11 +201,13 @@ export const AuthProvider = ({ children }) => {
           setTimeout(run, 2500);
         }
       };
-      schedulePrefetch('employees',  () => base44.entities.Employee.list('-updated_date', 200));
+      schedulePrefetch('employees', usaRapido(currentUser, 'empleados')
+        ? precargarEmpleados
+        : () => base44.entities.Employee.list('-updated_date', 200));
       schedulePrefetch('pendientes', () => base44.entities.Pendiente.list('-updated_date', 300));
 
       // Vincular ficha de empleado y cargar permisos reales según su rol
-      await linkEmployee(currentUser);
+      await linkEmployee(currentUser, true);
     } catch (error) {
       if (!owner) {
         // Otro intento ya resolvió o sigue en curso: este fallo no decide nada.
@@ -248,7 +256,9 @@ export const AuthProvider = ({ children }) => {
   //   1) SDK directo (Employee + RolePermission) — más rápido
   //   2) Backend function vincularEmpleado (service role, bypassa RLS)
   //   3) Acceso mínimo al Dashboard — NUNCA bloquear a un usuario autenticado
-  const linkEmployee = async (currentUser) => {
+  // usarGuardado: solo en la carga inicial. Con Arranque rápido encendido
+  // permite pintar con el resultado guardado de esta sesión.
+  const linkEmployee = async (currentUser, usarGuardado = false) => {
     // Los admins siempre tienen acceso total a todos los módulos.
     // PERO necesitan cargar su ficha de empleado (firma_url, nombre, sector)
     // para que los modales de firma funcionen correctamente. Sin esto,
@@ -256,7 +266,7 @@ export const AuthProvider = ({ children }) => {
     // fallar por RLS (Employee.read exige sector_id match, que puede estar
     // stale si nunca se sincronizó).
     if (currentUser?.role === 'admin') {
-      await loadAdminEmployeeMetadata(currentUser);
+      await loadAdminEmployeeMetadata(currentUser, usarGuardado);
       return;
     }
 
@@ -299,9 +309,13 @@ export const AuthProvider = ({ children }) => {
 
   // Carga metadata del empleado para admins via backend function (bypassa RLS).
   // NO aplica restricciones de RolePermission — los admins tienen acceso total.
-  const loadAdminEmployeeMetadata = async (currentUser) => {
+  const loadAdminEmployeeMetadata = async (currentUser, usarGuardado = false) => {
     try {
-      const result = await base44.functions.invoke('vincularEmpleado', {});
+      // Arranque rápido (beta): una llamada real por sesión; en las siguientes
+      // cargas se usa el resultado guardado. Apagado: la llamada de siempre.
+      const result = usarGuardado && usaRapido(currentUser, 'vinculo')
+        ? { data: await obtenerVinculo(currentUser.id) }
+        : await base44.functions.invoke('vincularEmpleado', {});
       const data = result?.data || result;
       if (data?.linked && data.fallback !== true) {
         setHasEmployeeRecord(true);
@@ -454,6 +468,23 @@ export const AuthProvider = ({ children }) => {
     } : prev);
   };
 
+  // Interruptor "Arranque rápido (beta)" de la propia cuenta.
+  const setArranqueRapido = async (value) => {
+    const v = !!value;
+    await base44.auth.updateMe({ arranque_rapido: v });
+    limpiarArranqueRapido();
+    setUser(prev => prev ? {
+      ...prev,
+      arranque_rapido: v,
+      ...(prev.data ? { data: { ...prev.data, arranque_rapido: v } } : {}),
+    } : prev);
+  };
+
+  // Vuelve a pedir la vinculación por el camino de siempre, sin pantalla de carga.
+  const refrescarVinculo = async () => {
+    if (user) await linkEmployee(user);
+  };
+
   const logout = () => {
     clearOfflineSession();
     setUser(null);
@@ -474,6 +505,7 @@ export const AuthProvider = ({ children }) => {
       const res = await base44.functions.invoke('cambiarSectorActivo', { sector_destino: sectorId });
       const data = res?.data || res;
       if (!data?.ok) throw new Error(data?.error || 'No se pudo cambiar de sector');
+      borrarVinculo();
       const nuevoSector = data.sector_activo || sectorId;
       const nuevoBase = data.sector_base || null;
       setUser(prev => ({
@@ -521,7 +553,9 @@ export const AuthProvider = ({ children }) => {
       justReconnected,
       setOfflineHabilitado,
       setPanelRapido,
-      setOrdenesRapidas
+      setOrdenesRapidas,
+      setArranqueRapido,
+      refrescarVinculo
     }}>
       {children}
     </AuthContext.Provider>

@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { ChevronDown, Building2, Check, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
+import { useUsaRapido, obtenerSectores } from '@/lib/arranqueRapido';
 
 export default function SectorSwitcher() {
   const { canSwitchSector, currentUser, employeeSector } = useCurrentUser();
@@ -20,12 +21,14 @@ export default function SectorSwitcher() {
   const currentSectorId = currentUser?.data?.sector_id || currentUser?.sector_id || employeeSector || 'escuela';
   const sectorBase = currentUser?.data?.sector_base || currentUser?.sector_base || null;
 
+  // Arranque rápido (beta): una sola consulta de sectores compartida.
+  const rapido = useUsaRapido(currentUser, 'sectores');
   useEffect(() => {
     if (!canSwitchSector) return;
-    base44.entities.Sector.list('orden', 100)
+    (rapido ? obtenerSectores() : base44.entities.Sector.list('orden', 100))
       .then(setSectores)
       .catch(() => {});
-  }, [canSwitchSector]);
+  }, [canSwitchSector, rapido]);
 
   useEffect(() => {
     if (!open) return;
