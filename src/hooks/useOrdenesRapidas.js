@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, QueryObserver } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { saveCacheEntry } from '@/lib/persistCache';
 import { fusionar, compararOrdenes } from '@/lib/ordenesRapidas';
+import { useTurnoVerificacion, tomarTurnoHoy, reportarDiferencias } from '@/lib/optimizaciones';
 
 // Clave PROPIA: no comparte caché (ni en memoria ni guardado) con el tablero
 // de siempre ('workorders-board').
@@ -57,8 +58,10 @@ async function cargar(previo) {
  * los cambios. Si además esAdmin, una vez por sesión pide el tablero de
  * siempre y compara; con diferencias, `usarViejo` pasa a true.
  */
-export function useOrdenesRapidas({ activo, userId, sector, employeeRole, esAdmin, legacyKey }) {
+export function useOrdenesRapidas({ activo, userId, sector, employeeRole, esAdmin, legacyKey, usuario }) {
   const queryClient = useQueryClient();
+  // Resto de los usuarios: la misma verificación, silenciosa, una vez por día.
+  const turno = useTurnoVerificacion(userId, 'ordenes', activo && !esAdmin);
   const queryKey = useMemo(() => [CLAVE, userId, sector, employeeRole], [userId, sector, employeeRole]);
 
   const esMio = (d) =>
@@ -105,7 +108,7 @@ export function useOrdenesRapidas({ activo, userId, sector, employeeRole, esAdmi
   }, [activo, queryClient, queryKey]);
 
   // Verificación (solo admin): una vez por sesión.
-  const listo = activo && esAdmin && !!query.data && query.isFetchedAfterMount && !query.isFetching;
+  const listo = activo && (esAdmin || turno) && !!query.data && query.isFetchedAfterMount && !query.isFetching;
   const verifQ = useQuery({
     queryKey: ['ordenes-rapidas-verificacion', userId, sector, employeeRole],
     enabled: listo,
@@ -116,11 +119,14 @@ export function useOrdenesRapidas({ activo, userId, sector, employeeRole, esAdmi
     refetchOnReconnect: false,
     refetchOnMount: false,
     queryFn: async () => {
+      if (!esAdmin && !tomarTurnoHoy(userId, 'ordenes')) return { diferencias: [] };
       try {
         const viejo = await queryClient.fetchQuery({ queryKey: legacyKey, queryFn: pedirTableroClasico, staleTime: 0 });
         await queryClient.refetchQueries({ queryKey, exact: true });
         const nuevo = queryClient.getQueryData(queryKey);
-        return { diferencias: compararOrdenes(viejo, nuevo) };
+        const diferencias = compararOrdenes(viejo, nuevo);
+        if (!esAdmin) reportarDiferencias(usuario, 'ordenes', diferencias);
+        return { diferencias };
       } catch {
         return { error: true, diferencias: [] };
       }

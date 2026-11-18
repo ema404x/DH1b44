@@ -40,6 +40,7 @@ import WorkOrdersLoadState from '@/components/workorders/WorkOrdersLoadState';
 import OfflineGuard from '@/components/pwa/OfflineGuard';
 import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
 import { useOrdenesRapidas } from '@/hooks/useOrdenesRapidas';
+import { mejoraActiva, datosUsuario } from '@/lib/optimizaciones';
 import OrdenesRapidasEstado from '@/components/workorders/OrdenesRapidasEstado';
 import DetalleOTCompleta from '@/components/workorders/DetalleOTCompleta';
 
@@ -83,7 +84,8 @@ export default function WorkOrders() {
   // Órdenes rápidas (beta): interruptor por usuario (ordenes_rapidas). Apagado
   // (o en modo sin conexión), usarRapidas es false y todo queda como siempre.
   // Encendido, la lista sale de getWorkOrdersBoard con clave de consulta propia.
-  const ordenesRapidasPref = (currentUser?.ordenes_rapidas === true || currentUser?.data?.ordenes_rapidas === true) && !offlineMode;
+  // Quién lo tiene activo se decide en src/lib/optimizaciones.js.
+  const ordenesRapidasPref = mejoraActiva(currentUser, 'ordenes') && !offlineMode;
   const rapidas = useOrdenesRapidas({
     activo: ordenesRapidasPref && !loading && !!currentUser?.id,
     userId: currentUser?.id || null,
@@ -91,6 +93,7 @@ export default function WorkOrders() {
     employeeRole,
     esAdmin: currentUser?.role === 'admin',
     legacyKey: legacyBoardKey,
+    usuario: datosUsuario(currentUser, employeeRole, activeSector),
   });
   const usarRapidas = ordenesRapidasPref && !rapidas.usarViejo;
   const boardQueryKey = usarRapidas ? rapidas.queryKey : legacyBoardKey;

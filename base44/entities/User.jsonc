@@ -53,6 +53,11 @@
       "type": "boolean",
       "default": false,
       "description": "Arranque r\u00e1pido (beta). Si es true, al abrir la app se comparten las consultas repetidas (usuario, sectores, empleados), la vinculaci\u00f3n de empleado y el registro push se hacen una vez por sesi\u00f3n, y la insignia de aprobaciones usa contarSolicitudesPendientes. Apagado por defecto: el arranque se comporta igual que siempre."
+    },
+    "optimizaciones_desactivadas": {
+      "type": "boolean",
+      "default": false,
+      "description": "Apaga Panel r\u00e1pido, \u00d3rdenes r\u00e1pidas y Arranque r\u00e1pido para esta persona puntual, aunque est\u00e9n activados para todos (OPTIMIZACIONES_PARA_TODOS en src/lib/optimizaciones.js) o tenga su interruptor individual encendido."
     }
   },
   "required": [],

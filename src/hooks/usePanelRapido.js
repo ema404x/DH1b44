@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { base44 } from '@/api/base44Client';
 import { fetchAllList } from '@/lib/fetchAllList';
 import { calcularResumenLegacy, compararResumenes } from '@/lib/panelRapidoLegacy';
+import { useTurnoVerificacion, tomarTurnoHoy, reportarDiferencias } from '@/lib/optimizaciones';
 
 const STALE_3MIN = 3 * 60 * 1000;
 const STALE_5MIN = 5 * 60 * 1000;
@@ -15,8 +16,10 @@ const STALE_5MIN = 5 * 60 * 1000;
  * completos de siempre, calcula el resumen "como hoy" y lo compara valor por
  * valor. Si algo difiere, `resumen` pasa a ser el del cálculo de siempre.
  */
-export function usePanelRapido({ activo, scope, filters, esAdmin }) {
+export function usePanelRapido({ activo, scope, filters, esAdmin, usuario }) {
   const queryClient = useQueryClient();
+  // Resto de los usuarios: la misma verificación, silenciosa, una vez por día.
+  const turno = useTurnoVerificacion(usuario?.id, 'panel', activo && !esAdmin);
   const { dateRange, jefeSitio, priority } = filters;
   const filtroKey = [scope ?? 'all', dateRange, jefeSitio, priority];
   const resumenKey = ['dashboard-summary', ...filtroKey];
@@ -55,13 +58,14 @@ export function usePanelRapido({ activo, scope, filters, esAdmin }) {
     placeholderData: keepPreviousData,
   });
 
-  const resumenListo = activo && esAdmin && !!resumenQ.data
+  const resumenListo = activo && (esAdmin || turno) && !!resumenQ.data
     && !resumenQ.isPlaceholderData && !resumenQ.isFetching;
 
   // Verificación: una vez por sesión y por filtro.
   const verifQ = useQuery({
     queryKey: ['panel-rapido-verificacion', ...filtroKey],
     queryFn: async () => {
+      if (!esAdmin && !tomarTurnoHoy(usuario?.id, 'panel')) return { diferencias: [] };
       const nuevo = queryClient.getQueryData(resumenKey);
       const [dash, direcciones, certs] = await Promise.all([
         queryClient.fetchQuery({ ...dashQuery, staleTime: 30000 }),
@@ -69,7 +73,9 @@ export function usePanelRapido({ activo, scope, filters, esAdmin }) {
         queryClient.fetchQuery({ ...certsQuery, staleTime: 30000 }),
       ]);
       const viejo = calcularResumenLegacy({ dash, direcciones, certs }, { dateRange, jefeSitio, priority }, nuevo.nowMs);
-      return { diferencias: compararResumenes(viejo, nuevo) };
+      const diferencias = compararResumenes(viejo, nuevo);
+      if (!esAdmin) reportarDiferencias(usuario, 'panel', diferencias, filtroKey.join(' · '));
+      return { diferencias };
     },
     enabled: resumenListo,
     staleTime: Infinity,
