@@ -39,6 +39,9 @@ import { useWorkOrderRealtime } from '@/hooks/useWorkOrderRealtime';
 import WorkOrdersLoadState from '@/components/workorders/WorkOrdersLoadState';
 import OfflineGuard from '@/components/pwa/OfflineGuard';
 import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
+import { useOrdenesRapidas } from '@/hooks/useOrdenesRapidas';
+import OrdenesRapidasEstado from '@/components/workorders/OrdenesRapidasEstado';
+import DetalleOTCompleta from '@/components/workorders/DetalleOTCompleta';
 
 
 
@@ -76,7 +79,21 @@ export default function WorkOrders() {
   const navigate = useNavigate();
   const { currentUser, isAdmin, isSuperAdmin, employeeRole, employeeSector, loading } = useCurrentUser();
   const activeSector = currentUser?.data?.sector_id || employeeSector || currentUser?.sector_id || null;
-  const boardQueryKey = useMemo(() => ['workorders-board', currentUser?.id || null, activeSector, employeeRole], [currentUser?.id, activeSector, employeeRole]);
+  const legacyBoardKey = useMemo(() => ['workorders-board', currentUser?.id || null, activeSector, employeeRole], [currentUser?.id, activeSector, employeeRole]);
+  // Órdenes rápidas (beta): interruptor por usuario (ordenes_rapidas). Apagado
+  // (o en modo sin conexión), usarRapidas es false y todo queda como siempre.
+  // Encendido, la lista sale de getWorkOrdersBoard con clave de consulta propia.
+  const ordenesRapidasPref = (currentUser?.ordenes_rapidas === true || currentUser?.data?.ordenes_rapidas === true) && !offlineMode;
+  const rapidas = useOrdenesRapidas({
+    activo: ordenesRapidasPref && !loading && !!currentUser?.id,
+    userId: currentUser?.id || null,
+    sector: activeSector,
+    employeeRole,
+    esAdmin: currentUser?.role === 'admin',
+    legacyKey: legacyBoardKey,
+  });
+  const usarRapidas = ordenesRapidasPref && !rapidas.usarViejo;
+  const boardQueryKey = usarRapidas ? rapidas.queryKey : legacyBoardKey;
   const isGerente = isAdmin || currentUser?.role === 'gerente';
   const isJefeSitio = isJefeSitioRole(employeeRole);
   const canCompleteOT = isGerente || isJefeSitio;
@@ -132,9 +149,9 @@ export default function WorkOrders() {
     queryClient.invalidateQueries({ queryKey: ['workorders-board'] });
   });
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: boardQueryKey,
-    enabled: !loading && !!currentUser?.id,
+  const legacyQuery = useQuery({
+    queryKey: legacyBoardKey,
+    enabled: !usarRapidas && !loading && !!currentUser?.id,
     initialData: () => {
       const saved = queryClient.getQueryData(['workorders-board']);
       // Reusar el respaldo offline solo si pertenece al mismo usuario y sector.
@@ -163,6 +180,7 @@ export default function WorkOrders() {
     refetchOnWindowFocus: true,
     ...offlineQueryOptions(offlineMode),
   });
+  const { data, isLoading, isError, error, refetch } = usarRapidas ? rapidas.query : legacyQuery;
 
   const orders = data?.orders || [];
   const ctx = data?.ctx || null;
@@ -603,6 +621,8 @@ export default function WorkOrders() {
         </motion.div>
       </motion.div>
 
+      {ordenesRapidasPref && <OrdenesRapidasEstado verificacion={rapidas.verificacion} />}
+
       {/* Filtros Avanzados (gerentes) */}
       {isGerente && showAdvanced && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
@@ -720,6 +740,18 @@ export default function WorkOrders() {
       <HistorialEstablecimiento open={historialOpen} onOpenChange={setHistorialOpen} onOpenOrder={setSelectedOrder} />
 
       {selectedOrder && (() => {
+        // Órdenes rápidas: la lista no trae la OT completa → se pide por id
+        // antes de abrir el detalle. (Una OT local sin sincronizar ya es completa.)
+        if (usarRapidas && !selectedOrder._offline) {
+          return (
+            <DetalleOTCompleta
+              key={selectedOrder.id}
+              orderId={selectedOrder.id}
+              onClose={() => setSelectedOrder(null)}
+              onDelete={canDelete ? deleteMutation.mutate : undefined}
+            />
+          );
+        }
         // Siempre pasar el objeto más fresco del cache — si la query se actualizó, el panel lo recibe
         const freshOrder = orders.find(o => o.id === selectedOrder.id) || selectedOrder;
         return (
