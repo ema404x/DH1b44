@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { LogOut, ChevronDown, UserCircle, Trash2, Bell, WifiOff } from 'lucide-react';
+import { LogOut, ChevronDown, UserCircle, Trash2, Bell, WifiOff, Gauge } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { isOfflineEnabled, clearOfflineSession } from '@/lib/offlineSession';
@@ -17,7 +17,18 @@ export default function UserMenu() {
   const [open, setOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const navigate = useNavigate();
-  const { user, offlineMode, setOfflineHabilitado } = useAuth();
+  const { user, offlineMode, setOfflineHabilitado, setPanelRapido } = useAuth();
+  const [savingPanel, setSavingPanel] = useState(false);
+  const handlePanelRapidoToggle = async (value) => {
+    setSavingPanel(true);
+    try {
+      await setPanelRapido(value);
+    } catch {
+      toast.error('No se pudo cambiar el Panel rápido');
+    } finally {
+      setSavingPanel(false);
+    }
+  };
   const { displayName } = useCurrentUser();
   const [savingOffline, setSavingOffline] = useState(false);
   // Con offline_habilitado: avisar antes de cerrar sesión si hay cambios sin enviar.
@@ -89,6 +100,20 @@ export default function UserMenu() {
                   checked={isOfflineEnabled(user)}
                   disabled={savingOffline || offlineMode}
                   onCheckedChange={handleOfflineToggle}
+                />
+              </div>
+            )}
+            {user?.role === 'admin' && (
+              <div
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground"
+                title={offlineMode ? 'Necesita conexión' : undefined}
+              >
+                <Gauge className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1">Panel rápido (beta)</span>
+                <Switch
+                  checked={user?.panel_rapido === true || user?.data?.panel_rapido === true}
+                  disabled={savingPanel || offlineMode}
+                  onCheckedChange={handlePanelRapidoToggle}
                 />
               </div>
             )}

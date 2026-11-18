@@ -38,6 +38,11 @@
       "type": "boolean",
       "default": false,
       "description": "Modo sin conexi\u00f3n (beta). Si es true, el dispositivo guarda la sesi\u00f3n y los datos para leerlos sin red. Apagado por defecto: la app se comporta igual que siempre."
+    },
+    "panel_rapido": {
+      "type": "boolean",
+      "default": false,
+      "description": "Panel r\u00e1pido (beta). Si es true, el Dashboard pide un resumen ya calculado en el servidor (getDashboardSummary) en lugar de las listas completas. Apagado por defecto: el Dashboard se comporta igual que siempre."
     }
   },
   "required": [],

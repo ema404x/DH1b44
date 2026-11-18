@@ -2,7 +2,8 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-export default function RevenueChart({ invoices }) {
+// resumen (Panel rápido): [{ key, facturado, cobrado }] de los últimos 6 meses.
+export default function RevenueChart({ invoices, resumen }) {
   const monthlyData = React.useMemo(() => {
     const months = {};
     const now = new Date();
@@ -10,6 +11,11 @@ export default function RevenueChart({ invoices }) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       months[key] = { month: d.toLocaleString('es', { month: 'short' }), facturado: 0, cobrado: 0 };
+    }
+    if (resumen) {
+      return Object.values(months).map((m, i) => ({
+        ...m, facturado: resumen[i]?.facturado ?? 0, cobrado: resumen[i]?.cobrado ?? 0,
+      }));
     }
     invoices.forEach((inv) => {
       const d = inv.issue_date || inv.created_date;
@@ -21,7 +27,7 @@ export default function RevenueChart({ invoices }) {
       }
     });
     return Object.values(months);
-  }, [invoices]);
+  }, [invoices, resumen]);
 
   return (
     <Card>

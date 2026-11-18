@@ -7,7 +7,9 @@ import {
 import { Activity } from 'lucide-react';
 import { startOfMonth, parseISO, isPast } from 'date-fns';
 
-export default function MetricasOperacion({ orders, projects, materials, assets, employees }) {
+// resumen (Panel rápido): { eficiencia, urgentes, vencidas, proyActivos,
+// empActivos, radar[6], porMes[6] } ya calculado en el servidor.
+export default function MetricasOperacion({ orders, projects, materials, assets, employees, resumen }) {
   const thisMonth = startOfMonth(new Date());
 
   const totalOrders = orders.length;
@@ -55,12 +57,24 @@ export default function MetricasOperacion({ orders, projects, materials, assets,
     return Object.values(meses);
   }, [orders]);
 
+  // v: valores a mostrar. Sin resumen son exactamente los calculados arriba.
+  const v = resumen
+    ? {
+        eficiencia: resumen.eficiencia, urgentes: resumen.urgentes, vencidas: resumen.vencidas,
+        proyActivos: resumen.proyActivos, empActivos: resumen.empActivos,
+        radar: radarData.map((d, i) => ({ ...d, value: resumen.radar?.[i] ?? 0 })),
+        porMes: completadasPorMes.map((m, i) => ({
+          ...m, completadas: resumen.porMes?.[i]?.completadas ?? 0, creadas: resumen.porMes?.[i]?.creadas ?? 0,
+        })),
+      }
+    : { eficiencia, urgentes, vencidas, proyActivos, empActivos, radar: radarData, porMes: completadasPorMes };
+
   const kpis = [
-    { label: 'Eficiencia',    value: `${eficiencia}%`,     color: eficiencia >= 70 ? '#10B981' : '#F59E0B' },
-    { label: 'Urgentes',      value: urgentes,              color: urgentes === 0 ? '#10B981' : '#EF4444' },
-    { label: 'Vencidas',      value: vencidas,              color: vencidas === 0 ? '#10B981' : '#EF4444' },
-    { label: 'Proyectos',     value: proyActivos,           color: '#3B82F6' },
-    { label: 'Técnicos',      value: empActivos,            color: '#6366F1' },
+    { label: 'Eficiencia',    value: `${v.eficiencia}%`,     color: v.eficiencia >= 70 ? '#10B981' : '#F59E0B' },
+    { label: 'Urgentes',      value: v.urgentes,              color: v.urgentes === 0 ? '#10B981' : '#EF4444' },
+    { label: 'Vencidas',      value: v.vencidas,              color: v.vencidas === 0 ? '#10B981' : '#EF4444' },
+    { label: 'Proyectos',     value: v.proyActivos,           color: '#3B82F6' },
+    { label: 'Técnicos',      value: v.empActivos,            color: '#6366F1' },
   ];
 
   return (
@@ -89,7 +103,7 @@ export default function MetricasOperacion({ orders, projects, materials, assets,
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Salud Operativa</p>
             <div className="hidden md:block h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={radarData} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
+                <RadarChart data={v.radar} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
                   <PolarGrid stroke="hsl(var(--border))" />
                   <PolarAngleAxis dataKey="metric" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} />
                   <Radar dataKey="value" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.2} strokeWidth={2} />
@@ -97,7 +111,7 @@ export default function MetricasOperacion({ orders, projects, materials, assets,
               </ResponsiveContainer>
             </div>
             <div className="md:hidden space-y-2 pt-1">
-              {radarData.map((d, i) => (
+              {v.radar.map((d, i) => (
                 <div key={i}>
                   <div className="flex justify-between text-[11px] mb-0.5">
                     <span className="text-muted-foreground">{d.metric}</span>
@@ -116,7 +130,7 @@ export default function MetricasOperacion({ orders, projects, materials, assets,
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">OTs Creadas vs Completadas</p>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={completadasPorMes} barGap={2} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                <BarChart data={v.porMes} barGap={2} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="mes" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />

@@ -432,6 +432,17 @@ export const AuthProvider = ({ children }) => {
     } : prev);
   };
 
+  // Interruptor "Panel rápido (beta)" de la propia cuenta.
+  const setPanelRapido = async (value) => {
+    const v = !!value;
+    await base44.auth.updateMe({ panel_rapido: v });
+    setUser(prev => prev ? {
+      ...prev,
+      panel_rapido: v,
+      ...(prev.data ? { data: { ...prev.data, panel_rapido: v } } : {}),
+    } : prev);
+  };
+
   const logout = () => {
     clearOfflineSession();
     setUser(null);
@@ -497,7 +508,8 @@ export const AuthProvider = ({ children }) => {
       offlineMode,
       offlineSavedAt,
       justReconnected,
-      setOfflineHabilitado
+      setOfflineHabilitado,
+      setPanelRapido
     }}>
       {children}
     </AuthContext.Provider>

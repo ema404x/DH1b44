@@ -17,11 +17,15 @@ const ESTADO_CONFIG = {
   aprobado: { label: 'Aprobado', color: '#10B981', bg: 'bg-emerald-500/15 text-emerald-400' },
 };
 
-export default function CertificadosPanel({ filterCutoff = null }) {
+// Panel rápido: con rapido=true no se pide la lista de certificados y los
+// valores salen de `resumen` (calculado en el servidor). Sin esas props el
+// componente queda como siempre.
+export default function CertificadosPanel({ filterCutoff = null, resumen = null, rapido = false }) {
   const { data: certs = [] } = useQuery({
     queryKey: ['certificados-dash'],
     queryFn: () => base44.entities.Certificado.list('-created_date', 200),
     staleTime: 1000 * 60 * 5,
+    enabled: !rapido,
   });
 
   const thisMonth = startOfMonth(new Date());
@@ -31,7 +35,8 @@ export default function CertificadosPanel({ filterCutoff = null }) {
   const thisMonthCerts = certs.filter(c => c.created_date && parseISO(c.created_date) >= cutoff);
   const emitidos = certs.filter(c => c.estado === 'emitido');
   const aprobados = certs.filter(c => c.estado === 'aprobado');
-  const totalMes = thisMonthCerts.reduce((s, c) => s + (c.subtotal || 0), 0);
+  const totalMes = resumen ? resumen.totalMes : thisMonthCerts.reduce((s, c) => s + (c.subtotal || 0), 0);
+  const countPeriodo = resumen ? resumen.countPeriodo : thisMonthCerts.length;
 
   // Últimos 6 meses
   const monthlyData = React.useMemo(() => {
@@ -40,6 +45,11 @@ export default function CertificadosPanel({ filterCutoff = null }) {
       const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       months[key] = { month: format(d, 'MMM', { locale: es }), cantidad: 0, monto: 0 };
+    }
+    if (resumen) {
+      return Object.values(months).map((m, i) => ({
+        ...m, cantidad: resumen.monthly?.[i]?.cantidad ?? 0, monto: resumen.monthly?.[i]?.monto ?? 0,
+      }));
     }
     certs.forEach(c => {
       const d = c.created_date;
@@ -51,12 +61,13 @@ export default function CertificadosPanel({ filterCutoff = null }) {
       }
     });
     return Object.values(months);
-  }, [certs]);
+  }, [certs, resumen]);
 
-  const recentCerts = thisMonthCerts.slice(0, 4);
+  const recentCerts = resumen ? resumen.recent : thisMonthCerts.slice(0, 4);
 
   // Conteo de abonos por comuna (histórico total)
   const abonosPorComuna = useMemo(() => {
+    if (resumen) return resumen.abonosPorComuna;
     const comunas = { '8A': 0, '8B': 0, '10A': 0, 'Sin comuna': 0 };
     certs.filter(c => c.tipo === 'abono_mensual').forEach(c => {
       const texto = `${c.emprendimiento || ''} ${c.obra_servicio || ''}`.toUpperCase();
@@ -66,7 +77,7 @@ export default function CertificadosPanel({ filterCutoff = null }) {
       else comunas['Sin comuna']++;
     });
     return comunas;
-  }, [certs]);
+  }, [certs, resumen]);
 
   const totalAbonos = Object.values(abonosPorComuna).reduce((a, b) => a + b, 0);
 
@@ -78,7 +89,7 @@ export default function CertificadosPanel({ filterCutoff = null }) {
             <FileCheck className="h-4 w-4 text-emerald-500" />
             <CardTitle className="text-sm font-semibold">Certificados este Mes</CardTitle>
             <span className="h-5 px-1.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold flex items-center">
-              {thisMonthCerts.length}
+              {countPeriodo}
             </span>
           </div>
           <Link to="/certificados">
@@ -92,15 +103,15 @@ export default function CertificadosPanel({ filterCutoff = null }) {
         {/* KPIs rápidos */}
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-lg bg-muted/50 p-2.5 text-center">
-            <p className="text-lg font-bold text-emerald-400 tabular-nums">{thisMonthCerts.length}</p>
+            <p className="text-lg font-bold text-emerald-400 tabular-nums">{countPeriodo}</p>
             <p className="text-[10px] text-muted-foreground font-medium">Este mes</p>
           </div>
           <div className="rounded-lg bg-muted/50 p-2.5 text-center">
-            <p className="text-lg font-bold text-blue-400 tabular-nums">{emitidos.length}</p>
+            <p className="text-lg font-bold text-blue-400 tabular-nums">{resumen ? resumen.emitidos : emitidos.length}</p>
             <p className="text-[10px] text-muted-foreground font-medium">Emitidos</p>
           </div>
           <div className="rounded-lg bg-muted/50 p-2.5 text-center">
-            <p className="text-lg font-bold">{aprobados.length}</p>
+            <p className="text-lg font-bold">{resumen ? resumen.aprobados : aprobados.length}</p>
             <p className="text-[10px] text-muted-foreground font-medium">Aprobados</p>
           </div>
         </div>
@@ -159,7 +170,7 @@ export default function CertificadosPanel({ filterCutoff = null }) {
           </div>
         )}
 
-        {thisMonthCerts.length === 0 && (
+        {countPeriodo === 0 && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-3 justify-center">
             <Clock className="h-4 w-4" />
             <span>Sin certificados este mes</span>
