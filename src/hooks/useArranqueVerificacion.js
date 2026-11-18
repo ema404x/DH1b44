@@ -14,7 +14,6 @@ export function useArranqueVerificacion() {
     if (!activo) return;
     const t = setTimeout(() => verificarArranque({ user, refrescarVinculo }), 6000);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activo, user?.id]);
 
   if (!activo || estado.userId !== user.id) return null;
