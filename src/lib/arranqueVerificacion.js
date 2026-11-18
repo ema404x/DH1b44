@@ -6,7 +6,7 @@ import { base44 } from '@/api/base44Client';
 import { queryClientInstance } from '@/lib/query-client';
 import {
   ME_KEY, SECTORES_KEY, estadoDe, registrarVerificacion,
-  getEmpleadosDerivados, vinculoVinoDeGuardado, leerVinculo, borrarVinculo,
+  getEmpleadosDerivados, vinculoPintado, llamarVinculo,
 } from '@/lib/arranqueRapido';
 
 const json = (v) => JSON.stringify(v ?? null);
@@ -69,14 +69,12 @@ const CHEQUEOS = {
       aplicar: () => queryClientInstance.setQueryData(['employees'], real),
     };
   },
-  vinculo: async ({ user, refrescarVinculo }) => {
-    const guardado = vinculoVinoDeGuardado() ? leerVinculo(user.id) : null;
-    if (!guardado) return null;
-    const real = (await base44.functions.invoke('vincularEmpleado', {})).data;
-    return {
-      difs: compararObjeto('Empleado vinculado', guardado, real),
-      aplicar: async () => { borrarVinculo(); await refrescarVinculo(); },
-    };
+  // La vinculación se revalida en cada carga con la llamada de siempre y la
+  // sesión toma ese resultado: queda verificada cuando esa llamada responde.
+  vinculo: async ({ user }) => {
+    if (!vinculoPintado()) return null;
+    const real = await llamarVinculo(user.id).catch(() => null);
+    return real ? { difs: [] } : null;
   },
 };
 

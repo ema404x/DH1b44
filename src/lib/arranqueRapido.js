@@ -56,7 +56,8 @@ export const useUsaRapido = (user, item) => {
 };
 
 export function limpiarArranqueRapido() {
-  [VINCULO_KEY, ESTADO_KEY, PUSH_KEY].forEach(quitar);
+  borrarVinculo();
+  [ESTADO_KEY, PUSH_KEY].forEach(quitar);
   estado = VACIO;
   oyentes.forEach((f) => f());
 }
@@ -76,38 +77,51 @@ export const obtenerSectores = () =>
     staleTime: 300000,
   });
 
-// ── vincularEmpleado: una llamada real por sesión (el resultado vale 30 min) ─
-let vinculoEnCurso = null;
-let vinculoPedido = false;
-let vinculoDeGuardado = false;
+// ── vincularEmpleado: una llamada real por carga de página, compartida ──────
+// Las cargas siguientes de la sesión pintan con el resultado guardado (vale
+// 30 min) y esa misma llamada lo revalida en segundo plano.
+let vinculoLlamada = null;
+let vinculoGen = 0;
+let vinculoPintadoConGuardado = false;
 
 export const leerVinculo = (userId) => {
   const v = leer(VINCULO_KEY);
   return v && v.userId === userId && Date.now() - v.savedAt < VINCULO_MAX_MS ? v.data : null;
 };
-export const borrarVinculo = () => quitar(VINCULO_KEY);
-// true si esta carga de página pintó con el resultado guardado (sin llamar).
-export const vinculoVinoDeGuardado = () => vinculoDeGuardado;
+// Borra lo guardado; una llamada que estaba en curso ya no lo vuelve a guardar.
+export const borrarVinculo = () => { vinculoGen += 1; quitar(VINCULO_KEY); };
+// true si esta carga de página pintó con el resultado guardado.
+export const marcarVinculoPintado = () => { vinculoPintadoConGuardado = true; };
+export const vinculoPintado = () => vinculoPintadoConGuardado;
 
-export function obtenerVinculo(userId) {
-  const guardado = leerVinculo(userId);
-  if (guardado) {
-    if (!vinculoPedido) vinculoDeGuardado = true;
-    return Promise.resolve(guardado);
+// La llamada a vincularEmpleado de esta carga (una sola). Rechaza si falla.
+export function llamarVinculo(userId) {
+  if (!vinculoLlamada) {
+    const gen = vinculoGen;
+    vinculoLlamada = base44.functions.invoke('vincularEmpleado', {}).then((r) => {
+      const data = r?.data || null;
+      if (gen === vinculoGen && data && data.linked !== undefined) {
+        guardar(VINCULO_KEY, { userId, data, savedAt: Date.now() });
+      }
+      return data;
+    });
+    vinculoLlamada.catch(() => {});
   }
-  if (!vinculoEnCurso) {
-    vinculoPedido = true;
-    vinculoDeGuardado = false;
-    vinculoEnCurso = base44.functions.invoke('vincularEmpleado', {})
-      .then((r) => {
-        const data = r?.data || null;
-        if (data && data.linked !== undefined) guardar(VINCULO_KEY, { userId, data, savedAt: Date.now() });
-        return data;
-      })
-      .finally(() => { vinculoEnCurso = null; });
-  }
-  return vinculoEnCurso;
+  return vinculoLlamada;
 }
+
+// Para quien no pinta el arranque (Alice): el resultado de esa misma llamada;
+// si falla, lo guardado.
+export const obtenerVinculo = (userId) => llamarVinculo(userId).catch(() => leerVinculo(userId));
+
+// ¿Cambió algo que se ve? Sector, rol, permisos (ver todo o solo lo propio
+// sale de rol y permisos), nombre o firma.
+const CAMPOS_VINCULO = [
+  'linked', 'fallback', 'employee_name', 'employee_role',
+  'employee_sector', 'employee_permissions', 'employee_firma_url',
+];
+export const vinculoCambio = (a, b) =>
+  CAMPOS_VINCULO.some((k) => JSON.stringify(a?.[k] ?? null) !== JSON.stringify(b?.[k] ?? null));
 
 // ── Empleados: en Órdenes, una sola consulta alimenta las dos listas ────────
 let empleadosDerivados = null;

@@ -7,7 +7,8 @@ import {
 } from '@/lib/offlineSession';
 import { scheduleOfflinePreload } from '@/lib/offlinePreload';
 import {
-  tieneArranqueRapido, usaRapido, compartirMe, obtenerVinculo, borrarVinculo,
+  tieneArranqueRapido, usaRapido, compartirMe, borrarVinculo,
+  leerVinculo, llamarVinculo, marcarVinculoPintado, vinculoCambio,
   precargarEmpleados, limpiarArranqueRapido,
 } from '@/lib/arranqueRapido';
 
@@ -309,14 +310,8 @@ export const AuthProvider = ({ children }) => {
 
   // Carga metadata del empleado para admins via backend function (bypassa RLS).
   // NO aplica restricciones de RolePermission — los admins tienen acceso total.
-  const loadAdminEmployeeMetadata = async (currentUser, usarGuardado = false) => {
-    try {
-      // Arranque rápido (beta): una llamada real por sesión; en las siguientes
-      // cargas se usa el resultado guardado. Apagado: la llamada de siempre.
-      const result = usarGuardado && usaRapido(currentUser, 'vinculo')
-        ? { data: await obtenerVinculo(currentUser.id) }
-        : await base44.functions.invoke('vincularEmpleado', {});
-      const data = result?.data || result;
+  // Aplica a la sesión el resultado de vincularEmpleado (misma lógica de siempre).
+  const aplicarVinculoAdmin = (currentUser, data) => {
       if (data?.linked && data.fallback !== true) {
         setHasEmployeeRecord(true);
         // Sincronizar sector_id en el objeto user para que las queries
@@ -338,6 +333,46 @@ export const AuthProvider = ({ children }) => {
         setUserPermissions({
           _employeeSector: currentUser?.data?.sector_id || currentUser?.sector_id || null,
         });
+      }
+  };
+
+  // Arranque rápido (beta): después de pintar con lo guardado se espera la
+  // llamada a vincularEmpleado de esta carga. Si cambió algo que se ve, la
+  // sesión toma el resultado nuevo y se vuelven a pedir los datos, sin
+  // recargar la página. Si la llamada falla, se sigue con lo guardado.
+  const revalidarVinculo = async (currentUser, guardado) => {
+    const nuevo = await llamarVinculo(currentUser.id).catch(() => null);
+    if (!nuevo || !vinculoCambio(guardado, nuevo)) return;
+    aplicarVinculoAdmin(currentUser, nuevo);
+    const vinculado = nuevo.linked && nuevo.fallback !== true;
+    const sector = (vinculado && nuevo.employee_sector) || currentUser?.data?.sector_id;
+    setUser(prev => (prev && prev.data?.sector_id !== sector
+      ? { ...prev, data: { ...(prev.data || {}), sector_id: sector } }
+      : prev));
+    if (guardado.employee_sector !== nuevo.employee_sector) {
+      // Otro sector: se descartan los datos en memoria del sector anterior.
+      await queryClientInstance.cancelQueries();
+      queryClientInstance.resetQueries();
+    } else {
+      queryClientInstance.invalidateQueries();
+    }
+  };
+
+  const loadAdminEmployeeMetadata = async (currentUser, usarGuardado = false) => {
+    try {
+      // Arranque rápido (beta): con resultado guardado en la sesión se pinta
+      // al instante y la llamada de esta carga corre en segundo plano; sin
+      // guardado se espera la llamada. Apagado: la llamada de siempre.
+      const rapido = usarGuardado && usaRapido(currentUser, 'vinculo');
+      const guardado = rapido ? leerVinculo(currentUser.id) : null;
+      const result = rapido
+        ? { data: guardado || await llamarVinculo(currentUser.id) }
+        : await base44.functions.invoke('vincularEmpleado', {});
+      const data = result?.data || result;
+      aplicarVinculoAdmin(currentUser, data);
+      if (guardado) {
+        marcarVinculoPintado();
+        revalidarVinculo(currentUser, guardado);
       }
     } catch (e) {
       console.warn('[AuthContext] Admin metadata load failed:', e?.message);
@@ -480,11 +515,6 @@ export const AuthProvider = ({ children }) => {
     } : prev);
   };
 
-  // Vuelve a pedir la vinculación por el camino de siempre, sin pantalla de carga.
-  const refrescarVinculo = async () => {
-    if (user) await linkEmployee(user);
-  };
-
   const logout = () => {
     clearOfflineSession();
     setUser(null);
@@ -554,8 +584,7 @@ export const AuthProvider = ({ children }) => {
       setOfflineHabilitado,
       setPanelRapido,
       setOrdenesRapidas,
-      setArranqueRapido,
-      refrescarVinculo
+      setArranqueRapido
     }}>
       {children}
     </AuthContext.Provider>

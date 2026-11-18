@@ -6,13 +6,13 @@ import { verificarArranque } from '@/lib/arranqueVerificacion';
 // Solo administradores con Arranque rápido encendido: lanza la verificación
 // en segundo plano y devuelve su resultado para el indicador.
 export function useArranqueVerificacion() {
-  const { user, offlineMode, refrescarVinculo } = useAuth();
+  const { user, offlineMode } = useAuth();
   const estado = useArranqueEstado();
   const activo = user?.role === 'admin' && tieneArranqueRapido(user) && !offlineMode;
 
   useEffect(() => {
     if (!activo) return;
-    const t = setTimeout(() => verificarArranque({ user, refrescarVinculo }), 6000);
+    const t = setTimeout(() => verificarArranque({ user }), 6000);
     return () => clearTimeout(t);
   }, [activo, user?.id]);
 
