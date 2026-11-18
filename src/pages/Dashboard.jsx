@@ -27,6 +27,8 @@ import { esOtVencida } from '@/lib/otVencimiento';
 import { fetchAllList } from '@/lib/fetchAllList';
 import OfflineGuard from '@/components/pwa/OfflineGuard';
 import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
+import { usePanelRapido } from '@/hooks/usePanelRapido';
+import PanelRapidoEstado from '@/components/dashboard/PanelRapidoEstado';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -144,13 +146,15 @@ const ActivityFeedItem = React.memo(function ActivityFeedItem({ o, isLast }) {
   );
 });
 
-function ActivityFeed({ orders }) {
-  const recent = useMemo(() =>
+function ActivityFeed({ orders, resumen }) {
+  const recentCalc = useMemo(() =>
     [...orders]
       .filter(o => o.updated_date || o.created_date)
       .sort((a, b) => new Date(b.updated_date || b.created_date) - new Date(a.updated_date || a.created_date))
       .slice(0, 6)
   , [orders]);
+  // Panel rápido: la lista ya viene armada del servidor.
+  const recent = resumen || recentCalc;
 
   if (recent.length === 0) return (
     <div className="flex flex-col items-center justify-center py-8 gap-2 text-muted-foreground">
@@ -203,18 +207,30 @@ export default function Dashboard() {
   const isGerente = isAdmin || user?.role === 'gerente';
   const dashScope = isGerente ? undefined : 'own';
 
+  // Panel rápido (beta): interruptor por usuario (panel_rapido). Apagado, todo
+  // lo de abajo queda como siempre. Encendido, los valores salen de
+  // getDashboardSummary (S) y no se piden las listas completas. Si el resumen
+  // falla, se vuelve solo al camino de siempre.
+  const panelRapidoPref = (user?.panel_rapido === true || user?.data?.panel_rapido === true) && !offlineMode;
+  const rapido = usePanelRapido({ activo: panelRapidoPref, scope: dashScope, filters: dashFilters, esAdmin: user?.role === 'admin' });
+  const panelRapido = panelRapidoPref && !rapido.fallo;
+  const S = panelRapido ? rapido.resumen : null;
+
   // Fuente única de verdad: getDashboardMetrics trae TODOS los arrays
   // (fetchAll sin cap) + conteos pre-calculados. Elimina las 7 queries
   // cliente .list(100) que tenían cap de 100 y la doble fuente con kpiVal.
   // queryKey incluye el scope para que el cache no sirva datos de scope
   // equivocado al cambiar de rol (gerente vs jefe de sitio).
   const STALE_3MIN = 3 * 60 * 1000;
-  const { data: dash, isLoading: dashLoading } = useQuery({
+  const { data: dashData, isLoading: dashLoadingClasico } = useQuery({
     queryKey: ['dashboard-metrics', dashScope],
     queryFn: async () => (await base44.functions.invoke('getDashboardMetrics', { scope: dashScope })).data,
     staleTime: STALE_3MIN, retry: 1,
+    enabled: !panelRapido,
     ...offlineQueryOptions(offlineMode, 'dashboard-metrics'),
   });
+  const dash = panelRapido ? undefined : dashData;
+  const dashLoading = panelRapido ? rapido.cargando : dashLoadingClasico;
 
   // Direcciones — fuente canónica de jefes de sitio (igual que WorkOrders).
   // Se usa para resolver el jefe_sitio de OTs que no lo tienen poblado,
@@ -223,6 +239,7 @@ export default function Dashboard() {
     queryKey: ['direcciones-jefes'],
     queryFn: () => fetchAllList('Direccion', '-created_date'),
     staleTime: 5 * 60 * 1000,
+    enabled: !panelRapido,
   });
 
   // Arrays completos del payload del backend (fetchAll sin cap de 100).
@@ -235,7 +252,7 @@ export default function Dashboard() {
   const assets       = dash?.assets || [];
   const employees    = dash?.employees || [];
   const pendientes   = dash?.pendientes || [];
-  const kpis         = dash; // conteos pre-calculados del backend
+  const kpis         = S ? S.kpis : dash; // conteos pre-calculados del backend
 
   // ── Normalización y lookups para el filtro de Jefe de Sitio ──
   // Mismo patrón que WorkOrders.jsx: resolver el nombre canónico del dropdown
@@ -399,7 +416,7 @@ export default function Dashboard() {
   // KPIs OT-dependientes: computados sobre `orders` (filtrado por dashFilters).
   // Los no-filtrables (proyectos, clientes, materiales, activos, finanzas,
   // pendientes SAP) vienen pre-calculados en `kpis` desde el backend.
-  const metrics = useMemo(() => {
+  const metricsClasico = useMemo(() => {
     const thisMonth = startOfMonth(new Date());
 
     const pendingOrders      = orders.filter(o => ['pendiente', 'asignada'].includes(o.status)).length;
@@ -413,6 +430,8 @@ export default function Dashboard() {
 
     return { pendingOrders, inProgressOrders, overdueOrders, completedThisMonth, efficiency, urgentOrders, recentProjects };
   }, [filteredProjects, orders]);
+  const metrics = S ? S.metrics : metricsClasico;
+  const urgentCount = S ? S.metrics.urgentCount : metricsClasico.urgentOrders.length;
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
@@ -458,7 +477,8 @@ export default function Dashboard() {
       <AlertasBanner />
 
       {/* ── FILTROS GLOBALES ── */}
-      <DashboardFilters filters={dashFilters} onChange={setDashFilters} jefes={jefesOptions} />
+      <DashboardFilters filters={dashFilters} onChange={setDashFilters} jefes={S ? S.jefesOptions : jefesOptions} />
+      {panelRapido && <PanelRapidoEstado verificacion={rapido.verificacion} />}
 
       {/* ── CRITICAL ALERTS ── */}
       {(() => {
@@ -526,7 +546,7 @@ export default function Dashboard() {
         <div className="h-4" />
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {canRead('Client')    && <KpiCard href="/clientes"   title="Proveedores"     value={kpis?.activeClients ?? 0}            subtitle={`${kpis?.totalClients ?? 0} en total`}                        icon={Users}         color="cyan" />}
-          {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={metrics.urgentOrders.length}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={metrics.urgentOrders.length > 0 ? 'red' : 'green'} />}
+          {canRead('WorkOrder') && <KpiCard href="/ordenes"    title="Urgentes"        value={urgentCount}       subtitle="Alta prioridad activas"                              icon={AlertTriangle} color={urgentCount > 0 ? 'red' : 'green'} />}
           {canRead('Pendientes') && <KpiCard href="/activos"    title="Pendientes SAP"  value={kpis?.pendientesActivos ?? 0} subtitle={`${kpis?.pendientesResueltos ?? 0} resueltos`} icon={Wrench} color="amber" alert={(kpis?.pendientesUrgentes ?? 0) > 0 ? (kpis?.pendientesUrgentes ?? 0) : undefined} />}
           {canRead('Inventory') && <KpiCard href="/inventario" title="Materiales"      value={kpis?.totalMaterials ?? materials.length}                  subtitle={`${kpis?.lowStockItems ?? 0} bajo mínimo`}      icon={Package}       color={(kpis?.lowStockItems ?? 0) > 0 ? 'red' : 'amber'} />}
         </div>
@@ -541,7 +561,7 @@ export default function Dashboard() {
             action={<Link to="/ordenes"><Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver todas <ArrowRight className="h-3 w-3" /></Button></Link>} />
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2">
-              <OTsPendientesPanel orders={orders} />
+              <OTsPendientesPanel orders={orders} resumen={S?.ots} />
             </div>
             <div className={cn(panel, "h-full")}>
               <div className="flex items-center justify-between mb-3">
@@ -553,7 +573,7 @@ export default function Dashboard() {
                   <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1 px-2">Ver <ArrowRight className="h-3 w-3" /></Button>
                 </Link>
               </div>
-              <ActivityFeed orders={orders} />
+              <ActivityFeed orders={orders} resumen={S?.activity} />
             </div>
           </div>
         </div>
@@ -567,10 +587,10 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             {canRead('Invoice') && (
               <div className="xl:col-span-2">
-                <RevenueChart invoices={invoices} />
+                <RevenueChart invoices={invoices} resumen={S?.revenue} />
               </div>
             )}
-            {canRead('Certificado') && <CertificadosPanel filterCutoff={filterCutoff} />}
+            {canRead('Certificado') && <CertificadosPanel filterCutoff={filterCutoff} resumen={S?.certs} rapido={panelRapido} />}
           </div>
         </div>
       )}
@@ -621,7 +641,7 @@ export default function Dashboard() {
       {/* ── GESTIÓN DE SITIOS ── */}
       <div className="acero-rise" style={{ animationDelay: '0.32s' }}>
         <SectionHeader icon={Shield} title="Gestión de sitios" subtitle="Indicadores por jefe de sitio" />
-        <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} orders={allOrders} pendientes={pendientes} employees={employees} />
+        <KpisJefeSitio filterJefe={dashFilters.jefeSitio} filterCutoff={filterCutoff} orders={allOrders} pendientes={pendientes} employees={employees} resumen={S?.jefesKpis} />
       </div>
 
       {/* ── MÉTRICAS DE OPERACIÓN ── */}
@@ -633,6 +653,7 @@ export default function Dashboard() {
           materials={materials}
           assets={assets}
           employees={employees}
+          resumen={S?.operacion}
         />
       </div>
     </div>

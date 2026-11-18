@@ -5,7 +5,8 @@ import { Progress } from '@/components/ui/progress';
 import { TrendingUp, AlertTriangle, CheckCircle2, Clock, User } from 'lucide-react';
 import { isPast, parseISO, differenceInDays } from 'date-fns';
 
-export default function KpisJefeSitio({ filterJefe = '', filterCutoff = null, orders = [], pendientes = [], employees = [] }) {
+// resumen (Panel rápido): la lista de KPIs por jefe ya calculada en el servidor.
+export default function KpisJefeSitio({ filterJefe = '', filterCutoff = null, orders = [], pendientes = [], employees = [], resumen }) {
 
   // Solo los empleados que son jefes de sitio
   const jefesSitio = useMemo(() => {
@@ -17,7 +18,7 @@ export default function KpisJefeSitio({ filterJefe = '', filterCutoff = null, or
     return set;
   }, [employees]);
 
-  const kpis = useMemo(() => {
+  const kpisCalc = useMemo(() => {
     if (jefesSitio.size === 0) return [];
     const jefesMap = {};
 
@@ -87,6 +88,7 @@ export default function KpisJefeSitio({ filterJefe = '', filterCutoff = null, or
     }).sort((a, b) => b.score - a.score).slice(0, 10);
   }, [pendientes, orders, jefesSitio, filterJefe, filterCutoff]);
 
+  const kpis = resumen || kpisCalc;
   if (kpis.length === 0) return null;
 
   const getScoreColor = (score) => {

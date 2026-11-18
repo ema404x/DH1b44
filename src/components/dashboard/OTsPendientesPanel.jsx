@@ -21,15 +21,18 @@ const PRIORITY_CONFIG = {
   baja:    { label: 'Baja',    color: '#94A3B8' },
 };
 
-export default function OTsPendientesPanel({ orders }) {
+// resumen (Panel rápido): { activeCount, statusCounts, priorityCounts } ya
+// calculado en el servidor. Sin resumen, todo se calcula como siempre.
+export default function OTsPendientesPanel({ orders, resumen }) {
   const active = orders.filter(o => !['completada', 'cancelada'].includes(o.status));
+  const activeCount = resumen ? resumen.activeCount : active.length;
 
   // Datos por estado para el pie
   const byStatus = Object.entries(STATUS_CONFIG)
     .filter(([key]) => key !== 'completada' && key !== 'cancelada')
     .map(([key, cfg]) => ({
       name: cfg.label,
-      value: orders.filter(o => o.status === key).length,
+      value: resumen ? (resumen.statusCounts?.[key] || 0) : orders.filter(o => o.status === key).length,
       color: cfg.color,
     }))
     .filter(d => d.value > 0);
@@ -37,7 +40,7 @@ export default function OTsPendientesPanel({ orders }) {
   // Datos por prioridad (activas)
   const byPriority = Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => ({
     name: cfg.label,
-    value: active.filter(o => o.priority === key).length,
+    value: resumen ? (resumen.priorityCounts?.[key] || 0) : active.filter(o => o.priority === key).length,
     color: cfg.color,
   })).filter(d => d.value > 0);
 
@@ -49,7 +52,7 @@ export default function OTsPendientesPanel({ orders }) {
             <ClipboardList className="h-4 w-4 text-amber-500" />
             <CardTitle className="text-sm font-semibold">Órdenes de Trabajo</CardTitle>
             <span className="h-5 px-1.5 rounded-full bg-amber-500/15 text-amber-400 text-[10px] font-bold flex items-center">
-              {active.length} activas
+              {activeCount} activas
             </span>
           </div>
           <Link to="/ordenes">
@@ -102,7 +105,7 @@ export default function OTsPendientesPanel({ orders }) {
             ) : (
               <div className="space-y-2.5 mt-3">
                 {byPriority.map((d, i) => {
-                  const pct = active.length > 0 ? (d.value / active.length) * 100 : 0;
+                  const pct = activeCount > 0 ? (d.value / activeCount) * 100 : 0;
                   return (
                     <div key={i}>
                       <div className="flex justify-between text-[11px] mb-0.5">
