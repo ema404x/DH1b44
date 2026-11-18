@@ -31,15 +31,36 @@ function ultimos6Meses(now) {
   return keys;
 }
 
-export function calcularResumenLegacy({ dash, direcciones = [], certs = [] }, filters, nowMs) {
+// Desempate determinista del orden de origen: la base no garantiza el orden
+// entre registros con la MISMA fecha de orden y cambia de una consulta a otra.
+// Solo reordena, por id, los tramos consecutivos con fecha idéntica.
+// Espejo de desempatar() en base44/shared/dashboardSummary.ts.
+function desempatar(arr, campo) {
+  const out = [];
+  let i = 0;
+  while (i < arr.length) {
+    let j = i + 1;
+    const k = String(arr[i]?.[campo] ?? '');
+    while (j < arr.length && String(arr[j]?.[campo] ?? '') === k) j++;
+    const tramo = arr.slice(i, j);
+    if (tramo.length > 1) tramo.sort((a, b) => (String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0));
+    out.push(...tramo);
+    i = j;
+  }
+  return out;
+}
+
+export function calcularResumenLegacy({ dash, direcciones: direccionesRaw = [], certs: certsRaw = [] }, filters, nowMs) {
   const now = new Date(nowMs);
-  const allOrders = (dash?.orders || []).filter(o => !o.archivada);
-  const projects = dash?.projects || [];
+  const direcciones = desempatar(direccionesRaw, 'created_date');
+  const certs = desempatar(certsRaw, 'created_date');
+  const allOrders = desempatar(dash?.orders || [], 'updated_date').filter(o => !o.archivada);
+  const projects = desempatar(dash?.projects || [], 'created_date');
   const invoices = dash?.invoices || [];
   const materials = dash?.materials || [];
   const assets = dash?.assets || [];
-  const employees = dash?.employees || [];
-  const pendientes = dash?.pendientes || [];
+  const employees = desempatar(dash?.employees || [], 'created_date');
+  const pendientes = desempatar(dash?.pendientes || [], 'created_date');
   const meses = ultimos6Meses(now);
   const thisMonth = startOfMonth(now);
 

@@ -55,18 +55,38 @@ const normCI = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase()
 const normEmp = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ');
 const normAddr = (s) => (s || '').toUpperCase().trim().replace(/\s+/g, ' ').replace(/,\s*CABA\s*$/, '').replace(/,\s*$/, '').trim();
 
+// Desempate determinista del orden de origen. La base no garantiza el orden
+// entre registros con la MISMA fecha de orden (ej. importados en el mismo
+// milisegundo): cambia de una consulta a otra. Acá solo se reordenan, por id,
+// los tramos consecutivos con fecha idéntica; el resto del orden no se toca.
+// Espejo de desempatar() en src/lib/panelRapidoLegacy.js.
+function desempatar(arr, campo) {
+  const out = [];
+  let i = 0;
+  while (i < arr.length) {
+    let j = i + 1;
+    const k = String(arr[i]?.[campo] ?? '');
+    while (j < arr.length && String(arr[j]?.[campo] ?? '') === k) j++;
+    const tramo = arr.slice(i, j);
+    if (tramo.length > 1) tramo.sort((a, b) => (String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0));
+    out.push(...tramo);
+    i = j;
+  }
+  return out;
+}
+
 export function buildPanelSummary(raw, opts) {
   const { dateRange, jefeSitio, priority, nowMs, tz } = opts;
   const now = new Date(nowMs);
-  const projects = raw.projects || [];
+  const projects = desempatar(raw.projects || [], 'created_date');
   const invoices = raw.invoices || [];
   const materials = raw.materials || [];
   const assets = raw.assets || [];
-  const employees = raw.employees || [];
-  const pendientes = raw.pendientes || [];
-  const direcciones = raw.direcciones || [];
-  const certs = raw.certs || [];
-  const allOrders = (raw.orders || []).filter((o) => !o.archivada);
+  const employees = desempatar(raw.employees || [], 'created_date');
+  const pendientes = desempatar(raw.pendientes || [], 'created_date');
+  const direcciones = desempatar(raw.direcciones || [], 'created_date');
+  const certs = desempatar(raw.certs || [], 'created_date');
+  const allOrders = desempatar(raw.orders || [], 'updated_date').filter((o) => !o.archivada);
 
   const thisMonth = (() => { const { y, m } = mesCliente(nowMs, tz); return Date.UTC(y, m, 1) + tz * 60000; })();
   const meses = ultimos6Meses(nowMs, tz);
