@@ -43,6 +43,11 @@
       "type": "boolean",
       "default": false,
       "description": "Panel r\u00e1pido (beta). Si es true, el Dashboard pide un resumen ya calculado en el servidor (getDashboardSummary) en lugar de las listas completas. Apagado por defecto: el Dashboard se comporta igual que siempre."
+    },
+    "ordenes_rapidas": {
+      "type": "boolean",
+      "default": false,
+      "description": "\u00d3rdenes r\u00e1pidas (beta). Si es true, la pantalla de \u00d3rdenes usa getWorkOrdersBoard (campos de tablero + solo cambios desde la \u00faltima visita) en lugar de getWorkOrdersForUser. Apagado por defecto: \u00d3rdenes se comporta igual que siempre."
     }
   },
   "required": [],

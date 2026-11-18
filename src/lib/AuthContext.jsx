@@ -443,6 +443,17 @@ export const AuthProvider = ({ children }) => {
     } : prev);
   };
 
+  // Interruptor "Órdenes rápidas (beta)" de la propia cuenta.
+  const setOrdenesRapidas = async (value) => {
+    const v = !!value;
+    await base44.auth.updateMe({ ordenes_rapidas: v });
+    setUser(prev => prev ? {
+      ...prev,
+      ordenes_rapidas: v,
+      ...(prev.data ? { data: { ...prev.data, ordenes_rapidas: v } } : {}),
+    } : prev);
+  };
+
   const logout = () => {
     clearOfflineSession();
     setUser(null);
@@ -509,7 +520,8 @@ export const AuthProvider = ({ children }) => {
       offlineSavedAt,
       justReconnected,
       setOfflineHabilitado,
-      setPanelRapido
+      setPanelRapido,
+      setOrdenesRapidas
     }}>
       {children}
     </AuthContext.Provider>
