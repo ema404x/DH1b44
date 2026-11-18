@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import ActivarNotificacionesBanner from '@/components/layout/ActivarNotificacionesBanner';
+import { tieneArranqueRapido, pushYaRegistrado, marcarPushRegistrado } from '@/lib/arranqueRapido';
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -44,6 +45,30 @@ async function registrarDispositivo() {
   });
 }
 
+// Arranque rápido (beta): el registro silencioso se hace una vez por sesión y
+// solo pide la clave pública si este dispositivo todavía no está suscripto.
+async function registrarUnaVezPorSesion(userId) {
+  if (pushYaRegistrado(userId)) return;
+  const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    const { data } = await base44.functions.invoke('gestionarPushSemanal', { action: 'get_vapid_key' });
+    if (!data?.publicKey) return;
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(data.publicKey),
+    });
+  }
+  await base44.functions.invoke('gestionarPushSemanal', {
+    action: 'subscribe',
+    subscription: sub.toJSON(),
+    user_agent: navigator.userAgent || '',
+    device_type: /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '') ? 'movil' : 'pc',
+  });
+  marcarPushRegistrado(userId);
+}
+
 export default function AvisoSemanalOT() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -54,7 +79,9 @@ export default function AvisoSemanalOT() {
     if (!user?.id || done.current) return;
     done.current = true;
     // Solo re-registra si ya hay permiso; el pedido de permiso lo hace el cartel con un toque
-    if (pushSupported() && Notification.permission === 'granted') registrarDispositivo().catch(() => {});
+    if (pushSupported() && Notification.permission === 'granted') {
+      (tieneArranqueRapido(user) ? registrarUnaVezPorSesion(user.id) : registrarDispositivo()).catch(() => {});
+    }
   }, [user?.id]);
 
   useEffect(() => {

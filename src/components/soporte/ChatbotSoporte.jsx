@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/lib/AuthContext';
+import { usaRapido, obtenerMe, obtenerVinculo } from '@/lib/arranqueRapido';
 
 // ── Constantes estáticas ──────────────────────────────────────────────────────
 const RUTA_MODULO = {
@@ -255,10 +257,16 @@ export default function ChatbotSoporte() {
   const sugerencias = useMemo(() => getSugerenciasParaRol(rolEfectivo), [rolEfectivo]);
 
   // ── Carga inicial: usuario + empleado en paralelo ─────────────────────────
+  // Arranque rápido (beta): reutiliza el usuario y la vinculación ya pedidos
+  // al abrir la app. Apagado: las dos llamadas de siempre.
+  const { user: authUser } = useAuth();
   useEffect(() => {
     Promise.all([
-      base44.auth.me().catch(() => null),
-      base44.functions.invoke('vincularEmpleado', {}).then(r => r?.data || null).catch(() => null),
+      (usaRapido(authUser, 'me') ? obtenerMe() : base44.auth.me()).catch(() => null),
+      (usaRapido(authUser, 'vinculo')
+        ? obtenerVinculo(authUser.id)
+        : base44.functions.invoke('vincularEmpleado', {}).then(r => r?.data || null)
+      ).catch(() => null),
     ]).then(([u, emp]) => {
       setCurrentUser(u);
       setEmpleadoInfo(emp);
