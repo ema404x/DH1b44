@@ -28,6 +28,7 @@ import { fetchAllList } from '@/lib/fetchAllList';
 import OfflineGuard from '@/components/pwa/OfflineGuard';
 import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
 import { usePanelRapido } from '@/hooks/usePanelRapido';
+import { mejoraActiva, datosUsuario } from '@/lib/optimizaciones';
 import PanelRapidoEstado from '@/components/dashboard/PanelRapidoEstado';
 
 const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0);
@@ -211,8 +212,12 @@ export default function Dashboard() {
   // lo de abajo queda como siempre. Encendido, los valores salen de
   // getDashboardSummary (S) y no se piden las listas completas. Si el resumen
   // falla, se vuelve solo al camino de siempre.
-  const panelRapidoPref = (user?.panel_rapido === true || user?.data?.panel_rapido === true) && !offlineMode;
-  const rapido = usePanelRapido({ activo: panelRapidoPref, scope: dashScope, filters: dashFilters, esAdmin: user?.role === 'admin' });
+  // Quién lo tiene activo se decide en src/lib/optimizaciones.js.
+  const panelRapidoPref = mejoraActiva(user, 'panel') && !offlineMode;
+  const rapido = usePanelRapido({
+    activo: panelRapidoPref, scope: dashScope, filters: dashFilters, esAdmin: user?.role === 'admin',
+    usuario: datosUsuario(user, userPermissions?._employeeRole, userPermissions?._employeeSector),
+  });
   const panelRapido = panelRapidoPref && !rapido.fallo;
   const S = panelRapido ? rapido.resumen : null;
 

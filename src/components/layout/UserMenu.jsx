@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { LogOut, ChevronDown, UserCircle, Trash2, Bell, WifiOff, Gauge, Zap, Rocket } from 'lucide-react';
-import { tieneArranqueRapido } from '@/lib/arranqueRapido';
+import VerificacionesResumen from '@/components/layout/VerificacionesResumen';
+import VerificacionesDialog from '@/components/layout/VerificacionesDialog';
 import { useArranqueVerificacion } from '@/hooks/useArranqueVerificacion';
 import ArranqueRapidoEstado from '@/components/layout/ArranqueRapidoEstado';
 import ArranqueRapidoDiferencias from '@/components/layout/ArranqueRapidoDiferencias';
@@ -24,6 +25,7 @@ export default function UserMenu() {
   const { user, offlineMode, setOfflineHabilitado, setPanelRapido, setOrdenesRapidas, setArranqueRapido } = useAuth();
   const verificacionArranque = useArranqueVerificacion();
   const [showArranqueDifs, setShowArranqueDifs] = useState(false);
+  const [showVerificaciones, setShowVerificaciones] = useState(false);
   const [savingArranque, setSavingArranque] = useState(false);
   const handleArranqueRapidoToggle = async (value) => {
     setSavingArranque(true);
@@ -167,7 +169,7 @@ export default function UserMenu() {
                 <Rocket className="h-4 w-4 text-muted-foreground" />
                 <span className="flex-1">Arranque rápido (beta)</span>
                 <Switch
-                  checked={tieneArranqueRapido(user)}
+                  checked={user?.arranque_rapido === true || user?.data?.arranque_rapido === true}
                   disabled={savingArranque || offlineMode}
                   onCheckedChange={handleArranqueRapidoToggle}
                 />
@@ -177,6 +179,9 @@ export default function UserMenu() {
               verificacion={verificacionArranque}
               onVer={() => { setShowArranqueDifs(true); setOpen(false); }}
             />
+            {user?.role === 'admin' && !offlineMode && (
+              <VerificacionesResumen onVer={() => { setShowVerificaciones(true); setOpen(false); }} />
+            )}
             <button
               onClick={() => { setShowDeleteDialog(true); setOpen(false); }}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-left text-popover-foreground"
@@ -205,6 +210,8 @@ export default function UserMenu() {
         onOpenChange={setShowArranqueDifs}
         diferencias={verificacionArranque?.diferencias}
       />
+
+      <VerificacionesDialog open={showVerificaciones} onOpenChange={setShowVerificaciones} />
 
       <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
         <AlertDialogContent>

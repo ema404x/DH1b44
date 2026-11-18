@@ -6,6 +6,7 @@ import { useSyncExternalStore } from 'react';
 import { base44 } from '@/api/base44Client';
 import { queryClientInstance } from '@/lib/query-client';
 import { fetchAllList } from '@/lib/fetchAllList';
+import { mejoraActiva } from '@/lib/optimizaciones';
 
 const VINCULO_KEY = 'dh1-arranque-vinculo';
 const ESTADO_KEY = 'dh1-arranque-estado';
@@ -16,8 +17,8 @@ const leer = (k) => { try { return JSON.parse(sessionStorage.getItem(k)); } catc
 const guardar = (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch { /* sin espacio */ } };
 const quitar = (k) => { try { sessionStorage.removeItem(k); } catch { /* nada */ } };
 
-export const tieneArranqueRapido = (user) =>
-  user?.arranque_rapido === true || user?.data?.arranque_rapido === true;
+// Quién lo tiene activo se decide en src/lib/optimizaciones.js.
+export const tieneArranqueRapido = (user) => mejoraActiva(user, 'arranque');
 
 // ── Estado de la verificación y de los caminos que volvieron al de siempre ──
 const VACIO = { userId: null, hechos: {}, diferencias: [], fallback: {} };

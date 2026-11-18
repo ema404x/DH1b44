@@ -1,0 +1,90 @@
+{
+  "name": "VerificacionOptimizacion",
+  "type": "object",
+  "properties": {
+    "usuario_email": {
+      "type": "string",
+      "description": "Email del usuario en cuya sesi\u00f3n se detect\u00f3 la diferencia"
+    },
+    "rol": {
+      "type": "string",
+      "description": "Rol del usuario al momento de la verificaci\u00f3n (rol de empleado o, si no tiene, rol de plataforma)"
+    },
+    "sector": {
+      "type": "string",
+      "description": "Sector activo del usuario al momento de la verificaci\u00f3n"
+    },
+    "mejora": {
+      "type": "string",
+      "enum": [
+        "panel",
+        "ordenes",
+        "arranque"
+      ],
+      "enumColors": [
+        "blue",
+        "purple",
+        "pink"
+      ],
+      "description": "Mejora verificada: Panel r\u00e1pido, \u00d3rdenes r\u00e1pidas o Arranque r\u00e1pido"
+    },
+    "filtro": {
+      "type": "string",
+      "description": "Filtro en uso al verificar (solo Panel r\u00e1pido)"
+    },
+    "cantidad_diferencias": {
+      "type": "number",
+      "description": "Cantidad total de diferencias encontradas entre el camino r\u00e1pido y el de siempre"
+    },
+    "detalle": {
+      "type": "array",
+      "description": "Hasta 20 diferencias",
+      "items": {
+        "type": "object",
+        "properties": {
+          "campo": {
+            "type": "string"
+          },
+          "valor_viejo": {
+            "type": "string",
+            "description": "Valor del camino de siempre"
+          },
+          "valor_nuevo": {
+            "type": "string",
+            "description": "Valor del camino r\u00e1pido"
+          }
+        }
+      }
+    },
+    "fecha": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la verificaci\u00f3n"
+    }
+  },
+  "required": [
+    "usuario_email",
+    "mejora",
+    "cantidad_diferencias"
+  ],
+  "rls": {
+    "create": {
+      "created_by_id": "{{user.id}}"
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
