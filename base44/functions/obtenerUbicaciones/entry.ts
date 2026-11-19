@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { crearMatcherQR } from '../../shared/ubicacionJoin.ts';
 
 /**
  * obtenerUbicaciones — devuelve LocationData, Direccion y LocationQR
@@ -39,25 +40,12 @@ export default async function(req) {
       dirMap.set(d.id, d);
     }
 
-    // Indexar QRs por nombre normalizado para lookup rápido
-    const norm = (s) => (s || '').toLowerCase().trim();
-    const qrByName = new Map();
-    const qrByAddress = new Map();
-    const qrByUbic = new Map();
-    for (const q of locationQRs) {
-      if (q.name) qrByName.set(norm(q.name), q);
-      if (q.address) qrByAddress.set(norm(q.address), q);
-    }
-
     // Join: cada LocationData obtiene su dirección real y su QR id
+    const matchQR = crearMatcherQR(locationQRs);
     const locations = locationData.map(ld => {
       const dir = ld.direccion_id ? dirMap.get(ld.direccion_id) : null;
       const address = dir?.direccion || '';
-      const qr =
-        qrByName.get(norm(ld.establecimiento)) ||
-        qrByAddress.get(norm(address)) ||
-        qrByName.get(norm(ld.ubic_tecnica)) ||
-        null;
+      const qr = matchQR(ld, address);
 
       return {
         id: ld.id,

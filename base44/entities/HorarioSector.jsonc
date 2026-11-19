@@ -39,6 +39,110 @@
       "type": "boolean",
       "default": true,
       "description": "Si est\u00e1 desactivado no se calculan tardanzas ni ausencias."
+    },
+    "horarios_por_dia": {
+      "type": "object",
+      "description": "Horario por d\u00eda (clave lun..dom). Si existe, reemplaza a hora_entrada/hora_salida/dias_laborales en los c\u00e1lculos; si no, se usa el horario \u00fanico.",
+      "properties": {
+        "lun": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "mar": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "mie": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "jue": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "vie": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "sab": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "dom": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   },
   "required": [

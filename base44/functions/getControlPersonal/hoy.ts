@@ -1,6 +1,6 @@
 import { isFieldRole } from '../../shared/roles.ts';
 import { fetchPaged, ms } from './util.ts';
-import { arInfo, inicioDia, sumarDias, esLaboral, limiteEntrada } from './tiempo.ts';
+import { arInfo, inicioDia, sumarDias, esLaboral, limiteEntrada, horarioDelDia } from './tiempo.ts';
 import { cargarHorario, horarioVigente, leanHorario } from './horario.ts';
 import { leanEmpleado } from './scope.ts';
 
@@ -19,7 +19,9 @@ export async function calcularHoy(sb: any, scope: any, ahora = new Date()) {
   ]);
   const horario = horarioVigente(h);
   const laboral = horario ? esLaboral(horario, fecha) : false;
-  const limite = horario ? limiteEntrada(horario) : null;
+  const limite = horario && laboral ? limiteEntrada(horario, fecha) : null;
+  const dia = horario && laboral ? horarioDelDia(horario, fecha) : null;
+  const horarioHoy = dia ? { hora_entrada: dia.hora_entrada, hora_salida: dia.hora_salida } : null;
   const umbralPasado = Boolean(horario && laboral && info.minutos > (limite as number));
 
   const fichajes = raw.filter(scope.fichajeVisible).map(scope.leanFichaje);
@@ -48,7 +50,7 @@ export async function calcularHoy(sb: any, scope: any, ahora = new Date()) {
     paraRevisar: fichajes.filter(revisar).length,
   };
   fichajes.sort((a: any, b: any) => ms(b.entrada_timestamp) - ms(a.entrada_timestamp));
-  return { fecha, horario: leanHorario(horario), laboral, umbralPasado, contadores, fichajes, noVinieron };
+  return { fecha, horario: leanHorario(horario), horarioHoy, laboral, umbralPasado, contadores, fichajes, noVinieron };
 }
 
 // Aviso de la campana: solo cuenta, nunca falla para quien no tiene acceso.

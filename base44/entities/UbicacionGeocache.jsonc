@@ -1,0 +1,75 @@
+{
+  "name": "UbicacionGeocache",
+  "type": "object",
+  "properties": {
+    "sector_id": {
+      "type": "string",
+      "description": "Sector que hizo la consulta."
+    },
+    "consulta": {
+      "type": "string",
+      "description": "Texto exacto enviado a OpenStreetMap Nominatim (normalizado en min\u00fasculas)."
+    },
+    "encontrado": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si Nominatim devolvi\u00f3 un resultado."
+    },
+    "lat": {
+      "type": "number"
+    },
+    "lng": {
+      "type": "number"
+    },
+    "nombre_resultado": {
+      "type": "string",
+      "description": "display_name devuelto por Nominatim."
+    },
+    "consultado_en": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "sector_id",
+    "consulta"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
