@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MAP_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_TILE_MAX_ZOOM } from '@/lib/mapTiles';
 import L from 'leaflet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -156,8 +157,9 @@ export default function MapaProyectosOTs() {
           <div className="lg:col-span-2 rounded-lg overflow-hidden shadow-lg border border-slate-200">
             <MapContainer center={center} zoom={12} style={{ height: '100%', width: '100%' }}>
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                attribution='&copy; OpenStreetMap contributors, &copy; CARTO'
+                url={MAP_TILE_URL}
+                attribution={MAP_TILE_ATTRIBUTION}
+                maxZoom={MAP_TILE_MAX_ZOOM}
               />
               {filteredOrders.map(order => (
                 <Marker
