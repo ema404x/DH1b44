@@ -70,7 +70,7 @@ export default async function exportAsistenciasExcel(query, coordinates, fetchPa
     query, groupBy: ['dni', 'operario_nombre'], limit: 1000,
   });
   if (grouped.truncated) throw new Error('El resumen supera los 1000 operarios. Acotá los filtros para descargarlo completo.');
-  const detail = [['Operario', 'DNI', 'Ubicación', 'Entrada', 'Salida', 'Horas trabajadas', 'Distancia', 'Jornada', 'Estado administrativo', 'Notas']];
+  const detail = [['Operario', 'DNI', 'Ubicación', 'Entrada', 'Salida', 'Horas trabajadas', 'Distancia', 'Jornada', 'Estado administrativo', 'Notas', 'Método']];
   // Duraciones y cachés de fórmulas se calculan únicamente para el archivo exportado.
   const totals = new Map();
   for (const i of records) {
@@ -90,7 +90,8 @@ export default async function exportAsistenciasExcel(query, coordinates, fetchPa
     detail.push([i.operario_nombre || '', String(i.dni || ''), i.location_name || '',
       excelDate(i.entrada_timestamp), excelDate(i.salida_timestamp), duration ?? '',
       distance(i, coordinates).text, jornadaLabel,
-      ADMIN[i.estado_admin] || (omitted ? 'Incidencia' : 'Pendiente'), i.notas_admin || '']);
+      ADMIN[i.estado_admin] || (omitted ? 'Incidencia' : 'Pendiente'), i.notas_admin || '',
+      i.metodo === 'cuenta' ? 'Cuenta' : 'QR público']);
   }
   const summary = [['Operario', 'DNI', 'Total fichajes', 'Jornadas abiertas', 'Jornadas cerradas', 'Salidas omitidas', 'Horas trabajadas', 'Incidencias']];
   const groups = [...grouped.rows].sort((a, b) => (a.operario_nombre || '').localeCompare(b.operario_nombre || '', 'es'));
@@ -110,7 +111,7 @@ export default async function exportAsistenciasExcel(query, coordinates, fetchPa
   }
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, sheet(summary, [32, 15, 18, 21, 21, 21, 21, 16], { 6: '[h]:mm' }), 'Resumen por operario');
-  XLSX.utils.book_append_sheet(wb, sheet(detail, [32, 15, 44, 23, 23, 21, 32, 15, 24, 60],
+  XLSX.utils.book_append_sheet(wb, sheet(detail, [32, 15, 44, 23, 23, 21, 32, 15, 24, 60, 14],
     { 3: 'dd/mm/yyyy hh:mm', 4: 'dd/mm/yyyy hh:mm', 5: '[h]:mm' }), 'Detalle');
   wb.Props = { Title: 'Resumen de asistencias', Subject: 'Horarios de Argentina (UTC-3)', Author: 'DH1' };
   XLSX.writeFile(wb, `asistencias_${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true });

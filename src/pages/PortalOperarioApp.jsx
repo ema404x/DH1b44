@@ -20,13 +20,15 @@ import { useOperarioOfflineActions } from '@/hooks/useOperarioOfflineActions';
 import { canActOn } from '@/lib/workOrderActions';
 import OfflineGuard from '@/components/pwa/OfflineGuard';
 import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
-import { irAFichajePublico, EVENTO_ESCANEAR_OPERARIO, EVENTO_ABRIR_OT_OPERARIO } from '@/lib/modoOperario';
+import { EVENTO_ESCANEAR_OPERARIO, EVENTO_ABRIR_OT_OPERARIO } from '@/lib/modoOperario';
+import { useAbrirFichajeQR } from '@/hooks/useAbrirFichajeQR';
 
 // compacto (solo Inicio operario): muestra las OT activas sin encabezado ni filtros.
 // Sin la prop, la pantalla es exactamente la de siempre.
 export default function PortalOperarioApp({ compacto = false, onResumen } = {}) {
   const { currentUser, displayName } = useCurrentUser();
   const navigate = useNavigate();
+  const abrirFichajeQR = useAbrirFichajeQR();
   const [finalizada, setFinalizada] = useState(false); // solo compacto: pantalla "OT finalizada"
   const [reporteOT, setReporteOT] = useState(null);
   const [processing, setProcessing] = useState(null);
@@ -295,9 +297,9 @@ export default function PortalOperarioApp({ compacto = false, onResumen } = {}) 
     // (mostrando el flash verde de "código detectado"). Si lo cerramos acá,
     // el flash nunca se ve y el feedback visual se pierde.
 
-    // Tipo 'fichaje' — redirigir siempre al dominio público dh1m.com
+    // Tipo 'fichaje' — operario con ficha: fichar con cuenta; si no, dominio público dh1m.com
     if (result.type === 'fichaje') {
-      irAFichajePublico(result.value);
+      abrirFichajeQR(result.value);
       return;
     }
 

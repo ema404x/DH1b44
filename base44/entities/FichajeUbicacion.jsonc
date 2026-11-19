@@ -109,6 +109,34 @@
     "sector_id": {
       "type": "string",
       "description": "Sector de la ubicaci\u00f3n (heredado de LocationQR). A\u00edsla los fichajes entre sectores."
+    },
+    "user_id": {
+      "type": "string",
+      "description": "Solo fichaje con cuenta: ID del usuario que fich\u00f3 (lo toma el servidor de la sesi\u00f3n)."
+    },
+    "employee_id": {
+      "type": "string",
+      "description": "Solo fichaje con cuenta: ID de la ficha Employee vinculada a la cuenta."
+    },
+    "metodo": {
+      "type": "string",
+      "enum": [
+        "cuenta",
+        "publico"
+      ],
+      "enumColors": [
+        "blue",
+        "gray"
+      ],
+      "description": "C\u00f3mo se registr\u00f3 la entrada: cuenta = desde la app con sesi\u00f3n; publico = portal p\u00fablico por QR. Los registros sin valor se consideran publico."
+    },
+    "client_op_id": {
+      "type": "string",
+      "description": "Identificador \u00fanico generado en el tel\u00e9fono para la entrada con cuenta. Evita duplicados si se reintenta."
+    },
+    "salida_client_op_id": {
+      "type": "string",
+      "description": "Identificador \u00fanico generado en el tel\u00e9fono para la salida con cuenta. Evita duplicados si se reintenta."
     }
   },
   "required": [

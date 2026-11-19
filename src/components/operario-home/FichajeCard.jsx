@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Clock, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 import QRScannerModal from '@/components/operario/QRScannerModal';
-import { irAFichajePublico, EVENTO_FICHAR_OPERARIO } from '@/lib/modoOperario';
+import { EVENTO_FICHAR_OPERARIO } from '@/lib/modoOperario';
+import { useAbrirFichajeQR } from '@/hooks/useAbrirFichajeQR';
 
 /**
  * Tarjeta "Fichaje" del Inicio operario. Abre el escáner y, con un QR de
@@ -11,6 +12,7 @@ import { irAFichajePublico, EVENTO_FICHAR_OPERARIO } from '@/lib/modoOperario';
  */
 export default function FichajeCard() {
   const [scannerOpen, setScannerOpen] = useState(false);
+  const abrirFichajeQR = useAbrirFichajeQR();
 
   useEffect(() => {
     const abrir = () => setScannerOpen(true);
@@ -20,7 +22,7 @@ export default function FichajeCard() {
 
   const handleResult = (result) => {
     if (result.type === 'fichaje') {
-      irAFichajePublico(result.value);
+      abrirFichajeQR(result.value);
       return;
     }
     toast.error('Ese código no es de fichaje. Escaneá el QR de fichaje de la ubicación.');
