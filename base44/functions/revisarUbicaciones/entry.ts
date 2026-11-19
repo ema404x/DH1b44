@@ -32,8 +32,8 @@ export default async function (req: Request): Promise<Response> {
       }
       case 'geocodificar': {
         const { pendientes } = await cargarItems(sb);
-        const r = await geocodificarLote(sb, pendientes, 20);
-        return Response.json({ ...r, restantes: Math.max(0, pendientes.length - r.procesadas) });
+        const r = await geocodificarLote(sb, pendientes, 15);
+        return Response.json({ ...r, total: pendientes.length, restantes: Math.max(0, pendientes.length - r.procesadas) });
       }
       case 'aplicar': return Response.json(await aplicarCoordenadas(sb, ctx, body));
       case 'ok': return Response.json(await marcarBien(sb, ctx, body));

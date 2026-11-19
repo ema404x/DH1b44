@@ -9,6 +9,7 @@ import useGeocodificar from './useGeocodificar';
 import RevisionFila from './RevisionFila';
 import RevisionDetalle from './RevisionDetalle';
 import RevisionHistorial from './RevisionHistorial';
+import GeoProgreso from './GeoProgreso';
 
 const FILTROS = [{ key: 'problemas', label: 'Para revisar' }, { key: 'todas', label: 'Todas' }];
 const PROBLEMA = ['mal_ubicada', 'sin_coordenadas'];
@@ -49,10 +50,11 @@ export default function RevisarUbicaciones() {
             Se busca cada dirección en OpenStreetMap (una por segundo). Nada cambia hasta que tocás un botón. {data.revisadas > 0 && `${data.revisadas} ya revisadas.`}
           </p>
         </div>
-        {pendientes > 0 && (geo.corriendo
-          ? <Button variant="outline" className="gap-2" onClick={geo.detener}><Square className="h-4 w-4" /> Detener ({pendientes} restantes)</Button>
-          : <Button className="gap-2" onClick={geo.iniciar}><MapPinned className="h-4 w-4" /> Buscar {pendientes} direcciones</Button>)}
+        {geo.corriendo
+          ? <Button variant="outline" className="gap-2" onClick={geo.detener}><Square className="h-4 w-4" /> Detener</Button>
+          : pendientes > 0 && <Button className="gap-2" onClick={() => geo.iniciar(pendientes)}><MapPinned className="h-4 w-4" /> Buscar {pendientes} direcciones</Button>}
       </div>
+      {geo.corriendo && <GeoProgreso {...geo.progreso} />}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_440px]">
         <div className="space-y-3 min-w-0">
