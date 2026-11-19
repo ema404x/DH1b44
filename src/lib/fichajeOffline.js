@@ -13,13 +13,34 @@ const KEY = 'fichaje_habilitacion';
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const AR_OFFSET_MS = 3 * 60 * 60 * 1000;
 
+// Marcas livianas en localStorage: evitan abrir IndexedDB a quien nunca tuvo habilitación.
+const MARCA_HAB = 'dh1-fichaje-hab-user';      // user_id dueño de la habilitación guardada
+const ULTIMO_USUARIO = 'dh1-ultimo-usuario-online'; // último user_id que abrió la app con red
+const LEER_TIMEOUT_MS = 2000;
+
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* silencioso */ } };
+const lsDel = (k) => { try { localStorage.removeItem(k); } catch { /* silencioso */ } };
+
+// Una sola llamada por apertura de la app y por usuario (no se reintenta en la misma apertura).
 let preparadoPara = null;
 
+/** Con red y sesión: recuerda quién abrió la app por última vez (solo localStorage). */
+export function recordarUsuarioOnline(userId) {
+  if (FICHAJE_SIN_CONEXION && userId) lsSet(ULTIMO_USUARIO, userId);
+}
+
+/** Habilitación vigente SOLO si es del último usuario que abrió con red. Nunca cuelga. */
 export async function leerHabilitacion() {
   if (!FICHAJE_SIN_CONEXION) return null;
+  const marca = lsGet(MARCA_HAB);
+  if (!marca || marca !== lsGet(ULTIMO_USUARIO)) return null;
   try {
-    const h = await getMeta(KEY);
-    if (!h?.user_id || typeof h.savedAt !== 'number' || Date.now() - h.savedAt >= MAX_AGE_MS) return null;
+    const h = await Promise.race([
+      getMeta(KEY),
+      new Promise((resolve) => setTimeout(() => resolve(null), LEER_TIMEOUT_MS)),
+    ]);
+    if (!h?.user_id || h.user_id !== marca || typeof h.savedAt !== 'number' || Date.now() - h.savedAt >= MAX_AGE_MS) return null;
     return h;
   } catch {
     return null;
@@ -27,7 +48,8 @@ export async function leerHabilitacion() {
 }
 
 export function borrarHabilitacion() {
-  preparadoPara = null;
+  if (!lsGet(MARCA_HAB)) return Promise.resolve(); // nunca hubo: no se toca IndexedDB
+  lsDel(MARCA_HAB);
   return deleteMeta(KEY).catch(() => {});
 }
 
@@ -45,7 +67,7 @@ export async function prepararFichajeSinConexion(user) {
   try {
     const { data } = await base44.functions.invoke('ficharConCuenta', { action: 'preparar' });
     if (data?.code === 'no_elegible') { await borrarHabilitacion(); return; }
-    if (!data?.ok || data.user_id !== user.id) { preparadoPara = null; return; }
+    if (!data?.ok || data.user_id !== user.id) return;
     await putMeta(KEY, {
       user_id: data.user_id,
       user: {
@@ -59,9 +81,10 @@ export async function prepararFichajeSinConexion(user) {
       abierta: data.abierta || null,
       savedAt: Date.now(),
     });
+    lsSet(MARCA_HAB, user.id);
     precargarPantallas();
   } catch {
-    preparadoPara = null; // sin red o error: se reintenta en la próxima apertura
+    // Sin red o error: no se reintenta hasta la próxima apertura de la app.
   }
 }
 

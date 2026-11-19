@@ -17,11 +17,34 @@ const MARKER = 'dh1-offline-has-ops';
 const PERSIST_ASKED = 'dh1-offline-persist-asked';
 const MIN_FREE_BYTES = 50 * 1024 * 1024;
 
+const BLOCKED_TIMEOUT_MS = 3000;
+
 let dbPromise = null;
 function openDB() {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      let req;
+      try {
+        req = indexedDB.open(DB_NAME, DB_VERSION);
+      } catch (e) {
+        // Sin IndexedDB (navegador viejo / privado): falla esta operación, la app sigue.
+        dbPromise = null;
+        reject(e);
+        return;
+      }
+      let settled = false;
+      let blockedTimer = null;
+      // Otra pestaña abierta con la versión vieja no suelta la base: no esperar
+      // para siempre. Si después se destraba, se cierra y se reabre en el próximo uso.
+      req.onblocked = () => {
+        if (blockedTimer) return;
+        blockedTimer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          dbPromise = null;
+          reject(new Error('Cerrá las otras pestañas de la app para guardar en el dispositivo.'));
+        }, BLOCKED_TIMEOUT_MS);
+      };
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(OPS)) db.createObjectStore(OPS, { keyPath: 'id' });
@@ -31,12 +54,21 @@ function openDB() {
         if (!db.objectStoreNames.contains(META)) db.createObjectStore(META, { keyPath: 'key' });
       };
       req.onsuccess = () => {
+        clearTimeout(blockedTimer);
         const db = req.result;
+        if (settled) { db.close(); return; } // llegó tarde, ya se avisó el error
+        settled = true;
         // Otra pestaña con una versión más nueva: se cierra para no bloquearla.
         db.onversionchange = () => { db.close(); dbPromise = null; };
         resolve(db);
       };
-      req.onerror = () => { dbPromise = null; reject(req.error); };
+      req.onerror = () => {
+        clearTimeout(blockedTimer);
+        if (settled) return;
+        settled = true;
+        dbPromise = null;
+        reject(req.error);
+      };
     });
   }
   return dbPromise;

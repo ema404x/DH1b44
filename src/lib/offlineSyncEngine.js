@@ -14,6 +14,7 @@ import { queryClientInstance } from '@/lib/query-client';
 import { getClave, getNombre } from '@/lib/operarioClave';
 import { resolvePendingPhotos, uploadPortalPhoto } from '@/lib/offlineSync';
 import * as store from '@/lib/offlineStore';
+import { FICHAJE_SIN_CONEXION } from '@/lib/fichajeCuenta';
 
 const BACKOFF_MS = [5000, 15000, 60000, 300000];
 const LOCK_KEY = 'dh1-offline-sync-lock';
@@ -424,6 +425,7 @@ export async function enqueueCreateSolicitudOT(data, photos = []) {
 // Fichaje con cuenta sin señal. f: { user_id, location_qr_id, location_name, tipo,
 // hora_dispositivo, latitude, longitude, accuracy }. Arranca el envío automático.
 export async function enqueueFichaje(f) {
+  if (!FICHAJE_SIN_CONEXION) throw new Error('Fichaje sin conexión desactivado');
   const id = store.newOpId();
   await store.addOps([{
     op: {
