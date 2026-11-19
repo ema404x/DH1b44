@@ -41,17 +41,32 @@ function sheet(rows, widths, formats = {}) {
   return ws;
 }
 
-export default async function exportAsistenciasExcel(query, coordinates) {
+// Agrupa en memoria (mismo formato que aggregate) cuando las páginas llegan por servidor.
+function groupRecords(records) {
+  const map = new Map();
+  for (const r of records) {
+    const key = JSON.stringify([r.dni || '', r.operario_nombre || '']);
+    const g = map.get(key) || { dni: r.dni || '', operario_nombre: r.operario_nombre || '', count: 0 };
+    g.count += 1;
+    map.set(key, g);
+  }
+  return { rows: [...map.values()], truncated: false };
+}
+
+// fetchPage es opcional (Control de Personal). Sin él, se exporta igual que siempre.
+export default async function exportAsistenciasExcel(query, coordinates, fetchPage = null) {
   // El archivo incluye todas las páginas que coinciden con los filtros, no solo las 200 visibles.
   const records = [];
   let cursor;
   do {
-    const page = await base44.entities.FichajeUbicacion.filter(query, { sort: '-entrada_timestamp', limit: 500, cursor });
+    const page = fetchPage
+      ? await fetchPage(query, { limit: 500, ...(cursor ? { cursor } : {}) })
+      : await base44.entities.FichajeUbicacion.filter(query, { sort: '-entrada_timestamp', limit: 500, cursor });
     records.push(...page.items);
     cursor = page.has_more ? page.next_cursor : undefined;
   } while (cursor);
   if (!records.length) return 0;
-  const grouped = await base44.entities.FichajeUbicacion.aggregate({
+  const grouped = fetchPage ? groupRecords(records) : await base44.entities.FichajeUbicacion.aggregate({
     query, groupBy: ['dni', 'operario_nombre'], limit: 1000,
   });
   if (grouped.truncated) throw new Error('El resumen supera los 1000 operarios. Acotá los filtros para descargarlo completo.');

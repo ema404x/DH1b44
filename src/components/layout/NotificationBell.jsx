@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck, AlertTriangle, Info, CheckCircle2, X, AlertCircle, Package, Wrench, Receipt, ClipboardList, Clock } from 'lucide-react';
+import { Bell, CheckCheck, AlertTriangle, Info, CheckCircle2, X, AlertCircle, Package, Wrench, Receipt, ClipboardList, Clock, UserX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -28,6 +28,7 @@ const TIPO_UI = {
   firma_certificado: { icon: Receipt,       path: '/certificados', single: 'Certificado para firmar', plural: 'Certificados para firmar' },
   aprobacion_certificado: { icon: CheckCircle2, path: '/aprobacion-certificados', single: 'Certificado para aprobar', plural: 'Certificados para aprobar' },
   factura_vencida:   { icon: Receipt,       path: '/facturacion', single: 'Factura vencida',       plural: 'Facturas vencidas' },
+  no_ficharon:       { icon: UserX,         path: '/control-personal', single: 'Operario sin fichar', plural: 'Operarios sin fichar' },
 };
 
 const NIVEL_RANK = { critical: 0, warning: 1, info: 2 };
@@ -80,7 +81,26 @@ export default function NotificationBell() {
     });
   }, [alertas]);
 
-  const allNotifs = [...systemAlerts, ...notifications];
+  // Aviso de Control de Personal (consulta aparte; no toca los avisos existentes).
+  // El servidor devuelve count 0 si no corresponde (sin acceso, sin horario,
+  // día no laboral o antes de la hora de entrada más la tolerancia).
+  const { data: avisoPersonal } = useQuery({
+    queryKey: ['aviso-control-personal'],
+    queryFn: async () => (await base44.functions.invoke('getControlPersonal', { action: 'aviso' })).data,
+    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+  const nFaltan = avisoPersonal?.count || 0;
+  const sistema = nFaltan > 0
+    ? [...systemAlerts, {
+      id: 'no_ficharon', iconKey: 'no_ficharon', path: '/control-personal', type: 'warning', read: false,
+      title: nFaltan === 1 ? '1 operario no fichó hoy' : `${nFaltan} operarios no ficharon hoy`,
+      message: 'Pasó la hora de entrada del sector y todavía no registraron su entrada.',
+    }]
+    : systemAlerts;
+
+  const allNotifs = [...sistema, ...notifications];
   const unread = allNotifs.filter(n => !n.read).length;
 
   const handleOpen = () => {
@@ -88,6 +108,7 @@ export default function NotificationBell() {
     setOpen(newOpen);
     if (newOpen) {
       qc.invalidateQueries({ queryKey: ['alertas-activas'] });
+      qc.invalidateQueries({ queryKey: ['aviso-control-personal'] });
     }
   };
 
@@ -152,12 +173,12 @@ export default function NotificationBell() {
               ) : (
                 <div className="p-2 space-y-1">
                   {/* Alertas del sistema agrupadas arriba */}
-                  {systemAlerts.length > 0 && (
+                  {sistema.length > 0 && (
                     <>
                       <div className="px-2 pt-1 pb-0.5">
                         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Sistema</span>
                       </div>
-                      {systemAlerts.map(n => {
+                      {sistema.map(n => {
                         const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.info;
                         const Icon = (TIPO_UI[n.iconKey] || {}).icon || cfg.icon;
                         return (

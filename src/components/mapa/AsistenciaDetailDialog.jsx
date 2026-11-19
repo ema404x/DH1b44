@@ -76,7 +76,9 @@ function SignatureBlock({ title, timestamp, signatureUrl, latitude, longitude, i
   );
 }
 
-export default function AsistenciaDetailDialog({ fichaje, onClose, locCoords }) {
+// onSave es opcional: si viene (Control de Personal), la revisión se guarda por
+// servidor. Sin onSave se guarda directo, como siempre lo hizo el Mapa.
+export default function AsistenciaDetailDialog({ fichaje, onClose, locCoords, onSave = null }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [estadoAdmin, setEstadoAdmin] = useState('pendiente');
@@ -93,12 +95,16 @@ export default function AsistenciaDetailDialog({ fichaje, onClose, locCoords }) 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await base44.entities.FichajeUbicacion.update(fichaje.id, {
-        estado_admin: estadoAdmin,
-        notas_admin: notas.trim(),
-        revisado_por: user?.full_name || user?.email || 'Sistema',
-        fecha_revision: new Date().toISOString(),
-      });
+      if (onSave) {
+        await onSave(fichaje.id, { estado_admin: estadoAdmin, notas_admin: notas.trim() });
+      } else {
+        await base44.entities.FichajeUbicacion.update(fichaje.id, {
+          estado_admin: estadoAdmin,
+          notas_admin: notas.trim(),
+          revisado_por: user?.full_name || user?.email || 'Sistema',
+          fecha_revision: new Date().toISOString(),
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ['fichajes-ubicacion'] });
       toast.success('Estado administrativo actualizado');
       onClose();

@@ -59,9 +59,18 @@ export function canSwitchSector(platformRole, employeeRole) {
 // (migración no-rompe-nada). Una vez que el admin guarda, el valor explícito persiste.
 const MIGRATION_DEFAULT_READ = new Set(['MisOrdenes']);
 
-export function hasModulePermission(modulePerms, action, moduleKey) {
+// Control de Personal: mientras el rol no lo tenga configurado, lo ven por
+// defecto los roles admin/gerente (nivel administrativo) y jefe de sitio.
+export function controlPersonalPorDefecto(employeeRole) {
+  return isAdminLevelRole(employeeRole) || isJefeSitioRole(employeeRole);
+}
+const ROLE_DEFAULT_READ = { ControlPersonal: controlPersonalPorDefecto };
+
+// employeeRole es opcional: solo lo usan los módulos de ROLE_DEFAULT_READ.
+export function hasModulePermission(modulePerms, action, moduleKey, employeeRole) {
   // Módulo ausente de los permisos del rol (rol creado antes de la clave).
   if (!modulePerms) {
+    if (action === 'read' && ROLE_DEFAULT_READ[moduleKey]?.(employeeRole)) return true;
     return action === 'read' && MIGRATION_DEFAULT_READ.has(moduleKey);
   }
   if (modulePerms[action] === true) return true;

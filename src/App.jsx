@@ -29,7 +29,7 @@ const {
   Tutorial, ImportarDatos, ConfigAlertas, InformacionGeneral, Emergencias,
   MapaJefes, InspeccionColegio, AprobacionCertificados, ControlRiesgo,
   CertificacionObras, CalendarioInformes, CrearOT, Foro, Calefaccion,
-  Sectores, Rutinas, PortalOperarioApp,
+  Sectores, Rutinas, PortalOperarioApp, ControlPersonal,
 } = lazyPages;
 import ProtectedPage from '@/components/shared/ProtectedPage';
 import DesktopOnlyGate from '@/components/shared/DesktopOnlyGate';
@@ -154,6 +154,7 @@ const AuthenticatedApp = () => {
         <Route path="/rutinas" element={<ProtectedPage moduleKey="Rutinas"><Rutinas /></ProtectedPage>} />
         <Route path="/sectores" element={<ProtectedPage moduleKey="Sectores"><Sectores /></ProtectedPage>} />
         <Route path="/mis-ots" element={<ProtectedPage moduleKey="MisOrdenes"><PortalOperarioApp /></ProtectedPage>} />
+        <Route path="/control-personal" element={<ProtectedPage moduleKey="ControlPersonal"><ControlPersonal /></ProtectedPage>} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

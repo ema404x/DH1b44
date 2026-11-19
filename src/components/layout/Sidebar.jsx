@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, ChevronDown, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet, HardHat, Building2
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet, HardHat, Building2, UserCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -57,6 +57,7 @@ const navGroups = [
     items: [
       { label: 'Información General', icon: Info, path: '/informacion-general' },
       { label: 'Empleados', icon: UserCog, path: '/empleados' },
+      { label: 'Control de Personal', icon: UserCheck, path: '/control-personal' },
       { label: 'Mapa de Ubicaciones', icon: MapPin, path: '/mapa' },
       { label: 'Mapa Jefes de Sitio', icon: MapPin, path: '/mapa-jefes' },
       { label: 'Inventario', icon: Package, path: '/inventario' },
@@ -100,7 +101,7 @@ const routeToModule = {
   '/empleados': 'Employee', '/mapa': 'Mapa', '/mapa-jefes': 'MapaJefes',
   '/inventario': 'Inventory', '/alertas': 'Alertas', '/permisos': 'Permisos',
   '/auditoria': 'AuditLog', '/seguridad': 'Seguridad', '/sectores': 'Sectores', '/calefaccion': 'Calefaccion',
-  '/rutinas': 'Rutinas', '/mis-ots': 'MisOrdenes', '/foro': 'Foro', '/tutorial': null, '/importar': 'ImportarDatos',
+  '/rutinas': 'Rutinas', '/mis-ots': 'MisOrdenes', '/control-personal': 'ControlPersonal', '/foro': 'Foro', '/tutorial': null, '/importar': 'ImportarDatos',
 };
 
 const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesAprobacion }) {
@@ -237,7 +238,7 @@ export default function Sidebar({ open, onOpenChange }) {
         }
         const moduleKey = routeToModule[item.path];
         if (!moduleKey) return true;
-        return hasModulePermission(userPermissions[moduleKey], 'read', moduleKey);
+        return hasModulePermission(userPermissions[moduleKey], 'read', moduleKey, userPermissions._employeeRole);
       })
     })).filter(group => group.items.length > 0);
   }, [user?.role, userPermissions]);
