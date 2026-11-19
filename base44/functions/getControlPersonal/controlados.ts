@@ -1,21 +1,18 @@
 // Quiénes cuentan para asistencia (tardanzas, ausencias y aviso de la campana):
-// solo empleados activos con rol operario, operario_portal o tecnico, excluyendo
-// cuentas de tablet (nombre igual al de una Tablet del sector).
-import { normalizeRole } from '../../shared/roles.ts';
+// solo empleados activos que cumplen esOperario, excluyendo cuentas de tablet
+// (nombre igual al de una Tablet del sector).
 import { fetchPaged, dniOf } from './util.ts';
-
-export const ROLES_CONTROL = ['operario', 'operario_portal', 'tecnico'];
+import { esOperario } from './operario.ts';
 
 const nombreNorm = (s: any) => String(s || '').toLowerCase().normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
-const rolNorm = (r: any) => normalizeRole(r).replace(/\s+/g, '_');
 
 export async function cargarControlados(sb: any, scope: any) {
   const tablets = await fetchPaged(sb, 'Tablet', { sector_id: scope.sector });
   const nombresTablet = new Set(tablets.map((t: any) => nombreNorm(t.nombre)).filter(Boolean));
   const empleados = scope.visibleEmployees.filter((e: any) =>
     (e.status || 'activo') === 'activo' &&
-    ROLES_CONTROL.includes(rolNorm(e.role)) &&
+    esOperario(e.role) &&
     !nombresTablet.has(nombreNorm(e.full_name)));
 
   // Cruce: por DNI (solo dígitos); si la ficha no tiene DNI, por nombre sin acentos.

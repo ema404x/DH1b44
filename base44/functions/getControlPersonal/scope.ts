@@ -8,6 +8,7 @@ import { isAdminLevelRole, isJefeSitioRole, isFieldRole } from '../../shared/rol
 import { loadRolePermissions, norm } from '../../shared/visibilityResolver.ts';
 import { fetchPaged, dniOf, esOmitida } from './util.ts';
 import { distanciaFichaje } from './geo.ts';
+import { esOperario, clasificadorFichas } from './operario.ts';
 
 export async function resolveAcceso(sb: any, user: any) {
   const { sector, employee } = await resolveCallerSectorCanonical(sb, user);
@@ -39,7 +40,10 @@ export async function resolveScope(sb: any, acceso: any) {
   const jefe = norm(employee?.full_name || user.full_name || '');
   const esMio = (v: any) => { const n = norm(v); return Boolean(n) && (n === jefe || n === norm(email)); };
 
-  const visibleEmployees = verTodo ? employees : employees.filter((e: any) => e.id !== employee?.id && esMio(e.assigned_jefe_sitio));
+  // Regla del módulo: solo operarios (ver operario.ts).
+  const fichas = clasificadorFichas(employees, variantesNombre);
+  const visibleEmployees = (verTodo ? employees : employees.filter((e: any) => e.id !== employee?.id && esMio(e.assigned_jefe_sitio)))
+    .filter((e: any) => esOperario(e.role));
   const visibleLocations = verTodo ? locations : locations.filter((l: any) =>
     (l.jefe_sitio_email && String(l.jefe_sitio_email).toLowerCase().trim() === email) || esMio(l.jefe_sitio) ||
     // En los datos actuales el jefe suele figurar en la cuadrilla asignada de la ubicación.
@@ -58,6 +62,7 @@ export async function resolveScope(sb: any, acceso: any) {
 
   const fichajeVisible = (f: any) => {
     if (f.sector_id !== sector) return false;
+    if (fichas.excluido(f)) return false;
     if (verTodo) return true;
     return locIds.has(f.location_qr_id) ||
       (f.jefe_sitio_email && String(f.jefe_sitio_email).toLowerCase().trim() === email) ||
@@ -66,6 +71,13 @@ export async function resolveScope(sb: any, acceso: any) {
 
   // Cláusula para consultas paginadas (Asistencias / Excel). false = nada visible.
   const visibilityClause = () => {
+    const vis = visibilidadBase();
+    if (vis === false) return false;
+    const op = fichas.clausula();
+    if (!op) return vis;
+    return vis ? { $and: [vis, op] } : op;
+  };
+  const visibilidadBase = () => {
     if (verTodo) return null;
     const or: any[] = [];
     if (locIds.size) or.push({ location_qr_id: { $in: [...locIds] } });
@@ -85,12 +97,12 @@ export async function resolveScope(sb: any, acceso: any) {
       location_qr_id: f.location_qr_id, location_name: f.location_name || 'Sin ubicación',
       entrada_timestamp: f.entrada_timestamp, salida_timestamp: f.salida_timestamp || null,
       estado: f.estado, estado_admin: f.estado_admin || 'pendiente', salida_omitida: esOmitida(f),
-      far: d.status === 'far', distancia: d.text, employee_id: emp?.id || null,
+      far: d.status === 'far', distancia: d.text, employee_id: emp?.id || null, sin_ficha: fichas.sinFicha(f),
       persona: emp ? `e:${emp.id}` : `f:${dniOf(f.dni) || norm(f.operario_nombre)}`, tarde: false,
     };
   };
 
-  return { ...acceso, visibleEmployees, visibleLocations, coords, matchEmployee, fichajeVisible, visibilityClause, leanFichaje, variantesNombre };
+  return { ...acceso, visibleEmployees, visibleLocations, coords, matchEmployee, fichajeVisible, visibilityClause, leanFichaje, variantesNombre, fichas };
 }
 
 export const leanEmpleado = (e: any) => ({

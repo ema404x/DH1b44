@@ -23,7 +23,7 @@ export async function accionLugares(sb: any, scope: any) {
     return {
       id: l.id, name: l.name, address: l.address || '', color: l.color || 'blue', is_active: l.is_active !== false,
       latitude: l.latitude, longitude: l.longitude, jefe_sitio: l.jefe_sitio || '',
-      assigned_employees: l.assigned_employees || [],
+      assigned_employees: (l.assigned_employees || []).filter((n: any) => !scope.fichas.esNoOperarioNombre(n)),
       hoy: g ? [...g.hoy.values()] : [], semana: g ? [...g.semana].sort() : [], total: g?.total || 0,
     };
   }).sort((a: any, b: any) => String(a.name).localeCompare(String(b.name), 'es'));
