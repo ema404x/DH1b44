@@ -11,7 +11,7 @@ export const SEMANA = [
 ];
 
 // Tabla lunes a domingo: laborable + entrada + salida por día.
-export default function HorarioSemana({ value, onChange, disabled }) {
+function HorarioSemana({ value, onChange, disabled }) {
   const setDia = (k, patch) => onChange({ ...value, [k]: { ...value[k], ...patch } });
   const copiar = (k) => {
     const { hora_entrada, hora_salida } = value[k];
@@ -43,3 +43,5 @@ export default function HorarioSemana({ value, onChange, disabled }) {
     </div>
   );
 }
+
+export default React.memo(HorarioSemana);

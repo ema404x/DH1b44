@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Save, Lock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,13 +22,29 @@ function semanaDesde(h) {
   return Object.fromEntries(SEMANA.map((d) => [d.key, dia((h.dias_laborales || []).includes(d.key), h.hora_entrada, h.hora_salida)]));
 }
 
+const formDesde = (h) => ({
+  horarios_por_dia: semanaDesde(h),
+  tolerancia_minutos: h?.tolerancia_minutos ?? 10,
+  activo: h?.activo ?? true,
+});
+// Firma estable del horario guardado: solo cambia si cambia el registro en el servidor.
+const firmaDe = (h) => (h ? `${h.id}|${h.updated_date || ''}` : '');
+
 export default function HorarioConfig() {
   const qc = useQueryClient();
-  const [form, setForm] = useState({ horarios_por_dia: POR_DEFECTO, tolerancia_minutos: 10, activo: true });
-  const { data, isLoading, error } = useQuery({ queryKey: ['control-personal', 'horario'], queryFn: () => controlPersonal('horario') });
+  const queryKey = ['control-personal', 'horario'];
+  // Inicialización perezosa: se calcula una sola vez (desde la caché si ya está).
+  const [form, setForm] = useState(() => formDesde(qc.getQueryData(queryKey)?.horario));
+  const { data, isLoading, error } = useQuery({ queryKey, queryFn: () => controlPersonal('horario') });
+  const firma = firmaDe(data?.horario);
+  const ultimaFirma = useRef(firmaDe(qc.getQueryData(queryKey)?.horario));
   useEffect(() => {
-    if (data?.horario) setForm({ horarios_por_dia: semanaDesde(data.horario), tolerancia_minutos: data.horario.tolerancia_minutos, activo: data.horario.activo });
-  }, [data]);
+    // Dependencia primitiva (string): solo re-inicializa si llega un horario distinto.
+    if (!firma || firma === ultimaFirma.current) return;
+    ultimaFirma.current = firma;
+    setForm(formDesde(data.horario));
+  }, [firma]); // eslint-disable-line react-hooks/exhaustive-deps
+  const setSemana = useCallback((v) => setForm((f) => ({ ...f, horarios_por_dia: v })), []);
   const guardar = useMutation({
     mutationFn: () => controlPersonal('guardarHorario', form),
     onSuccess: () => { toast.success('Horario guardado'); qc.invalidateQueries({ queryKey: ['control-personal'] }); },
@@ -47,7 +63,7 @@ export default function HorarioConfig() {
         {!data.horario && <p className="text-xs text-amber-400 mt-2">Todavía no hay horario cargado: no se calculan tardanzas ni ausencias.</p>}
         {ro && <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5"><Lock className="h-3.5 w-3.5" /> Solo admin y gerente pueden editarlo.</p>}
       </div>
-      <HorarioSemana value={form.horarios_por_dia} onChange={set('horarios_por_dia')} disabled={ro} />
+      <HorarioSemana value={form.horarios_por_dia} onChange={setSemana} disabled={ro} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tolerancia general (min)</p>
