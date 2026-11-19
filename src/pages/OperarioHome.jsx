@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PortalOperarioApp from '@/pages/PortalOperarioApp';
 import OperarioHeader from '@/components/operario-home/OperarioHeader';
 import FichajeCard from '@/components/operario-home/FichajeCard';
@@ -29,19 +28,13 @@ export default function OperarioHome() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 page-enter">
       <OperarioHeader />
       <FichajeCard />
+      <AccesosOperario onEmergencia={() => setEmergenciaOpen(true)} />
 
       <section>
-        <div className="mb-1 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mis OT de hoy</h2>
-          <Link to="/mis-ots" className="-mr-2 inline-flex h-12 items-center gap-1 rounded-lg px-2 text-sm font-medium text-primary active:bg-accent">
-            Ver todas
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        </div>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mis OT</h2>
         <PortalOperarioApp compacto />
       </section>
 
-      <AccesosOperario onEmergencia={() => setEmergenciaOpen(true)} />
       <EmergenciaRapidaDialog open={emergenciaOpen} onOpenChange={setEmergenciaOpen} />
     </div>
   );

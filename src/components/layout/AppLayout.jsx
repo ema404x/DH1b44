@@ -125,7 +125,7 @@ export default function AppLayout() {
         </header>}
         {/* Page content — slide transitions + pull-to-refresh */}
         <main ref={mainRef} onScroll={handleScroll} className={modoOperario
-          ? 'main-scroll flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 lg:p-6 pb-28 sm:pb-28 lg:pb-28'
+          ? 'main-scroll flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 lg:p-6 pb-36 sm:pb-36 lg:pb-36'
           : 'main-scroll flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 lg:p-6 pb-24 lg:pb-6'} style={{ background: 'transparent', scrollBehavior: 'smooth' }}>
           {isDesktopOnlyRoute ? (
             <PageErrorBoundary>

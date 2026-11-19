@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { parseFechaLocal } from '@/lib/fechaLocal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
@@ -558,7 +559,7 @@ export default function PortalOperarioApp({ compacto = false } = {}) {
       {/* SECCIÓN 2: Por iniciar */}
       {porIniciar.length > 0 && (
         <Seccion titulo="Para Empezar" subtitulo="Tocá Iniciar cuando llegues al sitio" icon={Play} color="blue">
-          {porIniciar.map(ot => (
+          {(compacto ? porIniciar.slice(0, 5) : porIniciar).map(ot => (
             <OTCard
               key={ot.id}
               ot={ot}
@@ -572,7 +573,7 @@ export default function PortalOperarioApp({ compacto = false } = {}) {
       )}
 
       {/* SECCIÓN 3: En validación (solo lectura) */}
-      {enValidacion.length > 0 && (
+      {!compacto && enValidacion.length > 0 && (
         <Seccion titulo="Enviadas al Jefe" subtitulo="Esperando validación del Jefe de Sitio" icon={Lock} color="amber">
           {enValidacion.map(ot => (
             <OTCard key={ot.id} ot={ot} processing={false} locked />
@@ -581,15 +582,17 @@ export default function PortalOperarioApp({ compacto = false } = {}) {
       )}
 
       {/* Empty state */}
-      {misOTsFiltradas.length === 0 && (
+      {(compacto ? enProgreso.length + porIniciar.length === 0 : misOTsFiltradas.length === 0) && (
         <div className={compacto
           ? 'flex flex-col items-center justify-center py-8 gap-3 text-slate-500'
           : 'flex flex-col items-center justify-center py-24 gap-3 text-slate-500'}>
           <CheckCircle2 className="h-12 w-12 text-slate-700" />
           <p className="text-sm font-medium">
-            {misOTs.length === 0 ? 'No tenés órdenes asignadas' : 'Ninguna orden coincide con los filtros'}
+            {compacto
+              ? (misOTs.length === 0 ? 'No tenés OT asignadas' : 'No tenés OT en progreso ni para empezar')
+              : misOTs.length === 0 ? 'No tenés órdenes asignadas' : 'Ninguna orden coincide con los filtros'}
           </p>
-          {misOTs.length > 0 && (
+          {!compacto && misOTs.length > 0 && (
             <button onClick={limpiarFiltros} className="text-xs text-primary hover:underline">
               Limpiar filtros
             </button>
@@ -597,6 +600,16 @@ export default function PortalOperarioApp({ compacto = false } = {}) {
         </div>
       )}
       </>
+      )}
+
+      {compacto && misOTs.length > 0 && (
+        <Link
+          to="/mis-ots"
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-semibold text-card-foreground transition-colors active:bg-accent"
+        >
+          Ver todas mis OT ({misOTs.length})
+          <ArrowRight className="h-5 w-5 text-muted-foreground" />
+        </Link>
       )}
 
       {/* Formulario de reporte */}
