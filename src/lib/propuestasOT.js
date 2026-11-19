@@ -46,7 +46,11 @@ export const PRIORIDADES = {
 };
 
 export async function resolverPropuesta(payload) {
-  const res = await base44.functions.invoke('resolverSolicitudOT', payload);
+  const res = await base44.functions.invoke('resolverSolicitudOT', payload).catch((e) => {
+    // Mostrar el motivo real del servidor, no el genérico "status code 500".
+    const d = e?.response?.data;
+    throw new Error(d?.error || d?.message || e.message);
+  });
   if (res?.data?.error) throw new Error(res.data.error);
   return res.data;
 }
