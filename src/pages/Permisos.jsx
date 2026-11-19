@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
+import { controlPersonalPorDefecto } from '@/lib/roles';
 
 const MODULES = [
   { key: 'Dashboard', label: 'Dashboard', group: 'General' },
@@ -41,6 +42,7 @@ const MODULES = [
   { key: 'CertificacionObras', label: 'Certificación de Obras', group: 'Finanzas' },
   { key: 'Invoice', label: 'Facturación', group: 'Finanzas' },
   { key: 'Employee', label: 'Empleados', group: 'Administración' },
+  { key: 'ControlPersonal', label: 'Control de Personal', group: 'Administración' },
   { key: 'Inventory', label: 'Inventario', group: 'Administración' },
   { key: 'Asset', label: 'Activos (Catálogo)', group: 'Administración' },
   { key: 'PendienteSAP', label: 'Pendientes SAP', group: 'Administración' },
@@ -113,6 +115,8 @@ function RoleCard({ role, onDelete, onToggle, deleteIsPending }) {
         // inicializar, para que la UI refleje el acceso actual y el admin pueda
         // desmarcar para revocar.
         if (mod.key === 'MisOrdenes') def.read = true;
+        // Control de Personal: acceso por defecto para admin, gerente y jefe de sitio.
+        if (mod.key === 'ControlPersonal' && controlPersonalPorDefecto(role.role_name)) def.read = true;
         normalized[mod.key] = def;
       }
     });

@@ -37,6 +37,6 @@ export function usePermission(moduleKey, action = 'read') {
     return { allowed: false, loading: false, vinculationFailed: false };
   }
 
-  const allowed = hasModulePermission(userPermissions?.[moduleKey], action, moduleKey);
+  const allowed = hasModulePermission(userPermissions?.[moduleKey], action, moduleKey, userPermissions?._employeeRole);
   return { allowed, loading: false, vinculationFailed: false };
 }
