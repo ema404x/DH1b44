@@ -8,6 +8,10 @@ import RelojVivo from '@/components/fichar-cuenta/RelojVivo';
 import GpsEstadoCuenta from '@/components/fichar-cuenta/GpsEstadoCuenta';
 import ComprobanteFichaje from '@/components/fichar-cuenta/ComprobanteFichaje';
 import SinConexionFichaje from '@/components/fichar-cuenta/SinConexionFichaje';
+import FichajeOfflineFlow from '@/components/fichar-cuenta/FichajeOfflineFlow';
+import FichajesPendientesAviso from '@/components/fichar-cuenta/FichajesPendientesAviso';
+import { FICHAJE_SIN_CONEXION } from '@/lib/fichajeCuenta';
+import { isNetworkError } from '@/lib/offlineSession';
 
 function useOnline() {
   const [online, setOnline] = useState(() => navigator.onLine);
@@ -39,8 +43,19 @@ export default function FicharCuenta() {
   if (resultado) return wrap(<ComprobanteFichaje resultado={resultado} onVolver={volver} />);
   if (!locId) return wrap(<p className="rounded-2xl border border-border bg-card p-5 text-center text-sm text-muted-foreground">El código QR no tiene una ubicación válida.</p>);
   if (!online || estado.isError || errorEnvio?.code === 'red') {
-    return wrap(<SinConexionFichaje locId={locId} mensaje={errorEnvio?.code === 'red' ? errorEnvio.mensaje : null}
-      onReintentar={online ? () => (errorEnvio?.code === 'red' && gps ? confirmar(gps) : estado.refetch()) : null} />);
+    const mensajeHoy = (
+      <SinConexionFichaje locId={locId} mensaje={errorEnvio?.code === 'red' ? errorEnvio.mensaje : null}
+        onReintentar={online ? () => (errorEnvio?.code === 'red' && gps ? confirmar(gps) : estado.refetch()) : null} />
+    );
+    // Sin señal real (no un error del servidor): fichar igual y guardar en el teléfono.
+    const sinSenal = !online || errorEnvio?.code === 'red' || isNetworkError(estado.error);
+    if (FICHAJE_SIN_CONEXION && sinSenal) {
+      return wrap(<>
+        <FichajesPendientesAviso />
+        <FichajeOfflineFlow locId={locId} gpsState={{ gps, loading: gpsLoading, error: gpsError, requestGps }} onVolver={volver} fallback={mensajeHoy} />
+      </>);
+    }
+    return wrap(mensajeHoy);
   }
   if (estado.isLoading || !data || data.code === 'no_elegible') {
     return wrap(<div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>);

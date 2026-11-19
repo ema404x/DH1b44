@@ -29,7 +29,7 @@ const {
   Tutorial, ImportarDatos, ConfigAlertas, InformacionGeneral, Emergencias,
   MapaJefes, InspeccionColegio, AprobacionCertificados, ControlRiesgo,
   CertificacionObras, CalendarioInformes, CrearOT, Foro, Calefaccion,
-  Sectores, Rutinas, PortalOperarioApp, OperarioHome, PropuestasOT, ProponerOT, ControlPersonal, FicharCuenta,
+  Sectores, Rutinas, PortalOperarioApp, OperarioHome, PropuestasOT, ProponerOT, ControlPersonal, FicharCuenta, FichajeSinConexionApp,
 } = lazyPages;
 import CrearOTSegunModo from '@/components/operario-home/CrearOTSegunModo';
 import InicioSegunModo from '@/components/operario-home/InicioSegunModo';
@@ -84,7 +84,7 @@ class ErrorBoundary extends React.Component {
 }
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, isSlowConnection, checkAppState } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, isSlowConnection, checkAppState, fichajeSoloOffline } = useAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -112,6 +112,11 @@ const AuthenticatedApp = () => {
       navigateToLogin();
       return null;
     }
+  }
+
+  // Sin red y sin modo sin conexión de lectura: solo el fichaje con cuenta.
+  if (fichajeSoloOffline) {
+    return <Suspense fallback={<PageLoader />}><FichajeSinConexionApp /></Suspense>;
   }
 
   return (

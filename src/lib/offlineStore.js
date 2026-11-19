@@ -9,27 +9,66 @@
  * transacción de IndexedDB terminó (oncomplete), no antes.
  */
 const DB_NAME = 'dh1-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const OPS = 'ops';
 const BLOBS = 'blobs';
+const META = 'meta'; // datos guardados por clave (ej. habilitación para fichar sin señal)
 const MARKER = 'dh1-offline-has-ops';
 const PERSIST_ASKED = 'dh1-offline-persist-asked';
 const MIN_FREE_BYTES = 50 * 1024 * 1024;
+
+const BLOCKED_TIMEOUT_MS = 3000;
 
 let dbPromise = null;
 function openDB() {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      let req;
+      try {
+        req = indexedDB.open(DB_NAME, DB_VERSION);
+      } catch (e) {
+        // Sin IndexedDB (navegador viejo / privado): falla esta operación, la app sigue.
+        dbPromise = null;
+        reject(e);
+        return;
+      }
+      let settled = false;
+      let blockedTimer = null;
+      // Otra pestaña abierta con la versión vieja no suelta la base: no esperar
+      // para siempre. Si después se destraba, se cierra y se reabre en el próximo uso.
+      req.onblocked = () => {
+        if (blockedTimer) return;
+        blockedTimer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          dbPromise = null;
+          reject(new Error('Cerrá las otras pestañas de la app para guardar en el dispositivo.'));
+        }, BLOCKED_TIMEOUT_MS);
+      };
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(OPS)) db.createObjectStore(OPS, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(BLOBS)) {
           db.createObjectStore(BLOBS, { keyPath: 'id' }).createIndex('op_id', 'op_id');
         }
+        if (!db.objectStoreNames.contains(META)) db.createObjectStore(META, { keyPath: 'key' });
       };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => { dbPromise = null; reject(req.error); };
+      req.onsuccess = () => {
+        clearTimeout(blockedTimer);
+        const db = req.result;
+        if (settled) { db.close(); return; } // llegó tarde, ya se avisó el error
+        settled = true;
+        // Otra pestaña con una versión más nueva: se cierra para no bloquearla.
+        db.onversionchange = () => { db.close(); dbPromise = null; };
+        resolve(db);
+      };
+      req.onerror = () => {
+        clearTimeout(blockedTimer);
+        if (settled) return;
+        settled = true;
+        dbPromise = null;
+        reject(req.error);
+      };
     });
   }
   return dbPromise;
@@ -199,6 +238,22 @@ export async function completeCreate(opId, otId) {
   });
   await refreshMarker();
   changed();
+}
+
+// ── Datos guardados por clave (no son operaciones pendientes) ────────────────
+export function getMeta(key) {
+  return run([META], 'readonly', (t, set) => {
+    const r = t.objectStore(META).get(key);
+    r.onsuccess = () => set(r.result?.value ?? null);
+  });
+}
+
+export function putMeta(key, value) {
+  return run([META], 'readwrite', (t) => { t.objectStore(META).put({ key, value }); });
+}
+
+export function deleteMeta(key) {
+  return run([META], 'readwrite', (t) => { t.objectStore(META).delete(key); });
 }
 
 // ── Espacio y persistencia ──────────────────────────────────────────────────

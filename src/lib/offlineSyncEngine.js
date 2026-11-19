@@ -14,6 +14,7 @@ import { queryClientInstance } from '@/lib/query-client';
 import { getClave, getNombre } from '@/lib/operarioClave';
 import { resolvePendingPhotos, uploadPortalPhoto } from '@/lib/offlineSync';
 import * as store from '@/lib/offlineStore';
+import { FICHAJE_SIN_CONEXION } from '@/lib/fichajeCuenta';
 
 const BACKOFF_MS = [5000, 15000, 60000, 300000];
 const LOCK_KEY = 'dh1-offline-sync-lock';
@@ -64,6 +65,7 @@ function rejected(message) {
 }
 
 function classify(err) {
+  if (err?.otraCuenta) return { retry: true, message: err.message };
   const status = err?.response?.status ?? err?.status ?? err?.statusCode;
   const message = err?.response?.data?.error || err?.data?.error || err?.message || 'El servidor rechazó el cambio';
   if (!status) return { retry: true, stop: true, message: 'Sin conexión con el servidor' };
@@ -170,6 +172,26 @@ const HANDLERS = {
     return base44.entities.WorkOrder.update(op.ot_id, op.data);
   },
 
+  // Fichaje con cuenta guardado sin señal. Solo se envía con la sesión de la
+  // misma cuenta que fichó. ficharConCuenta es idempotente por client_op_id.
+  async fichaje(op) {
+    const me = await base44.auth.me();
+    if (!me?.id || me.id !== op.user_id) {
+      const e = new Error('Este fichaje es de otra cuenta: se envía cuando esa cuenta inicie sesión en este teléfono.');
+      e.otraCuenta = true;
+      throw e;
+    }
+    const res = await base44.functions.invoke('ficharConCuenta', {
+      action: 'fichar', modo: 'sin_conexion', locationId: op.location_qr_id, client_op_id: op.client_op_id,
+      tipo_pensado: op.tipo, hora_dispositivo: op.hora_dispositivo, hora_envio_dispositivo: new Date().toISOString(),
+      latitude: op.latitude, longitude: op.longitude, accuracy: op.accuracy, deviceInfo: navigator.userAgent,
+    });
+    const data = res?.data || {};
+    if (!data.ok) throw rejected(data.error || 'El servidor rechazó el fichaje');
+    queryClientInstance.invalidateQueries({ queryKey: ['fichar-cuenta'] });
+    return data;
+  },
+
   // Primero se sube la foto; recién después se agrega la URL a la OT (sin duplicar).
   async photo(op) {
     let url = op.uploaded_url;
@@ -252,12 +274,15 @@ async function runOnce(force) {
 
   const blockedOps = new Set();
   const blockedOts = new Set();
-  const block = (op) => { blockedOps.add(op.id); if (op.ot_id) blockedOts.add(op.ot_id); };
+  // Fichajes: estrictamente en orden; si uno queda trabado, los siguientes esperan.
+  let fichajeBlocked = false;
+  const block = (op) => { blockedOps.add(op.id); if (op.ot_id) blockedOts.add(op.ot_id); if (op.kind === 'fichaje') fichajeBlocked = true; };
   let synced = 0;
 
   for (const listed of ops) {
     const op = await store.getOp(listed.id); // releer: la creación actualiza a sus dependientes
     if (!op) continue;
+    if (op.kind === 'fichaje' && fichajeBlocked) { block(op); continue; }
     if (op.status === 'attention') { block(op); continue; }
     if (op.depends_on && (blockedOps.has(op.depends_on) || await store.getOp(op.depends_on))) { block(op); continue; }
     if (op.ot_id && blockedOts.has(op.ot_id)) { block(op); continue; }
@@ -393,6 +418,24 @@ export async function enqueueCreateSolicitudOT(data, photos = []) {
     op: { id, kind: 'create_solicitud', client_op_id: id, data, ot_title: data?.titulo, blob_ids: list.map((b) => b.id) },
     blobs: list,
   }]);
+  afterEnqueue();
+  return id;
+}
+
+// Fichaje con cuenta sin señal. f: { user_id, location_qr_id, location_name, tipo,
+// hora_dispositivo, latitude, longitude, accuracy }. Arranca el envío automático.
+export async function enqueueFichaje(f) {
+  if (!FICHAJE_SIN_CONEXION) throw new Error('Fichaje sin conexión desactivado');
+  const id = store.newOpId();
+  await store.addOps([{
+    op: {
+      id, kind: 'fichaje', client_op_id: id, user_id: f.user_id,
+      location_qr_id: f.location_qr_id, tipo: f.tipo, hora_dispositivo: f.hora_dispositivo,
+      latitude: f.latitude, longitude: f.longitude, accuracy: f.accuracy ?? null,
+      ot_title: f.location_name,
+    },
+  }]);
+  startOfflineSync();
   afterEnqueue();
   return id;
 }
