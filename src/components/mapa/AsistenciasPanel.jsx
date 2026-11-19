@@ -255,19 +255,20 @@ export default function AsistenciasPanel({ locations = [], fetchPage = null, onS
             <TableHead>Distancia</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead>Admin</TableHead>
+            <TableHead>Método</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center py-8">
+              <TableCell colSpan={11} className="text-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" />
               </TableCell>
             </TableRow>
           ) : items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center py-8 text-muted-foreground text-sm">
+              <TableCell colSpan={11} className="text-center py-8 text-muted-foreground text-sm">
                 No hay registros de asistencia para los filtros seleccionados.
               </TableCell>
             </TableRow>
@@ -328,6 +329,11 @@ export default function AsistenciasPanel({ locations = [], fetchPage = null, onS
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className={ea.class}>{ea.label}</Badge>
+                </TableCell>
+                <TableCell>
+                  <span className={`text-[11px] font-medium whitespace-nowrap ${fichaje.metodo === 'cuenta' ? 'text-primary' : 'text-muted-foreground'}`}>
+                    {fichaje.metodo === 'cuenta' ? 'Cuenta' : 'QR público'}
+                  </span>
                 </TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setSelected(fichaje); }}>
