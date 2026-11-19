@@ -3,6 +3,7 @@ import { parseFechaLocal } from '@/lib/fechaLocal';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from 'react-leaflet';
+import { MAP_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_TILE_MAX_ZOOM } from '@/lib/mapTiles';
 import { CheckCircle2, MapPin, Filter, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -160,8 +161,9 @@ export default function MapaOTsCompletadas() {
             style={{ height: '100%', width: '100%' }}
           >
             <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; OpenStreetMap contributors'
+              url={MAP_TILE_URL}
+              attribution={MAP_TILE_ATTRIBUTION}
+              maxZoom={MAP_TILE_MAX_ZOOM}
             />
             {otsFiltradas.map(wo => (
               <CircleMarker

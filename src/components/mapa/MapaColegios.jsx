@@ -1,5 +1,6 @@
 import React, { useRef, useState, useMemo, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MAP_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_TILE_MAX_ZOOM } from '@/lib/mapTiles';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { base44 } from '@/api/base44Client';
@@ -237,8 +238,9 @@ export default function MapaColegios() {
           {filtered.length > 0 ? (
             <MapContainer ref={mapRef} center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                attribution='&copy; OpenStreetMap contributors, &copy; CARTO'
+                url={MAP_TILE_URL}
+                attribution={MAP_TILE_ATTRIBUTION}
+                maxZoom={MAP_TILE_MAX_ZOOM}
                 maxZoom={19}
               />
               {filtered.map(loc => {
