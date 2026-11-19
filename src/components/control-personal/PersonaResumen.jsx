@@ -1,5 +1,5 @@
 import React from 'react';
-import { Timer, UserX, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Timer, UserX, AlertTriangle, ShieldAlert, LogOut } from 'lucide-react';
 import SinHorarioAviso from './SinHorarioAviso';
 import { fechaCorta } from './formato';
 
@@ -20,9 +20,10 @@ export default function PersonaResumen({ data, onConfigurarHorario }) {
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">Últimos {data.periodoDias} días · {data.totalFichajes} fichajes</p>
       {sinHorario && <SinHorarioAviso compacto onConfigurar={onConfigurarHorario} />}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
         <Tile icon={Timer} label="Llegadas tarde" value={sinHorario ? '—' : data.tardanzas} tone="text-amber-400 bg-amber-500/15" />
         <Tile icon={UserX} label="Ausencias" value={sinHorario ? '—' : data.ausencias} tone="text-red-400 bg-red-500/15" />
+        <Tile icon={LogOut} label="Salidas anticipadas" value={sinHorario ? '—' : (data.salidasAnticipadas ?? 0)} tone="text-sky-400 bg-sky-500/15" />
         <Tile icon={AlertTriangle} label="Salidas omitidas" value={data.salidasOmitidas} tone="text-orange-400 bg-orange-500/15" />
         <Tile icon={ShieldAlert} label="Incidencias" value={data.incidencias} tone="text-violet-400 bg-violet-500/15" />
       </div>

@@ -32,10 +32,24 @@ export function hm(s: any): number | null {
   return h * 60 + mi;
 }
 
-// Minuto del día a partir del cual una entrada cuenta como tarde.
-export const limiteEntrada = (h: any) => (hm(h.hora_entrada) as number) + (Number(h.tolerancia_minutos) || 0);
+export const tienePorDia = (h: any) =>
+  Boolean(h?.horarios_por_dia && typeof h.horarios_por_dia === 'object' && Object.keys(h.horarios_por_dia).length);
 
-export const esLaboral = (h: any, fecha: string) => (h.dias_laborales || []).includes(diaDe(fecha));
+// Horario de una fecha: usa horarios_por_dia si existe; si no, el horario único de siempre.
+export function horarioDelDia(h: any, fecha: string) {
+  const dia = diaDe(fecha);
+  if (tienePorDia(h)) {
+    const d = h.horarios_por_dia[dia] || {};
+    const entrada = hm(d.hora_entrada);
+    return { laborable: d.laborable === true && entrada != null, entrada, salida: hm(d.hora_salida), hora_entrada: d.hora_entrada || null, hora_salida: d.hora_salida || null };
+  }
+  return { laborable: (h.dias_laborales || []).includes(dia), entrada: hm(h.hora_entrada), salida: hm(h.hora_salida), hora_entrada: h.hora_entrada, hora_salida: h.hora_salida };
+}
+
+// Minuto del día a partir del cual una entrada cuenta como tarde (según el día).
+export const limiteEntrada = (h: any, fecha: string) => (horarioDelDia(h, fecha).entrada as number) + (Number(h.tolerancia_minutos) || 0);
+
+export const esLaboral = (h: any, fecha: string) => horarioDelDia(h, fecha).laborable;
 
 // Lunes de la semana de la fecha.
 export function lunesDe(fecha: string) {

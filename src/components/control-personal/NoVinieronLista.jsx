@@ -3,7 +3,7 @@ import { UserX, CheckCircle2 } from 'lucide-react';
 
 export default function NoVinieronLista({ data }) {
   if (!data.laboral) return <Mensaje texto="Hoy no es día laboral según el horario del sector." />;
-  if (!data.umbralPasado) return <Mensaje texto={`Las ausencias se calculan pasadas las ${data.horario.hora_entrada} más ${data.horario.tolerancia_minutos} minutos de tolerancia.`} />;
+  if (!data.umbralPasado) return <Mensaje texto={`Las ausencias se calculan pasadas las ${(data.horarioHoy || data.horario).hora_entrada} más ${data.horario.tolerancia_minutos} minutos de tolerancia.`} />;
   if (!data.noVinieron.length) return <Mensaje ok texto="Todos los operarios activos ficharon su entrada hoy." />;
   return (
     <div className="rounded-2xl border border-border/60 bg-card divide-y divide-border/40 overflow-hidden">

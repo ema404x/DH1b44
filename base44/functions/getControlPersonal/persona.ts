@@ -1,5 +1,5 @@
 import { fetchPaged, HttpError, dniOf, ms } from './util.ts';
-import { arInfo, inicioDia, sumarDias, esLaboral, limiteEntrada, lunesDe } from './tiempo.ts';
+import { arInfo, inicioDia, sumarDias, esLaboral, limiteEntrada, lunesDe, horarioDelDia } from './tiempo.ts';
 import { cargarHorario, horarioVigente, leanHorario } from './horario.ts';
 import { leanEmpleado } from './scope.ts';
 
@@ -49,18 +49,25 @@ export async function accionPersona(sb: any, scope: any, body: any) {
     }
   }
 
-  let tardanzas = 0; const ausenciasFechas: string[] = [];
+  let tardanzas = 0; let salidasAnticipadas = 0; const ausenciasFechas: string[] = [];
   if (horario) {
-    const limite = limiteEntrada(horario);
     for (const [fecha, f] of primeraPorDia) {
-      if (esLaboral(horario, fecha) && (arInfo(f.entrada_timestamp) as any).minutos > limite) { tardanzas++; f.tarde = true; }
+      if (esLaboral(horario, fecha) && (arInfo(f.entrada_timestamp) as any).minutos > limiteEntrada(horario, fecha)) { tardanzas++; f.tarde = true; }
+    }
+    // Salida registrada el mismo día antes de la hora de salida de ese día.
+    for (const f of propios) {
+      if (!f.salida_timestamp || f.salida_omitida) continue;
+      const fecha = (arInfo(f.entrada_timestamp) as any).fecha;
+      const sal = arInfo(f.salida_timestamp) as any;
+      const dia = horarioDelDia(horario, fecha);
+      if (dia.laborable && dia.salida != null && sal?.fecha === fecha && sal.minutos < dia.salida) { salidasAnticipadas++; f.salidaAnticipada = true; }
     }
     if ((emp.status || 'activo') === 'activo') {
       const inicioHorario = (arInfo(h.created_date) as any)?.fecha || desde;
       let d = [desde, inicioHorario, emp.hire_date || desde].sort().pop() as string;
       for (; d <= hoy; d = sumarDias(d, 1)) {
         if (!esLaboral(horario, d) || primeraPorDia.has(d)) continue;
-        if (d === hoy && !(hoyInfo.minutos > limite)) continue;
+        if (d === hoy && !(hoyInfo.minutos > limiteEntrada(horario, hoy))) continue;
         ausenciasFechas.push(d);
       }
     }
@@ -68,6 +75,6 @@ export async function accionPersona(sb: any, scope: any, body: any) {
   return {
     empleado: leanEmpleado(emp), horario: leanHorario(horario), periodoDias: DIAS_PERIODO,
     semanas, meses, tardanzas, ausencias: ausenciasFechas.length, ausenciasFechas: ausenciasFechas.reverse().slice(0, 30),
-    salidasOmitidas, incidencias, totalFichajes: propios.length, historial: propios.slice(0, 200),
+    salidasOmitidas, salidasAnticipadas, incidencias, totalFichajes: propios.length, historial: propios.slice(0, 200),
   };
 }

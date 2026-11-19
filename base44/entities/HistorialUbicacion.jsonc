@@ -1,0 +1,108 @@
+{
+  "name": "HistorialUbicacion",
+  "type": "object",
+  "properties": {
+    "sector_id": {
+      "type": "string"
+    },
+    "entidad": {
+      "type": "string",
+      "enum": [
+        "LocationData",
+        "LocationQR"
+      ],
+      "enumColors": [
+        "purple",
+        "blue"
+      ],
+      "description": "Entidad cuyas coordenadas se cambiaron."
+    },
+    "entidad_id": {
+      "type": "string"
+    },
+    "nombre": {
+      "type": "string"
+    },
+    "direccion": {
+      "type": "string"
+    },
+    "modo": {
+      "type": "string",
+      "enum": [
+        "sugerida",
+        "manual"
+      ],
+      "enumColors": [
+        "green",
+        "yellow"
+      ]
+    },
+    "lat_anterior": {
+      "type": "number"
+    },
+    "lng_anterior": {
+      "type": "number"
+    },
+    "lat_nueva": {
+      "type": "number"
+    },
+    "lng_nueva": {
+      "type": "number"
+    },
+    "usuario_nombre": {
+      "type": "string"
+    },
+    "usuario_email": {
+      "type": "string"
+    },
+    "fecha": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "sector_id",
+    "entidad",
+    "entidad_id",
+    "lat_nueva",
+    "lng_nueva"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

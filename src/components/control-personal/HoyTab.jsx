@@ -25,7 +25,7 @@ export default function HoyTab({ onConfigurarHorario }) {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-muted-foreground first-letter:uppercase">
           {fechaLarga(data.fecha)}
-          {data.horario && ` · Horario ${data.horario.hora_entrada} a ${data.horario.hora_salida} (tolerancia ${data.horario.tolerancia_minutos} min)`}
+          {data.horario && (data.horarioHoy || !data.horario.horarios_por_dia) && ` · Horario ${(data.horarioHoy || data.horario).hora_entrada} a ${(data.horarioHoy || data.horario).hora_salida} (tolerancia ${data.horario.tolerancia_minutos} min)`}
           {data.horario && !data.laboral && ' · Hoy no es día laboral'}
         </p>
         <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-2">

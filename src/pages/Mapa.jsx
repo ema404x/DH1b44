@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Activity, List, Users, Globe, School, CheckCircle2, Download, Clock } from 'lucide-react';
+import { MapPin, Activity, List, Users, Globe, School, CheckCircle2, Download, Clock, MapPinned } from 'lucide-react';
+import RevisarUbicaciones from '@/components/mapa/revisar/RevisarUbicaciones';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useUbicaciones } from '@/hooks/useUbicaciones';
@@ -201,6 +202,11 @@ export default function Mapa() {
           <TabsTrigger value="asistencias" className="gap-2">
             <Clock className="h-4 w-4" /> Asistencias
           </TabsTrigger>
+          {isSuperAdmin && (
+            <TabsTrigger value="revisar-ubicaciones" className="gap-2">
+              <MapPinned className="h-4 w-4" /> Revisar ubicaciones
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="proyectos-ots" className="mt-5">
@@ -251,6 +257,12 @@ export default function Mapa() {
         <TabsContent value="asistencias" className="mt-5">
           <AsistenciasPanel locations={visibleLocations} />
         </TabsContent>
+
+        {isSuperAdmin && (
+          <TabsContent value="revisar-ubicaciones" className="mt-5">
+            <RevisarUbicaciones />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
