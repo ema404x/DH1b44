@@ -45,6 +45,7 @@ export const pageLoaders = {
   PortalOperarioApp: () => import('@/pages/PortalOperarioApp'),
   OperarioHome: () => import('@/pages/OperarioHome'),
   PropuestasOT: () => import('@/pages/PropuestasOT'),
+  ProponerOT: () => import('@/pages/ProponerOT'),
 };
 
 // React.lazy recuerda para siempre una carga fallida. Cada pantalla guarda su

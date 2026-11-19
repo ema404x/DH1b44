@@ -31,6 +31,7 @@ const ROUTE_TITLES = {
   '/mis-ots': 'Mis Órdenes',
   '/operario': 'Inicio operario',
   '/propuestas-ot': 'Propuestas de operarios',
+  '/proponer-ot': 'Proponer OT',
   '/mapa-jefes': 'Mapa Jefes',
   '/inspeccion-colegio': 'Inspección',
   '/aprobacion-certificados': 'Aprobación',

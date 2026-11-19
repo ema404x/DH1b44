@@ -6,14 +6,18 @@ import { useAuth } from '@/lib/AuthContext';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useSectorConfig } from '@/hooks/useSectorConfig';
 
-function saludo() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Buenos días';
-  if (h < 20) return 'Buenas tardes';
-  return 'Buenas noches';
+function resumenTexto(r) {
+  if (!r) return 'Cargando tus OT…';
+  const { paraHacer, enCurso } = r;
+  if (!paraHacer && !enCurso) return 'No tenés OT pendientes';
+  const partes = [];
+  if (paraHacer) partes.push(`${paraHacer} OT para hacer`);
+  if (enCurso) partes.push(`${enCurso} en curso`);
+  return `Tenés ${partes.join(' y ')}`;
 }
 
-export default function OperarioHeader() {
+/** Tarjeta de saludo del Inicio operario. resumen: { paraHacer, enCurso } */
+export default function OperarioHeader({ resumen }) {
   const navigate = useNavigate();
   const { user, offlineMode, setModoOperario } = useAuth();
   const { displayName } = useCurrentUser();
@@ -30,6 +34,7 @@ export default function OperarioHeader() {
   }, []);
 
   const conectado = online && !offlineMode;
+  const nombre = (displayName || '').split(' ')[0] || displayName;
 
   const salir = async () => {
     setSaliendo(true);
@@ -43,27 +48,18 @@ export default function OperarioHeader() {
   };
 
   return (
-    <header className="flex flex-col gap-4 pt-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            {sector?.nombre || sectorId}
-          </p>
-          <h1 className="mt-1.5 text-[26px] leading-tight font-light tracking-tight text-foreground">
-            {saludo()},
-            <span className="block font-semibold truncate">{displayName}</span>
-          </h1>
+    <header className="flex flex-col gap-3 pt-1">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-cyan-600 to-blue-700 p-5 text-white shadow-xl shadow-primary/20">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 acero-drift" />
+        <div className="relative flex items-start justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/80 truncate">{sector?.nombre || sectorId}</p>
+          <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${conectado ? 'bg-white/20 text-white' : 'bg-amber-300 text-amber-950'}`}>
+            {conectado ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+            {conectado ? 'En línea' : 'Sin conexión'}
+          </span>
         </div>
-        <span
-          className={`mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
-            conectado
-              ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300'
-              : 'border-amber-400/30 bg-amber-400/10 text-amber-300'
-          }`}
-        >
-          {conectado ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-          {conectado ? 'En línea' : 'Sin conexión'}
-        </span>
+        <h1 className="relative mt-3 text-3xl font-bold leading-tight tracking-tight truncate">Hola, {nombre}</h1>
+        <p className="relative mt-1 text-base font-medium text-white/90">{resumenTexto(resumen)}</p>
       </div>
 
       {user?.role === 'admin' && (

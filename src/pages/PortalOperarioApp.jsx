@@ -2,7 +2,9 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { parseFechaLocal } from '@/lib/fechaLocal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import OperarioMisOT from '@/components/operario-home/OperarioMisOT';
+import ConfirmacionOperario from '@/components/operario-home/ConfirmacionOperario';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
@@ -18,12 +20,14 @@ import { useOperarioOfflineActions } from '@/hooks/useOperarioOfflineActions';
 import { canActOn } from '@/lib/workOrderActions';
 import OfflineGuard from '@/components/pwa/OfflineGuard';
 import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
-import { irAFichajePublico, EVENTO_ESCANEAR_OPERARIO } from '@/lib/modoOperario';
+import { irAFichajePublico, EVENTO_ESCANEAR_OPERARIO, EVENTO_ABRIR_OT_OPERARIO } from '@/lib/modoOperario';
 
 // compacto (solo Inicio operario): muestra las OT activas sin encabezado ni filtros.
 // Sin la prop, la pantalla es exactamente la de siempre.
-export default function PortalOperarioApp({ compacto = false } = {}) {
+export default function PortalOperarioApp({ compacto = false, onResumen } = {}) {
   const { currentUser, displayName } = useCurrentUser();
+  const navigate = useNavigate();
+  const [finalizada, setFinalizada] = useState(false); // solo compacto: pantalla "OT finalizada"
   const [reporteOT, setReporteOT] = useState(null);
   const [processing, setProcessing] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // { ot, accion }
@@ -136,6 +140,23 @@ export default function PortalOperarioApp({ compacto = false } = {}) {
     return { porIniciar: ini, enProgreso: prog, enValidacion: val };
   }, [misOTsFiltradas]);
 
+  // Solo compacto (Inicio operario): resumen para el saludo y apertura de una OT
+  // desde otra sección (propuesta aprobada). Usa el mismo actOnOT de siempre.
+  useEffect(() => {
+    if (compacto) onResumen?.({ paraHacer: porIniciar.length, enCurso: enProgreso.length });
+  }, [compacto, onResumen, porIniciar.length, enProgreso.length]);
+
+  useEffect(() => {
+    if (!compacto) return undefined;
+    const abrir = (e) => {
+      const ot = allOTs.find((o) => o.id === e.detail?.otId);
+      if (ot) actOnOT(ot);
+      else toast.info('Esa OT no está en tu lista. Pedile a tu jefe que te la asigne.');
+    };
+    window.addEventListener(EVENTO_ABRIR_OT_OPERARIO, abrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_OT_OPERARIO, abrir);
+  });
+
   const ejecutarTransicion = async (ot, accion, extraData = {}) => {
     setProcessing(ot.id);
     try {
@@ -247,11 +268,13 @@ export default function PortalOperarioApp({ compacto = false } = {}) {
       await queueTransition(ot, 'finalizar', reporteData, optimistic);
       toast.success('Reporte guardado (sin conexión). Se enviará al jefe al volver online.');
       setReporteOT(null);
+      if (compacto) setFinalizada(true);
       return;
     }
     // El reporte ya guardó materiales; ahora transicionar a pendiente_validacion
     const ok = await ejecutarTransicion(ot, 'finalizar', reporteData);
     if (ok) setReporteOT(null);
+    if (ok && compacto) setFinalizada(true);
   };
 
   // OTs cacheadas para una ubicación (por id) — solo lectura offline
@@ -509,7 +532,18 @@ export default function PortalOperarioApp({ compacto = false } = {}) {
       />
       </>)}
 
-      {vista === 'historial' ? (
+      {compacto ? (
+        <OperarioMisOT
+          porIniciar={porIniciar}
+          enProgreso={enProgreso}
+          enValidacion={enValidacion}
+          total={misOTs.length}
+          processing={processing}
+          pendingOtIds={pendingOtIds}
+          onIniciar={(ot) => setConfirmAction({ ot, accion: 'iniciar' })}
+          onFinalizar={(ot) => setReporteOT(ot)}
+        />
+      ) : vista === 'historial' ? (
         <div>
           {historialFiltrado.length > 0 ? (
             <motion.div
@@ -602,14 +636,19 @@ export default function PortalOperarioApp({ compacto = false } = {}) {
       </>
       )}
 
-      {compacto && misOTs.length > 0 && (
-        <Link
-          to="/mis-ots"
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-semibold text-card-foreground transition-colors active:bg-accent"
-        >
-          Ver todas mis OT ({misOTs.length})
-          <ArrowRight className="h-5 w-5 text-muted-foreground" />
-        </Link>
+      {compacto && finalizada && (
+        <ConfirmacionOperario
+          titulo="OT finalizada"
+          detalle="Enviada a tu jefe"
+          acciones={(
+            <button
+              onClick={() => { setFinalizada(false); navigate('/operario'); }}
+              className="h-14 w-full rounded-xl bg-primary text-lg font-bold text-primary-foreground active:scale-[0.98]"
+            >
+              Volver al inicio
+            </button>
+          )}
+        />
       )}
 
       {/* Formulario de reporte */}

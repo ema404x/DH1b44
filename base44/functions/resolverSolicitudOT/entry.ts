@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
 import { sectorErrorResponse } from '../../shared/sectorGuard.ts';
+import { isJefeSitioRole } from '../../shared/roles.ts';
 import {
   identidadCaller, toArr, limpiarFotos, entradaHistorial, PRIORIDADES, TIPOS,
 } from '../../shared/solicitudOT.ts';
@@ -50,6 +51,23 @@ export default async function (req) {
       return Response.json({ solicitudes });
     }
 
+    // Propuestas propias del operario (últimas N) con el código de la OT creada.
+    if (action === 'mias') {
+      const limit = Math.min(Number(body.limit) || 5, 50);
+      const solicitudes = toArr(await sb.entities.SolicitudOT.filter({ solicitante_user_id: user.id }, '-created_date', limit));
+      const ids = solicitudes.map((s) => s.work_order_id).filter(Boolean);
+      const ots = ids.length ? toArr(await sb.entities.WorkOrder.filter({ id: { $in: ids } }, '-created_date', ids.length)) : [];
+      const codigo = new Map(ots.map((o) => [o.id, o.code || '']));
+      return Response.json({
+        solicitudes: solicitudes.map((s) => ({
+          id: s.id, titulo: s.titulo, estado: s.estado, motivo_rechazo: s.motivo_rechazo || '',
+          jefe_sitio: s.jefe_sitio || '', work_order_id: s.work_order_id || '',
+          work_order_code: codigo.get(s.work_order_id) || '', created_date: s.created_date,
+          location: s.location || s.asset_name || '', prioridad: s.prioridad,
+        })),
+      });
+    }
+
     if (action === 'contar') {
       const [enviada, aprobada, rechazada] = await Promise.all(
         ESTADOS.map((estado) => sb.entities.SolicitudOT.count({ ...alcance, estado })),
@@ -74,14 +92,29 @@ export default async function (req) {
       if (sol.work_order_id) return Response.json({ solicitud: sol, work_order_id: sol.work_order_id, ya_aprobada: true });
       if (sol.estado !== 'enviada') return Response.json({ error: 'La propuesta ya fue revisada' }, { status: 409 });
 
-      // Mismo payload que CrearOT.jsx (responsable por defecto = jefe a cargo).
-      const responsable = sol.jefe_sitio || '';
-      const jefeEmail = (sol.jefe_sitio_email || '').toLowerCase().trim();
-      let jefeUserId = '';
-      if (jefeEmail) {
-        const emp = toArr(await sb.entities.Employee.filter({ email: jefeEmail }, '-created_date', 5)).find((e) => e.user_id);
-        jefeUserId = emp?.user_id || '';
+      // Responsable: por defecto el operario que propuso. El revisor puede elegir
+      // otro operario del sector (responsable_user_id) o dejarla sin asignar ('').
+      const pedido = body.responsable_user_id === undefined ? sol.solicitante_user_id : String(body.responsable_user_id || '');
+      let responsable = '';
+      let responsableId = '';
+      let responsableEsJefe = false;
+      let responsableEmail = '';
+      if (pedido) {
+        const emp = toArr(await sb.entities.Employee.filter({ user_id: pedido }, '-created_date', 5))[0];
+        if (emp) {
+          responsable = emp.full_name || '';
+          responsableEsJefe = isJefeSitioRole(emp.role);
+          responsableEmail = (emp.email || '').toLowerCase().trim();
+        } else if (pedido === sol.solicitante_user_id) {
+          responsable = sol.solicitante_nombre || '';
+        } else {
+          return Response.json({ error: 'El responsable elegido no pertenece a tu sector' }, { status: 400 });
+        }
+        responsableId = pedido;
       }
+      // Igual que CrearOT: si el responsable es jefe, su email; si no, el del jefe a cargo.
+      const jefeEmail = (responsableEsJefe && responsableEmail) ? responsableEmail : (sol.jefe_sitio_email || '').toLowerCase().trim();
+      const jefeUserId = responsableId;
       // Se crea con la sesión del revisor (igual que CrearOT): mismas reglas y
       // mismas automatizaciones al crear (sector, jefe, auditoría).
       const ot = await base44.entities.WorkOrder.create({
@@ -108,7 +141,7 @@ export default async function (req) {
         work_order_id: ot.id,
         revisado_por: revisor,
         fecha_revision: new Date().toISOString(),
-        historial: [...historial, entradaHistorial(user, 'aprobada', { work_order_id: ot.id })],
+        historial: [...historial, entradaHistorial(user, 'aprobada', { work_order_id: ot.id, responsable: responsable || 'Sin asignar' })],
       });
       return Response.json({ solicitud, work_order_id: ot.id });
     }

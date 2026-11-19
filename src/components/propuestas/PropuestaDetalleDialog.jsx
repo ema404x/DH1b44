@@ -7,6 +7,7 @@ import PropuestaCampos from './PropuestaCampos';
 import PropuestaFotos from './PropuestaFotos';
 import PropuestaHistorial from './PropuestaHistorial';
 import PropuestaAcciones from './PropuestaAcciones';
+import ResponsableSelect, { SIN_ASIGNAR } from './ResponsableSelect';
 import { resolverPropuesta } from '@/lib/propuestasOT';
 
 const FIELDS = ['titulo', 'descripcion', 'prioridad', 'tipo', 'fecha_sugerida', 'fotos'];
@@ -18,7 +19,9 @@ const toForm = (p) => ({
 export default function PropuestaDetalleDialog({ propuesta, open, onOpenChange, onUpdated }) {
   const qc = useQueryClient();
   const [form, setForm] = useState(toForm(propuesta));
+  const [responsable, setResponsable] = useState(propuesta?.solicitante_user_id || SIN_ASIGNAR);
   useEffect(() => { setForm(toForm(propuesta)); }, [propuesta]);
+  useEffect(() => { setResponsable(propuesta?.solicitante_user_id || SIN_ASIGNAR); }, [propuesta?.id]);
 
   const editable = propuesta?.estado === 'enviada';
   const base = toForm(propuesta);
@@ -37,7 +40,12 @@ export default function PropuestaDetalleDialog({ propuesta, open, onOpenChange, 
     mutationFn: async ({ accion, motivo }) => {
       if (accion === 'guardar') return { accion, solicitud: await guardar() };
       if (accion === 'aprobar' && dirty) await guardar();
-      const res = await resolverPropuesta({ action: accion, id: propuesta.id, motivo });
+      const res = await resolverPropuesta({
+        action: accion,
+        id: propuesta.id,
+        motivo,
+        ...(accion === 'aprobar' ? { responsable_user_id: responsable === SIN_ASIGNAR ? '' : responsable } : {}),
+      });
       return { accion, solicitud: res.solicitud };
     },
     onSuccess: ({ accion, solicitud }) => {
@@ -71,6 +79,14 @@ export default function PropuestaDetalleDialog({ propuesta, open, onOpenChange, 
               onRemove={editable ? (url) => setForm((f) => ({ ...f, fotos: f.fotos.filter((u) => u !== url) })) : undefined}
             />
           </div>
+          {editable && (
+            <ResponsableSelect
+              value={responsable}
+              onChange={setResponsable}
+              solicitante={{ user_id: propuesta.solicitante_user_id, nombre: propuesta.solicitante_nombre }}
+              disabled={mutation.isPending}
+            />
+          )}
           {editable && (
             <PropuestaAcciones
               dirty={dirty}
