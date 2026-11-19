@@ -27,6 +27,12 @@ export default function ProponerOT() {
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const set = (patch) => setDatos((d) => ({ ...d, ...patch }));
+
+  // Cada paso nuevo arranca arriba de todo.
+  React.useEffect(() => {
+    document.querySelector('main.main-scroll')?.scrollTo({ top: 0, behavior: 'auto' });
+    window.scrollTo(0, 0);
+  }, [paso]);
   const offline = offlineMode || !navigator.onLine;
 
   const puedeSeguir = paso === 1 ? !!datos.lugar?.nombre?.trim() : paso === 2 ? !!datos.titulo.trim() : true;
@@ -69,7 +75,7 @@ export default function ProponerOT() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-5 page-enter">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-5 pb-24 page-enter">
       <div className="flex items-center gap-3">
         <button onClick={() => navigate('/operario')} aria-label="Cancelar" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border bg-card active:bg-accent">
           <X className="h-5 w-5" />

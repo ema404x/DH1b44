@@ -39,10 +39,10 @@ export default function OperarioBottomNav() {
       <div className="mx-auto flex max-w-3xl items-stretch">
         <NavLink label="Inicio" icon={Home} path="/operario" active={location.pathname === '/operario'} />
         <button onClick={fichar} className={ITEM}>
-          <span className="flex h-8 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/30">
-            <ScanLine className="h-5 w-5" />
+          <span className="flex h-8 w-16 items-center justify-center rounded-full">
+            <ScanLine className="h-5 w-5 text-muted-foreground" />
           </span>
-          <span className={cn(LABEL, 'text-foreground font-semibold')}>Fichar</span>
+          <span className={cn(LABEL, 'text-muted-foreground')}>Fichar</span>
         </button>
         <NavLink label="Mis OT" icon={HardHat} path="/mis-ots" active={location.pathname === '/mis-ots'} />
         <UserMenu variant="nav" />
