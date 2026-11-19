@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, CircleMarker } from 'react-leaflet';
+import { MAP_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_TILE_MAX_ZOOM } from '@/lib/mapTiles';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card, CardContent } from '@/components/ui/card';
@@ -171,8 +172,9 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
             style={{ height: '100%', width: '100%' }}
           >
             <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-              attribution='&copy; OpenStreetMap contributors, &copy; CARTO'
+              url={MAP_TILE_URL}
+              attribution={MAP_TILE_ATTRIBUTION}
+              maxZoom={MAP_TILE_MAX_ZOOM}
               maxZoom={19}
             />
 

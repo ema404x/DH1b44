@@ -1,0 +1,230 @@
+{
+  "name": "HorarioSector",
+  "type": "object",
+  "properties": {
+    "sector_id": {
+      "type": "string",
+      "description": "Sector al que aplica el horario general. Un horario por sector."
+    },
+    "hora_entrada": {
+      "type": "string",
+      "description": "Hora de entrada (HH:MM, hora de Argentina)."
+    },
+    "hora_salida": {
+      "type": "string",
+      "description": "Hora de salida (HH:MM, hora de Argentina)."
+    },
+    "dias_laborales": {
+      "type": "array",
+      "description": "D\u00edas laborales del sector.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "lun",
+          "mar",
+          "mie",
+          "jue",
+          "vie",
+          "sab",
+          "dom"
+        ]
+      }
+    },
+    "tolerancia_minutos": {
+      "type": "number",
+      "default": 10,
+      "description": "Minutos de tolerancia despu\u00e9s de la hora de entrada antes de contar llegada tarde o ausencia."
+    },
+    "activo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si est\u00e1 desactivado no se calculan tardanzas ni ausencias."
+    },
+    "horarios_por_dia": {
+      "type": "object",
+      "description": "Horario por d\u00eda (clave lun..dom). Si existe, reemplaza a hora_entrada/hora_salida/dias_laborales en los c\u00e1lculos; si no, se usa el horario \u00fanico.",
+      "properties": {
+        "lun": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "mar": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "mie": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "jue": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "vie": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "sab": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        },
+        "dom": {
+          "type": "object",
+          "properties": {
+            "laborable": {
+              "type": "boolean"
+            },
+            "hora_entrada": {
+              "type": "string"
+            },
+            "hora_salida": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "sector_id",
+    "hora_entrada",
+    "hora_salida"
+  ],
+  "rls": {
+    "create": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "read": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

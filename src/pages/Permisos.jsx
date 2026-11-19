@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
 import { propuestasPorDefecto } from '@/lib/propuestasOT';
+import { controlPersonalPorDefecto } from '@/lib/roles';
 
 const MODULES = [
   { key: 'Dashboard', label: 'Dashboard', group: 'General' },
@@ -43,6 +44,7 @@ const MODULES = [
   { key: 'CertificacionObras', label: 'Certificación de Obras', group: 'Finanzas' },
   { key: 'Invoice', label: 'Facturación', group: 'Finanzas' },
   { key: 'Employee', label: 'Empleados', group: 'Administración' },
+  { key: 'ControlPersonal', label: 'Control de Personal', group: 'Administración' },
   { key: 'Inventory', label: 'Inventario', group: 'Administración' },
   { key: 'Asset', label: 'Activos (Catálogo)', group: 'Administración' },
   { key: 'PendienteSAP', label: 'Pendientes SAP', group: 'Administración' },
@@ -117,6 +119,8 @@ function RoleCard({ role, onDelete, onToggle, deleteIsPending }) {
         if (mod.key === 'MisOrdenes') def.read = true;
         // PropuestasOT: por defecto admin, gerente y jefe de sitio (igual que en la app).
         if (mod.key === 'PropuestasOT') def.read = propuestasPorDefecto(role.role_name);
+        // Control de Personal: acceso por defecto para admin, gerente y jefe de sitio.
+        if (mod.key === 'ControlPersonal' && controlPersonalPorDefecto(role.role_name)) def.read = true;
         normalized[mod.key] = def;
       }
     });

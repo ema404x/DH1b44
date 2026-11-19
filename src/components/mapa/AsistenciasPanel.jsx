@@ -67,7 +67,9 @@ function StatCard({ icon: Icon, label, value, tone }) {
   );
 }
 
-export default function AsistenciasPanel({ locations = [] }) {
+// fetchPage / onSaveRevision son opcionales (Control de Personal los usa para
+// leer y revisar por servidor). Sin ellos, el panel funciona igual que siempre.
+export default function AsistenciasPanel({ locations = [], fetchPage = null, onSaveRevision = null }) {
   const [filters, setFilters] = useState({
     dateFrom: '', dateTo: '', locationId: 'all', estado: 'all', estadoAdmin: 'all', search: '',
   });
@@ -96,8 +98,10 @@ export default function AsistenciasPanel({ locations = [] }) {
   }, [filters]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['fichajes-ubicacion', query],
-    queryFn: () => base44.entities.FichajeUbicacion.filter(query, { sort: '-entrada_timestamp', limit: 200 }),
+    queryKey: fetchPage ? ['fichajes-ubicacion', query, 'control-personal'] : ['fichajes-ubicacion', query],
+    queryFn: () => (fetchPage
+      ? fetchPage(query, { limit: 200 })
+      : base44.entities.FichajeUbicacion.filter(query, { sort: '-entrada_timestamp', limit: 200 })),
     staleTime: 15000,
   });
 
@@ -140,7 +144,9 @@ export default function AsistenciasPanel({ locations = [] }) {
   const exportExcel = async () => {
     setExporting(true);
     try {
-      const count = await exportAsistenciasExcel(query, locCoords);
+      const count = fetchPage
+        ? await exportAsistenciasExcel(query, locCoords, fetchPage)
+        : await exportAsistenciasExcel(query, locCoords);
       if (!count) { toast.error('No hay registros para exportar'); return; }
       toast.success(`${count} registros exportados a Excel`);
     } catch (error) {
@@ -338,6 +344,7 @@ export default function AsistenciasPanel({ locations = [] }) {
         fichaje={selected}
         onClose={() => setSelected(null)}
         locCoords={selected ? locCoords.get(selected.location_qr_id) : null}
+        {...(onSaveRevision ? { onSave: onSaveRevision } : {})}
       />
     </div>
   );

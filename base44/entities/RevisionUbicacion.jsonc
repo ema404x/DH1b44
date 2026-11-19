@@ -1,0 +1,83 @@
+{
+  "name": "RevisionUbicacion",
+  "type": "object",
+  "properties": {
+    "sector_id": {
+      "type": "string"
+    },
+    "clave": {
+      "type": "string",
+      "description": "Identificador de la ubicaci\u00f3n revisada (ld:<LocationData.id> o qr:<LocationQR.id>)."
+    },
+    "nombre": {
+      "type": "string"
+    },
+    "firma_coords": {
+      "type": "string",
+      "description": "Coordenadas vigentes al revisar. Si cambian despu\u00e9s, la ubicaci\u00f3n vuelve a aparecer en la revisi\u00f3n."
+    },
+    "resultado": {
+      "type": "string",
+      "enum": [
+        "esta_bien",
+        "corregida"
+      ],
+      "enumColors": [
+        "green",
+        "blue"
+      ]
+    },
+    "revisado_por": {
+      "type": "string"
+    },
+    "revisado_por_email": {
+      "type": "string"
+    },
+    "fecha": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "sector_id",
+    "clave"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

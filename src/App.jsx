@@ -29,7 +29,7 @@ const {
   Tutorial, ImportarDatos, ConfigAlertas, InformacionGeneral, Emergencias,
   MapaJefes, InspeccionColegio, AprobacionCertificados, ControlRiesgo,
   CertificacionObras, CalendarioInformes, CrearOT, Foro, Calefaccion,
-  Sectores, Rutinas, PortalOperarioApp, OperarioHome, PropuestasOT, ProponerOT,
+  Sectores, Rutinas, PortalOperarioApp, OperarioHome, PropuestasOT, ProponerOT, ControlPersonal,
 } = lazyPages;
 import CrearOTSegunModo from '@/components/operario-home/CrearOTSegunModo';
 import InicioSegunModo from '@/components/operario-home/InicioSegunModo';
@@ -159,6 +159,7 @@ const AuthenticatedApp = () => {
         <Route path="/mis-ots" element={<ProtectedPage moduleKey="MisOrdenes"><PortalOperarioApp /></ProtectedPage>} />
         <Route path="/operario" element={<ProtectedPage moduleKey="MisOrdenes"><OperarioHome /></ProtectedPage>} />
         <Route path="/propuestas-ot" element={<ProtectedPage moduleKey="PropuestasOT"><PropuestasOT /></ProtectedPage>} />
+        <Route path="/control-personal" element={<ProtectedPage moduleKey="ControlPersonal"><ControlPersonal /></ProtectedPage>} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
