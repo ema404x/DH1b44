@@ -17,8 +17,11 @@ import { useOperarioOfflineActions } from '@/hooks/useOperarioOfflineActions';
 import { canActOn } from '@/lib/workOrderActions';
 import OfflineGuard from '@/components/pwa/OfflineGuard';
 import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
+import { irAFichajePublico, EVENTO_ESCANEAR_OPERARIO } from '@/lib/modoOperario';
 
-export default function PortalOperarioApp() {
+// compacto (solo Inicio operario): muestra las OT activas sin encabezado ni filtros.
+// Sin la prop, la pantalla es exactamente la de siempre.
+export default function PortalOperarioApp({ compacto = false } = {}) {
   const { currentUser, displayName } = useCurrentUser();
   const [reporteOT, setReporteOT] = useState(null);
   const [processing, setProcessing] = useState(null);
@@ -38,6 +41,13 @@ export default function PortalOperarioApp() {
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+
+  // Modo operario: "Escanear" de la barra inferior y del Inicio abren este mismo escáner.
+  useEffect(() => {
+    const abrir = () => setScannerOpen(true);
+    window.addEventListener(EVENTO_ESCANEAR_OPERARIO, abrir);
+    return () => window.removeEventListener(EVENTO_ESCANEAR_OPERARIO, abrir);
   }, []);
 
   const CACHE_KEY = `mis-ots-cache-${currentUser?.id || 'anon'}`;
@@ -263,7 +273,7 @@ export default function PortalOperarioApp() {
 
     // Tipo 'fichaje' — redirigir siempre al dominio público dh1m.com
     if (result.type === 'fichaje') {
-      window.location.href = `https://dh1m.com/fichar-ubicacion?loc=${encodeURIComponent(result.value)}`;
+      irAFichajePublico(result.value);
       return;
     }
 
@@ -411,6 +421,14 @@ export default function PortalOperarioApp() {
   // Skeleton shimmer solo en la primera carga real (sin data previa en cache).
   // Con initialData, las cargas siguientes muestran las OTs cacheadas de inmediato.
   if (isFetching && allOTs.length === 0) {
+    if (compacto) {
+      return (
+        <div className="flex flex-col gap-3">
+          <div className="h-32 rounded-xl skeleton" />
+          <div className="h-32 rounded-xl skeleton" />
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen flex flex-col gap-5 page-enter">
         <div className="flex items-center gap-3">
@@ -433,7 +451,7 @@ export default function PortalOperarioApp() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col gap-5 page-enter">
+    <div className={compacto ? 'flex flex-col gap-5' : 'min-h-screen flex flex-col gap-5 page-enter'}>
 
       {/* Banner offline / pendientes de sync */}
       {(!isOnline || pendingCount > 0) && (
@@ -447,6 +465,7 @@ export default function PortalOperarioApp() {
         </div>
       )}
 
+      {!compacto && (<>
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -487,6 +506,7 @@ export default function PortalOperarioApp() {
         onVistaChange={setVista}
         counts={{ activas: misOTs.length, historial: historial.length }}
       />
+      </>)}
 
       {vista === 'historial' ? (
         <div>
@@ -562,7 +582,9 @@ export default function PortalOperarioApp() {
 
       {/* Empty state */}
       {misOTsFiltradas.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-500">
+        <div className={compacto
+          ? 'flex flex-col items-center justify-center py-8 gap-3 text-slate-500'
+          : 'flex flex-col items-center justify-center py-24 gap-3 text-slate-500'}>
           <CheckCircle2 className="h-12 w-12 text-slate-700" />
           <p className="text-sm font-medium">
             {misOTs.length === 0 ? 'No tenés órdenes asignadas' : 'Ninguna orden coincide con los filtros'}

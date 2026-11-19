@@ -25,6 +25,8 @@ import { useAppUsageTracker } from '@/hooks/useAppUsageTracker';
 import { useLoadTelemetry } from '@/hooks/useLoadTelemetry';
 import PageErrorBoundary from '@/components/shared/PageErrorBoundary';
 import { isMobileOptimized } from '@/lib/mobileModuleConfig';
+import { isModoOperario } from '@/lib/modoOperario';
+import OperarioBottomNav from '@/components/operario-home/OperarioBottomNav';
 
 // Estable entre renders — no se recrea nunca
 const onSyncCallback = (count) =>
@@ -45,6 +47,8 @@ export default function AppLayout() {
   const { currentUser } = useCurrentUser();
   const { offlineMode, offlineSavedAt, justReconnected } = useAuth();
   useAppUsageTracker(currentUser);
+  // Modo operario (beta): barra inferior simple en lugar del menú completo.
+  const modoOperario = isModoOperario(currentUser);
   const location = useLocation();
   const navigationType = useNavigationType();
 
@@ -102,11 +106,13 @@ export default function AppLayout() {
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0f1e34 55%, #091422 100%)' }}>
       <OfflineBar isOnline={isOnline} pendingCount={pendingCount} isSyncing={isSyncing} onSync={syncPending} offlineMode={offlineMode} offlineSavedAt={offlineSavedAt} justReconnected={justReconnected} />
-      <Sidebar open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
+      {!modoOperario && <Sidebar open={mobileNavOpen} onOpenChange={setMobileNavOpen} />}
       <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${mainPaddingClass}`}>
-        <MobileHeader />
+        {modoOperario
+          ? <div className="flex-shrink-0" style={{ height: 'env(safe-area-inset-top)' }} />
+          : <MobileHeader />}
         {/* Top bar */}
-        <header className="hidden lg:flex h-14 border-b border-white/8 items-center gap-3 pl-5 pr-5 flex-shrink-0 z-30"
+        {!modoOperario && <header className="hidden lg:flex h-14 border-b border-white/8 items-center gap-3 pl-5 pr-5 flex-shrink-0 z-30"
           style={{ background: 'rgba(10,22,40,0.85)', backdropFilter: 'blur(12px)' }}>
           <div className="flex-1 max-w-md">
             <GlobalSearch />
@@ -116,9 +122,11 @@ export default function AppLayout() {
             <NotificationBell />
             <UserMenu />
           </div>
-        </header>
+        </header>}
         {/* Page content — slide transitions + pull-to-refresh */}
-        <main ref={mainRef} onScroll={handleScroll} className="main-scroll flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 lg:p-6 pb-24 lg:pb-6" style={{ background: 'transparent', scrollBehavior: 'smooth' }}>
+        <main ref={mainRef} onScroll={handleScroll} className={modoOperario
+          ? 'main-scroll flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 lg:p-6 pb-28 sm:pb-28 lg:pb-28'
+          : 'main-scroll flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 lg:p-6 pb-24 lg:pb-6'} style={{ background: 'transparent', scrollBehavior: 'smooth' }}>
           {isDesktopOnlyRoute ? (
             <PageErrorBoundary>
               <Outlet />
@@ -144,7 +152,7 @@ export default function AppLayout() {
           )}
         </main>
       </div>
-      <MobileBottomNav onMore={handleMoreMobile} />
+      {modoOperario ? <OperarioBottomNav /> : <MobileBottomNav onMore={handleMoreMobile} />}
       <ChatbotSoporte />
       <BugReportBubble />
       <AvisoSemanalOT />

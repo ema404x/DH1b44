@@ -58,6 +58,11 @@
       "type": "boolean",
       "default": false,
       "description": "Apaga Panel r\u00e1pido, \u00d3rdenes r\u00e1pidas y Arranque r\u00e1pido para esta persona puntual, aunque est\u00e9n activados para todos (OPTIMIZACIONES_PARA_TODOS en src/lib/optimizaciones.js) o tenga su interruptor individual encendido."
+    },
+    "modo_operario": {
+      "type": "boolean",
+      "default": false,
+      "description": "Modo operario (beta). Si es true, la app abre en la pantalla Inicio operario (/operario) y reemplaza el men\u00fa completo por una barra inferior simple. Apagado por defecto: la app se comporta igual que siempre."
     }
   },
   "required": [],

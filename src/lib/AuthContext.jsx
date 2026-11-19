@@ -515,6 +515,17 @@ export const AuthProvider = ({ children }) => {
     } : prev);
   };
 
+  // Interruptor "Modo operario (beta)" de la propia cuenta.
+  const setModoOperario = async (value) => {
+    const v = !!value;
+    await base44.auth.updateMe({ modo_operario: v });
+    setUser(prev => prev ? {
+      ...prev,
+      modo_operario: v,
+      ...(prev.data ? { data: { ...prev.data, modo_operario: v } } : {}),
+    } : prev);
+  };
+
   const logout = () => {
     clearOfflineSession();
     setUser(null);
@@ -584,7 +595,8 @@ export const AuthProvider = ({ children }) => {
       setOfflineHabilitado,
       setPanelRapido,
       setOrdenesRapidas,
-      setArranqueRapido
+      setArranqueRapido,
+      setModoOperario
     }}>
       {children}
     </AuthContext.Provider>

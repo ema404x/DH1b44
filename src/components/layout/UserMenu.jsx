@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { LogOut, ChevronDown, UserCircle, Trash2, Bell, WifiOff, Gauge, Zap, Rocket } from 'lucide-react';
+import { LogOut, ChevronDown, UserCircle, Trash2, Bell, WifiOff, Gauge, Zap, Rocket, Smartphone } from 'lucide-react';
+import { isModoOperario } from '@/lib/modoOperario';
 import VerificacionesResumen from '@/components/layout/VerificacionesResumen';
 import VerificacionesDialog from '@/components/layout/VerificacionesDialog';
 import { useArranqueVerificacion } from '@/hooks/useArranqueVerificacion';
@@ -18,11 +19,26 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
-export default function UserMenu() {
+// variant="nav": se usa como "Perfil" en la barra inferior del Modo operario.
+export default function UserMenu({ variant } = {}) {
+  const enBarra = variant === 'nav';
   const [open, setOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const navigate = useNavigate();
-  const { user, offlineMode, setOfflineHabilitado, setPanelRapido, setOrdenesRapidas, setArranqueRapido } = useAuth();
+  const { user, offlineMode, setOfflineHabilitado, setPanelRapido, setOrdenesRapidas, setArranqueRapido, setModoOperario } = useAuth();
+  const [savingOperario, setSavingOperario] = useState(false);
+  const handleModoOperarioToggle = async (value) => {
+    setSavingOperario(true);
+    try {
+      await setModoOperario(value);
+      setOpen(false);
+      navigate(value ? '/operario' : '/');
+    } catch {
+      toast.error('No se pudo cambiar el Modo operario');
+    } finally {
+      setSavingOperario(false);
+    }
+  };
   const verificacionArranque = useArranqueVerificacion();
   const [showArranqueDifs, setShowArranqueDifs] = useState(false);
   const [showVerificaciones, setShowVerificaciones] = useState(false);
@@ -84,7 +100,18 @@ export default function UserMenu() {
     : '?';
 
   return (
-    <div className="relative">
+    <div className={enBarra ? 'relative flex flex-1' : 'relative'}>
+      {enBarra ? (
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex flex-1 flex-col items-center justify-center gap-1.5 py-2.5 min-h-[56px] select-none active:bg-muted/40 transition-colors"
+        >
+          <span className="flex h-8 w-16 items-center justify-center rounded-full">
+            <UserCircle className="h-5 w-5 text-muted-foreground" />
+          </span>
+          <span className="text-[11px] leading-none tracking-wide text-muted-foreground">Perfil</span>
+        </button>
+      ) : (
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center justify-center gap-2 h-11 w-11 lg:h-9 lg:w-auto lg:px-2 rounded-lg hover:bg-white/10 transition-colors"
@@ -95,11 +122,17 @@ export default function UserMenu() {
         <span className="hidden lg:block text-sm font-medium max-w-[120px] truncate text-slate-300">{displayName}</span>
         <ChevronDown className="h-3.5 w-3.5 text-slate-500 hidden lg:block" />
       </button>
+      )}
 
       {open && (
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} style={{ touchAction: 'none' }} />
-          <div className="fixed right-2 top-14 z-[70] w-56 bg-popover border border-border rounded-xl shadow-2xl py-1.5 overflow-hidden">
+          <div
+            className={enBarra
+              ? 'fixed right-2 z-[70] w-64 max-h-[70vh] overflow-y-auto bg-popover border border-border rounded-xl shadow-2xl py-1.5'
+              : 'fixed right-2 top-14 z-[70] w-56 bg-popover border border-border rounded-xl shadow-2xl py-1.5 overflow-hidden'}
+            style={enBarra ? { bottom: 'calc(68px + env(safe-area-inset-bottom))' } : undefined}
+          >
             <div className="px-3 py-2.5 border-b border-border mb-1">
               <div className="text-sm font-semibold truncate text-popover-foreground">{displayName}</div>
               <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
@@ -172,6 +205,20 @@ export default function UserMenu() {
                   checked={user?.arranque_rapido === true || user?.data?.arranque_rapido === true}
                   disabled={savingArranque || offlineMode}
                   onCheckedChange={handleArranqueRapidoToggle}
+                />
+              </div>
+            )}
+            {user?.role === 'admin' && (
+              <div
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-popover-foreground"
+                title={offlineMode ? 'Necesita conexión' : undefined}
+              >
+                <Smartphone className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1">Modo operario (beta)</span>
+                <Switch
+                  checked={isModoOperario(user)}
+                  disabled={savingOperario || offlineMode}
+                  onCheckedChange={handleModoOperarioToggle}
                 />
               </div>
             )}

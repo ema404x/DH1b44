@@ -29,8 +29,9 @@ const {
   Tutorial, ImportarDatos, ConfigAlertas, InformacionGeneral, Emergencias,
   MapaJefes, InspeccionColegio, AprobacionCertificados, ControlRiesgo,
   CertificacionObras, CalendarioInformes, CrearOT, Foro, Calefaccion,
-  Sectores, Rutinas, PortalOperarioApp,
+  Sectores, Rutinas, PortalOperarioApp, OperarioHome,
 } = lazyPages;
+import InicioSegunModo from '@/components/operario-home/InicioSegunModo';
 import ProtectedPage from '@/components/shared/ProtectedPage';
 import DesktopOnlyGate from '@/components/shared/DesktopOnlyGate';
 import { isChunkLoadError, tryChunkReload } from '@/lib/chunkReload';
@@ -116,7 +117,7 @@ const AuthenticatedApp = () => {
     <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route element={<AppLayout />}>
-        <Route path="/" element={<ProtectedPage moduleKey="Dashboard"><Dashboard /></ProtectedPage>} />
+        <Route path="/" element={<InicioSegunModo><ProtectedPage moduleKey="Dashboard"><Dashboard /></ProtectedPage></InicioSegunModo>} />
         <Route path="/proyectos" element={<ProtectedPage moduleKey="Project"><Projects /></ProtectedPage>} />
         <Route path="/ordenes" element={<ProtectedPage moduleKey="WorkOrder"><WorkOrders /></ProtectedPage>} />
         <Route path="/clientes" element={<ProtectedPage moduleKey="Client"><Clients /></ProtectedPage>} />
@@ -154,6 +155,7 @@ const AuthenticatedApp = () => {
         <Route path="/rutinas" element={<ProtectedPage moduleKey="Rutinas"><Rutinas /></ProtectedPage>} />
         <Route path="/sectores" element={<ProtectedPage moduleKey="Sectores"><Sectores /></ProtectedPage>} />
         <Route path="/mis-ots" element={<ProtectedPage moduleKey="MisOrdenes"><PortalOperarioApp /></ProtectedPage>} />
+        <Route path="/operario" element={<ProtectedPage moduleKey="MisOrdenes"><OperarioHome /></ProtectedPage>} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
