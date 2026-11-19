@@ -14,17 +14,28 @@ export default function useGeocodificar(onTanda) {
     parar.current = false;
     setCorriendo(true);
     let hechas = 0;
-    setProgreso({ hechas: 0, total: pendientes || 0 });
+    let fallidas = 0;
+    setProgreso({ hechas: 0, total: pendientes || 0, fallidas: 0, detenido: null });
     try {
       while (!parar.current) {
         const r = await revisarUbicaciones('geocodificar');
+        if (r.ok === false) {
+          toast.error(`${r.error}. Lo buscado quedó guardado: podés seguir con el botón.`);
+          onTanda();
+          break;
+        }
         hechas += r.procesadas || 0;
+        fallidas += r.fallidas || 0;
         setRestantes(r.restantes);
-        setProgreso({ hechas, total: hechas + (r.restantes || 0) });
+        setProgreso({ hechas, total: hechas + (r.restantes || 0), fallidas, detenido: r.detenido || null });
         onTanda();
-        if (r.detenido) { toast.error(r.detenido); break; }
-        if (!r.restantes || !r.procesadas) break;
+        if (r.detenido) { toast.error(`${r.detenido} Podés seguir con el botón.`); break; }
+        if (!r.restantes || !r.procesadas) {
+          if (r.fallidas) toast.warning(`${fallidas} direcciones no respondieron a tiempo. Podés reintentarlas con el botón.`);
+          break;
+        }
       }
+      if (fallidas > 0 && !parar.current) toast.message(`Búsqueda terminada con ${fallidas} consultas fallidas; quedaron pendientes para reintentar.`);
     } catch (e) {
       toast.error(`${errorTexto(e)}. Lo buscado quedó guardado: podés retomar.`);
       onTanda();
