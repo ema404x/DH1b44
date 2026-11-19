@@ -31,9 +31,13 @@ export default async function (req: Request): Promise<Response> {
         return Response.json({ items: visibles, revisadas: items.length - visibles.length, pendientes: pendientes.length, umbral: 300 });
       }
       case 'geocodificar': {
-        const { pendientes } = await cargarItems(sb);
-        const r = await geocodificarLote(sb, pendientes, 15);
-        return Response.json({ ...r, total: pendientes.length, restantes: Math.max(0, pendientes.length - r.procesadas) });
+        try {
+          const { pendientes } = await cargarItems(sb);
+          const r = await geocodificarLote(sb, pendientes, 10);
+          return Response.json({ ok: true, ...r, total: pendientes.length, restantes: Math.max(0, pendientes.length - r.procesadas) });
+        } catch (e: any) {
+          return Response.json({ ok: false, error: e?.message || 'Error inesperado al buscar direcciones.' });
+        }
       }
       case 'aplicar': return Response.json(await aplicarCoordenadas(sb, ctx, body));
       case 'ok': return Response.json(await marcarBien(sb, ctx, body));
