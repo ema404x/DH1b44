@@ -17,6 +17,7 @@ export default function FichajeFila({ f }) {
         </p>
       </div>
       <div className="flex flex-wrap justify-end gap-1.5">
+        {f.sin_ficha && <Badge variant="outline" className="text-xs text-muted-foreground">Sin ficha</Badge>}
         {f.tarde && <Badge variant="outline" className="gap-1 border-amber-500/30 bg-amber-500/10 text-amber-400"><Timer className="h-3 w-3" />Tarde</Badge>}
         {f.far && <Badge variant="outline" className="gap-1 border-orange-500/30 bg-orange-500/10 text-orange-400"><MapPinOff className="h-3 w-3" />Fuera del radio · {f.distancia}</Badge>}
         {f.salida_omitida && <Badge variant="outline" className="gap-1 border-red-500/30 bg-red-500/10 text-red-400"><AlertTriangle className="h-3 w-3" />Salida omitida</Badge>}

@@ -37,7 +37,10 @@ export async function accionFichajes(sb: any, scope: any, body: any) {
   const opts: any = { sort: '-entrada_timestamp', limit };
   if (typeof body.cursor === 'string' && body.cursor) opts.cursor = body.cursor;
   const res = await sb.entities.FichajeUbicacion.filter(filtro, opts);
-  return { items: lista(res), has_more: Boolean(res?.has_more), next_cursor: res?.next_cursor || null };
+  // Solo para mostrar: los fichajes sin ficha en Empleados llevan la etiqueta en el nombre.
+  const items = lista(res).map((f: any) => (scope.fichas.sinFicha(f)
+    ? { ...f, operario_nombre: `${f.operario_nombre || 'Sin nombre'} · Sin ficha` } : f));
+  return { items, has_more: Boolean(res?.has_more), next_cursor: res?.next_cursor || null };
 }
 
 export async function accionRevisar(sb: any, scope: any, body: any) {
