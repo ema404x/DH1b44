@@ -43,6 +43,9 @@ export const pageLoaders = {
   Sectores: () => import('@/pages/Sectores'),
   Rutinas: () => import('@/pages/Rutinas'),
   PortalOperarioApp: () => import('@/pages/PortalOperarioApp'),
+  OperarioHome: () => import('@/pages/OperarioHome'),
+  PropuestasOT: () => import('@/pages/PropuestasOT'),
+  ProponerOT: () => import('@/pages/ProponerOT'),
   ControlPersonal: () => import('@/pages/ControlPersonal'),
 };
 

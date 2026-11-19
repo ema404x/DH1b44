@@ -29,8 +29,10 @@ const {
   Tutorial, ImportarDatos, ConfigAlertas, InformacionGeneral, Emergencias,
   MapaJefes, InspeccionColegio, AprobacionCertificados, ControlRiesgo,
   CertificacionObras, CalendarioInformes, CrearOT, Foro, Calefaccion,
-  Sectores, Rutinas, PortalOperarioApp, ControlPersonal,
+  Sectores, Rutinas, PortalOperarioApp, OperarioHome, PropuestasOT, ProponerOT, ControlPersonal,
 } = lazyPages;
+import CrearOTSegunModo from '@/components/operario-home/CrearOTSegunModo';
+import InicioSegunModo from '@/components/operario-home/InicioSegunModo';
 import ProtectedPage from '@/components/shared/ProtectedPage';
 import DesktopOnlyGate from '@/components/shared/DesktopOnlyGate';
 import { isChunkLoadError, tryChunkReload } from '@/lib/chunkReload';
@@ -116,7 +118,7 @@ const AuthenticatedApp = () => {
     <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route element={<AppLayout />}>
-        <Route path="/" element={<ProtectedPage moduleKey="Dashboard"><Dashboard /></ProtectedPage>} />
+        <Route path="/" element={<InicioSegunModo><ProtectedPage moduleKey="Dashboard"><Dashboard /></ProtectedPage></InicioSegunModo>} />
         <Route path="/proyectos" element={<ProtectedPage moduleKey="Project"><Projects /></ProtectedPage>} />
         <Route path="/ordenes" element={<ProtectedPage moduleKey="WorkOrder"><WorkOrders /></ProtectedPage>} />
         <Route path="/clientes" element={<ProtectedPage moduleKey="Client"><Clients /></ProtectedPage>} />
@@ -148,12 +150,15 @@ const AuthenticatedApp = () => {
         <Route path="/certificacion-obras" element={<ProtectedPage moduleKey="CertificacionObras"><CertificacionObras /></ProtectedPage>} />
 
         <Route path="/calendario-informes" element={<ProtectedPage moduleKey="Informes"><DesktopOnlyGate path="/calendario-informes"><CalendarioInformes /></DesktopOnlyGate></ProtectedPage>} />
-        <Route path="/crear-ot" element={<ProtectedPage moduleKey="WorkOrder"><CrearOT /></ProtectedPage>} />
+        <Route path="/crear-ot" element={<CrearOTSegunModo><ProtectedPage moduleKey="WorkOrder"><CrearOT /></ProtectedPage></CrearOTSegunModo>} />
+        <Route path="/proponer-ot" element={<ProtectedPage moduleKey="MisOrdenes"><ProponerOT /></ProtectedPage>} />
         <Route path="/foro" element={<ProtectedPage moduleKey="Foro"><Foro /></ProtectedPage>} />
         <Route path="/calefaccion" element={<ProtectedPage moduleKey="Calefaccion"><Calefaccion /></ProtectedPage>} />
         <Route path="/rutinas" element={<ProtectedPage moduleKey="Rutinas"><Rutinas /></ProtectedPage>} />
         <Route path="/sectores" element={<ProtectedPage moduleKey="Sectores"><Sectores /></ProtectedPage>} />
         <Route path="/mis-ots" element={<ProtectedPage moduleKey="MisOrdenes"><PortalOperarioApp /></ProtectedPage>} />
+        <Route path="/operario" element={<ProtectedPage moduleKey="MisOrdenes"><OperarioHome /></ProtectedPage>} />
+        <Route path="/propuestas-ot" element={<ProtectedPage moduleKey="PropuestasOT"><PropuestasOT /></ProtectedPage>} />
         <Route path="/control-personal" element={<ProtectedPage moduleKey="ControlPersonal"><ControlPersonal /></ProtectedPage>} />
       </Route>
       <Route path="*" element={<PageNotFound />} />

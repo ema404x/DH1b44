@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck, AlertTriangle, Info, CheckCircle2, X, AlertCircle, Package, Wrench, Receipt, ClipboardList, Clock, UserX } from 'lucide-react';
+import { Bell, CheckCheck, AlertTriangle, Info, CheckCircle2, X, AlertCircle, Package, Wrench, Receipt, ClipboardList, Clock, Inbox, UserX } from 'lucide-react';
+import { usePropuestasPendientes } from '@/hooks/usePropuestasPendientes';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -28,6 +29,7 @@ const TIPO_UI = {
   firma_certificado: { icon: Receipt,       path: '/certificados', single: 'Certificado para firmar', plural: 'Certificados para firmar' },
   aprobacion_certificado: { icon: CheckCircle2, path: '/aprobacion-certificados', single: 'Certificado para aprobar', plural: 'Certificados para aprobar' },
   factura_vencida:   { icon: Receipt,       path: '/facturacion', single: 'Factura vencida',       plural: 'Facturas vencidas' },
+  propuestas_ot:     { icon: Inbox,         path: '/propuestas-ot', single: 'Propuesta de OT por revisar', plural: 'Propuestas de OT por revisar' },
   no_ficharon:       { icon: UserX,         path: '/control-personal', single: 'Operario sin fichar', plural: 'Operarios sin fichar' },
 };
 
@@ -81,6 +83,18 @@ export default function NotificationBell() {
     });
   }, [alertas]);
 
+  // Propuestas de OT de operarios esperando revisión (tipo aparte, no toca los demás).
+  const { enviadas: propuestas } = usePropuestasPendientes();
+  const propuestasAlert = propuestas > 0 ? [{
+    id: 'propuestas_ot',
+    iconKey: 'propuestas_ot',
+    path: TIPO_UI.propuestas_ot.path,
+    title: `${propuestas} ${propuestas > 1 ? TIPO_UI.propuestas_ot.plural : TIPO_UI.propuestas_ot.single}`,
+    message: 'Enviadas por operarios, esperando tu aprobación',
+    type: 'warning',
+    read: false,
+  }] : [];
+
   // Aviso de Control de Personal (consulta aparte; no toca los avisos existentes).
   // El servidor devuelve count 0 si no corresponde (sin acceso, sin horario,
   // día no laboral o antes de la hora de entrada más la tolerancia).
@@ -93,12 +107,12 @@ export default function NotificationBell() {
   });
   const nFaltan = avisoPersonal?.count || 0;
   const sistema = nFaltan > 0
-    ? [...systemAlerts, {
+    ? [...propuestasAlert, ...systemAlerts, {
       id: 'no_ficharon', iconKey: 'no_ficharon', path: '/control-personal', type: 'warning', read: false,
       title: nFaltan === 1 ? '1 operario no fichó hoy' : `${nFaltan} operarios no ficharon hoy`,
       message: 'Pasó la hora de entrada del sector y todavía no registraron su entrada.',
     }]
-    : systemAlerts;
+    : [...propuestasAlert, ...systemAlerts];
 
   const allNotifs = [...sistema, ...notifications];
   const unread = allNotifs.filter(n => !n.read).length;
@@ -108,6 +122,7 @@ export default function NotificationBell() {
     setOpen(newOpen);
     if (newOpen) {
       qc.invalidateQueries({ queryKey: ['alertas-activas'] });
+      qc.invalidateQueries({ queryKey: ['propuestas-ot-contar'] });
       qc.invalidateQueries({ queryKey: ['aviso-control-personal'] });
     }
   };

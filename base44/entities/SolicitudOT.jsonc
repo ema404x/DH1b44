@@ -1,0 +1,242 @@
+{
+  "name": "SolicitudOT",
+  "type": "object",
+  "properties": {
+    "titulo": {
+      "type": "string",
+      "description": "T\u00edtulo propuesto para la OT"
+    },
+    "descripcion": {
+      "type": "string",
+      "description": "Detalle del trabajo propuesto"
+    },
+    "prioridad": {
+      "type": "string",
+      "enum": [
+        "baja",
+        "media",
+        "alta",
+        "urgente"
+      ],
+      "enumColors": [
+        "gray",
+        "blue",
+        "yellow",
+        "red"
+      ],
+      "default": "media"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "mantenimiento_preventivo",
+        "mantenimiento_correctivo",
+        "instalacion",
+        "inspeccion",
+        "reparacion",
+        "emergencia"
+      ],
+      "enumColors": [
+        "green",
+        "blue",
+        "purple",
+        "yellow",
+        "pink",
+        "red"
+      ],
+      "default": "mantenimiento_correctivo"
+    },
+    "asset_id": {
+      "type": "string",
+      "description": "Activo elegido (FK Asset)"
+    },
+    "asset_name": {
+      "type": "string",
+      "description": "Nombre del activo (denormalizado)"
+    },
+    "location": {
+      "type": "string",
+      "description": "Ubicaci\u00f3n textual (sede \u00b7 \u00e1rea)"
+    },
+    "location_qr_id": {
+      "type": "string",
+      "description": "Ubicaci\u00f3n QR elegida (FK LocationQR), si aplica"
+    },
+    "project_name": {
+      "type": "string",
+      "description": "Proyecto del activo (denormalizado)"
+    },
+    "fotos": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "URLs de fotos adjuntas"
+    },
+    "fecha_sugerida": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha sugerida por el operario"
+    },
+    "solicitante_user_id": {
+      "type": "string",
+      "description": "Usuario que propuso (lo estampa el servidor)"
+    },
+    "solicitante_employee_id": {
+      "type": "string",
+      "description": "Ficha Employee del solicitante"
+    },
+    "solicitante_nombre": {
+      "type": "string"
+    },
+    "solicitante_email": {
+      "type": "string"
+    },
+    "jefe_sitio": {
+      "type": "string",
+      "description": "Jefe de sitio a cargo (nombre)"
+    },
+    "jefe_sitio_email": {
+      "type": "string",
+      "description": "Email del jefe a cargo. Usado por RLS."
+    },
+    "sector_id": {
+      "type": "string",
+      "description": "Sector del solicitante. Lo estampa el servidor."
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "enviada",
+        "aprobada",
+        "rechazada"
+      ],
+      "enumColors": [
+        "yellow",
+        "green",
+        "red"
+      ],
+      "default": "enviada"
+    },
+    "motivo_rechazo": {
+      "type": "string"
+    },
+    "work_order_id": {
+      "type": "string",
+      "description": "OT creada al aprobar"
+    },
+    "revisado_por": {
+      "type": "string",
+      "description": "Nombre de quien aprob\u00f3 o rechaz\u00f3"
+    },
+    "fecha_revision": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "client_op_id": {
+      "type": "string",
+      "description": "Identificador del dispositivo para no duplicar reenv\u00edos sin conexi\u00f3n"
+    },
+    "historial": {
+      "type": "array",
+      "description": "Historial de cambios",
+      "items": {
+        "type": "object",
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usuario": {
+            "type": "string"
+          },
+          "accion": {
+            "type": "string"
+          },
+          "cambios": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "titulo",
+    "estado"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "data.solicitante_user_id": "{{user.id}}"
+        },
+        {
+          "$and": [
+            {
+              "data.sector_id": "{{user.data.sector_id}}"
+            },
+            {
+              "$or": [
+                {
+                  "user_condition": {
+                    "role": "admin"
+                  }
+                },
+                {
+                  "user_condition": {
+                    "role": "gerente"
+                  }
+                },
+                {
+                  "data.jefe_sitio_email": "{{user.email}}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "update": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "user_condition": {
+                "role": "gerente"
+              }
+            },
+            {
+              "data.jefe_sitio_email": "{{user.email}}"
+            }
+          ]
+        }
+      ]
+    },
+    "delete": {
+      "$and": [
+        {
+          "data.sector_id": "{{user.data.sector_id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

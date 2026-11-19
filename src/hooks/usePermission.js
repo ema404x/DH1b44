@@ -1,6 +1,7 @@
 import { useContext } from 'react';
 import { AuthContext } from '@/lib/AuthContext';
 import { hasModulePermission } from '@/lib/roles';
+import { puedeVerPropuestas } from '@/lib/propuestasOT';
 
 /**
  * Retorna si el usuario actual tiene permiso para una acción en un módulo.
@@ -35,6 +36,11 @@ export function usePermission(moduleKey, action = 'read') {
   // Sin permisos configurados para este usuario → denegar
   if (!moduleKey) {
     return { allowed: false, loading: false, vinculationFailed: false };
+  }
+
+  // Módulo nuevo con acceso por defecto según rol (ver lib/propuestasOT).
+  if (moduleKey === 'PropuestasOT') {
+    return { allowed: puedeVerPropuestas(user, userPermissions), loading: false, vinculationFailed: false };
   }
 
   const allowed = hasModulePermission(userPermissions?.[moduleKey], action, moduleKey, userPermissions?._employeeRole);

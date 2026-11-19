@@ -151,6 +151,21 @@ const HANDLERS = {
     return ot;
   },
 
+  // Propuesta de OT (SolicitudOT): primero las fotos, después el envío.
+  // crearSolicitudOT es idempotente por client_op_id (no duplica si se reenvía).
+  async create_solicitud(op) {
+    for (const id of op.blob_ids || []) {
+      if (op.uploaded?.[id]) continue;
+      const url = await uploadBlob(id);
+      op.uploaded = { ...(op.uploaded || {}), [id]: url };
+      await store.putOp(op);
+    }
+    const fotos = [...(op.data?.fotos || []), ...(op.blob_ids || []).map((id) => op.uploaded[id])];
+    const res = await base44.functions.invoke('crearSolicitudOT', { ...op.data, fotos, client_op_id: op.client_op_id });
+    if (res?.data?.error) throw rejected(res.data.error);
+    return res?.data?.solicitud;
+  },
+
   async update_ot(op) {
     return base44.entities.WorkOrder.update(op.ot_id, op.data);
   },
@@ -366,6 +381,18 @@ export async function enqueueCreateOT(data, photos = []) {
     });
   }
   await store.addOps(entries);
+  afterEnqueue();
+  return id;
+}
+
+// Propuesta de OT con sus fotos guardadas en el dispositivo. photos: [{ blob, name }]
+export async function enqueueCreateSolicitudOT(data, photos = []) {
+  const id = store.newOpId();
+  const list = (photos || []).map(blobEntry);
+  await store.addOps([{
+    op: { id, kind: 'create_solicitud', client_op_id: id, data, ot_title: data?.titulo, blob_ids: list.map((b) => b.id) },
+    blobs: list,
+  }]);
   afterEnqueue();
   return id;
 }

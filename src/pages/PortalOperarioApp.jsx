@@ -2,6 +2,9 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { parseFechaLocal } from '@/lib/fechaLocal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import { Link, useNavigate } from 'react-router-dom';
+import OperarioMisOT from '@/components/operario-home/OperarioMisOT';
+import ConfirmacionOperario from '@/components/operario-home/ConfirmacionOperario';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
@@ -17,9 +20,14 @@ import { useOperarioOfflineActions } from '@/hooks/useOperarioOfflineActions';
 import { canActOn } from '@/lib/workOrderActions';
 import OfflineGuard from '@/components/pwa/OfflineGuard';
 import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
+import { irAFichajePublico, EVENTO_ESCANEAR_OPERARIO, EVENTO_ABRIR_OT_OPERARIO } from '@/lib/modoOperario';
 
-export default function PortalOperarioApp() {
+// compacto (solo Inicio operario): muestra las OT activas sin encabezado ni filtros.
+// Sin la prop, la pantalla es exactamente la de siempre.
+export default function PortalOperarioApp({ compacto = false, onResumen } = {}) {
   const { currentUser, displayName } = useCurrentUser();
+  const navigate = useNavigate();
+  const [finalizada, setFinalizada] = useState(false); // solo compacto: pantalla "OT finalizada"
   const [reporteOT, setReporteOT] = useState(null);
   const [processing, setProcessing] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // { ot, accion }
@@ -38,6 +46,13 @@ export default function PortalOperarioApp() {
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+
+  // Modo operario: "Escanear" de la barra inferior y del Inicio abren este mismo escáner.
+  useEffect(() => {
+    const abrir = () => setScannerOpen(true);
+    window.addEventListener(EVENTO_ESCANEAR_OPERARIO, abrir);
+    return () => window.removeEventListener(EVENTO_ESCANEAR_OPERARIO, abrir);
   }, []);
 
   const CACHE_KEY = `mis-ots-cache-${currentUser?.id || 'anon'}`;
@@ -124,6 +139,23 @@ export default function PortalOperarioApp() {
     }
     return { porIniciar: ini, enProgreso: prog, enValidacion: val };
   }, [misOTsFiltradas]);
+
+  // Solo compacto (Inicio operario): resumen para el saludo y apertura de una OT
+  // desde otra sección (propuesta aprobada). Usa el mismo actOnOT de siempre.
+  useEffect(() => {
+    if (compacto) onResumen?.({ paraHacer: porIniciar.length, enCurso: enProgreso.length });
+  }, [compacto, onResumen, porIniciar.length, enProgreso.length]);
+
+  useEffect(() => {
+    if (!compacto) return undefined;
+    const abrir = (e) => {
+      const ot = allOTs.find((o) => o.id === e.detail?.otId);
+      if (ot) actOnOT(ot);
+      else toast.info('Esa OT no está en tu lista. Pedile a tu jefe que te la asigne.');
+    };
+    window.addEventListener(EVENTO_ABRIR_OT_OPERARIO, abrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_OT_OPERARIO, abrir);
+  });
 
   const ejecutarTransicion = async (ot, accion, extraData = {}) => {
     setProcessing(ot.id);
@@ -236,11 +268,13 @@ export default function PortalOperarioApp() {
       await queueTransition(ot, 'finalizar', reporteData, optimistic);
       toast.success('Reporte guardado (sin conexión). Se enviará al jefe al volver online.');
       setReporteOT(null);
+      if (compacto) setFinalizada(true);
       return;
     }
     // El reporte ya guardó materiales; ahora transicionar a pendiente_validacion
     const ok = await ejecutarTransicion(ot, 'finalizar', reporteData);
     if (ok) setReporteOT(null);
+    if (ok && compacto) setFinalizada(true);
   };
 
   // OTs cacheadas para una ubicación (por id) — solo lectura offline
@@ -263,7 +297,7 @@ export default function PortalOperarioApp() {
 
     // Tipo 'fichaje' — redirigir siempre al dominio público dh1m.com
     if (result.type === 'fichaje') {
-      window.location.href = `https://dh1m.com/fichar-ubicacion?loc=${encodeURIComponent(result.value)}`;
+      irAFichajePublico(result.value);
       return;
     }
 
@@ -411,6 +445,14 @@ export default function PortalOperarioApp() {
   // Skeleton shimmer solo en la primera carga real (sin data previa en cache).
   // Con initialData, las cargas siguientes muestran las OTs cacheadas de inmediato.
   if (isFetching && allOTs.length === 0) {
+    if (compacto) {
+      return (
+        <div className="flex flex-col gap-3">
+          <div className="h-32 rounded-xl skeleton" />
+          <div className="h-32 rounded-xl skeleton" />
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen flex flex-col gap-5 page-enter">
         <div className="flex items-center gap-3">
@@ -433,7 +475,7 @@ export default function PortalOperarioApp() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col gap-5 page-enter">
+    <div className={compacto ? 'flex flex-col gap-5' : 'min-h-screen flex flex-col gap-5 page-enter'}>
 
       {/* Banner offline / pendientes de sync */}
       {(!isOnline || pendingCount > 0) && (
@@ -447,6 +489,7 @@ export default function PortalOperarioApp() {
         </div>
       )}
 
+      {!compacto && (<>
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-[#3b82f6] to-[#6366f1] flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -487,8 +530,20 @@ export default function PortalOperarioApp() {
         onVistaChange={setVista}
         counts={{ activas: misOTs.length, historial: historial.length }}
       />
+      </>)}
 
-      {vista === 'historial' ? (
+      {compacto ? (
+        <OperarioMisOT
+          porIniciar={porIniciar}
+          enProgreso={enProgreso}
+          enValidacion={enValidacion}
+          total={misOTs.length}
+          processing={processing}
+          pendingOtIds={pendingOtIds}
+          onIniciar={(ot) => setConfirmAction({ ot, accion: 'iniciar' })}
+          onFinalizar={(ot) => setReporteOT(ot)}
+        />
+      ) : vista === 'historial' ? (
         <div>
           {historialFiltrado.length > 0 ? (
             <motion.div
@@ -538,7 +593,7 @@ export default function PortalOperarioApp() {
       {/* SECCIÓN 2: Por iniciar */}
       {porIniciar.length > 0 && (
         <Seccion titulo="Para Empezar" subtitulo="Tocá Iniciar cuando llegues al sitio" icon={Play} color="blue">
-          {porIniciar.map(ot => (
+          {(compacto ? porIniciar.slice(0, 5) : porIniciar).map(ot => (
             <OTCard
               key={ot.id}
               ot={ot}
@@ -552,7 +607,7 @@ export default function PortalOperarioApp() {
       )}
 
       {/* SECCIÓN 3: En validación (solo lectura) */}
-      {enValidacion.length > 0 && (
+      {!compacto && enValidacion.length > 0 && (
         <Seccion titulo="Enviadas al Jefe" subtitulo="Esperando validación del Jefe de Sitio" icon={Lock} color="amber">
           {enValidacion.map(ot => (
             <OTCard key={ot.id} ot={ot} processing={false} locked />
@@ -561,13 +616,17 @@ export default function PortalOperarioApp() {
       )}
 
       {/* Empty state */}
-      {misOTsFiltradas.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-500">
+      {(compacto ? enProgreso.length + porIniciar.length === 0 : misOTsFiltradas.length === 0) && (
+        <div className={compacto
+          ? 'flex flex-col items-center justify-center py-8 gap-3 text-slate-500'
+          : 'flex flex-col items-center justify-center py-24 gap-3 text-slate-500'}>
           <CheckCircle2 className="h-12 w-12 text-slate-700" />
           <p className="text-sm font-medium">
-            {misOTs.length === 0 ? 'No tenés órdenes asignadas' : 'Ninguna orden coincide con los filtros'}
+            {compacto
+              ? (misOTs.length === 0 ? 'No tenés OT asignadas' : 'No tenés OT en progreso ni para empezar')
+              : misOTs.length === 0 ? 'No tenés órdenes asignadas' : 'Ninguna orden coincide con los filtros'}
           </p>
-          {misOTs.length > 0 && (
+          {!compacto && misOTs.length > 0 && (
             <button onClick={limpiarFiltros} className="text-xs text-primary hover:underline">
               Limpiar filtros
             </button>
@@ -575,6 +634,21 @@ export default function PortalOperarioApp() {
         </div>
       )}
       </>
+      )}
+
+      {compacto && finalizada && (
+        <ConfirmacionOperario
+          titulo="OT finalizada"
+          detalle="Enviada a tu jefe"
+          acciones={(
+            <button
+              onClick={() => { setFinalizada(false); navigate('/operario'); }}
+              className="h-14 w-full rounded-xl bg-primary text-lg font-bold text-primary-foreground active:scale-[0.98]"
+            >
+              Volver al inicio
+            </button>
+          )}
+        />
       )}
 
       {/* Formulario de reporte */}
