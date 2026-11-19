@@ -7,7 +7,7 @@ import {
 } from '@/lib/offlineSession';
 import { scheduleOfflinePreload } from '@/lib/offlinePreload';
 import { FICHAJE_SIN_CONEXION, puedeFicharConCuenta } from '@/lib/fichajeCuenta';
-import { prepararFichajeSinConexion, leerHabilitacion, borrarHabilitacion } from '@/lib/fichajeOffline';
+import { prepararFichajeSinConexion, leerHabilitacion, borrarHabilitacion, recordarUsuarioOnline } from '@/lib/fichajeOffline';
 import {
   tieneArranqueRapido, usaRapido, compartirMe, borrarVinculo,
   leerVinculo, llamarVinculo, marcarVinculoPintado, vinculoCambio,
@@ -59,7 +59,10 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!FICHAJE_SIN_CONEXION || isLoadingAuth || offlineMode || !isAuthenticated || !user?.id) return;
     if (userPermissions == null || hasEmployeeRecord == null || userPermissions._minimalAccess) return;
-    if (puedeFicharConCuenta({ isAuthenticated, hasEmployeeRecord, userPermissions })) prepararFichajeSinConexion(user);
+    recordarUsuarioOnline(user.id);
+    // Ficha cargada sin DNI: no se llama al servidor (lo rechazaría igual).
+    const sinDni = userPermissions._employeeTieneDni === false;
+    if (!sinDni && puedeFicharConCuenta({ isAuthenticated, hasEmployeeRecord, userPermissions })) prepararFichajeSinConexion(user);
     else borrarHabilitacion();
   }, [user?.id, userPermissions, hasEmployeeRecord, isLoadingAuth, isAuthenticated, offlineMode]);
 
@@ -466,6 +469,7 @@ export const AuthProvider = ({ children }) => {
     setUserPermissions({
       ...perms,
       _employeeRole: emp.role || null,
+      _employeeTieneDni: !!String(emp.dni || '').replace(/\D/g, ''),
       _employeeName: emp.full_name || null,
       _employeeSector: emp.sector_id || null,
       _employeeFirmaUrl: emp.firma_url || null,
