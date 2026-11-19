@@ -9,9 +9,10 @@
  * transacción de IndexedDB terminó (oncomplete), no antes.
  */
 const DB_NAME = 'dh1-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const OPS = 'ops';
 const BLOBS = 'blobs';
+const META = 'meta'; // datos guardados por clave (ej. habilitación para fichar sin señal)
 const MARKER = 'dh1-offline-has-ops';
 const PERSIST_ASKED = 'dh1-offline-persist-asked';
 const MIN_FREE_BYTES = 50 * 1024 * 1024;
@@ -27,8 +28,14 @@ function openDB() {
         if (!db.objectStoreNames.contains(BLOBS)) {
           db.createObjectStore(BLOBS, { keyPath: 'id' }).createIndex('op_id', 'op_id');
         }
+        if (!db.objectStoreNames.contains(META)) db.createObjectStore(META, { keyPath: 'key' });
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        // Otra pestaña con una versión más nueva: se cierra para no bloquearla.
+        db.onversionchange = () => { db.close(); dbPromise = null; };
+        resolve(db);
+      };
       req.onerror = () => { dbPromise = null; reject(req.error); };
     });
   }
@@ -199,6 +206,22 @@ export async function completeCreate(opId, otId) {
   });
   await refreshMarker();
   changed();
+}
+
+// ── Datos guardados por clave (no son operaciones pendientes) ────────────────
+export function getMeta(key) {
+  return run([META], 'readonly', (t, set) => {
+    const r = t.objectStore(META).get(key);
+    r.onsuccess = () => set(r.result?.value ?? null);
+  });
+}
+
+export function putMeta(key, value) {
+  return run([META], 'readwrite', (t) => { t.objectStore(META).put({ key, value }); });
+}
+
+export function deleteMeta(key) {
+  return run([META], 'readwrite', (t) => { t.objectStore(META).delete(key); });
 }
 
 // ── Espacio y persistencia ──────────────────────────────────────────────────

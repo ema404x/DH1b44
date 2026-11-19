@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import QRScannerModal from '@/components/operario/QRScannerModal';
 import { EVENTO_FICHAR_OPERARIO } from '@/lib/modoOperario';
 import { useAbrirFichajeQR } from '@/hooks/useAbrirFichajeQR';
+import FichajesPendientesAviso from '@/components/fichar-cuenta/FichajesPendientesAviso';
 
 /**
  * Tarjeta "Fichaje" del Inicio operario. Abre el escáner y, con un QR de
@@ -46,6 +47,7 @@ export default function FichajeCard() {
         <ScanLine className="h-7 w-7" />
         Escanear para fichar
       </button>
+      <div className="mt-4 empty:hidden"><FichajesPendientesAviso /></div>
       <QRScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} onResult={handleResult} />
     </section>
   );

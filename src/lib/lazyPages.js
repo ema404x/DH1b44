@@ -48,6 +48,7 @@ export const pageLoaders = {
   ProponerOT: () => import('@/pages/ProponerOT'),
   ControlPersonal: () => import('@/pages/ControlPersonal'),
   FicharCuenta: () => import('@/pages/FicharCuenta'),
+  FichajeSinConexionApp: () => import('@/pages/FichajeSinConexionApp'),
 };
 
 // React.lazy recuerda para siempre una carga fallida. Cada pantalla guarda su

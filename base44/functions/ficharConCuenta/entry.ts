@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.57';
 import { createScopedClient } from '../../shared/sectorGuard.ts';
 import { fetchAllFichajesPaginated, reconcileExpiredOpenFichajes, isExpiredOpenFichaje } from '../../shared/fichajeAutoCierre.ts';
 import { getDistanceStatus, hasCoordinates } from '../../shared/geoDistance.ts';
+import { ficharSinConexion } from '../../shared/fichajeSinConexion.ts';
 
 // Fichaje con cuenta: la identidad sale SOLO de la sesión (auth.me) y de la ficha
 // Employee vinculada. Nunca se acepta del cliente nombre, DNI, user_id ni employee_id.
@@ -46,14 +47,37 @@ export default async function (req: Request): Promise<Response> {
     if (!user) return fail('Tenés que iniciar sesión para fichar con tu cuenta.', 'no_elegible');
     const body = await req.json().catch(() => ({}));
     const { action, locationId } = body || {};
-    if (action !== 'estado' && action !== 'fichar') return fail('Acción no válida.');
-    if (typeof locationId !== 'string' || !locationId.trim()) return fail('El código QR no tiene una ubicación válida.');
+    if (action !== 'estado' && action !== 'fichar' && action !== 'preparar') return fail('Acción no válida.');
+    if (action !== 'preparar' && (typeof locationId !== 'string' || !locationId.trim())) return fail('El código QR no tiene una ubicación válida.');
 
     const sb = base44.asServiceRole;
     const emp = await resolverEmpleado(sb, user);
     const motivo = elegibilidad(emp);
     if (motivo) return fail(motivo, 'no_elegible');
     const dni = dniDe(emp.dni);
+
+    // Preparación para fichar sin señal: lugares activos del sector + jornada abierta de hoy.
+    if (action === 'preparar') {
+      const locs = [];
+      let cursor;
+      for (let i = 0; i < 20; i++) {
+        const page = await sb.entities.LocationQR.filter({ sector_id: emp.sector_id, is_active: true }, { sort: 'name', limit: 500, ...(cursor ? { cursor } : {}) });
+        locs.push(...lista(page));
+        if (Array.isArray(page) || !page?.has_more || !page?.next_cursor) break;
+        cursor = page.next_cursor;
+      }
+      const scopedP = createScopedClient(base44, emp.sector_id);
+      const ahora = new Date();
+      const abiertas = (await fetchAllFichajesPaginated(scopedP, { dni, estado: 'abierta' }, '-entrada_timestamp'))
+        .filter((j) => !isExpiredOpenFichaje(j, ahora));
+      const ab = abiertas[0];
+      return Response.json({
+        ok: true, user_id: user.id, operario_nombre: emp.full_name, employee_role: emp.role, sector_id: emp.sector_id,
+        locations: locs.map(leanLoc),
+        abierta: ab ? { location_qr_id: ab.location_qr_id, location_name: ab.location_name || '', entrada_timestamp: ab.entrada_timestamp } : null,
+        server_time: ahora.toISOString(),
+      });
+    }
 
     const loc = await sb.entities.LocationQR.get(locationId).catch(nf);
     if (!loc) return fail('No encontramos ese punto de fichaje. Revisá el QR.');
@@ -87,6 +111,11 @@ export default async function (req: Request): Promise<Response> {
     const previo = lista(await scoped.entities.FichajeUbicacion.filter({ $or: [{ client_op_id: opId }, { salida_client_op_id: opId }] }, { limit: 1 }))[0];
     if (previo) {
       return Response.json({ ok: true, repetido: true, tipo: previo.salida_client_op_id === opId ? 'salida' : 'entrada', jornada: previo, location: leanLoc(loc), distancia });
+    }
+
+    if (body.modo === 'sin_conexion') {
+      const r = await ficharSinConexion({ scoped, body, emp, user, loc, dni, opId, lat, lng, accuracy, distancia, rawOpen, now });
+      return Response.json(r.ok ? { ...r, location: leanLoc(loc), distancia } : r);
     }
 
     const { activeToday } = await reconcileExpiredOpenFichajes(scoped, rawOpen, now, { throwOnFailure: true });

@@ -137,6 +137,32 @@
     "salida_client_op_id": {
       "type": "string",
       "description": "Identificador \u00fanico generado en el tel\u00e9fono para la salida con cuenta. Evita duplicados si se reintenta."
+    },
+    "sin_conexion": {
+      "type": "boolean",
+      "description": "Entrada con cuenta guardada en el tel\u00e9fono sin se\u00f1al y enviada despu\u00e9s (m\u00e9todo cuenta sin conexi\u00f3n)."
+    },
+    "recibido_en": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Solo entrada sin conexi\u00f3n: hora del servidor en que lleg\u00f3 el fichaje guardado en el tel\u00e9fono."
+    },
+    "desfasaje_reloj_seg": {
+      "type": "number",
+      "description": "Solo entrada sin conexi\u00f3n: desfasaje del reloj del tel\u00e9fono en segundos (hora del servidor menos hora del tel\u00e9fono al enviar). Se us\u00f3 para corregir la hora."
+    },
+    "salida_sin_conexion": {
+      "type": "boolean",
+      "description": "Salida con cuenta guardada en el tel\u00e9fono sin se\u00f1al y enviada despu\u00e9s."
+    },
+    "salida_recibido_en": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Solo salida sin conexi\u00f3n: hora del servidor en que lleg\u00f3 la salida guardada en el tel\u00e9fono."
+    },
+    "salida_desfasaje_reloj_seg": {
+      "type": "number",
+      "description": "Solo salida sin conexi\u00f3n: desfasaje del reloj del tel\u00e9fono en segundos usado para corregir la hora de salida."
     }
   },
   "required": [

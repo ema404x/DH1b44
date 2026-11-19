@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { base44 } from '@/api/base44Client';
 import { getDistanceStatus } from '@/components/fichar/geoDistance';
+import { metodoFichajeLabel } from '@/lib/fichajeCuenta';
 
 const ADMIN = { pendiente: 'Pendiente', revisado: 'Revisado', incidencia: 'Incidencia' };
 const clock = new Intl.DateTimeFormat('en-GB', {
@@ -91,7 +92,7 @@ export default async function exportAsistenciasExcel(query, coordinates, fetchPa
       excelDate(i.entrada_timestamp), excelDate(i.salida_timestamp), duration ?? '',
       distance(i, coordinates).text, jornadaLabel,
       ADMIN[i.estado_admin] || (omitted ? 'Incidencia' : 'Pendiente'), i.notas_admin || '',
-      i.metodo === 'cuenta' ? 'Cuenta' : 'QR público']);
+      metodoFichajeLabel(i)]);
   }
   const summary = [['Operario', 'DNI', 'Total fichajes', 'Jornadas abiertas', 'Jornadas cerradas', 'Salidas omitidas', 'Horas trabajadas', 'Incidencias']];
   const groups = [...grouped.rows].sort((a, b) => (a.operario_nombre || '').localeCompare(b.operario_nombre || '', 'es'));

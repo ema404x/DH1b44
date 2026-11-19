@@ -6,6 +6,8 @@ import {
   isOfflineEnabled, saveOfflineSession, readOfflineSession, clearOfflineSession, isNetworkError,
 } from '@/lib/offlineSession';
 import { scheduleOfflinePreload } from '@/lib/offlinePreload';
+import { FICHAJE_SIN_CONEXION, puedeFicharConCuenta } from '@/lib/fichajeCuenta';
+import { prepararFichajeSinConexion, leerHabilitacion, borrarHabilitacion } from '@/lib/fichajeOffline';
 import {
   tieneArranqueRapido, usaRapido, compartirMe, borrarVinculo,
   leerVinculo, llamarVinculo, marcarVinculoPintado, vinculoCambio,
@@ -45,10 +47,21 @@ export const AuthProvider = ({ children }) => {
   const [offlineMode, setOfflineMode] = useState(false);
   const [offlineSavedAt, setOfflineSavedAt] = useState(null);
   const [justReconnected, setJustReconnected] = useState(false);
+  // Abrió sin red solo para fichar (operario con habilitación guardada, sin offline_habilitado).
+  const [fichajeSoloOffline, setFichajeSoloOffline] = useState(false);
 
   useEffect(() => {
     checkAppState();
   }, []);
+
+  // Fichaje con cuenta sin conexión: con red, el operario habilitado guarda en el
+  // teléfono su habilitación, sus lugares y su jornada. Si dejó de estar habilitado, se borra.
+  useEffect(() => {
+    if (!FICHAJE_SIN_CONEXION || isLoadingAuth || offlineMode || !isAuthenticated || !user?.id) return;
+    if (userPermissions == null || hasEmployeeRecord == null || userPermissions._minimalAccess) return;
+    if (puedeFicharConCuenta({ isAuthenticated, hasEmployeeRecord, userPermissions })) prepararFichajeSinConexion(user);
+    else borrarHabilitacion();
+  }, [user?.id, userPermissions, hasEmployeeRecord, isLoadingAuth, isAuthenticated, offlineMode]);
 
   // Sesión guardada para el modo sin conexión: se guarda solo si el usuario
   // tiene offline_habilitado y hay red; si el campo es false, se borra.
@@ -112,6 +125,7 @@ export const AuthProvider = ({ children }) => {
         await linkEmployee(currentUser);
         setQueriesOffline(false);
         setIsAuthenticated(true);
+        setFichajeSoloOffline(false);
         setOfflineMode(false);
         setJustReconnected(true);
         queryClientInstance.invalidateQueries();
@@ -124,6 +138,7 @@ export const AuthProvider = ({ children }) => {
         if (error?.status === 401 || error?.status === 403) {
           clearOfflineSession();
           setQueriesOffline(false);
+          setFichajeSoloOffline(false);
           setOfflineMode(false);
           setIsAuthenticated(false);
           setUser(null);
@@ -232,7 +247,28 @@ export const AuthProvider = ({ children }) => {
         setOfflineMode(true);
         return;
       }
+      // Fichaje sin conexión: sin sesión de lectura guardada, pero con habilitación
+      // para fichar (menos de 7 días) → la app abre solo con el fichaje.
+      const habFichaje = !savedSession && isNetworkError(error) ? await leerHabilitacion() : null;
+      if (habFichaje) {
+        setQueriesOffline(true);
+        setUser(habFichaje.user);
+        setUserPermissions({
+          MisOrdenes: { read: true },
+          _employeeRole: habFichaje.employee_role || null,
+          _employeeName: habFichaje.operario_nombre || null,
+          _employeeSector: habFichaje.sector_id || null,
+        });
+        setHasEmployeeRecord(true);
+        setVinculationFailed(false);
+        setIsAuthenticated(true);
+        setOfflineSavedAt(habFichaje.savedAt);
+        setFichajeSoloOffline(true);
+        setOfflineMode(true);
+        return;
+      }
       if (savedSession && (error?.status === 401 || error?.status === 403)) clearOfflineSession();
+      if (error?.status === 401 || error?.status === 403) borrarHabilitacion();
       setIsAuthenticated(false);
       setUser(null);
       if (error?.status === 403 && error?.data?.extra_data?.reason === 'user_not_registered') {
@@ -528,6 +564,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     clearOfflineSession();
+    borrarHabilitacion();
     setUser(null);
     setIsAuthenticated(false);
     base44.auth.logout(window.location.href);
@@ -590,6 +627,7 @@ export const AuthProvider = ({ children }) => {
       checkAppState,
       switchSector,
       offlineMode,
+      fichajeSoloOffline,
       offlineSavedAt,
       justReconnected,
       setOfflineHabilitado,

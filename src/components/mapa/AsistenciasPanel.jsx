@@ -12,6 +12,7 @@ import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import AsistenciaDetailDialog from './AsistenciaDetailDialog';
 import exportAsistenciasExcel from '@/components/fichar/exportAsistenciasExcel';
+import { metodoFichajeLabel } from '@/lib/fichajeCuenta';
 import { DISTANCE_THRESHOLD_M, getDistanceStatus, hasCoordinates } from '@/components/fichar/geoDistance';
 
 const ESTADO_ADMIN = {
@@ -331,8 +332,8 @@ export default function AsistenciasPanel({ locations = [], fetchPage = null, onS
                   <Badge variant="outline" className={ea.class}>{ea.label}</Badge>
                 </TableCell>
                 <TableCell>
-                  <span className={`text-[11px] font-medium whitespace-nowrap ${fichaje.metodo === 'cuenta' ? 'text-primary' : 'text-muted-foreground'}`}>
-                    {fichaje.metodo === 'cuenta' ? 'Cuenta' : 'QR público'}
+                  <span className={`text-[11px] font-medium whitespace-nowrap ${metodoFichajeLabel(fichaje) !== 'QR público' ? 'text-primary' : 'text-muted-foreground'}`}>
+                    {metodoFichajeLabel(fichaje)}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
