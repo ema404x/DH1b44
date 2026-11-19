@@ -3,8 +3,10 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, ChevronDown, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet, HardHat, Building2
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet, HardHat, Building2, Inbox
 } from 'lucide-react';
+import { puedeVerPropuestas } from '@/lib/propuestasOT';
+import { usePropuestasPendientes } from '@/hooks/usePropuestasPendientes';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { useForoNotificaciones } from '@/hooks/useForoNotificaciones';
@@ -31,6 +33,7 @@ const navGroups = [
     items: [
       { label: 'Proyectos', icon: FolderKanban, path: '/proyectos' },
       { label: 'Órdenes de Trabajo', icon: ClipboardList, path: '/ordenes' },
+      { label: 'Propuestas de operarios', icon: Inbox, path: '/propuestas-ot' },
       { label: 'Activos', icon: ClipboardCheck, path: '/activos' },
       { label: 'Informes', icon: ClipboardCheck, path: '/informes' },
       { label: 'Plan de Infraestructura', icon: Wrench, path: '/calefaccion' },
@@ -90,7 +93,7 @@ const navGroups = [
 // Mapa estático — fuera del componente, no se recrea nunca
 const routeToModule = {
   '/': 'Dashboard', '/calendario': 'Calendario', '/emergencias': 'Emergencias',
-  '/proyectos': 'Project', '/ordenes': 'WorkOrder', '/activos': 'Asset',
+  '/proyectos': 'Project', '/ordenes': 'WorkOrder', '/propuestas-ot': 'PropuestasOT', '/activos': 'Asset',
   '/informes': 'Informes', '/inspeccion-colegio': 'InspeccionColegio',
   '/reportes': 'Reportes', '/automatizaciones': 'Automatizaciones',
   '/clientes': 'Client', '/presupuestos-obra': 'PresupuestosObra',
@@ -103,8 +106,9 @@ const routeToModule = {
   '/rutinas': 'Rutinas', '/mis-ots': 'MisOrdenes', '/foro': 'Foro', '/tutorial': null, '/importar': 'ImportarDatos',
 };
 
-const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesAprobacion }) {
+const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, hasNewMessages, pendientesAprobacion, propuestasPendientes = 0 }) {
   const isForo = item.path === '/foro';
+  const showPropuestasBadge = item.path === '/propuestas-ot' && propuestasPendientes > 0;
   const isAprobacion = item.path === '/aprobacion-certificados';
   const showAprobacionBadge = isAprobacion && pendientesAprobacion > 0 && !active;
 
@@ -144,6 +148,14 @@ const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, 
         {!collapsed && isForo && hasNewMessages && !active && (
           <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse flex-shrink-0" />
         )}
+        {showPropuestasBadge && (
+          <span className={cn(
+            "flex-shrink-0 text-[10px] font-bold bg-amber-400/20 text-amber-400 border border-amber-400/40 px-1.5 py-0.5 rounded-full leading-none tabular-nums",
+            collapsed ? "absolute top-0 right-0" : "ml-auto"
+          )}>
+            {propuestasPendientes > 99 ? '99+' : propuestasPendientes}
+          </span>
+        )}
         {!collapsed && showAprobacionBadge && (
           <span className="ml-auto flex items-center gap-1 flex-shrink-0">
             <span className="text-[10px] font-bold bg-amber-400/20 text-amber-400 border border-amber-400/40 px-1.5 py-0.5 rounded-full leading-none shadow-[0_0_6px_2px_rgba(251,191,36,0.3)] animate-pulse">
@@ -166,7 +178,8 @@ const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, 
   prev.active === next.active &&
   prev.collapsed === next.collapsed &&
   prev.hasNewMessages === next.hasNewMessages &&
-  prev.pendientesAprobacion === next.pendientesAprobacion
+  prev.pendientesAprobacion === next.pendientesAprobacion &&
+  prev.propuestasPendientes === next.propuestasPendientes
 );
 
 export default function Sidebar({ open, onOpenChange }) {
@@ -189,6 +202,7 @@ export default function Sidebar({ open, onOpenChange }) {
   });
   const { hasNewMessages, resetNotification } = useForoNotificaciones();
   const { pendientesAprobacion } = useAprobacionPendientes();
+  const { enviadas: propuestasPendientes } = usePropuestasPendientes();
 
   // Memoizar isActive — evita recalcular por cada navitem en cada render
   const isActive = useCallback((path) => {
@@ -237,10 +251,11 @@ export default function Sidebar({ open, onOpenChange }) {
         }
         const moduleKey = routeToModule[item.path];
         if (!moduleKey) return true;
+        if (moduleKey === 'PropuestasOT') return puedeVerPropuestas(user, userPermissions);
         return hasModulePermission(userPermissions[moduleKey], 'read', moduleKey);
       })
     })).filter(group => group.items.length > 0);
-  }, [user?.role, userPermissions]);
+  }, [user, userPermissions]);
 
   const handleCloseMobile = useCallback(() => setMobileOpen(false), [setMobileOpen]);
 
@@ -376,6 +391,7 @@ export default function Sidebar({ open, onOpenChange }) {
                     onClick={handleCloseMobile}
                     hasNewMessages={item.path === '/foro' ? hasNewMessages : false}
                     pendientesAprobacion={pendientesAprobacion}
+                    propuestasPendientes={item.path === '/propuestas-ot' ? propuestasPendientes : 0}
                   />
                 ))}
               </div>

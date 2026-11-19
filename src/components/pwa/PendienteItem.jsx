@@ -6,6 +6,7 @@ import PendingPhotoThumb from '@/components/pwa/PendingPhotoThumb';
 
 function opLabel(op) {
   if (op.kind === 'create_ot') return 'Nueva OT';
+  if (op.kind === 'create_solicitud') return 'Propuesta de OT';
   if (op.kind === 'photo') return op.target === 'checklist' ? 'Foto de checklist' : 'Foto';
   if (op.kind === 'update_ot') return 'Cambio en OT';
   if (op.accion === 'iniciar') return 'Iniciar';

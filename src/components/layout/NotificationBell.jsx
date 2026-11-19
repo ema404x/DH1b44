@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck, AlertTriangle, Info, CheckCircle2, X, AlertCircle, Package, Wrench, Receipt, ClipboardList, Clock } from 'lucide-react';
+import { Bell, CheckCheck, AlertTriangle, Info, CheckCircle2, X, AlertCircle, Package, Wrench, Receipt, ClipboardList, Clock, Inbox } from 'lucide-react';
+import { usePropuestasPendientes } from '@/hooks/usePropuestasPendientes';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -28,6 +29,7 @@ const TIPO_UI = {
   firma_certificado: { icon: Receipt,       path: '/certificados', single: 'Certificado para firmar', plural: 'Certificados para firmar' },
   aprobacion_certificado: { icon: CheckCircle2, path: '/aprobacion-certificados', single: 'Certificado para aprobar', plural: 'Certificados para aprobar' },
   factura_vencida:   { icon: Receipt,       path: '/facturacion', single: 'Factura vencida',       plural: 'Facturas vencidas' },
+  propuestas_ot:     { icon: Inbox,         path: '/propuestas-ot', single: 'Propuesta de OT por revisar', plural: 'Propuestas de OT por revisar' },
 };
 
 const NIVEL_RANK = { critical: 0, warning: 1, info: 2 };
@@ -80,7 +82,20 @@ export default function NotificationBell() {
     });
   }, [alertas]);
 
-  const allNotifs = [...systemAlerts, ...notifications];
+  // Propuestas de OT de operarios esperando revisión (tipo aparte, no toca los demás).
+  const { enviadas: propuestas } = usePropuestasPendientes();
+  const propuestasAlert = propuestas > 0 ? [{
+    id: 'propuestas_ot',
+    iconKey: 'propuestas_ot',
+    path: TIPO_UI.propuestas_ot.path,
+    title: `${propuestas} ${propuestas > 1 ? TIPO_UI.propuestas_ot.plural : TIPO_UI.propuestas_ot.single}`,
+    message: 'Enviadas por operarios, esperando tu aprobación',
+    type: 'warning',
+    read: false,
+  }] : [];
+  const systemAlertsAll = [...propuestasAlert, ...systemAlerts];
+
+  const allNotifs = [...systemAlertsAll, ...notifications];
   const unread = allNotifs.filter(n => !n.read).length;
 
   const handleOpen = () => {
@@ -88,6 +103,7 @@ export default function NotificationBell() {
     setOpen(newOpen);
     if (newOpen) {
       qc.invalidateQueries({ queryKey: ['alertas-activas'] });
+      qc.invalidateQueries({ queryKey: ['propuestas-ot-contar'] });
     }
   };
 
@@ -152,12 +168,12 @@ export default function NotificationBell() {
               ) : (
                 <div className="p-2 space-y-1">
                   {/* Alertas del sistema agrupadas arriba */}
-                  {systemAlerts.length > 0 && (
+                  {systemAlertsAll.length > 0 && (
                     <>
                       <div className="px-2 pt-1 pb-0.5">
                         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Sistema</span>
                       </div>
-                      {systemAlerts.map(n => {
+                      {systemAlertsAll.map(n => {
                         const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.info;
                         const Icon = (TIPO_UI[n.iconKey] || {}).icon || cfg.icon;
                         return (

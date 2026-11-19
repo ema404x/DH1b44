@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
+import { propuestasPorDefecto } from '@/lib/propuestasOT';
 
 const MODULES = [
   { key: 'Dashboard', label: 'Dashboard', group: 'General' },
@@ -25,6 +26,7 @@ const MODULES = [
   { key: 'Project', label: 'Proyectos', group: 'Operaciones' },
   { key: 'WorkOrder', label: 'Órdenes de Trabajo', group: 'Operaciones' },
   { key: 'MisOrdenes', label: 'Mis Órdenes de Trabajo', group: 'Operaciones' },
+  { key: 'PropuestasOT', label: 'Propuestas de operarios', group: 'Operaciones' },
   { key: 'Emergencias', label: 'Emergencias', group: 'Operaciones' },
   { key: 'Mapa', label: 'Mapa de Ubicaciones', group: 'Operaciones' },
   { key: 'MapaJefes', label: 'Mapa de Jefes', group: 'Operaciones' },
@@ -113,6 +115,8 @@ function RoleCard({ role, onDelete, onToggle, deleteIsPending }) {
         // inicializar, para que la UI refleje el acceso actual y el admin pueda
         // desmarcar para revocar.
         if (mod.key === 'MisOrdenes') def.read = true;
+        // PropuestasOT: por defecto admin, gerente y jefe de sitio (igual que en la app).
+        if (mod.key === 'PropuestasOT') def.read = propuestasPorDefecto(role.role_name);
         normalized[mod.key] = def;
       }
     });
