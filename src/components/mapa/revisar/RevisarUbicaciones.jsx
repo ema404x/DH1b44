@@ -11,8 +11,13 @@ import RevisionDetalle from './RevisionDetalle';
 import RevisionHistorial from './RevisionHistorial';
 import GeoProgreso from './GeoProgreso';
 
-const FILTROS = [{ key: 'problemas', label: 'Para revisar' }, { key: 'todas', label: 'Todas' }];
+const FILTROS = [{ key: 'problemas', label: 'Para revisar' }, { key: 'revisadas', label: 'Revisadas' }, { key: 'todas', label: 'Todas' }];
 const PROBLEMA = ['mal_ubicada', 'sin_coordenadas'];
+const EN_FILTRO = {
+  problemas: (i) => !i.revisada && PROBLEMA.includes(i.estado),
+  revisadas: (i) => i.revisada,
+  todas: () => true,
+};
 
 export default function RevisarUbicaciones() {
   const qc = useQueryClient();
@@ -25,7 +30,7 @@ export default function RevisarUbicaciones() {
 
   const items = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return (data?.items || []).filter((i) => (filtro === 'todas' || PROBLEMA.includes(i.estado)) &&
+    return (data?.items || []).filter((i) => EN_FILTRO[filtro](i) &&
       (!t || i.nombre.toLowerCase().includes(t) || i.direccion.toLowerCase().includes(t)));
   }, [data, filtro, q]);
   const seleccionado = data?.items?.find((i) => i.clave === sel) || null;

@@ -82,11 +82,13 @@ export async function cargarItems(sb: any) {
     else if (!sugerida) estado = 'sin_resultado';
     else if ((distancia as number) > UMBRAL_M) estado = 'mal_ubicada';
     const rev = revMap.get(it.clave);
+    const revisada = Boolean(rev && rev.firma_coords === firmaCoords(it.targets));
     return {
       ...it, targets, sugerida, estado, distancia,
       actual: conCoords[0] ? { lat: conCoords[0].lat, lng: conCoords[0].lng } : null,
       usaFichaje: targets.some((t: any) => t.entidad === 'LocationQR'),
-      revisada: Boolean(rev && rev.firma_coords === firmaCoords(it.targets)),
+      revisada,
+      revision: revisada ? { resultado: rev.resultado, fecha: rev.fecha || rev.created_date, por: rev.revisado_por || '' } : null,
     };
   });
   return { items, pendientes: [...pendientes] };

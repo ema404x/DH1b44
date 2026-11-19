@@ -20,18 +20,25 @@ function Encuadre({ puntos }) {
   return null;
 }
 
+function SeguirFoco({ foco }) {
+  const map = useMap();
+  useEffect(() => { if (foco) map.panTo([foco.lat, foco.lng]); }, [map, foco]);
+  return null;
+}
+
 function ClickMover({ onMove }) {
   useMapEvents({ click: (e) => onMove(e.latlng) });
   return null;
 }
 
-export default function RevisionMiniMapa({ actuales, sugerida, manual, onManualMove }) {
+export default function RevisionMiniMapa({ actuales, sugerida, manual, onManualMove, foco }) {
   const puntos = [...actuales.map((a) => [a.lat, a.lng]), ...(sugerida ? [[sugerida.lat, sugerida.lng]] : [])];
   return (
     <div className="h-64 rounded-xl overflow-hidden border border-border/60">
       <MapContainer center={puntos[0] || CABA} zoom={15} className="h-full w-full" scrollWheelZoom>
         <TileLayer url={MAP_TILE_URL} attribution={MAP_TILE_ATTRIBUTION} maxZoom={MAP_TILE_MAX_ZOOM} />
         <Encuadre puntos={puntos} />
+        <SeguirFoco foco={foco} />
         {actuales.map((a) => (
           <Marker key={a.key} position={[a.lat, a.lng]} icon={ICONOS.actual}><Tooltip>{a.label}</Tooltip></Marker>
         ))}

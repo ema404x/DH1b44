@@ -4,12 +4,14 @@ import { toast } from 'sonner';
 import { Loader2, MapPinned, Move, CheckCircle2, X, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RevisionMiniMapa from './RevisionMiniMapa';
-import { revisarUbicaciones, errorTexto, ESTADOS, metros, coordTexto } from './api';
+import CoordenadasManual from './CoordenadasManual';
+import { revisarUbicaciones, errorTexto, ESTADOS, metros, coordTexto, REVISADA_CLS, ultimaAccion } from './api';
 
 const ETIQUETA = { LocationData: 'Colegio (mapa)', LocationQR: 'Punto de fichaje' };
 
 export default function RevisionDetalle({ item, onHecho, onCerrar }) {
   const [manual, setManual] = useState(null);
+  const [foco, setFoco] = useState(null);
   const accion = useMutation({
     mutationFn: (p) => revisarUbicaciones(p.action, { clave: item.clave, ...p }),
     onSuccess: (_, p) => { toast.success(p.action === 'ok' ? 'Marcada como revisada' : 'Ubicación actualizada'); onHecho(); },
@@ -25,12 +27,17 @@ export default function RevisionDetalle({ item, onHecho, onCerrar }) {
         <div className="min-w-0">
           <h3 className="font-semibold leading-tight">{item.nombre}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">{item.direccion}</p>
-          <span className={`inline-block mt-2 text-[11px] px-2 py-0.5 rounded-md border ${ESTADOS[item.estado].cls}`}>{ESTADOS[item.estado].label}</span>
+          <div className="flex flex-wrap gap-1 mt-2">
+            <span className={`inline-block text-[11px] px-2 py-0.5 rounded-md border ${ESTADOS[item.estado].cls}`}>{ESTADOS[item.estado].label}</span>
+            {item.revisada && <span className={`inline-block text-[11px] px-2 py-0.5 rounded-md border ${REVISADA_CLS}`}>Revisada</span>}
+          </div>
+          {item.revision && <p className="text-[11px] text-muted-foreground mt-1">Última acción: {ultimaAccion(item.revision)}</p>}
         </div>
         <Button variant="ghost" size="icon" onClick={onCerrar} aria-label="Cerrar"><X className="h-4 w-4" /></Button>
       </div>
 
-      <RevisionMiniMapa actuales={actuales} sugerida={item.sugerida} manual={manual} onManualMove={(ll) => setManual({ lat: ll.lat, lng: ll.lng })} />
+      <RevisionMiniMapa actuales={actuales} sugerida={item.sugerida} manual={manual} foco={foco} onManualMove={(ll) => setManual({ lat: ll.lat, lng: ll.lng })} />
+      {manual && <CoordenadasManual manual={manual} onCambio={(ll) => { setManual(ll); setFoco(ll); }} />}
       <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Actual</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Sugerida</span>
