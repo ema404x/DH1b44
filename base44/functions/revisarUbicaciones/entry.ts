@@ -27,8 +27,8 @@ export default async function (req: Request): Promise<Response> {
     switch (body.action) {
       case 'listar': {
         const { items, pendientes } = await cargarItems(sb);
-        const visibles = ordenar(items.filter((i: any) => !i.revisada));
-        return Response.json({ items: visibles, revisadas: items.length - visibles.length, pendientes: pendientes.length, umbral: 300 });
+        const revisadas = items.filter((i: any) => i.revisada).length;
+        return Response.json({ items: ordenar(items), revisadas, pendientes: pendientes.length, umbral: 300 });
       }
       case 'geocodificar': {
         try {

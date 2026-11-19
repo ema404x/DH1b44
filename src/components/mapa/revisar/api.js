@@ -15,5 +15,13 @@ export const ESTADOS = {
   pendiente: { label: 'Falta buscar la dirección', cls: 'bg-muted text-muted-foreground border-border' },
 };
 
+export const REVISADA_CLS = 'bg-primary/15 text-primary border-primary/30';
+export const ultimaAccion = (r) => {
+  if (!r) return '';
+  const que = r.resultado === 'corregida' ? 'Ubicación corregida' : 'Marcada como bien';
+  const cuando = r.fecha ? new Date(r.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+  return [que, r.por, cuando].filter(Boolean).join(' · ');
+};
+
 export const metros = (m) => (m == null ? '—' : m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`);
 export const coordTexto = (lat, lng) => (Number.isFinite(lat) && Number.isFinite(lng) ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : 'Sin coordenadas');
