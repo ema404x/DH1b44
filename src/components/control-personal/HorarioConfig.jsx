@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { controlPersonal } from './api';
 import EstadoCarga from './EstadoCarga';
 import HorarioSemana, { SEMANA } from './HorarioSemana';
+import ControladosAviso from './ControladosAviso';
 
 const dia = (laborable, hora_entrada, hora_salida) => ({ laborable, hora_entrada, hora_salida });
 const POR_DEFECTO = {
@@ -64,6 +65,7 @@ export default function HorarioConfig() {
         {ro && <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5"><Lock className="h-3.5 w-3.5" /> Solo admin y gerente pueden editarlo.</p>}
       </div>
       <HorarioSemana value={form.horarios_por_dia} onChange={setSemana} disabled={ro} />
+      <ControladosAviso controlados={data.controlados} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tolerancia general (min)</p>

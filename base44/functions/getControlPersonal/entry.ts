@@ -6,6 +6,7 @@ import { accionFichajes, accionRevisar } from './fichajes.ts';
 import { accionPersona } from './persona.ts';
 import { accionLugares } from './lugares.ts';
 import { accionHorario, accionGuardarHorario } from './horario.ts';
+import { cargarControlados } from './controlados.ts';
 
 // Control de Personal: lectura de asistencias con visibilidad aplicada en servidor.
 // No modifica el fichaje público ni sus funciones; solo lee FichajeUbicacion y
@@ -27,7 +28,13 @@ export default async function (req: Request): Promise<Response> {
     if (!acceso.sector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
     if (!acceso.canAccess) return Response.json({ error: 'Sin acceso a Control de personal' }, { status: 403 });
 
-    if (action === 'horario') return Response.json(await accionHorario(sb, acceso));
+    if (action === 'horario') {
+      const control = await cargarControlados(sb, await resolveScope(sb, acceso));
+      return Response.json({
+        ...(await accionHorario(sb, acceso)),
+        controlados: control.empleados.map(leanEmpleado).sort((a: any, b: any) => a.full_name.localeCompare(b.full_name, 'es')),
+      });
+    }
     if (action === 'guardarHorario') return Response.json(await accionGuardarHorario(sb, acceso, body));
 
     const scope = await resolveScope(sb, acceso);
