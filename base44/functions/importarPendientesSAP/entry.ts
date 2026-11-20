@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
 import { createScopedClient } from "../../shared/sectorGuard.ts";
+import { importRoleError } from "../../shared/importGuard.ts";
 
 const SKIP_SHEETS = ['PARA FORMATO CONDICIONAL', 'ESC'];
 const BATCH_SIZE = 50;
@@ -166,8 +167,9 @@ function parseRows8A(ws) {
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await base44.auth.me().catch((e) => (e.status === 401 ? null : Promise.reject(e)));
+  const roleErr = importRoleError(user);
+  if (roleErr) return roleErr;
 
   // Aislamiento de raíz: los pendientes caen al sector activo del operador.
   const callerSector = user.data?.sector_id || user.sector_id;

@@ -14,6 +14,7 @@ import AssetOTs from '@/components/assets/ficha/AssetOTs';
 import AssetDocumentos from '@/components/assets/ficha/AssetDocumentos';
 import QRCodeModal from '@/components/shared/QRCodeModal';
 import { fmtCurrency } from '@/lib/format';
+import { useActivosVisibles, useVeTodosLosActivos } from '@/hooks/useActivosVisibles';
 
 const typeLabels = {
   equipo_electrico: 'Eléctrico', equipo_mecanico: 'Mecánico', instalacion_hvac: 'HVAC',
@@ -48,15 +49,30 @@ export default function ActivoFicha() {
   const [editOpen, setEditOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
 
-  const { data: asset, isLoading } = useQuery({
-    queryKey: ['asset', id],
-    queryFn: () => base44.entities.Asset.get(id),
+  const veTodo = useVeTodosLosActivos();
+  const { data: result, isLoading } = useQuery({
+    queryKey: ['asset', id, veTodo ? 'todo' : 'propio'],
+    queryFn: veTodo
+      ? async () => ({ asset: await base44.entities.Asset.get(id) })
+      : async () => {
+          try {
+            const res = await base44.functions.invoke('getActivosSector', { asset_id: id });
+            return { asset: res.data?.asset || null };
+          } catch (e) {
+            const status = e?.response?.status || e?.status;
+            if (status === 403) return { denied: true };
+            if (status === 404) return { asset: null };
+            throw e;
+          }
+        },
     enabled: !!id,
   });
+  const asset = result?.asset;
   const { data: sedes = [] } = useQuery({ queryKey: ['edificios'], queryFn: () => base44.entities.Edificio.list('-updated_date', 500) });
-  const { data: assets = [] } = useQuery({ queryKey: ['assets'], queryFn: () => base44.entities.Asset.list('-updated_date', 500) });
+  const { data: assets = [] } = useActivosVisibles();
 
   if (isLoading) return <div className="p-6"><div className="skeleton h-48" /></div>;
+  if (result?.denied) return <div className="p-6 text-center text-muted-foreground">Acceso denegado: este activo no está a tu cargo.</div>;
   if (!asset) return <div className="p-6 text-center text-muted-foreground">Activo no encontrado.</div>;
 
   const sedeName = sedes.find((s) => s.id === asset.location_id)?.nombre || asset.sede || '—';
