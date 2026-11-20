@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
-import { seesAllAssets, assetMatchKeys, assetIsMine } from '../../shared/assetVisibility.ts';
+import { seesAllAssets, assetMatchKeys, assetIsMine, crearResolverJefe } from '../../shared/assetVisibility.ts';
 import { buildOtVisibilityContext, otEsVisiblePara } from '../../shared/workOrderVisibility.ts';
 
 // Activos del sector del caller, filtrados por la regla de base44/shared/assetVisibility.ts.
@@ -39,6 +39,13 @@ export default async function (req) {
 
     const seesAll = seesAllAssets(user);
     const keys = assetMatchKeys(employee, user);
+    // Jefe del colegio/dirección: solo hace falta si el caller no ve todo.
+    const jefeDe = seesAll
+      ? () => ''
+      : crearResolverJefe(...(await Promise.all([
+          base44.asServiceRole.entities.LocationData.filter({ sector_id: callerSector }, '-created_date', 5000),
+          base44.asServiceRole.entities.Direccion.filter({ sector_id: callerSector }, '-direccion', 5000),
+        ])));
 
     if (assetId) {
       const asset = await base44.asServiceRole.entities.Asset.get(assetId)
@@ -46,7 +53,7 @@ export default async function (req) {
       if (!asset || asset.sector_id !== callerSector) {
         return Response.json({ error: 'Activo no encontrado' }, { status: 404 });
       }
-      if (seesAll || assetIsMine(asset, keys)) return Response.json({ asset });
+      if (seesAll || assetIsMine(asset, keys, jefeDe)) return Response.json({ asset });
 
       // ¿Figura en alguna OT que el caller puede ver?
       const ctx = await buildOtVisibilityContext(base44.asServiceRole, user);
@@ -67,7 +74,7 @@ export default async function (req) {
     // Lista: mismo orden (-name) que usaba CrearOT con Asset.list.
     const all = await base44.asServiceRole.entities.Asset.list('-name', 1000);
     const inSector = all.filter((a) => a.sector_id === callerSector);
-    const assets = seesAll ? inSector : inSector.filter((a) => assetIsMine(a, keys));
+    const assets = seesAll ? inSector : inSector.filter((a) => assetIsMine(a, keys, jefeDe));
 
     return Response.json({
       assets,
