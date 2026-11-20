@@ -68,7 +68,7 @@ export default function Clients() {
 
   const { data: providers = [], isLoading } = useQuery({
     queryKey: ['clients'],
-    queryFn: () => base44.entities.Client.list('-created_date')
+    queryFn: async () => (await base44.functions.invoke('getClientesSector', {})).data?.clientes || []
   });
 
   const saveMutation = useMutation({

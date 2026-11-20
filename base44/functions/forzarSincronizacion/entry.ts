@@ -112,8 +112,9 @@ Deno.serve(async (req) => {
       .map(u => ({ email: u.email, name: u.full_name, role: u.role }));
 
     // 5. Sincronizar roles de plataforma de todos los usuarios
-    //    (basándose en shared/roles.ts — ADMIN_LEVEL_ROLES)
-    const roleSync = await syncAllPlatformRoles(sb, employees, users, permsMap);
+    //    Misma regla que vincularEmpleado (shared/roles.ts — shouldSyncToGerente).
+    //    El "ver todo" de la matriz no cambia el rol de plataforma.
+    const roleSync = await syncAllPlatformRoles(sb, employees, users);
 
     // Construir detalle final
     const vinculados = employees.filter(e => e.user_id);
