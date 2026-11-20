@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useUbicaciones } from '@/hooks/useUbicaciones';
+import { useVeTodosLosActivos, fetchActivosPropios } from '@/hooks/useActivosVisibles';
 
 /**
  * Activos y ubicaciones para elegir dónde va una propuesta. Activos con la
@@ -9,12 +10,12 @@ import { useUbicaciones } from '@/hooks/useUbicaciones';
  */
 export function useLugaresPropuesta() {
   const { employeeSector } = useCurrentUser();
-  const isEscuela = employeeSector === 'escuela';
+  const veTodo = useVeTodosLosActivos();
+  // Servidor (regla de visibilidad) para escuela y para todo usuario que no es admin/gerente.
+  const usaServidor = employeeSector === 'escuela' || !veTodo;
   const { data: assets = [], isLoading } = useQuery({
-    queryKey: ['assets-ot-select', isEscuela ? 'escuela-resolver' : 'rls'],
-    queryFn: isEscuela
-      ? async () => (await base44.functions.invoke('getActivosSector')).data?.assets || []
-      : () => base44.entities.Asset.list('-name', 500),
+    queryKey: ['assets-ot-select', usaServidor ? 'escuela-resolver' : 'rls', veTodo ? 'todo' : 'propios'],
+    queryFn: usaServidor ? fetchActivosPropios : () => base44.entities.Asset.list('-name', 500),
     staleTime: 120000,
   });
   const { locationQRs, isLoading: loadingLoc } = useUbicaciones();

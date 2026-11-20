@@ -9,6 +9,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { useOfflineMode } from '@/hooks/useOfflineMode';
 import { isJefeSitioRole } from '@/lib/roles';
+import { useVeTodosLosActivos, fetchActivosPropios } from '@/hooks/useActivosVisibles';
 import { compressImage } from '@/lib/compressImage';
 import { prepareOfflinePhoto } from '@/lib/offlinePhotos';
 import PendingPhotoThumb from '@/components/pwa/PendingPhotoThumb';
@@ -111,11 +112,7 @@ export default function CrearOT() {
   const { isSuperAdmin, employeeSector, employeeRole, displayName } = useCurrentUser();
   const { isOnline, queueCreate } = useOfflineQueue();
   const offlineMode = useOfflineMode();
-  // Un jefe de sitio que crea una OT solo debe ver sus direcciones vinculadas (no
-  // las de todos los jefes). Aplica solo en escuela, donde existe el vínculo
-  // Direccion.jefe_sitio → asset.name/location. Admins/gerentes y otros sectores
-  // ven todos los activos (sin cambios).
-  const isJefeSitioCreator = !isSuperAdmin && isJefeSitioRole(employeeRole);
+  const veTodosActivos = useVeTodosLosActivos();
   // Solo sector escuela: cargar activos vía resolver backend (getActivosSector) en
   // lugar de Asset.list (RLS). La cláusula RLS anidada de Asset no se honra para
   // role 'user' de escuela → la lista llega vacía y no ven sus ubicaciones al crear OT.
@@ -191,51 +188,19 @@ export default function CrearOT() {
   // Sector escuela → resolver backend (service-role, sector-scoped). Otros sectores
   // → Asset.list con RLS (comportamiento original, sin tocar). El queryKey cambia con
   // isEscuela para que React Query refetchee al resolver el sector y no sirva data stale.
+  // Quien no es admin/gerente usa siempre el servidor: solo ve los activos de su jefe de sitio.
+  const usaServidorActivos = isEscuela || !veTodosActivos;
   const { data: assetsRaw = [], isLoading: loadingAssets } = useQuery({
-    queryKey: ['assets-ot-select', isEscuela ? 'escuela-resolver' : 'rls'],
-    queryFn: isEscuela
-      ? async () => {
-          const res = await base44.functions.invoke('getActivosSector');
-          return res.data?.assets || [];
-        }
-      : () => base44.entities.Asset.list('-name', 500),
+    queryKey: ['assets-ot-select', usaServidorActivos ? 'escuela-resolver' : 'rls', veTodosActivos ? 'todo' : 'propios'],
+    queryFn: usaServidorActivos ? fetchActivosPropios : () => base44.entities.Asset.list('-name', 500),
     staleTime: 120000,
   });
 
-  // Direcciones del jefe de sitio (escuela) — para acotar el picker de activos a
-  // sus direcciones vinculadas. Solo se carga si el creador es jefe de sitio del
-  // sector escuela. La RLS de Direccion ya aísla por sector, así que acá solo
-  // filtramos por jefe_sitio (nombre) contra el del creador. Debe declararse
-  // ANTES que activeAssets (que consume misDirSet) para evitar temporal dead zone.
-  const { data: misDirecciones = [] } = useQuery({
-    queryKey: ['mis-direcciones', displayName, isEscuela, isJefeSitioCreator],
-    queryFn: () => base44.entities.Direccion.list('-created_date', 500),
-    enabled: isEscuela && isJefeSitioCreator,
-    staleTime: 300000,
-  });
-  const misDirSet = useMemo(
-    () => new Set(
-      misDirecciones
-        .filter(d => normName(d.jefe_sitio) === normName(displayName))
-        .map(d => normName(d.direccion))
-        .filter(Boolean)
-    ),
-    [misDirecciones, displayName]
-  );
-
-  // Lista de activos para el buscador (excluye los dados de baja).
+  // Lista de activos para el buscador (excluye los dados de baja). Para quien no es
+  // admin/gerente, el servidor ya devuelve solo los activos de su jefe de sitio.
   const activeAssets = useMemo(
     () => (assetsRaw || [])
       .filter(a => a.status !== 'baja')
-      // Jefes de sitio (escuela): solo activos cuyas direcciones figuran en sus
-      // Direccion vinculadas. El activo de escuela es la dirección misma (name =
-      // calle, ej: "ZUVIRIA 6640"), así que el match es name/location contra el
-      // set de direcciones del jefe. Si no hay direcciones cargadas todavía o el
-      // creador no es jefe, se ven todos (fallback no destructivo).
-      .filter(a => {
-        if (!(isEscuela && isJefeSitioCreator && misDirSet.size > 0)) return true;
-        return misDirSet.has(normName(a.name)) || misDirSet.has(normName(a.location));
-      })
       .map(a => ({
         id: a.id,
         name: a.name,
@@ -248,7 +213,7 @@ export default function CrearOT() {
         project_name: a.project_name || '',
         code: a.code || '',
       })),
-    [assetsRaw, isEscuela, isJefeSitioCreator, misDirSet]
+    [assetsRaw]
   );
 
   // Empleados activos para asignación responsable

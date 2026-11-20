@@ -1,15 +1,14 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import * as XLSX from 'npm:xlsx@0.18.5';
 import { createScopedClient, resolveCallerSector, sectorErrorResponse } from "../../shared/sectorGuard.ts";
+import { importRoleError } from "../../shared/importGuard.ts";
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const user = await base44.auth.me().catch((e) => (e.status === 401 ? null : Promise.reject(e)));
+    const roleErr = importRoleError(user);
+    if (roleErr) return roleErr;
 
     // Aislamiento entre sectores centralizado — ver base44/shared/sectorGuard.ts
     const callerSector = resolveCallerSector(user);

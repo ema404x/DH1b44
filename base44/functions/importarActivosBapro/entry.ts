@@ -3,6 +3,7 @@ import * as XLSX from 'npm:xlsx@0.18.5';
 import { createScopedClient, resolveCallerSector, SectorError } from '../../shared/sectorGuard.ts';
 import { normalizeName, findHeaderIndex, findHeaderRow, assertAllowedFileUrl, SEDE_HEADERS } from '../../shared/excelImport.ts';
 import { bulkImportAssets } from '../../shared/assetBulkImport.ts';
+import { importRoleError } from '../../shared/importGuard.ts';
 
 // Importer masivo de Activos BAPRO.
 //   dry_run=true  → parsea + valida SIN escribir; devuelve preview.
@@ -14,11 +15,9 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'admin' && user.role !== 'gerente') {
-      return Response.json({ error: 'Forbidden: solo admin/gerente' }, { status: 403 });
-    }
+    const user = await base44.auth.me().catch((e) => (e.status === 401 ? null : Promise.reject(e)));
+    const roleErr = importRoleError(user);
+    if (roleErr) return roleErr;
     const callerSector = resolveCallerSector(user);
     const sb = createScopedClient(base44, callerSector);
 
