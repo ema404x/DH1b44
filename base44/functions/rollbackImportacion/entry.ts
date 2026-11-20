@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { createScopedClient, resolveCallerSector, SectorError } from '../../shared/sectorGuard.ts';
+import { importRoleError } from '../../shared/importGuard.ts';
 
 // Revierte una importación de activos (rollback).
 //   1. Lee ImportacionActivos por id (scoped al sector).
@@ -17,11 +18,9 @@ const UPDATE_BATCH = 100;
 export default async function(req) {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'admin' && user.role !== 'gerente') {
-      return Response.json({ error: 'Forbidden: solo admin/gerente' }, { status: 403 });
-    }
+    const user = await base44.auth.me().catch((e) => (e.status === 401 ? null : Promise.reject(e)));
+    const roleErr = importRoleError(user);
+    if (roleErr) return roleErr;
     const callerSector = resolveCallerSector(user);
     const sb = createScopedClient(base44, callerSector);
 

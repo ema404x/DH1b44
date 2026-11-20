@@ -1,10 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { importRoleError, entityNotAllowedError } from '../../shared/importGuard.ts';
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const user = await base44.auth.me().catch((e) => (e.status === 401 ? null : Promise.reject(e)));
+    const roleErr = importRoleError(user);
+    if (roleErr) return roleErr;
 
     // Helper functions
     function detectWorkOrder(sheetName, headers) {
@@ -89,7 +91,11 @@ Deno.serve(async (req) => {
     };
 
     let raw_data = null;
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
+    if (body.hint_entity) {
+      const entityErr = entityNotAllowedError([body.hint_entity]);
+      if (entityErr) return entityErr;
+    }
 
     // Si viene raw_data desde frontend (caso manual), usar eso
     if (body.raw_data && Object.keys(body.raw_data).length > 0) {

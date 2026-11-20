@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { createScopedClient } from "../../shared/sectorGuard.ts";
+import { importRoleError, entityNotAllowedError } from "../../shared/importGuard.ts";
 
 const ENTITY_DEFAULTS = {
    InformePlaneacion: { estado_contacto: 'PENDIENTE' },
@@ -57,20 +58,42 @@ const BATCH_SIZE = 50;
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
-  const user = await base44.auth.me();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await base44.auth.me().catch((e) => (e.status === 401 ? null : Promise.reject(e)));
+  const roleErr = importRoleError(user);
+  if (roleErr) return roleErr;
+  const isAdmin = user.role === 'admin';
 
   // Aislamiento entre sectores centralizado — ver base44/shared/sectorGuard.ts
   const callerSector = user.data?.sector_id || user.sector_id;
   if (!callerSector) return Response.json({ error: 'Sin sector asignado' }, { status: 403 });
   const sb = createScopedClient(base44, callerSector);
 
-  const { mapping, raw_data } = await req.json();
-  const sheets = (mapping.sheets || []).filter(s => s.target_entity && s.target_entity !== 'skip');
+  const { mapping, raw_data } = await req.json().catch(() => ({}));
+  const sheets = (mapping?.sheets || []).filter(s => s.target_entity && s.target_entity !== 'skip');
 
   if (sheets.length === 0) {
     return Response.json({ error: 'No hay hojas para importar' }, { status: 400 });
   }
+
+  const entityErr = entityNotAllowedError(sheets.map(s => s.target_entity));
+  if (entityErr) return entityErr;
+
+  // sector_id del archivo: solo un admin puede elegir otro sector (debe existir).
+  // Para el resto se descarta y el registro queda con el sector de quien importa.
+  let validSectors = null;
+  const scopedBySector = new Map([[callerSector, sb]]);
+  const clientFor = async (record) => {
+    const wanted = record.sector_id;
+    delete record.sector_id;
+    if (!isAdmin || !wanted || wanted === callerSector) return sb;
+    if (!validSectors) {
+      const all = await base44.asServiceRole.entities.Sector.list();
+      validSectors = new Set((Array.isArray(all) ? all : all.items || []).map(s => s.clave));
+    }
+    if (!validSectors.has(wanted)) throw new Error(`Sector inexistente: ${wanted}`);
+    if (!scopedBySector.has(wanted)) scopedBySector.set(wanted, createScopedClient(base44, wanted));
+    return scopedBySector.get(wanted);
+  };
 
   if (!raw_data || Object.keys(raw_data).length === 0) {
     return Response.json({ error: 'No se encontraron datos para importar' }, { status: 400 });
@@ -156,12 +179,25 @@ Deno.serve(async (req) => {
     }
     console.log(`[IMPORT] Built ${records.length} valid records from ${dataRows.length} data rows`);
 
+    // Agrupar por sector destino (siempre el de quien importa, salvo admin con sector_id válido)
+    const groups = new Map();
+    for (const record of records) {
+      try {
+        const client = await clientFor(record);
+        if (!groups.has(client)) groups.set(client, []);
+        groups.get(client).push(record);
+      } catch (err) {
+        errorDetails.push(`${record.name || record.full_name || record.title || 'Registro'}: ${err.message}`);
+      }
+    }
+
     // Insert in batches using bulkCreate
-     for (let i = 0; i < records.length; i += BATCH_SIZE) {
-       const batch = records.slice(i, i + BATCH_SIZE);
+    for (const [client, groupRecords] of groups) {
+     for (let i = 0; i < groupRecords.length; i += BATCH_SIZE) {
+       const batch = groupRecords.slice(i, i + BATCH_SIZE);
        try {
          console.log(`[IMPORT] Attempting bulkCreate for ${batch.length} records`);
-         await sb.entities[entityKey].bulkCreate(batch);
+         await client.entities[entityKey].bulkCreate(batch);
          imported += batch.length;
          console.log(`[IMPORT] Successfully imported ${batch.length} records`);
        } catch (batchErr) {
@@ -169,7 +205,7 @@ Deno.serve(async (req) => {
          // If bulk fails, try one by one to get individual errors
          for (const record of batch) {
            try {
-             await sb.entities[entityKey].create(record);
+             await client.entities[entityKey].create(record);
              imported++;
            } catch (err) {
              const recordSummary = [
@@ -186,6 +222,7 @@ Deno.serve(async (req) => {
          }
        }
      }
+    }
 
     results.push({
       entity: ENTITY_LABELS[entityKey] || entityKey,
