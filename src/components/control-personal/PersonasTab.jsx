@@ -7,6 +7,8 @@ import { controlPersonal } from './api';
 import { ESTADO_FICHA, normTexto } from './formato';
 import EstadoCarga from './EstadoCarga';
 import PersonaDetalle from './PersonaDetalle';
+import SinOperariosAviso from './SinOperariosAviso';
+import VacioModulo from '@/components/shared/VacioModulo';
 
 export default function PersonasTab({ onConfigurarHorario }) {
   const [busqueda, setBusqueda] = useState('');
@@ -28,8 +30,10 @@ export default function PersonasTab({ onConfigurarHorario }) {
         <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar por nombre o DNI…" className="pl-9 h-11" />
       </div>
-      {lista.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border/70 py-10 text-center text-sm text-muted-foreground">No hay operarios para mostrar.</div>
+      {!data?.personas?.length ? (
+        <SinOperariosAviso />
+      ) : lista.length === 0 ? (
+        <VacioModulo icon={Search} titulo="Ningún operario coincide con la búsqueda." texto="Probá con otro nombre o DNI." />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
           {lista.map((p) => {

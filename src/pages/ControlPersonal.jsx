@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Sun, ClipboardList, UserRound, Building2, Clock3 } from 'lucide-react';
+import { Sun, ClipboardList, UserRound, Building2, Clock3 } from 'lucide-react';
 import HoyTab from '@/components/control-personal/HoyTab';
 import AsistenciasTab from '@/components/control-personal/AsistenciasTab';
 import PersonasTab from '@/components/control-personal/PersonasTab';
 import LugaresTab from '@/components/control-personal/LugaresTab';
 import HorarioConfig from '@/components/control-personal/HorarioConfig';
+import { CONTROL_PERSONAL } from '@/lib/modulosNuevos';
 
 const TABS = [
   { value: 'hoy', label: 'Hoy', icon: Sun },
@@ -18,24 +19,26 @@ const TABS = [
 export default function ControlPersonal() {
   const [tab, setTab] = useState('hoy');
   const irAHorario = () => setTab('horario');
+  const Icon = CONTROL_PERSONAL.icon;
 
   return (
-    <div className="space-y-5 page-enter">
+    <div className="space-y-5 page-enter min-w-0">
       <header className="flex items-center gap-3">
         <div className="h-11 w-11 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-          <Users className="h-5 w-5 text-primary" />
+          <Icon className="h-5 w-5 text-primary" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Control de personal</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{CONTROL_PERSONAL.label}</h1>
           <p className="text-sm text-muted-foreground">Quién está, quién se fue, quién llegó tarde y quién falta.</p>
         </div>
       </header>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <div className="-mx-1 px-1 overflow-x-auto pb-1">
-          <TabsList className="h-11 w-max">
+        {/* En el teléfono las pestañas se deslizan de costado sin cortarse. */}
+        <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto overscroll-x-contain snap-x pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className="h-11 w-max justify-start">
             {TABS.map((t) => (
-              <TabsTrigger key={t.value} value={t.value} className="gap-2 px-3.5 h-9">
+              <TabsTrigger key={t.value} value={t.value} className="gap-2 px-3.5 h-9 shrink-0 snap-start">
                 <t.icon className="h-4 w-4" /> {t.label}
               </TabsTrigger>
             ))}

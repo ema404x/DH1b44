@@ -4,7 +4,7 @@ import { FILTROS_HOY } from './filtros';
 
 export default function HoyContadores({ contadores, sinHorario, activo, onSelect }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3">
       {FILTROS_HOY.map((item, i) => {
         const bloqueado = sinHorario && item.horario;
         const selected = activo === item.key;
@@ -16,7 +16,7 @@ export default function HoyContadores({ contadores, sinHorario, activo, onSelect
             onClick={() => onSelect(item.key)}
             style={{ animationDelay: `${i * 45}ms` }}
             className={cn(
-              'acero-rise acero-kpi text-left rounded-2xl border bg-card px-4 py-4 min-h-[118px] flex flex-col justify-between',
+              'acero-rise acero-kpi text-left rounded-2xl border bg-card px-3 py-3 sm:px-4 sm:py-4 min-h-[104px] sm:min-h-[118px] min-w-0 flex flex-col justify-between',
               selected ? 'border-primary ring-2 ring-primary/40' : 'border-border/60',
               bloqueado && 'opacity-50 cursor-not-allowed',
             )}

@@ -3,10 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardList, ClipboardCheck, Users, UserCog,
   Package, FileText, Receipt, ChevronLeft, ChevronRight, ChevronDown, Menu, X,
-  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet, HardHat, Building2, Inbox, UserCheck
+  Wrench, TrendingUp, Calculator, CalendarDays, Zap, BarChart2, Award, Shield, Lock, MapPin, BookOpen, Upload, Bell, Truck, Info, AlertTriangle, FileCheck2, ShieldAlert, MessageSquare, Flame, RefreshCw, Wallet, HardHat, Building2
 } from 'lucide-react';
 import { puedeVerPropuestas } from '@/lib/propuestasOT';
 import { usePropuestasPendientes } from '@/hooks/usePropuestasPendientes';
+import { CONTROL_PERSONAL, PROPUESTAS_OT } from '@/lib/modulosNuevos';
+import { MOBILE_DRAWER_EXTRA } from '@/lib/mobileModuleConfig';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { useForoNotificaciones } from '@/hooks/useForoNotificaciones';
@@ -33,7 +35,7 @@ const navGroups = [
     items: [
       { label: 'Proyectos', icon: FolderKanban, path: '/proyectos' },
       { label: 'Órdenes de Trabajo', icon: ClipboardList, path: '/ordenes' },
-      { label: 'Propuestas de operarios', icon: Inbox, path: '/propuestas-ot' },
+      { label: PROPUESTAS_OT.label, icon: PROPUESTAS_OT.icon, path: PROPUESTAS_OT.path },
       { label: 'Activos', icon: ClipboardCheck, path: '/activos' },
       { label: 'Informes', icon: ClipboardCheck, path: '/informes' },
       { label: 'Plan de Infraestructura', icon: Wrench, path: '/calefaccion' },
@@ -60,7 +62,7 @@ const navGroups = [
     items: [
       { label: 'Información General', icon: Info, path: '/informacion-general' },
       { label: 'Empleados', icon: UserCog, path: '/empleados' },
-      { label: 'Control de Personal', icon: UserCheck, path: '/control-personal' },
+      { label: CONTROL_PERSONAL.label, icon: CONTROL_PERSONAL.icon, path: CONTROL_PERSONAL.path },
       { label: 'Mapa de Ubicaciones', icon: MapPin, path: '/mapa' },
       { label: 'Mapa Jefes de Sitio', icon: MapPin, path: '/mapa-jefes' },
       { label: 'Inventario', icon: Package, path: '/inventario' },
@@ -264,7 +266,14 @@ export default function Sidebar({ open, onOpenChange }) {
   // Mismos permisos que el sidebar desktop, filtrando a las 3 secciones operativas.
   const mobileVisibleGroups = useMemo(() => {
     const KEEP = new Set(['General', 'Emergencias', 'Operaciones']);
-    return visibleGroups.filter(g => KEEP.has(g.label));
+    // Módulos de otras secciones que también van en el celular (ya filtrados por permiso).
+    const extras = visibleGroups
+      .filter(g => !KEEP.has(g.label))
+      .flatMap(g => g.items)
+      .filter(it => MOBILE_DRAWER_EXTRA.includes(it.path));
+    return visibleGroups
+      .filter(g => KEEP.has(g.label))
+      .map(g => (g.label === 'Operaciones' && extras.length ? { ...g, items: [...g.items, ...extras] } : g));
   }, [visibleGroups]);
 
   // Render del drawer mobile — 3 secciones reorganizadas.
@@ -307,6 +316,7 @@ export default function Sidebar({ open, onOpenChange }) {
                   onClick={handleCloseMobile}
                   hasNewMessages={item.path === '/foro' ? hasNewMessages : false}
                   pendientesAprobacion={pendientesAprobacion}
+                  propuestasPendientes={item.path === '/propuestas-ot' ? propuestasPendientes : 0}
                 />
               ))}
             </div>

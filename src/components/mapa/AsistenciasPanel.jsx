@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import AsistenciaDetailDialog from './AsistenciaDetailDialog';
+import AsistenciaTarjeta from './AsistenciaTarjeta';
 import exportAsistenciasExcel from '@/components/fichar/exportAsistenciasExcel';
 import { metodoFichajeLabel } from '@/lib/fichajeCuenta';
 import { DISTANCE_THRESHOLD_M, getDistanceStatus, hasCoordinates } from '@/components/fichar/geoDistance';
@@ -47,6 +48,13 @@ function calcDuration(entrada, salida) {
   return `${h}h ${m}m`;
 }
 
+function DistanciaBadge({ d }) {
+  if (d.status === 'far') return <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-400 gap-1"><AlertTriangle className="h-2.5 w-2.5" />{d.text}</Badge>;
+  if (d.status === 'no_gps') return <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-400">{d.text}</Badge>;
+  if (d.status === 'no_coords') return <span className="text-xs text-muted-foreground">{d.text}</span>;
+  return <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400">{d.text}</Badge>;
+}
+
 function StatCard({ icon: Icon, label, value, tone }) {
   const tones = {
     blue: 'text-blue-400 bg-blue-500/10',
@@ -70,7 +78,8 @@ function StatCard({ icon: Icon, label, value, tone }) {
 
 // fetchPage / onSaveRevision son opcionales (Control de Personal los usa para
 // leer y revisar por servidor). Sin ellos, el panel funciona igual que siempre.
-export default function AsistenciasPanel({ locations = [], fetchPage = null, onSaveRevision = null }) {
+// tarjetasEnMovil: en pantallas angostas muestra la lista como tarjetas (Control de personal).
+export default function AsistenciasPanel({ locations = [], fetchPage = null, onSaveRevision = null, tarjetasEnMovil = false }) {
   const [filters, setFilters] = useState({
     dateFrom: '', dateTo: '', locationId: 'all', estado: 'all', estadoAdmin: 'all', search: '',
   });
@@ -244,6 +253,32 @@ export default function AsistenciasPanel({ locations = [], fetchPage = null, onS
         </Button>
       </div>
 
+      {tarjetasEnMovil && (
+        <div className="md:hidden space-y-2.5">
+          {isLoading ? (
+            <div className="py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" /></div>
+          ) : items.length === 0 ? (
+            <p className="text-center py-8 text-muted-foreground text-sm">No hay registros de asistencia para los filtros seleccionados.</p>
+          ) : items.map(fichaje => {
+            const distance = calcFichajeDistance(fichaje, locCoords);
+            return (
+              <AsistenciaTarjeta
+                key={fichaje.id}
+                fichaje={fichaje}
+                omitida={isSalidaOmitida(fichaje)}
+                duracion={calcDuration(fichaje.entrada_timestamp, fichaje.salida_timestamp) || (fichaje.estado === 'abierta' ? 'En curso' : '—')}
+                distancia={distance}
+                distanciaBadge={<DistanciaBadge d={distance} />}
+                estadoAdmin={ESTADO_ADMIN[fichaje.estado_admin] || ESTADO_ADMIN.pendiente}
+                metodo={metodoFichajeLabel(fichaje)}
+                onVer={() => setSelected(fichaje)}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      <div className={tarjetasEnMovil ? 'hidden md:block' : undefined}>
       <Table>
         <TableHeader>
           <TableRow>
@@ -309,13 +344,7 @@ export default function AsistenciasPanel({ locations = [], fetchPage = null, onS
                     : (calcDuration(fichaje.entrada_timestamp, fichaje.salida_timestamp) || (fichaje.estado === 'abierta' ? 'En curso' : '—'))}
                 </TableCell>
                 <TableCell>
-                  {(() => {
-                    const d = calcFichajeDistance(fichaje, locCoords);
-                    if (d.status === 'far') return <Badge variant="outline" className="border-red-500/30 bg-red-500/10 text-red-400 gap-1"><AlertTriangle className="h-2.5 w-2.5" />{d.text}</Badge>;
-                    if (d.status === 'no_gps') return <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-400">{d.text}</Badge>;
-                    if (d.status === 'no_coords') return <span className="text-xs text-muted-foreground">{d.text}</span>;
-                    return <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400">{d.text}</Badge>;
-                  })()}
+                  <DistanciaBadge d={distance} />
                 </TableCell>
                 <TableCell>
                   {isSalidaOmitida(fichaje) ? (
@@ -346,6 +375,7 @@ export default function AsistenciasPanel({ locations = [], fetchPage = null, onS
           })}
         </TableBody>
       </Table>
+      </div>
 
       <AsistenciaDetailDialog
         fichaje={selected}

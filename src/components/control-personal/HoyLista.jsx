@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { filtroPorKey } from './filtros';
 import GrupoLugar from './GrupoLugar';
 import NoVinieronLista from './NoVinieronLista';
+import VacioModulo from '@/components/shared/VacioModulo';
 
 export default function HoyLista({ data, filtro }) {
   const f = filtroPorKey(filtro);
@@ -25,9 +26,7 @@ export default function HoyLista({ data, filtro }) {
       {!f.fn ? (
         <NoVinieronLista data={data} />
       ) : grupos.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border/70 py-10 text-center text-sm text-muted-foreground">
-          No hay operarios en esta categoría por ahora.
-        </div>
+        <VacioModulo icon={f.icon} titulo="No hay operarios en esta categoría por ahora." texto="Se actualiza solo cada minuto a medida que los operarios fichan." />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {grupos.map(([lugar, items]) => <GrupoLugar key={lugar} lugar={lugar} items={items} />)}
