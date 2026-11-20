@@ -52,6 +52,11 @@ export const MOBILE_OPTIMIZED = {
   '/automatizaciones': true,
   '/alertas': true,
   '/control-riesgo': true,
+  '/control-personal': true,
+  '/propuestas-ot': true,
+  '/operario': true,
+  '/proponer-ot': true,
+  '/fichar-cuenta': true,
   // Desktop-only:
   '/presupuestos-obra': false,
   '/inventario': false,
@@ -174,6 +179,13 @@ export function getRolePrimaries(role) {
 const ADMIN_MOBILE_MODULES = new Set([
   '/auditoria', '/sectores', '/alertas', '/automatizaciones',
 ]);
+
+/**
+ * Módulos de secciones que el drawer mobile no muestra (Recursos, etc.) y que
+ * igual se agregan al final de Operaciones. Respetan el mismo filtro de permisos.
+ * Propuestas de OT ya está en Operaciones.
+ */
+export const MOBILE_DRAWER_EXTRA = ['/control-personal'];
 
 export function getMobileSection(path) {
   if (!isMobileOptimized(path)) return 'desktop';

@@ -10,6 +10,7 @@ import RevisionFila from './RevisionFila';
 import RevisionDetalle from './RevisionDetalle';
 import RevisionHistorial from './RevisionHistorial';
 import GeoProgreso from './GeoProgreso';
+import VacioModulo from '@/components/shared/VacioModulo';
 
 const FILTROS = [{ key: 'problemas', label: 'Para revisar' }, { key: 'revisadas', label: 'Revisadas' }, { key: 'todas', label: 'Todas' }];
 const PROBLEMA = ['mal_ubicada', 'sin_coordenadas'];
@@ -77,7 +78,7 @@ export default function RevisarUbicaciones() {
           </div>
           <div className="rounded-2xl border border-border/60 bg-card divide-y divide-border/40 overflow-hidden">
             {items.length ? items.map((i) => <RevisionFila key={i.clave} item={i} activo={i.clave === sel} onClick={() => setSel(i.clave)} />)
-              : <p className="px-4 py-8 text-sm text-center text-muted-foreground">No hay ubicaciones en esta vista.</p>}
+              : <div className="p-3"><VacioModulo icon={MapPinned} titulo="No hay ubicaciones en esta vista." texto="Cambiá el filtro o la búsqueda para ver otras ubicaciones." /></div>}
           </div>
         </div>
         <div className="space-y-4 order-first lg:order-none lg:sticky lg:top-4 self-start">

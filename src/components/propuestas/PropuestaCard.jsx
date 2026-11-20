@@ -11,7 +11,7 @@ export default function PropuestaCard({ propuesta: p, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="w-full text-left rounded-xl border border-border bg-card p-3.5 flex items-start gap-3 hover:bg-accent/40 active:scale-[0.99] transition"
+      className="w-full text-left rounded-xl border border-border bg-card p-4 min-h-[72px] flex items-start gap-3 hover:bg-accent/40 active:scale-[0.99] transition"
     >
       <div className="flex-1 min-w-0 space-y-1.5">
         <div className="flex items-center gap-2 flex-wrap">

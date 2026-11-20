@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Inbox, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import VacioModulo from '@/components/shared/VacioModulo';
+import { PROPUESTAS_OT } from '@/lib/modulosNuevos';
+
+const VACIO_TEXTO = {
+  enviada: 'Cuando un operario proponga una OT desde su teléfono, aparece acá para que la revises.',
+  aprobada: 'Las propuestas que apruebes se convierten en OT y quedan listadas acá.',
+  rechazada: 'Las propuestas que rechaces quedan acá con el motivo.',
+};
 import PageHeader from '@/components/shared/PageHeader';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PropuestaCard from '@/components/propuestas/PropuestaCard';
@@ -21,12 +29,12 @@ export default function PropuestasOT() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <PageHeader icon={Inbox} title="Propuestas de operarios" subtitle="Revisá, editá y aprobá las OT que proponen los operarios" />
+      <PageHeader icon={PROPUESTAS_OT.icon} title={PROPUESTAS_OT.label} subtitle="Revisá, editá y aprobá las OT que proponen los operarios" />
 
       <Tabs value={estado} onValueChange={setEstado} className="mb-4">
-        <TabsList className="w-full grid grid-cols-3">
+        <TabsList className="w-full grid grid-cols-3 h-11">
           {ESTADOS.map((e) => (
-            <TabsTrigger key={e.key} value={e.key} className="text-xs sm:text-sm gap-1.5">
+            <TabsTrigger key={e.key} value={e.key} className="text-xs sm:text-sm gap-1.5 h-9">
               {e.label}
               {typeof conteos?.[e.key] === 'number' && (
                 <span className="tabular-nums text-[10px] font-bold opacity-80">{conteos[e.key]}</span>
@@ -41,10 +49,11 @@ export default function PropuestasOT() {
       ) : isError ? (
         <p className="text-sm text-destructive text-center py-12">{error?.message || 'No se pudieron cargar las propuestas'}</p>
       ) : propuestas.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <Inbox className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">No hay propuestas {ESTADOS.find((e) => e.key === estado)?.label.toLowerCase()}</p>
-        </div>
+        <VacioModulo
+          icon={PROPUESTAS_OT.icon}
+          titulo={`No hay propuestas ${ESTADOS.find((e) => e.key === estado)?.label.toLowerCase()}.`}
+          texto={VACIO_TEXTO[estado]}
+        />
       ) : (
         <div className="space-y-2">
           {propuestas.map((p) => (

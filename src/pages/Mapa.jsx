@@ -16,6 +16,7 @@ import MapaProyectosOTs from '@/components/mapa/MapaProyectosOTs';
 import MapaColegios from '@/components/mapa/MapaColegios';
 import MapaOTsCompletadas from '@/components/mapa/MapaOTsCompletadas';
 import AsistenciasPanel from '@/components/mapa/AsistenciasPanel';
+import AsistenciasMovidoAviso from '@/components/mapa/AsistenciasMovidoAviso';
 
 export default function Mapa() {
   const [tab, setTab] = useState('mapa');
@@ -43,6 +44,8 @@ export default function Mapa() {
   // Admin y gerente ven todas. Combina asignación manual (jefe_sitio_email)
   // con asignación existente (assigned_employees).
   const { isSuperAdmin, employeeName, currentUser } = useCurrentUser();
+  // Revisar ubicaciones: su función de servidor exige admin, así que la pestaña también.
+  const esAdmin = currentUser?.role === 'admin';
   const visibleLocations = useMemo(() => {
     if (isSuperAdmin) return locations;
     const userName = employeeName || currentUser?.full_name || '';
@@ -202,7 +205,7 @@ export default function Mapa() {
           <TabsTrigger value="asistencias" className="gap-2">
             <Clock className="h-4 w-4" /> Asistencias
           </TabsTrigger>
-          {isSuperAdmin && (
+          {esAdmin && (
             <TabsTrigger value="revisar-ubicaciones" className="gap-2">
               <MapPinned className="h-4 w-4" /> Revisar ubicaciones
             </TabsTrigger>
@@ -255,10 +258,11 @@ export default function Mapa() {
         </TabsContent>
 
         <TabsContent value="asistencias" className="mt-5">
+          <AsistenciasMovidoAviso />
           <AsistenciasPanel locations={visibleLocations} />
         </TabsContent>
 
-        {isSuperAdmin && (
+        {esAdmin && (
           <TabsContent value="revisar-ubicaciones" className="mt-5">
             <RevisarUbicaciones />
           </TabsContent>

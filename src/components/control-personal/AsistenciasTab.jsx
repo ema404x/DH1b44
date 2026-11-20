@@ -20,5 +20,5 @@ export default function AsistenciasTab() {
   }, [qc]);
 
   if (isLoading || error) return <EstadoCarga error={error} />;
-  return <AsistenciasPanel locations={data.lugares} fetchPage={fetchPage} onSaveRevision={onSaveRevision} />;
+  return <AsistenciasPanel locations={data.lugares} fetchPage={fetchPage} onSaveRevision={onSaveRevision} tarjetasEnMovil />;
 }

@@ -9,6 +9,7 @@ import EstadoCarga from './EstadoCarga';
 import SinHorarioAviso from './SinHorarioAviso';
 import HoyContadores from './HoyContadores';
 import HoyLista from './HoyLista';
+import SinOperariosAviso from './SinOperariosAviso';
 
 export default function HoyTab({ onConfigurarHorario }) {
   const [filtro, setFiltro] = useState('enLugar');
@@ -18,7 +19,14 @@ export default function HoyTab({ onConfigurarHorario }) {
     refetchInterval: 60000,
     staleTime: 30000,
   });
+  // Misma consulta (y caché) que la pestaña Por persona: solo para avisar si no hay operarios.
+  const { data: personas } = useQuery({
+    queryKey: ['control-personal', 'personas'],
+    queryFn: () => controlPersonal('personas'),
+    staleTime: 60000,
+  });
   if (isLoading || error) return <EstadoCarga error={error} />;
+  if (personas && !personas.personas?.length) return <SinOperariosAviso />;
 
   return (
     <div className="space-y-5">

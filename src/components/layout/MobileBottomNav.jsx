@@ -4,6 +4,7 @@ import { ClipboardList, AlertTriangle, HardHat, LayoutGrid } from 'lucide-react'
 import { motion, MotionConfig } from 'framer-motion';
 import { useAuth } from '@/lib/AuthContext';
 import { hasModulePermission } from '@/lib/roles';
+import { usePropuestasPendientes } from '@/hooks/usePropuestasPendientes';
 import { cn } from '@/lib/utils';
 
 /**
@@ -20,6 +21,8 @@ const NAV_ITEMS = [
 export default function MobileBottomNav({ onMore }) {
   const location = useLocation();
   const { user, userPermissions } = useAuth();
+  // Misma cuenta que el menú de escritorio; se muestra en "Más" porque Propuestas vive en el drawer.
+  const { enviadas: propuestasPendientes } = usePropuestasPendientes();
 
   const isActive = (path) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
@@ -83,6 +86,14 @@ export default function MobileBottomNav({ onMore }) {
           >
             <span className="relative flex h-9 w-16 items-center justify-center rounded-full">
               <LayoutGrid className="h-5 w-5 text-muted-foreground" />
+              {propuestasPendientes > 0 && (
+                <span
+                  aria-label={`${propuestasPendientes} propuestas de OT por revisar`}
+                  className="absolute top-0 right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-400 text-[10px] font-bold leading-[18px] text-background tabular-nums"
+                >
+                  {propuestasPendientes > 99 ? '99+' : propuestasPendientes}
+                </span>
+              )}
             </span>
             <span className="text-[10px] leading-none tracking-wide text-muted-foreground">Más</span>
           </button>
