@@ -18,6 +18,7 @@ import InviteUserDialog from '@/components/employees/InviteUserDialog';
 import SyncEmployeesButton from '@/components/employees/SyncEmployeesButton';
 import EmployeeCard from '@/components/employees/EmployeeCard';
 import EmployeeSignatureDialog from '@/components/employees/EmployeeSignatureDialog';
+import DefinirPasswordDialog from '@/components/employees/DefinirPasswordDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { usePermission } from '@/hooks/usePermission';
@@ -96,6 +97,7 @@ export default function Employees() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [signEmp, setSignEmp] = useState(null);
+  const [passwordEmp, setPasswordEmp] = useState(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -452,6 +454,8 @@ export default function Employees() {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onSign={setSignEmp}
+              isAdmin={currentUser?.role === 'admin'}
+              onSetPassword={setPasswordEmp}
               onRelink={handleRelink}
               isRelinking={relinkMutation.isPending}
               users={users}
@@ -462,6 +466,14 @@ export default function Employees() {
       )}
 
       <InviteUserDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+
+      {passwordEmp && (
+        <DefinirPasswordDialog
+          emp={passwordEmp}
+          open={!!passwordEmp}
+          onOpenChange={(o) => { if (!o) setPasswordEmp(null); }}
+        />
+      )}
 
       <EmployeeSignatureDialog
         emp={signEmp}

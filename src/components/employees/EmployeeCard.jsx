@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   Pencil, Trash2, Phone, Mail, MapPin, Building2,
-  CheckCircle2, XCircle, RefreshCw, Signature
+  CheckCircle2, XCircle, RefreshCw, Signature, KeyRound
 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -66,7 +66,7 @@ const sectorBadgeColors = {
 };
 
 function EmployeeCard({
-  emp, canEdit, canDelete, roleLabel, roleBadgeClass, sectorLabel, item, users, rolePermissions, onEdit, onDelete, onRelink, isRelinking, onSign
+  emp, canEdit, canDelete, roleLabel, roleBadgeClass, sectorLabel, item, users, rolePermissions, onEdit, onDelete, onRelink, isRelinking, onSign, isAdmin, onSetPassword
 }) {
   const linkStatus = getLinkStatus(emp, users, rolePermissions);
   const hasIssue = linkStatus.level === 'error';
@@ -163,6 +163,17 @@ function EmployeeCard({
                   >
                     <RefreshCw className={`h-2.5 w-2.5 ${isRelinking ? 'animate-spin' : ''}`} />
                     Re-vincular
+                  </Button>
+                )}
+                {isAdmin && emp.email?.trim() && emp.role?.toLowerCase().trim() === 'operario' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onSetPassword(emp)}
+                    className="h-5 px-1.5 text-[10px] gap-1 text-cyan-400 hover:text-cyan-300"
+                  >
+                    <KeyRound className="h-2.5 w-2.5" />
+                    Definir contraseña
                   </Button>
                 )}
               </div>
