@@ -25,7 +25,7 @@ import { useAppUsageTracker } from '@/hooks/useAppUsageTracker';
 import { useLoadTelemetry } from '@/hooks/useLoadTelemetry';
 import PageErrorBoundary from '@/components/shared/PageErrorBoundary';
 import { isMobileOptimized } from '@/lib/mobileModuleConfig';
-import { isModoOperario } from '@/lib/modoOperario';
+import { useModoOperario } from '@/hooks/useModoOperario';
 import OperarioBottomNav from '@/components/operario-home/OperarioBottomNav';
 
 // Estable entre renders — no se recrea nunca
@@ -48,7 +48,7 @@ export default function AppLayout() {
   const { offlineMode, offlineSavedAt, justReconnected } = useAuth();
   useAppUsageTracker(currentUser);
   // Modo operario (beta): barra inferior simple en lugar del menú completo.
-  const modoOperario = isModoOperario(currentUser);
+  const modoOperario = useModoOperario();
   const location = useLocation();
   const navigationType = useNavigationType();
 
