@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import CamaraInput from '@/components/camara/CamaraInput';
 import { base44 } from '@/api/base44Client';
 import { compressImage } from '@/lib/compressImage';
 import { Input } from '@/components/ui/input';
@@ -204,7 +205,7 @@ export default function WorkOrderChecklist({ checklist = [], onChange, otId, otT
                       </button>
                     )}
 
-                    <input type="file" accept="image/*" capture="environment" className="hidden"
+                    <CamaraInput accept="image/*" capture="environment" className="hidden"
                       ref={el => fileRefs.current[task.id] = el}
                       onChange={e => uploadPhoto(task.id, e.target.files[0])} />
 

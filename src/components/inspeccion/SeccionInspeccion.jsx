@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import CamaraInput from '@/components/camara/CamaraInput';
+import { ES_WEBVIEW_ANDROID } from '@/lib/camaraDH1';
 import { Mic, Square, ChevronDown, ChevronUp, CheckCircle2, Camera, AlertCircle, Loader2, Image, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -294,7 +296,7 @@ export default function SeccionInspeccion({ seccion, onChange }) {
               )}
 
               {/* Botones de captura */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid ${ES_WEBVIEW_ANDROID ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
                 <button
                   onClick={() => !subiendoFotos && cameraInputRef.current?.click()}
                   disabled={subiendoFotos}
@@ -303,14 +305,14 @@ export default function SeccionInspeccion({ seccion, onChange }) {
                   {subiendoFotos ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
                   <span className="text-xs">Cámara</span>
                 </button>
-                <button
+                {!ES_WEBVIEW_ANDROID && <button
                   onClick={() => !subiendoFotos && fileInputRef.current?.click()}
                   disabled={subiendoFotos}
                   className="flex flex-col items-center justify-center gap-1.5 h-14 rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground active:bg-accent/50 transition-all disabled:opacity-40 text-sm"
                 >
                   <Image className="h-5 w-5" />
                   <span className="text-xs">Galería</span>
-                </button>
+                </button>}
               </div>
               {subiendoFotos && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-2">
@@ -318,7 +320,7 @@ export default function SeccionInspeccion({ seccion, onChange }) {
                 </p>
               )}
 
-              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotos} />
+              <CamaraInput ref={cameraInputRef} accept="image/*" capture="environment" className="hidden" onChange={handlePhotos} />
               <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
             </div>
 

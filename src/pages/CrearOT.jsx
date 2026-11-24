@@ -3,6 +3,8 @@
  * Flujo guiado por pasos: Ubicación → Detalle → Tareas & Materiales → Asignación → Confirmación
  */
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import CamaraInput from '@/components/camara/CamaraInput';
+import { ES_WEBVIEW_ANDROID } from '@/lib/camaraDH1';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -954,9 +956,9 @@ export default function CrearOT() {
                   ))}
                 </div>
               )}
-              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handlePhotos(e.target.files)} />
+              <CamaraInput ref={cameraRef} accept="image/*" capture="environment" className="hidden" onChange={e => handlePhotos(e.target.files)} />
               <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handlePhotos(e.target.files)} />
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid ${ES_WEBVIEW_ANDROID ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
                 <button
                   type="button"
                   onClick={() => cameraRef.current?.click()}
@@ -968,14 +970,14 @@ export default function CrearOT() {
                     : <><Camera className="h-4 w-4" /> Cámara</>
                   }
                 </button>
-                <button
+                {!ES_WEBVIEW_ANDROID && <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
                   disabled={uploadingPhoto}
                   className="h-11 rounded-xl border-2 border-dashed border-border bg-card hover:border-primary/50 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   <Image className="h-4 w-4" /> Galería
-                </button>
+                </button>}
               </div>
             </FieldGroup>
           </div>

@@ -3,6 +3,7 @@
  * Flujo: Ver instrucciones → Sacar fotos → Marcar completada
  */
 import React, { useState, useEffect, useRef } from 'react';
+import CamaraInput from '@/components/camara/CamaraInput';
 import { base44 } from '@/api/base44Client';
 import { CheckCircle2, Loader2, AlertTriangle, Camera, X, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import { useGeolocalizacion } from '@/hooks/useGeolocalizacion';
@@ -75,7 +76,7 @@ function FotoUploader({ photos, onAdd, onRemove }) {
           ))}
         </div>
       )}
-      <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={e => handleFiles(e.target.files)} />
+      <CamaraInput ref={fileRef} accept="image/*" multiple capture="environment" className="hidden" onChange={e => handleFiles(e.target.files)} />
       <button
         onClick={() => fileRef.current?.click()}
         disabled={uploading}

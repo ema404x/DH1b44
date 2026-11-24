@@ -2,6 +2,8 @@ import React, { useRef, useState } from 'react';
 import { Camera, Image as ImageIcon, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { prepareOfflinePhoto } from '@/lib/offlinePhotos';
+import CamaraInput from '@/components/camara/CamaraInput';
+import { ES_WEBVIEW_ANDROID } from '@/lib/camaraDH1';
 
 const MAX = 6;
 
@@ -38,15 +40,15 @@ export default function PasoFotos({ fotos, onChange }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className={`grid ${ES_WEBVIEW_ANDROID ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
         <button disabled={lleno || procesando} onClick={() => camRef.current?.click()} className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-2xl bg-primary text-base font-bold text-primary-foreground active:scale-[0.97] disabled:opacity-50">
           <Camera className="h-7 w-7" /> Cámara
         </button>
-        <button disabled={lleno || procesando} onClick={() => galRef.current?.click()} className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-card text-base font-bold text-card-foreground active:scale-[0.97] disabled:opacity-50">
+        {!ES_WEBVIEW_ANDROID && <button disabled={lleno || procesando} onClick={() => galRef.current?.click()} className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-card text-base font-bold text-card-foreground active:scale-[0.97] disabled:opacity-50">
           <ImageIcon className="h-7 w-7" /> Galería
-        </button>
+        </button>}
       </div>
-      <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => agregar(e.target.files)} />
+      <CamaraInput ref={camRef} accept="image/*" capture="environment" className="hidden" onChange={(e) => agregar(e.target.files)} />
       <input ref={galRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => agregar(e.target.files)} />
       {procesando && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Preparando foto…</p>}
       {fotos.length === 0 ? (

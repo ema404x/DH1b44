@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import CamaraInput from '@/components/camara/CamaraInput';
 import { base44 } from '@/api/base44Client';
 import { compressImage } from '@/lib/compressImage';
 import { X, Loader2, Package, AlertTriangle, Camera } from 'lucide-react';
@@ -195,7 +196,7 @@ export default function ReporteForm({ ot, onClose, onSaved }) {
             <label className={`flex items-center justify-center gap-2 h-10 rounded-lg border border-dashed border-slate-600 text-slate-400 text-xs font-medium cursor-pointer hover:bg-slate-800 hover:text-slate-200 transition-colors ${uploadingPhoto ? 'opacity-50 pointer-events-none' : ''}`}>
               {uploadingPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
               {uploadingPhoto ? 'Subiendo...' : 'Agregar foto'}
-              <input type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload} className="hidden" />
+              <CamaraInput accept="image/*" capture="environment" onChange={handlePhotoUpload} className="hidden" />
             </label>
           </div>
 

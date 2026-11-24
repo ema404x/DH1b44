@@ -12,6 +12,7 @@
  * motor de estados y validaciones que el módulo autenticado.
  */
 import React, { useState } from 'react';
+import CamaraInput from '@/components/camara/CamaraInput';
 import { motion } from 'framer-motion';
 import { base44 } from '@/api/base44Client';
 import {
@@ -106,7 +107,7 @@ function FotoUploader({ photos, onAdd, onRemove, offline, onAddPending }) {
           ))}
         </motion.div>
       )}
-      <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={e => handleFiles(e.target.files)} />
+      <CamaraInput ref={fileRef} accept="image/*" multiple capture="environment" className="hidden" onChange={e => handleFiles(e.target.files)} />
       <button
         onClick={() => fileRef.current?.click()}
         disabled={uploading}

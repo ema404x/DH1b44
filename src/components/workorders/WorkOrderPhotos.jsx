@@ -1,4 +1,6 @@
 import React, { useRef, useState } from 'react';
+import CamaraInput from '@/components/camara/CamaraInput';
+import { ES_WEBVIEW_ANDROID } from '@/lib/camaraDH1';
 import { base44 } from '@/api/base44Client';
 import { compressImage } from '@/lib/compressImage';
 import { toast } from 'sonner';
@@ -123,7 +125,7 @@ export default function WorkOrderPhotos({ photos = [], onChange, otId, otTitle }
         )}
 
         {/* Botones cámara / galería */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className={`grid ${ES_WEBVIEW_ANDROID ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
           <button
             onClick={() => cameraRef.current?.click()}
             disabled={uploading}
@@ -132,14 +134,14 @@ export default function WorkOrderPhotos({ photos = [], onChange, otId, otTitle }
             {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
             <span className="text-xs">Cámara</span>
           </button>
-          <button
+          {!ES_WEBVIEW_ANDROID && <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
             className="flex flex-col items-center justify-center gap-1.5 h-14 rounded-xl border-2 border-dashed border-slate-600/60 text-slate-400 hover:border-slate-500 hover:text-slate-300 active:bg-slate-800/40 transition-all disabled:opacity-40"
           >
             <Image className="h-5 w-5" />
             <span className="text-xs">Galería</span>
-          </button>
+          </button>}
         </div>
 
         {uploading && (
@@ -152,7 +154,7 @@ export default function WorkOrderPhotos({ photos = [], onChange, otId, otTitle }
           <p className="text-center text-[10px] text-slate-600">{photos.length} foto{photos.length !== 1 ? 's' : ''}</p>
         )}
 
-        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
+        <CamaraInput ref={cameraRef} accept="image/*" capture="environment" className="hidden"
           onChange={e => handleFiles(e.target.files)} />
         <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
           onChange={e => handleFiles(e.target.files)} />
