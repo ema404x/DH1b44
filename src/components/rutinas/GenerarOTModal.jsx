@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { crearOTServidor } from '@/lib/crearOTServidor';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,7 +79,7 @@ export default function GenerarOTModal({ orden, onClose, onCreated }) {
     mutationFn: async () => {
       const empleado = empleados.find(e => e.id === form.assigned_to);
 
-      const ot = await base44.entities.WorkOrder.create({
+      const ot = await crearOTServidor({
         title: form.title,
         type: form.type,
         status: 'pendiente',

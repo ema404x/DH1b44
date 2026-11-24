@@ -15,6 +15,7 @@ import { getClave, getNombre } from '@/lib/operarioClave';
 import { resolvePendingPhotos, uploadPortalPhoto } from '@/lib/offlineSync';
 import * as store from '@/lib/offlineStore';
 import { FICHAJE_SIN_CONEXION } from '@/lib/fichajeCuenta';
+import { crearOTServidor } from '@/lib/crearOTServidor';
 
 const BACKOFF_MS = [5000, 15000, 60000, 300000];
 const LOCK_KEY = 'dh1-offline-sync-lock';
@@ -71,6 +72,8 @@ function classify(err) {
   if (!status) return { retry: true, stop: true, message: 'Sin conexión con el servidor' };
   if (status === 401) return { retry: true, stop: true, auth: true, message: 'Iniciá sesión para enviar los pendientes' };
   if (status >= 500 || status === 408 || status === 429) return { retry: true, message };
+  // 403: sin permiso → error definitivo, no se reintenta.
+  if (status === 403) return { retry: false, forbidden: true, message };
   if (status >= 400) return { retry: false, message };
   return { retry: true, message };
 }
@@ -147,7 +150,7 @@ const HANDLERS = {
   // Idempotente: si ya existe una OT con este client_op_id, se toma como enviada.
   async create_ot(op) {
     let ot = firstOf(await base44.entities.WorkOrder.filter({ client_op_id: op.client_op_id }));
-    if (!ot) ot = await base44.entities.WorkOrder.create({ ...op.data, client_op_id: op.client_op_id });
+    if (!ot) ot = await crearOTServidor({ ...op.data, client_op_id: op.client_op_id });
     if (!ot?.id) throw new Error('El servidor no devolvió la OT creada');
     await store.completeCreate(op.id, ot.id);
     return ot;
@@ -307,7 +310,9 @@ async function runOnce(force) {
       await store.putOp(next);
       block(next);
       if (!c.retry) {
-        toast.error(`${op.ot_title || 'Cambio pendiente'}: requiere atención. ${c.message}`);
+        toast.error(c.forbidden
+          ? `No se pudo enviar "${op.ot_title || 'el cambio pendiente'}": ${c.message}`
+          : `${op.ot_title || 'Cambio pendiente'}: requiere atención. ${c.message}`);
         emit({ type: 'attention', op: next, message: c.message });
       }
       if (c.stop) break;

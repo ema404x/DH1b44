@@ -11,8 +11,8 @@ import { Button } from '@/components/ui/button';
  * @param {string} moduleKey - Clave del módulo en RolePermission (requerido)
  * @param {React.ReactNode} children - Contenido de la página
  */
-export default function ProtectedPage({ moduleKey, children }) {
-  const { allowed, loading, vinculationFailed } = usePermission(moduleKey, 'read');
+export default function ProtectedPage({ moduleKey, action = 'read', children }) {
+  const { allowed, loading, vinculationFailed } = usePermission(moduleKey, action);
   const { retryVinculation, hasEmployeeRecord } = useAuth();
 
   // Validar que moduleKey sea proporcionado

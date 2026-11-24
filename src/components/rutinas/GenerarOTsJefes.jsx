@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
+import { crearOTServidor } from '@/lib/crearOTServidor';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -96,7 +97,7 @@ export default function GenerarOTsJefes() {
         rutinasList,
       ].filter(l => l !== undefined).join('\n');
 
-      const ot = await base44.entities.WorkOrder.create({
+      const ot = await crearOTServidor({
         title: `[Rutinas] ${grupo.edificio_nombre} — ${grupo.ordenes.length} rutinas pendientes`,
         type: 'mantenimiento_preventivo',
         status: 'pendiente',

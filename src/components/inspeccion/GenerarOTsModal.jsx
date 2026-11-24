@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { crearOTServidor } from '@/lib/crearOTServidor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -106,7 +107,7 @@ ${informe.slice(0, 6000)}`,
       const locEspecifica = ot.location && ot.location !== establecimiento
         ? `${ot.location} — ${establecimiento}`
         : establecimiento;
-      await base44.entities.WorkOrder.create({
+      await crearOTServidor({
         title: ot.title,
         description: ot.description,
         type: ot.type || 'mantenimiento_correctivo',

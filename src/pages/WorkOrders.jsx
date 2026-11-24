@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { fetchAllList } from '@/lib/fetchAllList';
+import { crearOTServidor } from '@/lib/crearOTServidor';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { motion } from 'framer-motion';
@@ -264,7 +265,7 @@ export default function WorkOrders() {
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
-      if (isOnline && !offlineMode) return await base44.entities.WorkOrder.create(data);
+      if (isOnline && !offlineMode) return await crearOTServidor(data);
       // Offline: encola en IndexedDB y devuelve la OT local (con _offline).
       return await queueCreate(data);
     },

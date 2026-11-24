@@ -12,6 +12,7 @@ const ESTADO = {
   aprobada: { label: 'Aprobada', cls: 'bg-emerald-400/15 text-emerald-300 border-emerald-400/30' },
   rechazada: { label: 'Rechazada', cls: 'bg-red-400/15 text-red-300 border-red-400/30' },
   cola: { label: 'Se enviará con señal', cls: 'bg-muted text-muted-foreground border-border' },
+  error: { label: 'No se pudo enviar', cls: 'bg-red-400/15 text-red-300 border-red-400/30' },
 };
 
 /** "Mis propuestas" del Inicio operario: últimas 5, con las que esperan señal. */
@@ -42,7 +43,9 @@ export default function MisPropuestas() {
   }, []);
 
   const items = [
-    ...enCola.map((o) => ({ id: o.id, titulo: o.data?.titulo, estado: 'cola' })),
+    ...enCola.map((o) => (o.status === 'attention'
+      ? { id: o.id, titulo: o.data?.titulo, estado: 'error', motivo_rechazo: o.error }
+      : { id: o.id, titulo: o.data?.titulo, estado: 'cola' })),
     ...propuestas,
   ].slice(0, 5);
 
@@ -73,7 +76,7 @@ export default function MisPropuestas() {
                     {p.estado === 'cola' && <WifiOff className="h-3 w-3" />}
                     {e.label}{p.estado === 'aprobada' && p.work_order_code ? ` · OT #${p.work_order_code}` : ''}
                   </span>
-                  {p.estado === 'rechazada' && p.motivo_rechazo && (
+                  {(p.estado === 'rechazada' || p.estado === 'error') && p.motivo_rechazo && (
                     <p className="mt-1 text-sm text-red-300">{p.motivo_rechazo}</p>
                   )}
                 </div>

@@ -13,6 +13,7 @@ import { useOfflineMode } from '@/hooks/useOfflineMode';
 import { isJefeSitioRole } from '@/lib/roles';
 import { useVeTodosLosActivos, fetchActivosPropios } from '@/hooks/useActivosVisibles';
 import { compressImage } from '@/lib/compressImage';
+import { crearOTServidor } from '@/lib/crearOTServidor';
 import { prepareOfflinePhoto } from '@/lib/offlinePhotos';
 import PendingPhotoThumb from '@/components/pwa/PendingPhotoThumb';
 import { toast } from 'sonner';
@@ -272,7 +273,7 @@ export default function CrearOT() {
   const createMutation = useMutation({
     mutationFn: async (data) => {
       if (isOnline && !offlineMode) {
-        if (!offlinePhotos.length) return await base44.entities.WorkOrder.create(data);
+        if (!offlinePhotos.length) return await crearOTServidor(data);
         // Fotos tomadas sin conexión pero ya volvió la señal: se suben antes de crear.
         const urls = [];
         for (const p of offlinePhotos) {
@@ -280,7 +281,7 @@ export default function CrearOT() {
           if (!res?.file_url) throw new Error('No se recibió la URL de la foto subida');
           urls.push(res.file_url);
         }
-        return await base44.entities.WorkOrder.create({ ...data, photos: [...(data.photos || []), ...urls] });
+        return await crearOTServidor({ ...data, photos: [...(data.photos || []), ...urls] });
       }
       // Offline: encola en IndexedDB (con sus fotos) y devuelve la OT local (con _offline).
       return await queueCreate(data, offlinePhotos);
@@ -301,7 +302,7 @@ export default function CrearOT() {
         toast.success('¡Orden de trabajo creada exitosamente!');
       }
     },
-    onError: () => toast.error('Error al crear la OT. Intente nuevamente.'),
+    onError: (err) => toast.error(err?.response?.data?.error || 'Error al crear la OT. Intente nuevamente.'),
   });
 
   const createFuturaObraMutation = useMutation({

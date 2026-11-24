@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import { crearOTServidor } from '@/lib/crearOTServidor';
 import { useOfflineEnabled, useOfflineOps } from '@/hooks/useOfflineOps';
 import { enqueueCreateOT, enqueueUpdateOT, requestSync } from '@/lib/offlineSyncEngine';
 
@@ -122,7 +123,7 @@ function useLegacyOfflineQueue(onSyncSuccess, active) {
       try {
         let result;
         if (item.action === 'create') {
-          result = await base44.entities.WorkOrder.create(item.data);
+          result = await crearOTServidor(item.data);
         } else if (item.action === 'update') {
           result = await base44.entities.WorkOrder.update(item.entityId, item.data);
         }

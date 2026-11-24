@@ -39,7 +39,8 @@ export function usePermission(moduleKey, action = 'read') {
   }
 
   // Módulo nuevo con acceso por defecto según rol (ver lib/propuestasOT).
-  if (moduleKey === 'PropuestasOT') {
+  // Solo "Ver" (revisión de propuestas); Crear y demás acciones van por su permiso explícito.
+  if (moduleKey === 'PropuestasOT' && action === 'read') {
     return { allowed: puedeVerPropuestas(user, userPermissions), loading: false, vinculationFailed: false };
   }
 

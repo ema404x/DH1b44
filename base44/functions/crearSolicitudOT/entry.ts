@@ -3,6 +3,7 @@ import { waitUntil } from 'base44:runtime';
 import { sectorErrorResponse } from '../../shared/sectorGuard.ts';
 import { isJefeSitioRole } from '../../shared/roles.ts';
 import { enviarPushAUsuario } from '../../shared/webPushUsuario.ts';
+import { tienePermisoModulo } from '../../shared/modulePermission.ts';
 import {
   identidadCaller, toArr, norm, limpiarFotos, entradaHistorial, PRIORIDADES, TIPOS,
 } from '../../shared/solicitudOT.ts';
@@ -34,6 +35,11 @@ export default async function (req) {
     if (clientOpId) {
       const existing = toArr(await sb.entities.SolicitudOT.filter({ client_op_id: clientOpId }))[0];
       if (existing) return Response.json({ solicitud: existing, duplicada: true });
+    }
+
+    // Permiso propio del módulo: PropuestasOT.create (admin siempre puede).
+    if (!(await tienePermisoModulo(base44, user, 'PropuestasOT', 'create', employee || null))) {
+      return Response.json({ error: 'No tenés permiso para proponer OT' }, { status: 403 });
     }
 
     // Ubicación / activo elegido (validado dentro del sector).

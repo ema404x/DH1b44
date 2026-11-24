@@ -104,37 +104,14 @@ export default function EmergenciaForm({ onSuccess, onCancel }) {
       return;
     }
     setSaving(true);
-    const codigo = `EMG-${Date.now().toString().slice(-6)}`;
-    let emergencia = null;
     try {
-      emergencia = await base44.entities.Emergencia.create({
-        ...form, codigo, estado: 'activa',
-      });
-      const ot = await base44.entities.WorkOrder.create({
-        title: `[EMERGENCIA] ${form.titulo}`,
-        type: 'emergencia', status: 'pendiente', priority: 'urgente',
-        description: form.descripcion,
-        location: [form.establecimiento, form.direccion].filter(Boolean).join(' - '),
-        assigned_name: form.jefe_sitio_asignado,
-        gps_status: 'no_disponible',
-        photos: form.fotos,
-        notes: `Emergencia: ${codigo}`,
-      });
-      // Vincular la OT a la emergencia — si falla, la emergencia existe igual
-      // pero sin OT asociada (el usuario puede vincularla manualmente después)
-      try {
-        await base44.entities.Emergencia.update(emergencia.id, { work_order_id: ot.id });
-      } catch (err) {
-        console.warn('No se pudo vincular la OT a la emergencia:', err?.message);
-      }
+      // El servidor verifica Emergencias.create y crea la emergencia con su OT.
+      const res = await base44.functions.invoke('crearEmergencia', { form });
+      if (res?.data?.error) throw new Error(res.data.error);
       toast.success('Emergencia registrada y OT creada');
       onSuccess?.();
     } catch (err) {
-      // Rollback: si la OT falló pero la emergencia se creó, eliminarla para evitar huérfanas
-      if (emergencia) {
-        base44.entities.Emergencia.delete(emergencia.id).catch(() => {});
-      }
-      toast.error('No se pudo registrar la emergencia: ' + (err?.message || 'error de conexión'));
+      toast.error('No se pudo registrar la emergencia: ' + (err?.response?.data?.error || err?.message || 'error de conexión'));
     } finally {
       setSaving(false);
     }

@@ -20,11 +20,15 @@ function Acceso({ icon: Icon, label, onClick, tone }) {
 /** Accesos grandes del Inicio operario: Proponer OT y, con permiso, Reportar emergencia. */
 export default function AccesosOperario({ onEmergencia }) {
   const navigate = useNavigate();
-  const { allowed: puedeEmergencia } = usePermission('Emergencias', 'read');
+  const { allowed: puedeProponer } = usePermission('PropuestasOT', 'create');
+  const { allowed: puedeEmergencia } = usePermission('Emergencias', 'create');
+  if (!puedeProponer && !puedeEmergencia) return null;
 
   return (
-    <section className={`grid gap-3 ${puedeEmergencia ? 'grid-cols-2' : 'grid-cols-1'}`}>
-      <Acceso icon={Lightbulb} label="Proponer OT" onClick={() => navigate('/proponer-ot')} tone="bg-emerald-400/15 text-emerald-300" />
+    <section className={`grid gap-3 ${puedeProponer && puedeEmergencia ? 'grid-cols-2' : 'grid-cols-1'}`}>
+      {puedeProponer && (
+        <Acceso icon={Lightbulb} label="Proponer OT" onClick={() => navigate('/proponer-ot')} tone="bg-emerald-400/15 text-emerald-300" />
+      )}
       {puedeEmergencia && (
         <Acceso icon={AlertTriangle} label="Reportar emergencia" onClick={onEmergencia} tone="bg-destructive/15 text-destructive" />
       )}

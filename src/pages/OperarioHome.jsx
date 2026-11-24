@@ -7,6 +7,7 @@ import AccesosOperario from '@/components/operario-home/AccesosOperario';
 import MisPropuestas from '@/components/operario-home/MisPropuestas';
 import EmergenciaRapidaDialog from '@/components/operario-home/EmergenciaRapidaDialog';
 import { abrirEscanerOperario, abrirFicharOperario } from '@/lib/modoOperario';
+import { usePermission } from '@/hooks/usePermission';
 
 /**
  * Inicio operario (/operario) — pantalla del "Modo operario (beta)".
@@ -18,6 +19,7 @@ export default function OperarioHome() {
   const navigate = useNavigate();
   const [emergenciaOpen, setEmergenciaOpen] = useState(false);
   const [resumen, setResumen] = useState(null);
+  const { allowed: puedeProponer } = usePermission('PropuestasOT', 'create');
 
   // Llegada desde "Fichar" (o el escáner) de la barra inferior estando en otra pantalla.
   useEffect(() => {
@@ -38,7 +40,7 @@ export default function OperarioHome() {
         <PortalOperarioApp compacto onResumen={setResumen} />
       </section>
 
-      <MisPropuestas />
+      {puedeProponer && <MisPropuestas />}
 
       <EmergenciaRapidaDialog open={emergenciaOpen} onOpenChange={setEmergenciaOpen} />
     </div>
