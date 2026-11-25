@@ -47,14 +47,26 @@ export default async function (req: Request): Promise<Response> {
     if (!user) return fail('Tenés que iniciar sesión para fichar con tu cuenta.', 'no_elegible');
     const body = await req.json().catch(() => ({}));
     const { action, locationId } = body || {};
-    if (action !== 'estado' && action !== 'fichar' && action !== 'preparar') return fail('Acción no válida.');
-    if (action !== 'preparar' && (typeof locationId !== 'string' || !locationId.trim())) return fail('El código QR no tiene una ubicación válida.');
+    if (!['estado', 'fichar', 'preparar', 'mi_estado'].includes(action)) return fail('Acción no válida.');
+    if (action !== 'preparar' && action !== 'mi_estado' && (typeof locationId !== 'string' || !locationId.trim())) return fail('El código QR no tiene una ubicación válida.');
 
     const sb = base44.asServiceRole;
     const emp = await resolverEmpleado(sb, user);
     const motivo = elegibilidad(emp);
     if (motivo) return fail(motivo, 'no_elegible');
     const dni = dniDe(emp.dni);
+
+    // Estado del operario para el Inicio: jornada abierta de hoy (sin lugares).
+    if (action === 'mi_estado') {
+      const ahora = new Date();
+      const ab = (await fetchAllFichajesPaginated(createScopedClient(base44, emp.sector_id), { dni, estado: 'abierta' }, '-entrada_timestamp'))
+        .filter((j) => !isExpiredOpenFichaje(j, ahora))[0];
+      return Response.json({
+        ok: true, operario_nombre: emp.full_name,
+        abierta: ab ? { location_qr_id: ab.location_qr_id, location_name: ab.location_name || '', entrada_timestamp: ab.entrada_timestamp } : null,
+        server_time: ahora.toISOString(),
+      });
+    }
 
     // Preparación para fichar sin señal: lugares activos del sector + jornada abierta de hoy.
     if (action === 'preparar') {

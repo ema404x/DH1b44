@@ -5,6 +5,7 @@ import useRequiredGps from '@/components/fichar/useRequiredGps';
 import { irAFichajePublico } from '@/lib/modoOperario';
 import useFichajeCuenta from '@/components/fichar-cuenta/useFichajeCuenta';
 import RelojVivo from '@/components/fichar-cuenta/RelojVivo';
+import EntradaResumen from '@/components/fichar-cuenta/EntradaResumen';
 import GpsEstadoCuenta from '@/components/fichar-cuenta/GpsEstadoCuenta';
 import ComprobanteFichaje from '@/components/fichar-cuenta/ComprobanteFichaje';
 import SinConexionFichaje from '@/components/fichar-cuenta/SinConexionFichaje';
@@ -79,6 +80,7 @@ export default function FicharCuenta() {
         <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${esSalida ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400'}`}>{esSalida ? 'Salida' : 'Entrada'}</span>
       </div>
       <div className="mt-6"><RelojVivo /></div>
+      {esSalida && data.entrada_timestamp && <EntradaResumen entrada={data.entrada_timestamp} />}
     </section>
     <GpsEstadoCuenta gps={gps} loading={gpsLoading} error={gpsError} onRetry={requestGps} location={data.location} />
     {error && <p className="flex items-start gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{error}</p>}
