@@ -1,9 +1,9 @@
 import React from 'react';
-import { LogOut, MapPin, ScanLine } from 'lucide-react';
+import { MapPin, ScanLine } from 'lucide-react';
 import { horaAR, duracion, useAhoraMinuto } from '@/components/fichar-cuenta/jornadaTiempo';
 
 /** Contenido de la tarjeta de fichaje cuando hay una jornada abierta. */
-export default function JornadaAbiertaCard({ abierta, onSalida, onEscanear }) {
+export default function JornadaAbiertaCard({ abierta, onEscanear }) {
   const now = useAhoraMinuto();
   return (
     <>
@@ -20,15 +20,15 @@ export default function JornadaAbiertaCard({ abierta, onSalida, onEscanear }) {
         </div>
       </div>
       <button
-        onClick={onSalida}
-        className="mt-5 flex h-20 w-full items-center justify-center gap-3 rounded-2xl bg-amber-500 text-xl font-bold text-slate-950 shadow-lg shadow-amber-500/25 transition-transform active:scale-[0.97]"
+        onClick={onEscanear}
+        className="mt-5 flex h-20 w-full items-center justify-center gap-3 rounded-2xl bg-amber-500 px-4 text-lg font-bold leading-tight text-slate-950 shadow-lg shadow-amber-500/25 transition-transform active:scale-[0.97]"
       >
-        <LogOut className="h-7 w-7" />
-        Registrar salida
+        <ScanLine className="h-7 w-7 shrink-0" />
+        Escanear QR para registrar salida
       </button>
-      <button onClick={onEscanear} className="mx-auto mt-3 flex items-center gap-1.5 text-sm font-medium text-muted-foreground underline-offset-4 hover:underline">
-        <ScanLine className="h-4 w-4" /> Escanear otro QR
-      </button>
+      <p className="mt-3 text-center text-xs text-muted-foreground">
+        Escaneá el QR de {abierta.location_name || 'tu lugar de trabajo'} para cerrar tu jornada.
+      </p>
     </>
   );
 }

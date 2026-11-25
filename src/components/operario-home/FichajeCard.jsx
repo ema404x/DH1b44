@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Clock, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
@@ -29,7 +28,6 @@ function useOnline() {
 export default function FichajeCard() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const abrirFichajeQR = useAbrirFichajeQR();
-  const navigate = useNavigate();
   const online = useOnline();
 
   const { data } = useQuery({
@@ -44,12 +42,8 @@ export default function FichajeCard() {
   const conEstado = online && data?.ok === true;
   const abierta = conEstado ? data.abierta : null;
 
-  const irASalida = () => navigate(`/fichar-cuenta?loc=${encodeURIComponent(abierta.location_qr_id)}`);
-  const accionRef = useRef(null);
-  accionRef.current = abierta ? irASalida : () => setScannerOpen(true);
-
   useEffect(() => {
-    const abrir = () => accionRef.current();
+    const abrir = () => setScannerOpen(true);
     window.addEventListener(EVENTO_FICHAR_OPERARIO, abrir);
     return () => window.removeEventListener(EVENTO_FICHAR_OPERARIO, abrir);
   }, []);
@@ -65,7 +59,7 @@ export default function FichajeCard() {
   return (
     <section className="rounded-3xl border border-border bg-card p-5 shadow-lg shadow-black/10 acero-rise">
       {abierta ? (
-        <JornadaAbiertaCard abierta={abierta} onSalida={irASalida} onEscanear={() => setScannerOpen(true)} />
+        <JornadaAbiertaCard abierta={abierta} onEscanear={() => setScannerOpen(true)} />
       ) : (
         <>
           <div className="flex items-center gap-3">
