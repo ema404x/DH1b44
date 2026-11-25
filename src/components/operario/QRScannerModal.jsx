@@ -26,6 +26,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
   const scannerRef = useRef(null);
   const startingRef = useRef(false);
   const stopRef = useRef(false);
+  const closedRef = useRef(false);
 
   const [error, setError] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -47,12 +48,14 @@ export default function QRScannerModal({ open, onClose, onResult }) {
     scannerRef.current = null;
     setScanning(false);
     if (!inst) return;
-    // stop() y clear() son async y pueden rechazar si ya se detuvo; los
-    // envolvemos para que nunca lancen al caller.
-    Promise.allSettled([
-      inst.stop().catch(() => {}),
-      inst.clear().catch(() => {}),
-    ]);
+    // Secuencial y protegido: html5-qrcode lanza SINCRÓNICAMENTE en clear()
+    // si sigue escaneando y en stop() si no está corriendo. Nunca lanza al caller.
+    (async () => {
+      try {
+        if (inst.isScanning || inst.getState?.() === 2 || inst.getState?.() === 3) await inst.stop();
+      } catch {}
+      try { inst.clear(); } catch {}
+    })();
   }, []);
 
   const dispatchResult = useCallback((parsed) => {
@@ -74,7 +77,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
     }
     setTimeout(() => {
       cleanupScanner();
-      onCloseRef.current();
+      try { onCloseRef.current(); } catch (e) { console.error('[QR] Error en onClose:', e); }
     }, 350);
   }, [cleanupScanner]);
 
@@ -133,6 +136,12 @@ export default function QRScannerModal({ open, onClose, onResult }) {
         } catch (_) {}
       }
       if (!started) throw new Error('No camera available');
+      // El modal se cerró mientras arrancaba la cámara: apagarla.
+      if (closedRef.current) {
+        scannerRef.current = html5QrCode;
+        cleanupScanner();
+        return;
+      }
       setScanning(true);
     } catch (err) {
       console.error('QR scanner start error:', err);
@@ -146,6 +155,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
 
   useEffect(() => {
     if (!open) return;
+    closedRef.current = false;
     stopRef.current = false;
     startingRef.current = false;
     setError(null);
@@ -162,6 +172,7 @@ export default function QRScannerModal({ open, onClose, onResult }) {
 
     return () => {
       cancelled = true;
+      closedRef.current = true;
       clearTimeout(timer);
       stopRef.current = true;
       cleanupScanner();
