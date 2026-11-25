@@ -120,9 +120,25 @@
           }
         },
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "gerente"
+                  }
+                },
+                {
+                  "data.sector_id": "bapro"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -142,9 +158,25 @@
           }
         },
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "gerente"
+                  }
+                },
+                {
+                  "data.sector_id": "bapro"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -164,9 +196,25 @@
           }
         },
         {
-          "user_condition": {
-            "role": "admin"
-          }
+          "$or": [
+            {
+              "user_condition": {
+                "role": "admin"
+              }
+            },
+            {
+              "$and": [
+                {
+                  "user_condition": {
+                    "role": "gerente"
+                  }
+                },
+                {
+                  "data.sector_id": "bapro"
+                }
+              ]
+            }
+          ]
         }
       ]
     }

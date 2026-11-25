@@ -23,9 +23,9 @@ export default async function(req) {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'admin') return Response.json({ error: 'Forbidden: solo admin' }, { status: 403 });
-
     const { sector: callerSector } = await resolveCallerSectorCanonical(base44.asServiceRole, user);
+    const permitido = user.role === 'admin' || (user.role === 'gerente' && callerSector === 'bapro');
+    if (!permitido) return Response.json({ error: 'Forbidden: solo admin o gerente de BAPRO' }, { status: 403 });
     const sb = createScopedClient(base44, callerSector);
 
     const body = await req.json().catch(() => ({}));

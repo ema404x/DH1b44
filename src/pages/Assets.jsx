@@ -8,6 +8,7 @@ import PendientesTab from '@/components/assets/PendientesTab';
 import RevisionBaproPanel from '@/components/assets/RevisionBaproPanel';
 import SincronizacionPanel from '@/components/assets/SincronizacionPanel';
 import { usePermission } from '@/hooks/usePermission';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 // Mapa de pestaña → moduleKey de permiso. 'sync' hereda el acceso del
 // módulo Asset (catálogo) porque es una herramienta administrativa del mismo.
@@ -26,13 +27,16 @@ export default function Assets() {
   const permActivos = usePermission('Asset', 'read');
   const permPendientes = usePermission('PendienteSAP', 'read');
   const permBapro = usePermission('RevisionBapro', 'read');
+  const { user, employeeSector } = useCurrentUser();
+  const esGerenteBapro = user?.role === 'gerente' && employeeSector === 'bapro';
+  const puedeRevision = permBapro.allowed || esGerenteBapro;
 
   const tabPerms = useMemo(() => ({
     activos: permActivos,
     pendientes: permPendientes,
-    bapro: permBapro,
+    bapro: { ...permBapro, allowed: puedeRevision },
     sync: permActivos,
-  }), [permActivos, permPendientes, permBapro]);
+  }), [permActivos, permPendientes, permBapro, puedeRevision]);
 
   // Si la pestaña activa no tiene permiso, caer a la primera que sí lo tenga.
   const activeTab = useMemo(() => {
@@ -62,7 +66,7 @@ export default function Assets() {
         <TabsList>
           <TabsTrigger value="activos" className="gap-1.5" disabled={!permActivos.allowed}><Boxes className="h-3.5 w-3.5" />Catálogo</TabsTrigger>
           <TabsTrigger value="pendientes" className="gap-1.5" disabled={!permPendientes.allowed}><ClipboardList className="h-3.5 w-3.5" />Pendientes SAP</TabsTrigger>
-          <TabsTrigger value="bapro" className="gap-1.5" disabled={!permBapro.allowed}><Link2 className="h-3.5 w-3.5" />Revisión</TabsTrigger>
+          <TabsTrigger value="bapro" className="gap-1.5" disabled={!puedeRevision}><Link2 className="h-3.5 w-3.5" />Revisión</TabsTrigger>
           <TabsTrigger value="sync" className="gap-1.5" disabled={!permActivos.allowed}><RefreshCw className="h-3.5 w-3.5" />Sincronización</TabsTrigger>
         </TabsList>
         <TabsContent value="activos" className="mt-5">
@@ -72,7 +76,7 @@ export default function Assets() {
           {permPendientes.allowed ? <PendientesTab /> : <TabBlocked />}
         </TabsContent>
         <TabsContent value="bapro" className="mt-5">
-          {permBapro.allowed ? <RevisionBaproPanel sedes={sedes} /> : <TabBlocked />}
+          {puedeRevision ? <RevisionBaproPanel sedes={sedes} /> : <TabBlocked />}
         </TabsContent>
         <TabsContent value="sync" className="mt-5">
           {permActivos.allowed ? <SincronizacionPanel /> : <TabBlocked />}

@@ -125,8 +125,8 @@ export default function CrearOT() {
   // BAPRO: las OT son generales (no se rigen por ubicación/activo). El primer
   // paso (selección de activo) se omite para ese sector — arrancan directo en
   // Detalle. Escuela y demás sectores mantienen el flujo de 3 pasos intacto.
-  const firstStep = isBapro ? 2 : 1;
-  const steps = isBapro ? STEPS.filter(s => s.id !== 1) : STEPS;
+  const firstStep = 1;
+  const steps = STEPS;
 
   // Wizard state
   const [step, setStep] = useState(firstStep);
