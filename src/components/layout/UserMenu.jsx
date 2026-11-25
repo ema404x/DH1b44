@@ -229,13 +229,15 @@ export default function UserMenu({ variant } = {}) {
             {user?.role === 'admin' && !offlineMode && (
               <VerificacionesResumen onVer={() => { setShowVerificaciones(true); setOpen(false); }} />
             )}
-            <button
-              onClick={() => { setShowDeleteDialog(true); setOpen(false); }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-left text-popover-foreground"
-            >
-              <Trash2 className="h-4 w-4 text-muted-foreground" />
-              Eliminar cuenta
-            </button>
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => { setShowDeleteDialog(true); setOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-destructive/10 hover:text-destructive transition-colors text-left text-popover-foreground"
+              >
+                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                Eliminar cuenta
+              </button>
+            )}
             <div className="mx-2 my-1 border-t border-border" />
             <button
               onClick={() => {
