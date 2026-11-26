@@ -88,6 +88,25 @@ export default async function(req) {
         });
       }
 
+      // 4) Solo BAPRO: las OT se guardan con sede_id/sede_nombre (Edificio).
+      if (locSector === 'bapro' && location.name) {
+        const locNameNorm = normalize(location.name);
+        const edificios = await sb.entities.Edificio.list('-updated_date', 500).catch(() => []);
+        const edificio = edificios.find(e => e.sector_id === locSector && normalize(e.nombre) === locNameNorm);
+        const [porSedeId, porSedeNombre] = await Promise.all([
+          edificio ? sb.entities.WorkOrder.filter({ sede_id: edificio.id }).catch(() => []) : [],
+          sb.entities.WorkOrder.filter({ sede_nombre: location.name }).catch(() => []),
+        ]);
+        const ids = new Set(activeOrders.map(o => o.id));
+        for (const o of [...porSedeId, ...porSedeNombre]) {
+          if (ids.has(o.id)) continue;
+          if (['completada', 'cancelada'].includes(o.status) || !sameSector(o)) continue;
+          if (!(edificio && o.sede_id === edificio.id) && normalize(o.sede_nombre) !== locNameNorm) continue;
+          ids.add(o.id);
+          activeOrders.push(o);
+        }
+      }
+
       const priorityOrder = { urgente: 0, alta: 1, media: 2, baja: 3 };
       activeOrders.sort((a, b) => (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2));
 
