@@ -14,9 +14,16 @@ export default async function(req) {
     const activos = await loadAssets();
     const loteIds = activos.map(a => a.id);
     // Los historiales y las OTs no pueden ampliar el lote a otras sedes.
-    const allOts = loteIds.length
+    const assetOts = loteIds.length
       ? await sb.entities.WorkOrder.filter({ asset_id: { $in: loteIds } }, '-created_date', 500)
       : [];
+    // BAPRO con link de una sola sede: también las OT de esa sede (con o sin activo).
+    const sedeUnica = tok.sector_id === 'bapro' && tok.sede_scope && tok.sede_scope !== 'TODAS' ? tok.sede_scope : null;
+    const sedeOts = sedeUnica
+      ? await sb.entities.WorkOrder.filter({ sede_id: sedeUnica }, '-created_date', 500)
+      : [];
+    const vistas = new Set();
+    const allOts = [...assetOts, ...sedeOts].filter(o => !vistas.has(o.id) && vistas.add(o.id));
 
     // Rango del mes del lote (YYYY-MM).
     const [yy, mm] = (tok.mes_periodo || '').split('-').map(Number);
@@ -64,7 +71,8 @@ export default async function(req) {
     // OTs generadas en el mes (listado plano para la solapa de OTs).
     const otsMes = [];
     for (const o of allOts) {
-      if (!idSet.has(o.asset_id) || !inMes(o.created_date)) continue;
+      const delaSede = !!sedeUnica && o.sede_id === sedeUnica;
+      if ((!idSet.has(o.asset_id) && !delaSede) || !inMes(o.created_date)) continue;
       if (o.status !== 'completada') continue;
       if (otsMes.length >= 200) break;
       otsMes.push({

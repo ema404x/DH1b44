@@ -24,6 +24,14 @@
       "type": "string",
       "description": "Activo/equipo asociado (denormalizado de Asset.name)"
     },
+    "sede_id": {
+      "type": "string",
+      "description": "Solo BAPRO: ID del Edificio (sede) al que pertenece la OT. Opcional."
+    },
+    "sede_nombre": {
+      "type": "string",
+      "description": "Solo BAPRO: nombre de la sede (denormalizado de Edificio.nombre)."
+    },
     "location": {
       "type": "string",
       "description": "Ubicaci\u00f3n del trabajo"

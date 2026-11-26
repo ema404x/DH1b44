@@ -14,6 +14,9 @@ import { isJefeSitioRole } from '@/lib/roles';
 import { useVeTodosLosActivos, fetchActivosPropios } from '@/hooks/useActivosVisibles';
 import { compressImage } from '@/lib/compressImage';
 import { crearOTServidor } from '@/lib/crearOTServidor';
+import useEsBapro from '@/hooks/useEsBapro';
+import SedeBuscador from '@/components/assets/bapro/SedeBuscador';
+import { ordenarSedes } from '@/components/assets/bapro/sedesBapro';
 import { prepareOfflinePhoto } from '@/lib/offlinePhotos';
 import PendingPhotoThumb from '@/components/pwa/PendingPhotoThumb';
 import { toast } from 'sonner';
@@ -137,6 +140,15 @@ export default function CrearOT() {
   // Form fields
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedAssetId, setSelectedAssetId] = useState(null);
+  // BAPRO: cada OT pertenece a una sede (Edificio); el activo es opcional.
+  const esBapro = useEsBapro();
+  const [sedeId, setSedeId] = useState('');
+  const { data: edificios = [] } = useQuery({
+    queryKey: ['edificios-ot-bapro'],
+    queryFn: () => base44.entities.Edificio.list('-updated_date', 500),
+    enabled: esBapro,
+  });
+  const sedesBapro = useMemo(() => ordenarSedes(edificios.filter(e => e.activo !== false)), [edificios]);
   const [title, setTitle] = useState('');
   const [type, setType] = useState('mantenimiento_correctivo');
   const [priority, setPriority] = useState('media');
@@ -331,6 +343,7 @@ export default function CrearOT() {
     };
     setSelectedLocation(loc);
     setSelectedAssetId(asset.id);
+    if (asset.location_id) setSedeId(asset.location_id);
     setLocationSearch(loc.address || asset.name || '');
     setShowSuggestions(false);
     setAutoJefeSitio(asset.jefe_sitio || '');
@@ -349,14 +362,15 @@ export default function CrearOT() {
   const filteredSuggestions = useMemo(() => {
     const q = locationSearch.toLowerCase();
     return activeAssets.filter(a =>
-      !q ||
+      (!esBapro || !sedeId || a.location_id === sedeId) &&
+      (!q ||
       a.name?.toLowerCase().includes(q) ||
       a.sede?.toLowerCase().includes(q) ||
       a.area?.toLowerCase().includes(q) ||
       a.code?.toLowerCase().includes(q) ||
-      a.jefe_sitio?.toLowerCase().includes(q)
+      a.jefe_sitio?.toLowerCase().includes(q))
     ).slice(0, 10);
-  }, [activeAssets, locationSearch]);
+  }, [activeAssets, locationSearch, esBapro, sedeId]);
 
   // Close suggestions on outside click
   useEffect(() => {
@@ -537,6 +551,7 @@ export default function CrearOT() {
         photos,
         asset_id: selectedAssetId || undefined,
         asset_name: selectedLocation?.name || '',
+        ...(esBapro ? { sede_id: sedeId, sede_nombre: sedesBapro.find(s => s.id === sedeId)?.nombre || '' } : {}),
         location: locationLabel,
         project_name: selectedLocation?.project_name || '',
         assigned_name: responsable || undefined,
@@ -557,6 +572,7 @@ export default function CrearOT() {
     setShowQR(false);
     setSelectedLocation(null);
     setSelectedAssetId(null);
+    setSedeId('');
     setLocationSearch('');       // ← fix: limpiar el input de búsqueda
     setShowSuggestions(false);
     setTitle('');
@@ -579,7 +595,7 @@ export default function CrearOT() {
   // ── Validaciones por paso ────────────────────────────────────────────────────
 
   const canProceed = () => {
-    if (step === 1) return true; // ubicación es opcional
+    if (step === 1) return esBapro ? !!sedeId : true; // activo opcional; en BAPRO la sede es obligatoria
     if (step === 2) return title.trim().length > 0;
     if (step === 3) return true; // materiales opcionales
     return false;
@@ -702,6 +718,21 @@ export default function CrearOT() {
         {step === 1 && (
           <div className="space-y-5">
             <SectionTitle icon={Wrench} label="¿Qué activo intervenir?" sub="Seleccioná el equipo/activo del módulo Activos sobre el que se trabajará" />
+
+            {esBapro && (
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium">Sede *</p>
+                <SedeBuscador
+                  options={sedesBapro.map(s => ({ value: s.id, label: s.nombre }))}
+                  value={sedeId}
+                  placeholder="Elegir sede"
+                  onChange={(v) => {
+                    setSedeId(v);
+                    if (selectedLocation?._asset?.location_id !== v) handleClearLocation();
+                  }}
+                />
+              </div>
+            )}
 
             {loadingAssets ? (
               <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
@@ -1108,11 +1139,11 @@ export default function CrearOT() {
           {step < 3 ? (
             <Button
               className="flex-1 h-12 gap-2 bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-lg shadow-purple-500/30"
-              disabled={uploadingPhoto}
+              disabled={uploadingPhoto || (step === 1 && esBapro && !sedeId)}
               onClick={() => {
                 if (uploadingPhoto) return;
                 if (!canProceed()) {
-                  toast.error('Completá el título para continuar');
+                  toast.error(step === 1 ? 'Elegí la sede para continuar' : 'Completá el título para continuar');
                   return;
                 }
                 setStep(s => s + 1);

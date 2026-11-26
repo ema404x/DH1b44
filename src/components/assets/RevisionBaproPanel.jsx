@@ -40,11 +40,18 @@ export default function RevisionBaproPanel({ sedes }) {
     setGeneratedLink(null);
     setProgreso('Contando activos…');
     try {
-      const conteos = await Promise.all(sedes.map(s => base44.entities.Asset.count({ location_id: s.id })));
+      const [yy, mm] = mes.split('-').map(Number);
+      const desde = new Date(yy, mm - 1, 1).toISOString();
+      const hasta = new Date(yy, mm, 1).toISOString();
+      const conteos = await Promise.all(sedes.map(async s => {
+        const activos = await base44.entities.Asset.count({ location_id: s.id });
+        if (activos > 0) return activos;
+        return base44.entities.WorkOrder.count({ sede_id: s.id, created_date: { $gte: desde, $lt: hasta } });
+      }));
       const validas = ordenarSedes(sedes).filter(s => conteos[sedes.indexOf(s)] > 0);
       const saltadas = sedes.length - validas.length;
-      if (validas.length === 0) { toast.error('Ninguna sede tiene activos'); return; }
-      const aviso = saltadas > 0 ? ` (${saltadas} sin activos se saltean)` : '';
+      if (validas.length === 0) { toast.error('Ninguna sede tiene activos ni OT'); return; }
+      const aviso = saltadas > 0 ? ` (${saltadas} sin activos ni OT se saltean)` : '';
       if (!window.confirm(`Se van a generar ${validas.length} links, uno por sede${aviso}. ¿Continuar?`)) return;
       let ok = 0, fallidas = 0;
       for (let i = 0; i < validas.length; i++) {
@@ -58,7 +65,7 @@ export default function RevisionBaproPanel({ sedes }) {
         } catch { fallidas++; }
       }
       qc.invalidateQueries({ queryKey: ['bapro_tokens'] });
-      toast.success(`${ok} links generados${saltadas ? `, ${saltadas} sedes salteadas (0 activos)` : ''}${fallidas ? `, ${fallidas} con error` : ''}`);
+      toast.success(`${ok} links generados${saltadas ? `, ${saltadas} sedes salteadas (sin activos ni OT)` : ''}${fallidas ? `, ${fallidas} con error` : ''}`);
     } catch (err) {
       toast.error(err.message || 'Error al generar links');
     } finally {
