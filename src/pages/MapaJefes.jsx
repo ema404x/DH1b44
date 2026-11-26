@@ -4,8 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { MapPin, Users, Map, Layers, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import MapaJefesVista from '@/components/mapa-jefes/MapaJefesVista';
+import useEsBapro from '@/hooks/useEsBapro';
 
 export default function MapaJefes() {
+  const esBapro = useEsBapro();
   const [modo, setModo] = useState('jefe'); // 'jefe' | 'comuna' | 'cluster'
 
   const { data: rawDirecciones = [], isLoading: loadingDir, refetch: refetchDir } = useQuery({
@@ -59,7 +61,7 @@ export default function MapaJefes() {
 
   const MODOS = [
     { id: 'jefe', label: 'Por Jefe', icon: Users },
-    { id: 'comuna', label: 'Por Comuna', icon: Map },
+    ...(esBapro ? [] : [{ id: 'comuna', label: 'Por Comuna', icon: Map }]),
     { id: 'cluster', label: 'Cluster', icon: Layers },
   ];
 
@@ -73,7 +75,7 @@ export default function MapaJefes() {
             Mapa de Jefes de Sitio
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {direcciones.length} direcciones · {escuelas.length} escuelas · {conCoords} geocodificadas
+            {direcciones.length} direcciones · {escuelas.length} {esBapro ? 'sedes' : 'escuelas'} · {conCoords} geocodificadas
             {sinCoords > 0 && <span className="text-amber-600"> · {sinCoords} sin coordenadas</span>}
           </p>
         </div>

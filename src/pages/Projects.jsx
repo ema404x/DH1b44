@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Search, Trash2, Upload, Plus, Loader2, X, ChevronUp, ChevronDown, ScanSearch } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermission } from '@/hooks/usePermission';
+import useEsBapro from '@/hooks/useEsBapro';
 
 import ImportarObrasExcelModal from '@/components/projects/ImportarObrasExcelModal';
 import AuditoriaSincronizacion from '@/components/projects/AuditoriaSincronizacion';
@@ -28,6 +29,7 @@ function SortIcon({ active, dir }) {
 }
 
 export default function Projects() {
+  const esBapro = useEsBapro();
   const { allowed: canEdit }   = usePermission('Project', 'update');
   const { allowed: canCreate } = usePermission('Project', 'create');
   const { allowed: canDelete } = usePermission('Project', 'delete');
@@ -177,7 +179,7 @@ export default function Projects() {
         <div>
           <h1 className="text-xl font-bold text-white">Planilla de Obras</h1>
           <p className="text-slate-400 text-xs">
-            {projects.length.toLocaleString()} obras · 8A: {comunaStats['8A']} · 8B: {comunaStats['8B']} · 10A: {comunaStats['10A']}
+            {projects.length.toLocaleString()} obras{!esBapro && ` · 8A: ${comunaStats['8A']} · 8B: ${comunaStats['8B']} · 10A: ${comunaStats['10A']}`}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

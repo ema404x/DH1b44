@@ -50,7 +50,10 @@ const CustomPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, nam
   );
 };
 
+import useEsBapro from '@/hooks/useEsBapro';
+
 export default function EmergenciasDashboard({ emergencias }) {
+  const esBapro = useEsBapro();
   const dataEstado = useMemo(() => {
     const counts = {};
     emergencias.forEach(e => { counts[e.estado] = (counts[e.estado] || 0) + 1; });
@@ -154,7 +157,7 @@ export default function EmergenciasDashboard({ emergencias }) {
       </div>
 
       {/* Barras por comuna */}
-      {dataComuna.length > 0 && (
+      {!esBapro && dataComuna.length > 0 && (
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 backdrop-blur p-5">
           <h3 className="text-sm font-bold text-slate-200 mb-4 uppercase tracking-wide">Por Comuna</h3>
           <ResponsiveContainer width="100%" height={180}>

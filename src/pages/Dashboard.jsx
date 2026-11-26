@@ -26,6 +26,7 @@ import { es } from 'date-fns/locale';
 import { esOtVencida } from '@/lib/otVencimiento';
 import { fetchAllList } from '@/lib/fetchAllList';
 import OfflineGuard from '@/components/pwa/OfflineGuard';
+import useEsBapro from '@/hooks/useEsBapro';
 import { useOfflineMode, offlineQueryOptions } from '@/hooks/useOfflineMode';
 import { usePanelRapido } from '@/hooks/usePanelRapido';
 import { mejoraActiva, datosUsuario } from '@/lib/optimizaciones';
@@ -192,6 +193,7 @@ const QuickActionCard = React.memo(function QuickActionCard({ icon: Icon, label,
 
 export default function Dashboard() {
   const { userPermissions, user, displayName, isAdmin } = useCurrentUser();
+  const esBapro = useEsBapro();
   const [dashFilters, setDashFilters] = React.useState({ dateRange: 'all', jefeSitio: '', priority: '' });
   const offlineMode = useOfflineMode();
 
@@ -517,7 +519,7 @@ export default function Dashboard() {
         const actions = [
           canRead('WorkOrder')         && { href: '/crear-ot',           icon: Zap,          label: 'Crear OT',     desc: 'Orden rápida',    color: 'bg-cyan-500/15 text-cyan-300' },
           canRead('WorkOrder')         && { href: '/ordenes',            icon: ClipboardList, label: 'OTs',          desc: 'Gestionar',       color: 'bg-cyan-500/15 text-cyan-300' },
-          canRead('InspeccionColegio') && { href: '/inspeccion-colegio', icon: Target,        label: 'Inspección',   desc: 'Recorrido colegio', color: 'bg-cyan-500/15 text-cyan-300' },
+          canRead('InspeccionColegio') && { href: '/inspeccion-colegio', icon: Target,        label: 'Inspección',   desc: esBapro ? 'Recorrido sede' : 'Recorrido colegio', color: 'bg-cyan-500/15 text-cyan-300' },
           canRead('Asset')             && { href: '/activos',            icon: Wrench,        label: 'Pendientes',   desc: 'Gestión SAP',     color: 'bg-cyan-500/15 text-cyan-300' },
           canRead('Certificado')       && { href: '/certificados',       icon: FileCheck,     label: 'Certificados', desc: 'Emitir',          color: 'bg-cyan-500/15 text-cyan-300' },
           canRead('Reportes')          && { href: '/reportes',           icon: BarChart3,     label: 'Reportes',     desc: 'Ver métricas',    color: 'bg-cyan-500/15 text-cyan-300' },

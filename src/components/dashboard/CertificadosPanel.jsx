@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import useEsBapro from '@/hooks/useEsBapro';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +22,7 @@ const ESTADO_CONFIG = {
 // valores salen de `resumen` (calculado en el servidor). Sin esas props el
 // componente queda como siempre.
 export default function CertificadosPanel({ filterCutoff = null, resumen = null, rapido = false }) {
+  const esBapro = useEsBapro();
   const { data: certs = [] } = useQuery({
     queryKey: ['certificados-dash'],
     queryFn: () => base44.entities.Certificado.list('-created_date', 200),
@@ -178,7 +180,7 @@ export default function CertificadosPanel({ filterCutoff = null, resumen = null,
         )}
 
         {/* Abonos por Comuna — histórico total */}
-        {totalAbonos > 0 && (
+        {!esBapro && totalAbonos > 0 && (
           <div>
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
               Abonos por Comuna (total: {totalAbonos})

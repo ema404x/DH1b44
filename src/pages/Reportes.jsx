@@ -41,7 +41,10 @@ function Empty({ text = 'Sin datos' }) {
   return <div className="text-center py-12 text-slate-500 text-sm">{text}</div>;
 }
 
+import useEsBapro from '@/hooks/useEsBapro';
+
 export default function Reportes() {
+  const esBapro = useEsBapro();
   const [dateFrom, setDateFrom] = useState(format(subMonths(new Date(), 5), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [comuna, setComuna] = useState('all');
@@ -149,7 +152,7 @@ export default function Reportes() {
               <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Hasta</label>
               <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white" />
             </div>
-            <div>
+            {!esBapro && <div>
               <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Comuna</label>
               <Select value={comuna} onValueChange={setComuna}>
                 <SelectTrigger className="h-9 text-xs bg-slate-700/50 border-slate-600/50 text-white"><SelectValue /></SelectTrigger>
@@ -158,7 +161,7 @@ export default function Reportes() {
                   {filtros.comunas.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
+            </div>}
             <div>
               <label className="text-xs font-semibold text-slate-400 uppercase block mb-2">Jefe de Sitio</label>
               <Select value={jefe} onValueChange={setJefe}>
