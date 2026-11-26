@@ -105,7 +105,8 @@ export default async function(req) {
       });
     }
 
-    const result = await bulkImportAssets(sb, inputs, { autoCreateLocations: auto_create_locations, dryRun: dry_run });
+    const sedeOpts = callerSector === 'bapro' ? { defaultSede: 'Sede Central', sedeAliases: true } : {};
+    const result = await bulkImportAssets(sb, inputs, { autoCreateLocations: auto_create_locations, dryRun: dry_run, ...sedeOpts });
 
     // ── Modo dry-run: devolver preview ──────────────────────────────────
     if (dry_run) {

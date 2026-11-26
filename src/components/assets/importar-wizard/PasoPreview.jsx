@@ -54,17 +54,17 @@ export default function PasoPreview({ preview, autoCreateLocations, onVolver, on
 
       {/* Sedes a crear */}
       {sedesCrear.length > 0 && (
-        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-emerald-600 mb-2">
-            <Building2 className="h-4 w-4" /> Sedes que se crearán ({sedesCrear.length})
+        <div className="rounded-lg border-2 border-amber-500/50 bg-amber-500/10 p-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-amber-400 mb-1">
+            <AlertTriangle className="h-4 w-4" /> Estas sedes no existen y se van a crear ({sedesCrear.length}):
           </div>
+          <p className="text-xs text-muted-foreground mb-2">Revisalas antes de confirmar. Si alguna es un error de tipeo, volvé y corregí el archivo.</p>
           <div className="flex flex-wrap gap-1.5">
-            {sedesCrear.slice(0, 12).map((s, i) => (
-              <span key={i} className="text-xs px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                {s.nombre}{s.comuna ? ` · ${s.comuna}` : ''}
+            {sedesCrear.map((s, i) => (
+              <span key={i} className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                {s.nombre}
               </span>
             ))}
-            {sedesCrear.length > 12 && <span className="text-xs text-muted-foreground self-center">+{sedesCrear.length - 12} más</span>}
           </div>
         </div>
       )}

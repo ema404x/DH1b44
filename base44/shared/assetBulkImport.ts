@@ -116,8 +116,56 @@ function enumValid(raw, map) {
   return !!(map[k] || map[String(raw).toLowerCase().trim()]);
 }
 
-export async function bulkImportAssets(sb, inputs, opts: { autoCreateLocations?: boolean; dryRun?: boolean } = {}) {
-  const { autoCreateLocations = true, dryRun = false } = opts;
+// ── Alias de sedes (opcional, usado por BAPRO) ─────────────────────────
+// Quita prefijos "sucursal", "suc.", "suc", "sede" y numeraciones tipo
+// "n° 12" / "12 -" al principio, para que "B. Irigoyen", "Suc. B. Irigoyen"
+// y "Sucursal B. Irigoyen" den la misma clave.
+const CENTRAL_ALIASES = new Set(['casa central', 'sede central', 'central', 'sede principal', 'principal']);
+const DEFAULT_KEY = '__sede_default__';
+
+function sedeBaseKey(raw) {
+  let s = normalizeName(raw);
+  let prev;
+  do {
+    prev = s;
+    s = s.replace(/^(?:sucursal\b|suc\.|suc\b|sede\b)\s*/, '');
+    s = s.replace(/^(?:n[°º.]?|nro\.?|numero)\s*\d+\s*[-–:]?\s*/, '');
+    s = s.replace(/^\d+\s*[-–:]\s*/, '');
+    s = s.trim();
+  } while (s !== prev);
+  return s.replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function makeSedeAliasKey(defaultSede) {
+  const defaultBase = sedeBaseKey(defaultSede);
+  return (raw) => {
+    const n = normalizeName(raw).replace(/[^a-z0-9]+/g, ' ').trim();
+    const b = sedeBaseKey(raw);
+    if (CENTRAL_ALIASES.has(n) || CENTRAL_ALIASES.has(b) || b === defaultBase) return DEFAULT_KEY;
+    return b;
+  };
+}
+
+export async function bulkImportAssets(
+  sb,
+  inputs,
+  opts: { autoCreateLocations?: boolean; dryRun?: boolean; defaultSede?: string; sedeAliases?: boolean } = {},
+) {
+  const { autoCreateLocations = true, dryRun = false, defaultSede = 'Sede Principal', sedeAliases = false } = opts;
+  const aliasKey = sedeAliases ? makeSedeAliasKey(defaultSede) : null;
+  // Clave de agrupación de sede: alias si está activo, nombre normalizado si no.
+  const keyOf = (raw) => (aliasKey ? aliasKey(raw) : normalizeName(raw));
+  // Indexa por nombre normalizado y, con alias, también por clave alias (sin pisar).
+  const indexSede = (map, raw, value) => {
+    const n = normalizeName(raw);
+    if (n) map.set(n, value);
+    if (aliasKey) { const k = aliasKey(raw); if (k && !map.has(k)) map.set(k, value); }
+  };
+  const findSede = (map, raw) => {
+    const n = normalizeName(raw);
+    if (map.has(n)) return map.get(n);
+    return aliasKey ? map.get(aliasKey(raw)) : undefined;
+  };
 
   // ── Pre-fetch paginado de existentes ─────────────────────────────────
   const [allLD, allEd, existing] = await Promise.all([
@@ -128,14 +176,12 @@ export async function bulkImportAssets(sb, inputs, opts: { autoCreateLocations?:
 
   const ldByNorm = new Map();
   for (const ld of allLD) {
-    const n = normalizeName(ld.establecimiento || ld.ubic_tecnica);
-    if (n) ldByNorm.set(n, ld);
+    indexSede(ldByNorm, ld.establecimiento || ld.ubic_tecnica, ld);
   }
   const edByNorm = new Map();
   const edByLink = new Map();
   for (const ed of allEd) {
-    const n = normalizeName(ed.nombre);
-    if (n) edByNorm.set(n, ed);
+    indexSede(edByNorm, ed.nombre, ed);
     if (ed.location_id) edByLink.set(ed.location_id, ed);
   }
   const existingByCode = new Map();
@@ -144,7 +190,7 @@ export async function bulkImportAssets(sb, inputs, opts: { autoCreateLocations?:
   const parseErrors: string[] = [];
   const sedesCreadas: { locationdata_id: string; nombre: string }[] = [];
   const sedesCreadasIds: string[] = [];
-  const defaultSedeNorm = normalizeName('Sede Principal');
+  const defaultSedeNorm = keyOf(defaultSede);
 
   // ── PASADA 1: recolectar sedes únicas del lote ───────────────────────
   const uniqueSedes = new Map();
@@ -153,15 +199,18 @@ export async function bulkImportAssets(sb, inputs, opts: { autoCreateLocations?:
     const sedeRaw = input.sede ? String(input.sede).trim() : '';
     const comunaRaw = input.comuna ? String(input.comuna).trim() : '';
     const jefeRaw = input.jefe_sitio ? String(input.jefe_sitio).trim() : '';
-    const sedeNorm = sedeRaw ? normalizeName(sedeRaw) : defaultSedeNorm;
+    const sedeNorm = sedeRaw ? keyOf(sedeRaw) : defaultSedeNorm;
     if (!uniqueSedes.has(sedeNorm)) {
-      uniqueSedes.set(sedeNorm, { raw: sedeRaw || 'Sede Principal', comuna: comunaRaw, jefe: jefeRaw });
+      uniqueSedes.set(sedeNorm, { raw: sedeRaw || defaultSede, comuna: comunaRaw, jefe: jefeRaw });
     }
   }
 
   const sedesToCreateLD: string[] = [];
-  for (const [norm] of uniqueSedes) {
-    if (!ldByNorm.has(norm) && !edByNorm.has(norm)) sedesToCreateLD.push(norm);
+  for (const [norm, info] of uniqueSedes) {
+    const existe = aliasKey
+      ? findSede(ldByNorm, info.raw) !== undefined || findSede(edByNorm, info.raw) !== undefined
+      : ldByNorm.has(norm) || edByNorm.has(norm);
+    if (!existe) sedesToCreateLD.push(norm);
   }
 
   // ── PASADA 2: crear sedes faltantes (solo en modo real) ──────────────
@@ -218,6 +267,14 @@ export async function bulkImportAssets(sb, inputs, opts: { autoCreateLocations?:
   }
 
   function resolveSedeId(sedeRaw) {
+    if (aliasKey) {
+      const raw = sedeRaw || defaultSede;
+      const edA = findSede(edByNorm, raw);
+      if (edA) return { location_id: edA.id, sedeNombre: edA.nombre, sedeExiste: true };
+      const ldA = findSede(ldByNorm, raw);
+      if (ldA) return { location_id: ldA.id, sedeNombre: ldA.establecimiento, sedeExiste: true };
+      return { location_id: null, sedeNombre: sedeRaw || '', sedeExiste: false };
+    }
     const norm = sedeRaw ? normalizeName(sedeRaw) : defaultSedeNorm;
     const ed = edByNorm.get(norm);
     if (ed) return { location_id: ed.id, sedeNombre: ed.nombre, sedeExiste: true };

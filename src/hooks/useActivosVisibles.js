@@ -14,11 +14,28 @@ export async function fetchActivosPropios() {
   return res.data?.assets || [];
 }
 
+/** Solo BAPRO: todos los activos del sector, paginando de a 500. */
+async function fetchTodosLosActivos() {
+  const out = [];
+  let cursor;
+  do {
+    const page = await base44.entities.Asset.list({ sort: '-updated_date', limit: 500, cursor });
+    const items = page?.items || [];
+    out.push(...items);
+    if (!page?.has_more || items.length < 500) break;
+    cursor = page.next_cursor;
+  } while (cursor);
+  return out;
+}
+
 /** Lista de la pantalla Activos y de la ficha (misma clave de caché 'assets'). */
 export function useActivosVisibles() {
   const veTodo = useVeTodosLosActivos();
+  const { user } = useCurrentUser();
+  const isBapro = (user?.data?.sector_id || user?.sector_id) === 'bapro';
+  const baproTodo = veTodo && isBapro;
   return useQuery({
-    queryKey: veTodo ? ['assets'] : ['assets', 'propios'],
-    queryFn: veTodo ? () => base44.entities.Asset.list('-updated_date', 500) : fetchActivosPropios,
+    queryKey: baproTodo ? ['assets', 'bapro-todo'] : veTodo ? ['assets'] : ['assets', 'propios'],
+    queryFn: baproTodo ? fetchTodosLosActivos : veTodo ? () => base44.entities.Asset.list('-updated_date', 500) : fetchActivosPropios,
   });
 }

@@ -117,7 +117,8 @@ export default async function(req) {
       return Response.json({ error: 'No se pudieron extraer activos de los PDFs', fileErrors, fileStats, extracted: 0 }, { status: 400 });
     }
 
-    const result = await bulkImportAssets(sb, allInputs, { autoCreateLocations: auto_create_locations, dryRun: dry_run });
+    const sedeOpts = callerSector === 'bapro' ? { defaultSede: 'Sede Central', sedeAliases: true } : {};
+    const result = await bulkImportAssets(sb, allInputs, { autoCreateLocations: auto_create_locations, dryRun: dry_run, ...sedeOpts });
 
     if (dry_run) {
       return Response.json({

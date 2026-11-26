@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import AssetHistory from '@/components/assets/AssetHistory';
+import SedeBuscador from '@/components/assets/bapro/SedeBuscador';
+import { ordenarSedes } from '@/components/assets/bapro/sedesBapro';
 
 const typeLabels = {
   equipo_electrico: 'Eléctrico', equipo_mecanico: 'Mecánico', instalacion_hvac: 'HVAC',
@@ -26,7 +28,13 @@ const emptyAsset = {
   parent_asset_id: '',
 };
 
-export default function AssetFormDialog({ open, onOpenChange, editing, sedes, assets }) {
+// bapro (opcional): sedes ordenadas (Sede Central primero) y selector con buscador.
+// editing sin id = alta nueva con valores precargados (ej. la sede elegida).
+export default function AssetFormDialog({ open, onOpenChange, editing, sedes, assets, bapro = false }) {
+  const esEdicion = !!editing?.id;
+  const opcionesSede = React.useMemo(() => bapro
+    ? [{ value: '__none', label: '— Sin sede —' }, ...ordenarSedes(sedes).map(s => ({ value: s.id, label: s.nombre }))]
+    : [], [bapro, sedes]);
   const [form, setForm] = useState(emptyAsset);
   const qc = useQueryClient();
 
@@ -59,12 +67,12 @@ export default function AssetFormDialog({ open, onOpenChange, editing, sedes, as
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>{editing ? `Editar: ${editing.name}` : 'Nuevo Activo'}</DialogTitle>
+          <DialogTitle>{esEdicion ? `Editar: ${editing.name}` : 'Nuevo Activo'}</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="datos" className="flex-1 overflow-hidden flex flex-col">
           <TabsList className="flex-shrink-0">
             <TabsTrigger value="datos">Datos del Activo</TabsTrigger>
-            {editing && <TabsTrigger value="historial">Historial OTs</TabsTrigger>}
+            {esEdicion && <TabsTrigger value="historial">Historial OTs</TabsTrigger>}
           </TabsList>
           <TabsContent value="datos" className="flex-1 overflow-y-auto mt-3 pr-1">
             <div className="grid grid-cols-2 gap-4">
@@ -81,6 +89,9 @@ export default function AssetFormDialog({ open, onOpenChange, editing, sedes, as
 
               <div className="space-y-1.5">
                 <Label className="text-xs">Sede (Ubicación del mapa)</Label>
+                {bapro ? (
+                  <SedeBuscador options={opcionesSede} value={form.location_id || '__none'} onChange={onSedeChange} placeholder="Sin sede" />
+                ) : (
                 <Select value={form.location_id || '__none'} onValueChange={onSedeChange}>
                   <SelectTrigger><SelectValue placeholder="Sin sede" /></SelectTrigger>
                   <SelectContent>
@@ -88,6 +99,7 @@ export default function AssetFormDialog({ open, onOpenChange, editing, sedes, as
                     {sedes.map(s => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Activo padre (jerarquía)</Label>
@@ -161,7 +173,7 @@ export default function AssetFormDialog({ open, onOpenChange, editing, sedes, as
               </Button>
             </DialogFooter>
           </TabsContent>
-          {editing && (
+          {esEdicion && (
             <TabsContent value="historial" className="flex-1 overflow-y-auto mt-3 px-1">
               <AssetHistory assetName={editing.name} assetId={editing.id} />
             </TabsContent>

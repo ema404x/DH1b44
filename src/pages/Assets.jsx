@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Boxes, ClipboardList, Link2, RefreshCw, Lock } from 'lucide-react';
 import ActivosTab from '@/components/assets/ActivosTab';
+import ActivosTabBapro from '@/components/assets/ActivosTabBapro';
 import PendientesTab from '@/components/assets/PendientesTab';
 import RevisionBaproPanel from '@/components/assets/RevisionBaproPanel';
 import SincronizacionPanel from '@/components/assets/SincronizacionPanel';
@@ -29,6 +30,7 @@ export default function Assets() {
   const permBapro = usePermission('RevisionBapro', 'read');
   const { user, employeeSector } = useCurrentUser();
   const esGerenteBapro = user?.role === 'gerente' && employeeSector === 'bapro';
+  const isBapro = (user?.data?.sector_id || user?.sector_id) === 'bapro';
   const puedeRevision = permBapro.allowed || esGerenteBapro;
 
   const tabPerms = useMemo(() => ({
@@ -70,7 +72,7 @@ export default function Assets() {
           <TabsTrigger value="sync" className="gap-1.5" disabled={!permActivos.allowed}><RefreshCw className="h-3.5 w-3.5" />Sincronización</TabsTrigger>
         </TabsList>
         <TabsContent value="activos" className="mt-5">
-          {permActivos.allowed ? <ActivosTab /> : <TabBlocked />}
+          {permActivos.allowed ? (isBapro ? <ActivosTabBapro /> : <ActivosTab />) : <TabBlocked />}
         </TabsContent>
         <TabsContent value="pendientes" className="mt-5">
           {permPendientes.allowed ? <PendientesTab /> : <TabBlocked />}
