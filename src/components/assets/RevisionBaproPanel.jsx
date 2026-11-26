@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,8 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Link2, Copy, Check, Clock, Ban, Send, ExternalLink, Trash2 } from 'lucide-react';
+import { Loader2, Link2, Copy, Check, Send, ExternalLink } from 'lucide-react';
+import useEsBapro from '@/hooks/useEsBapro';
+import SedeBuscador from '@/components/assets/bapro/SedeBuscador';
+import { ordenarSedes } from '@/components/assets/bapro/sedesBapro';
+import LinksBaproLista from '@/components/assets/LinksBaproLista';
 import { toast } from 'sonner';
 
 function currentMonth() {
@@ -16,7 +19,10 @@ function currentMonth() {
 }
 
 export default function RevisionBaproPanel({ sedes }) {
-  const [sedeScope, setSedeScope] = useState('TODAS');
+  const esBapro = useEsBapro();
+  const [sedeScope, setSedeScope] = useState(esBapro ? '' : 'TODAS');
+  const [progreso, setProgreso] = useState('');
+  useEffect(() => { if (esBapro) setSedeScope(s => (s === 'TODAS' ? '' : s)); }, [esBapro]);
   const [mes, setMes] = useState(currentMonth());
   const [dias, setDias] = useState(30);
   const [notas, setNotas] = useState('');
@@ -30,7 +36,38 @@ export default function RevisionBaproPanel({ sedes }) {
     queryFn: () => base44.entities.RevisionBaproToken.list('-created_date', 50),
   });
 
+  const generarPorSede = async () => {
+    setGeneratedLink(null);
+    setProgreso('Contando activos…');
+    try {
+      const conteos = await Promise.all(sedes.map(s => base44.entities.Asset.count({ location_id: s.id })));
+      const validas = ordenarSedes(sedes).filter(s => conteos[sedes.indexOf(s)] > 0);
+      const saltadas = sedes.length - validas.length;
+      if (validas.length === 0) { toast.error('Ninguna sede tiene activos'); return; }
+      const aviso = saltadas > 0 ? ` (${saltadas} sin activos se saltean)` : '';
+      if (!window.confirm(`Se van a generar ${validas.length} links, uno por sede${aviso}. ¿Continuar?`)) return;
+      let ok = 0, fallidas = 0;
+      for (let i = 0; i < validas.length; i++) {
+        setProgreso(`Generando ${i + 1} de ${validas.length}…`);
+        try {
+          await base44.functions.invoke('generarLinkBapro', {
+            sede_scope: validas[i].id, sede_nombre: validas[i].nombre, mes_periodo: mes,
+            dias_expiracion: parseInt(dias, 10) || 30, notas,
+          });
+          ok++;
+        } catch { fallidas++; }
+      }
+      qc.invalidateQueries({ queryKey: ['bapro_tokens'] });
+      toast.success(`${ok} links generados${saltadas ? `, ${saltadas} sedes salteadas (0 activos)` : ''}${fallidas ? `, ${fallidas} con error` : ''}`);
+    } catch (err) {
+      toast.error(err.message || 'Error al generar links');
+    } finally {
+      setProgreso('');
+    }
+  };
+
   const generate = async () => {
+    if (esBapro && !sedeScope) return;
     setGenerating(true);
     setGeneratedLink(null);
     try {
@@ -82,13 +119,6 @@ export default function RevisionBaproPanel({ sedes }) {
     }
   };
 
-  const estadoColor = {
-    activo: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    usado: 'bg-blue-100 text-blue-700 border-blue-200',
-    expirado: 'bg-gray-100 text-gray-500 border-gray-200',
-    revocado: 'bg-red-100 text-red-600 border-red-200',
-  };
-
   return (
     <div className="space-y-5">
       <Card className="border-l-4 border-l-blue-500">
@@ -104,13 +134,17 @@ export default function RevisionBaproPanel({ sedes }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Sede (scope)</Label>
-              <Select value={sedeScope} onValueChange={setSedeScope}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TODAS">Todas las sedes</SelectItem>
-                  {sedes.map(s => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              {esBapro ? (
+                <SedeBuscador options={ordenarSedes(sedes).map(s => ({ value: s.id, label: s.nombre }))} value={sedeScope} onChange={setSedeScope} placeholder="Elegir sede" />
+              ) : (
+                <Select value={sedeScope} onValueChange={setSedeScope}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TODAS">Todas las sedes</SelectItem>
+                    {sedes.map(s => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Mes del lote</Label>
@@ -126,10 +160,18 @@ export default function RevisionBaproPanel({ sedes }) {
             </div>
           </div>
 
-          <Button onClick={generate} disabled={generating} className="gap-1.5">
-            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Generar link
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button onClick={generate} disabled={generating || !!progreso || (esBapro && !sedeScope)} className="gap-1.5">
+              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Generar link
+            </Button>
+            {esBapro && (
+              <Button variant="outline" onClick={generarPorSede} disabled={generating || !!progreso || sedes.length === 0} className="gap-1.5">
+                {progreso && <Loader2 className="h-4 w-4 animate-spin" />}
+                {progreso || 'Generar un link por cada sede'}
+              </Button>
+            )}
+          </div>
 
           {generatedLink && (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5">
@@ -146,58 +188,7 @@ export default function RevisionBaproPanel({ sedes }) {
         </CardContent>
       </Card>
 
-      <div>
-        <h3 className="text-sm font-semibold mb-3">Links generados</h3>
-        {isLoading ? (
-          <div className="text-center py-8 text-muted-foreground text-sm"><Loader2 className="h-5 w-5 mx-auto animate-spin" /></div>
-        ) : tokens.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground text-sm">No hay links generados aún.</div>
-        ) : (
-          <div className="space-y-2">
-            {tokens.map(t => {
-              const expirado = new Date(t.expiracion).getTime() < Date.now();
-              const estadoFinal = expirado && t.estado === 'activo' ? 'expirado' : t.estado;
-              const pct = t.total_activos > 0 ? Math.round((t.vistos_count / t.total_activos) * 100) : 0;
-              return (
-                <Card key={t.id} className="hover:shadow-sm transition-shadow">
-                  <CardContent className="pt-3 pb-3">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium">{t.sede_nombre}</span>
-                          <Badge variant="outline" className={`text-[10px] ${estadoColor[estadoFinal]}`}>{estadoFinal}</Badge>
-                          <span className="text-[11px] text-muted-foreground font-mono">{t.mes_periodo}</span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
-                          <span className="flex items-center gap-1"><Check className="h-3 w-3" />{t.vistos_count}/{t.total_activos} vistos ({pct}%)</span>
-                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Vence {new Date(t.expiracion).toLocaleDateString('es-AR')}</span>
-                          {t.ultima_actividad && <span>Últ. {new Date(t.ultima_actividad).toLocaleDateString('es-AR')}</span>}
-                        </div>
-                      </div>
-                      <div className="flex gap-1.5 flex-shrink-0">
-                        <Button size="sm" variant="default" className="h-8 gap-1.5" onClick={() => window.open(`https://dh1m.com/revision-bapro/${t.token}`, '_blank')}>
-                          <ExternalLink className="h-3.5 w-3.5" /> Abrir
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => copyLink(`https://dh1m.com/revision-bapro/${t.token}`)}>
-                          <Copy className="h-3.5 w-3.5" /> Copiar
-                        </Button>
-                        {(t.estado === 'activo' || t.estado === 'usado') && (
-                          <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-destructive" onClick={() => revoke(t.id)}>
-                            <Ban className="h-3.5 w-3.5" /> Revocar
-                          </Button>
-                        )}
-                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-destructive" onClick={() => eliminar(t.id)}>
-                          <Trash2 className="h-3.5 w-3.5" /> Eliminar
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <LinksBaproLista tokens={tokens} isLoading={isLoading} esBapro={esBapro} onCopy={copyLink} onRevoke={revoke} onDelete={eliminar} />
     </div>
   );
 }
