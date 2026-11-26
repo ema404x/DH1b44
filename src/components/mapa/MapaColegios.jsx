@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo, useCallback } from 'react';
+import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { MAP_TILE_URL, MAP_TILE_ATTRIBUTION, MAP_TILE_MAX_ZOOM } from '@/lib/mapTiles';
 import L from 'leaflet';
@@ -34,14 +34,14 @@ const getSemaforoColor = (establecimiento, pendientes, emergencias) => {
   return '#10b981'; // verde
 };
 
-const createSchoolIcon = (comuna, isSelected = false, semaforoColor = null) => {
+const createSchoolIcon = (comuna, isSelected = false, semaforoColor = null, emoji = '🏫') => {
   const color = COMUNA_COLORS[comuna] || '#64748b';
   const size = isSelected ? 40 : 32;
   const semaforo = semaforoColor || color;
   return L.divIcon({
     html: `<div style="position:relative;width:${size}px;height:${size}px;">
         <div style="background:${color};width:${size}px;height:${size}px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;cursor:pointer;">
-          <div style="transform:rotate(45deg);font-size:${isSelected ? 16 : 13}px;">🏫</div>
+          <div style="transform:rotate(45deg);font-size:${isSelected ? 16 : 13}px;">${emoji}</div>
         </div>
         <div style="position:absolute;top:-4px;right:-4px;width:12px;height:12px;border-radius:50%;background:${semaforo};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>
       </div>`,
@@ -136,6 +136,22 @@ export default function MapaColegios() {
     }
     return [-34.6037, -58.3816];
   }, [filtered]);
+
+  // BAPRO: encuadrar todas las sedes visibles (CABA + costa) al cargar y al filtrar.
+  useEffect(() => {
+    if (!esBapro || filtered.length === 0) return;
+    const coords = filtered.map(l => [l.gps_latitude, l.gps_longitude]);
+    const t = setTimeout(() => {
+      const map = mapRef.current;
+      if (!map) return;
+      map.whenReady(() => {
+        map.invalidateSize();
+        if (coords.length === 1) map.setView(coords[0], 15);
+        else map.fitBounds(L.latLngBounds(coords), { padding: [40, 40], maxZoom: 15 });
+      });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [esBapro, filtered]);
 
   const handleSelect = (loc) => {
     setSelected(loc);
@@ -261,13 +277,13 @@ export default function MapaColegios() {
                   <Marker
                     key={loc.id}
                     position={[loc.gps_latitude, loc.gps_longitude]}
-                    icon={createSchoolIcon(loc.comuna, selected?.id === loc.id, semColor)}
+                    icon={createSchoolIcon(loc.comuna, selected?.id === loc.id, semColor, esBapro ? '🏦' : '🏫')}
                     eventHandlers={{ click: () => setSelected(loc) }}
                   >
                     <Popup>
                       <div className="min-w-44">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-base">🏫</span>
+                          <span className="text-base">{esBapro ? '🏦' : '🏫'}</span>
                           <h3 className="font-bold text-sm">{loc.establecimiento}</h3>
                           <span style={{ width: 10, height: 10, borderRadius: '50%', background: semColor, display: 'inline-block', flexShrink: 0 }} />
                         </div>
@@ -328,7 +344,7 @@ export default function MapaColegios() {
                     }`}
                   >
                     <div className="flex items-start gap-2">
-                      <span className="text-base mt-0.5">🏫</span>
+                      <span className="text-base mt-0.5">{esBapro ? '🏦' : '🏫'}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{loc.establecimiento}</p>
                         {dir?.direccion && (
