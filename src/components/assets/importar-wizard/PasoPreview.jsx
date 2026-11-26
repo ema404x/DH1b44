@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, AlertTriangle, FilePlus, RefreshCw, Building2, Download, ArrowLeft, ArrowRight } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, FilePlus, RefreshCw, Building2, Download, ArrowLeft, ArrowRight, Copy } from 'lucide-react';
+import PreviewDetalle from './PreviewDetalle';
 
 const STATUS_BADGE = {
   crear: { label: 'Crear', cls: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
@@ -18,14 +19,15 @@ const TYPE_LABEL = {
 };
 
 // Paso 2: vista previa validada (dry-run). Tabla de filas + resumen + descarga de errores.
-export default function PasoPreview({ preview, autoCreateLocations, onVolver, onConfirmar, error }) {
+export default function PasoPreview({ preview, esPdf, autoCreateLocations, onVolver, onConfirmar, error }) {
   if (!preview) return null;
   const rows = preview.preview_rows || [];
   const counts = preview.counts || {};
   const errores = preview.errores || [];
   const sedesCrear = preview.sedes_a_crear || [];
   const total = preview.total_filas || 0;
-  const puedeConfirmar = (counts.error || 0) < total; // si todo es error, no tiene sentido
+  const pdfIncompleto = esPdf && (!preview.inputs?.length || preview.inputs_truncados);
+  const puedeConfirmar = (counts.error || 0) < total && !pdfIncompleto; // si todo es error, no tiene sentido
 
   const descargarErrores = () => {
     const header = 'Fila,Nombre,Codigo,Sede,Motivo\n';
@@ -44,13 +46,22 @@ export default function PasoPreview({ preview, autoCreateLocations, onVolver, on
   return (
     <div className="space-y-4 overflow-y-auto pr-1">
       {/* Resumen */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
         <StatCard icon={FilePlus} label="Total" value={total} color="text-slate-300" />
         <StatCard icon={CheckCircle2} label="A crear" value={counts.crear || 0} color="text-blue-400" />
         <StatCard icon={RefreshCw} label="A actualizar" value={counts.actualizar || 0} color="text-indigo-400" />
         <StatCard icon={Building2} label="Sedes nuevas" value={(counts.sede_nueva || 0)} color="text-emerald-400" />
+        <StatCard icon={Copy} label="Duplicados" value={preview.duplicados_count || 0} color="text-amber-400" />
         <StatCard icon={AlertTriangle} label="Con error" value={counts.error || 0} color="text-red-400" />
       </div>
+
+      <PreviewDetalle preview={preview} esPdf={esPdf} />
+
+      {pdfIncompleto && (
+        <div className="text-xs text-destructive bg-destructive/10 p-2.5 rounded-md">
+          Se extrajeron demasiados activos para importarlos de una vez (máx. 5000). Subí los PDFs en lotes más chicos.
+        </div>
+      )}
 
       {/* Sedes a crear */}
       {sedesCrear.length > 0 && (
@@ -114,6 +125,10 @@ export default function PasoPreview({ preview, autoCreateLocations, onVolver, on
           <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <p>{errores.length} fila(s) con error. Podés confirmar igual (se omiten) o corregir el archivo y volver a analizar.</p>
+            <ul className="mt-1 max-h-24 overflow-y-auto space-y-0.5 text-muted-foreground">
+              {errores.slice(0, 50).map((e, i) => <li key={i}>Fila {e.fila}: {e.motivo}</li>)}
+              {errores.length > 50 && <li>…y {errores.length - 50} más (descargá el CSV)</li>}
+            </ul>
             <button onClick={descargarErrores} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:underline">
               <Download className="h-3 w-3" /> Descargar filas con error (CSV)
             </button>

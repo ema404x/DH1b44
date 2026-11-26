@@ -9,6 +9,7 @@ import { importRoleError } from '../../shared/importGuard.ts';
 //   dry_run=false → ejecuta el import real y persiste ImportacionActivos.
 
 const MAX_FILES = 20;
+const MAX_INPUTS = 5000;
 const ASSET_SCHEMA = {
   type: 'object',
   properties: {
@@ -18,12 +19,12 @@ const ASSET_SCHEMA = {
         type: 'object',
         properties: {
           nombre: { type: 'string', description: 'Nombre o descripción del activo' },
-          codigo: { type: 'string', description: 'Código interno del activo' },
+          codigo: { type: 'string', description: 'Código, número de inventario o patrimonio del bien' },
           tipo: { type: 'string', description: 'Tipo: eléctrico, mecánico, HVAC, sanitario, estructura, vehículo, herramienta, informático, mobiliario, seguridad u otro' },
           marca: { type: 'string' },
           modelo: { type: 'string' },
           serie: { type: 'string', description: 'Número de serie' },
-          sede: { type: 'string', description: 'Sede, edificio, establecimiento o ubicación' },
+          sede: { type: 'string', description: 'Nombre de la sucursal o sede del banco (por ejemplo Sucursal Flores o Sede Central). No poner la dirección.' },
           area: { type: 'string', description: 'Área, zona o departamento dentro de la sede' },
           jefe_sitio: { type: 'string', description: 'Responsable / jefe de sitio' },
           comuna: { type: 'string', description: 'Comuna: 8A, 8B o 10A' },
@@ -58,12 +59,12 @@ function mapExtractedItem(item) {
     jefe_sitio: item.jefe_sitio || item.responsable || '',
     comuna: item.comuna || '',
     status: item.estado || item.status || '',
-    criticality: item.criticidad || item.critica || item.criticity || '',
+    criticality: item.criticidad || item.critica || item.criticity || item.criticality || '',
     location: item.ubicacion || item.ubicación || item.location || '',
-    purchase_cost: item.costo || item.valor || 0,
+    purchase_cost: item.costo || item.valor || item.purchase_cost || 0,
     purchase_date: item.fecha_compra || item.purchase_date || '',
     warranty_expiry: item.garantia || item.garantía || item.warranty_expiry || '',
-    notes: item.notas || item.observaciones || '',
+    notes: item.notas || item.observaciones || item.notes || '',
   };
 }
 
@@ -101,7 +102,8 @@ export default async function(req) {
     const sb = createScopedClient(base44, callerSector);
 
     const body = await req.json().catch(() => ({}));
-    const { file_urls, auto_create_locations = true, dry_run = false } = body;
+    const { file_urls, auto_create_locations = true, dry_run = false, sede_id, inputs: bodyInputs } = body;
+    const isBapro = callerSector === 'bapro';
     if (!file_urls || !Array.isArray(file_urls) || file_urls.length === 0) {
       return Response.json({ error: 'file_urls (array) requerido' }, { status: 400 });
     }
@@ -112,18 +114,38 @@ export default async function(req) {
       catch (e) { return Response.json({ error: e.message }, { status: 400 }); }
     }
 
-    const { allInputs, fileErrors, fileStats } = await extractInputs(base44, file_urls);
+    // Sede elegida (solo bapro): todas las filas van a esa sede.
+    let sedeElegida = null;
+    if (isBapro && typeof sede_id === 'string' && sede_id) {
+      const edificios = await sb.entities.Edificio.list('-updated_date', 1000);
+      sedeElegida = (edificios || []).find(e => e.id === sede_id);
+      if (!sedeElegida) return Response.json({ error: 'sede_id no válido: la sede no existe en tu sector' }, { status: 400 });
+    }
+
+    let allInputs: any[] = [];
+    let fileErrors: any[] = [];
+    let fileStats: any[] = [];
+    // Importación real con las filas de la vista previa: no se vuelve a extraer.
+    const reusar = isBapro && !dry_run && Array.isArray(bodyInputs) && bodyInputs.length > 0;
+    if (reusar) {
+      if (bodyInputs.length > MAX_INPUTS) return Response.json({ error: `Máximo ${MAX_INPUTS} filas por importación` }, { status: 400 });
+      allInputs = bodyInputs.map(mapExtractedItem).filter(Boolean);
+    } else {
+      ({ allInputs, fileErrors, fileStats } = await extractInputs(base44, file_urls));
+    }
     if (allInputs.length === 0) {
       return Response.json({ error: 'No se pudieron extraer activos de los PDFs', fileErrors, fileStats, extracted: 0 }, { status: 400 });
     }
+    if (sedeElegida) allInputs = allInputs.map(i => ({ ...i, sede: sedeElegida.nombre }));
 
-    const sedeOpts = callerSector === 'bapro' ? { defaultSede: 'Sede Central', sedeAliases: true } : {};
+    const sedeOpts = isBapro ? { defaultSede: 'Sede Central', sedeAliases: true, strictSede: true } : {};
     const result = await bulkImportAssets(sb, allInputs, { autoCreateLocations: auto_create_locations, dryRun: dry_run, ...sedeOpts });
 
     if (dry_run) {
       return Response.json({
         ok: true, sector: callerSector, tipo: 'pdf',
         files: file_urls.length, fileErrors, fileStats, extracted: allInputs.length,
+        ...(isBapro ? { inputs: allInputs.slice(0, MAX_INPUTS), inputs_truncados: allInputs.length > MAX_INPUTS, sede_elegida: sedeElegida ? sedeElegida.nombre : null } : {}),
         ...result,
       });
     }

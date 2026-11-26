@@ -4,11 +4,13 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Download, Upload, FileSpreadsheet, FileText, Building2, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { downloadPlantillaActivos } from '@/utils/exportActivosExcel';
+import SedeArchivoSelector from './SedeArchivoSelector';
 
 // Paso 1 del wizard: selección de archivo(s) + toggle de auto-creación de sedes.
-export default function PasoSubir({ files, setFiles, autoCreateLocations, setAutoCreateLocations, onAnalizar, error }) {
+export default function PasoSubir({ files, setFiles, autoCreateLocations, setAutoCreateLocations, sedes, sedeId, setSedeId, onAnalizar, error }) {
   const inputRef = useRef(null);
   const hasPdf = files.some(f => f.kind === 'pdf');
+  const mezcla = hasPdf && files.some(f => f.kind !== 'pdf');
 
   const onSelect = (e) => {
     const picked = Array.from(e.target.files || []);
@@ -41,7 +43,7 @@ export default function PasoSubir({ files, setFiles, autoCreateLocations, setAut
           <p className="text-muted-foreground mb-2">
             {hasPdf
               ? 'Se extrae la lista de activos de cada PDF. Podés combinar varios en un mismo lote.'
-              : '.xlsx o .csv. La columna de ubicación identifica la sede del activo.'}
+              : '.xlsx o .csv. Podés subir varios a la vez. Se leen todas las hojas; la columna Sucursal/Sede (o el nombre de la hoja) identifica la sede.'}
           </p>
           <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv,.pdf" multiple className="hidden" onChange={onSelect} />
           <div className="flex gap-2 flex-wrap items-center">
@@ -68,6 +70,8 @@ export default function PasoSubir({ files, setFiles, autoCreateLocations, setAut
         </div>
       </div>
 
+      <SedeArchivoSelector sedes={sedes} value={sedeId} onChange={setSedeId} />
+
       {/* Auto-creación de sedes */}
       <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
         <Building2 className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
@@ -75,7 +79,7 @@ export default function PasoSubir({ files, setFiles, autoCreateLocations, setAut
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="font-medium mb-0.5">Crear sedes faltantes automáticamente</p>
-              <p className="text-muted-foreground">Las sedes del archivo que no existan se crean como LocationData + Edificio y se vinculan al activo.</p>
+              <p className="text-muted-foreground">Apagado: las filas cuya sede no existe no se importan y aparecen como error "Sede no encontrada". Encendido: se crean las sedes que falten.</p>
             </div>
             <Switch checked={autoCreateLocations} onCheckedChange={setAutoCreateLocations} />
           </div>
@@ -87,6 +91,13 @@ export default function PasoSubir({ files, setFiles, autoCreateLocations, setAut
         <span>Al tocar Analizar se valida el archivo <strong>sin escribir nada</strong>. Revisás la vista previa y confirmás después.</span>
       </div>
 
+      {mezcla && (
+        <div className="flex items-start gap-2 text-xs text-amber-600 bg-amber-500/10 p-2.5 rounded-md">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+          <span>Subí solo Excel o solo PDF en cada importación. Quitá los archivos que no correspondan.</span>
+        </div>
+      )}
+
       {error && (
         <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 p-2.5 rounded-md">
           <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
@@ -95,7 +106,7 @@ export default function PasoSubir({ files, setFiles, autoCreateLocations, setAut
       )}
 
       <div className="flex justify-end pt-1">
-        <Button onClick={onAnalizar} disabled={files.length === 0}>
+        <Button onClick={onAnalizar} disabled={files.length === 0 || mezcla}>
           <Upload className="h-4 w-4" /> Analizar
         </Button>
       </div>

@@ -136,7 +136,7 @@ function sedeBaseKey(raw) {
   return s.replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-function makeSedeAliasKey(defaultSede) {
+export function makeSedeAliasKey(defaultSede) {
   const defaultBase = sedeBaseKey(defaultSede);
   return (raw) => {
     const n = normalizeName(raw).replace(/[^a-z0-9]+/g, ' ').trim();
@@ -149,9 +149,12 @@ function makeSedeAliasKey(defaultSede) {
 export async function bulkImportAssets(
   sb,
   inputs,
-  opts: { autoCreateLocations?: boolean; dryRun?: boolean; defaultSede?: string; sedeAliases?: boolean } = {},
+  opts: { autoCreateLocations?: boolean; dryRun?: boolean; defaultSede?: string; sedeAliases?: boolean; strictSede?: boolean } = {},
 ) {
-  const { autoCreateLocations = true, dryRun = false, defaultSede = 'Sede Principal', sedeAliases = false } = opts;
+  // strictSede (opcional, BAPRO): si la sede no existe y NO se auto-crean sedes,
+  // la fila es error "Sede no encontrada: X" (también cuando no trae sede y la
+  // sede por defecto no existe). Default false = comportamiento anterior.
+  const { autoCreateLocations = true, dryRun = false, defaultSede = 'Sede Principal', sedeAliases = false, strictSede = false } = opts;
   const aliasKey = sedeAliases ? makeSedeAliasKey(defaultSede) : null;
   // Clave de agrupación de sede: alias si está activo, nombre normalizado si no.
   const keyOf = (raw) => (aliasKey ? aliasKey(raw) : normalizeName(raw));
@@ -316,12 +319,12 @@ export async function bulkImportAssets(
 
     // Sede sin resolver
     let sedeSinResolver = false;
-    if (sedeRaw && !sedeExiste) {
+    if (!sedeExiste && (sedeRaw || strictSede)) {
       if (autoCreateLocations) {
         // se creará → sede_nueva
       } else {
         sedeSinResolver = true;
-        problemas.push(`sede "${sedeRaw}" no encontrada`);
+        problemas.push(strictSede ? `Sede no encontrada: ${sedeRaw || defaultSede}` : `sede "${sedeRaw}" no encontrada`);
       }
     }
 
@@ -377,8 +380,17 @@ export async function bulkImportAssets(
       return { nombre: info.raw, comuna: safeComuna(info.comuna), jefe_sitio: info.jefe };
     });
     const counts = preview_rows.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {} as any);
+    // Activos que se importarían, agrupados por sede (todas las filas, no solo las 25 del preview).
+    const porSede = new Map<string, number>();
+    for (const r of preview_rows) {
+      if (r.status !== 'crear' && r.status !== 'actualizar' && r.status !== 'sede_nueva') continue;
+      const s = r.sede || defaultSede;
+      porSede.set(s, (porSede.get(s) || 0) + 1);
+    }
+    const resumen_por_sede = [...porSede.entries()].map(([sede, cantidad]) => ({ sede, cantidad })).sort((a, b) => b.cantidad - a.cantidad);
     return {
       dry_run: true,
+      resumen_por_sede,
       total_filas: preview_rows.length,
       preview_rows: preview_rows.slice(0, 25),
       counts,
