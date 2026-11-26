@@ -5,6 +5,8 @@
 // asignar una misma columna a dos campos. Solo lo usa importarActivosBapro
 // (sector bapro); el resto de los sectores conserva su lógica propia.
 
+import { resolverTipoBapro } from './baproTipos.ts';
+
 const nz = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const hasToken = (h, c) => (' ' + h + ' ').includes(' ' + c + ' ');
 
@@ -19,7 +21,7 @@ const FIELDS: Field[] = [
     ['postal', 'sucursal']),
   f('name', ['descripcion', 'detalle', 'nombre del bien', 'bien', 'equipo', 'articulo', 'nombre', 'activo', 'name'],
     ['sucursal', 'sede', 'tipo', 'codigo', 'código']),
-  f('type', ['tipo', 'type']),
+  f('type', ['tipo', 'type', 'rubro', 'categoria', 'categoría', 'clase', 'familia', 'tipo de bien', 'especialidad']),
   f('brand', ['marca', 'brand']),
   f('model', ['modelo', 'model']),
   f('serial_number', ['serie', 'serial', 'n serie', 'nro serie', 'numero de serie']),
@@ -116,7 +118,7 @@ export function parseBaproWorkbook(XLSX, workbook, opts: ParseOpts) {
       inputs.push({
         name,
         code: cell(row, c.code),
-        type: cell(row, c.type),
+        type: resolverTipoBapro(cell(row, c.type), name),
         brand: cell(row, c.brand),
         model: cell(row, c.model),
         serial_number: cell(row, c.serial_number),

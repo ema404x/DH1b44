@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { resolverTipoBapro } from '../../shared/baproTipos.ts';
 import { createScopedClient, resolveCallerSector, SectorError } from '../../shared/sectorGuard.ts';
 import { assertAllowedFileUrl } from '../../shared/excelImport.ts';
 import { bulkImportAssets } from '../../shared/assetBulkImport.ts';
@@ -137,6 +138,8 @@ export default async function(req) {
       return Response.json({ error: 'No se pudieron extraer activos de los PDFs', fileErrors, fileStats, extracted: 0 }, { status: 400 });
     }
     if (sedeElegida) allInputs = allInputs.map(i => ({ ...i, sede: sedeElegida.nombre }));
+    // Solo BAPRO: sinónimos de tipo (por tipo y, si no alcanza, por nombre).
+    if (isBapro) allInputs = allInputs.map(i => ({ ...i, type: resolverTipoBapro(i.type, i.name) }));
 
     const sedeOpts = isBapro ? { defaultSede: 'Sede Central', sedeAliases: true, strictSede: true } : {};
     const result = await bulkImportAssets(sb, allInputs, { autoCreateLocations: auto_create_locations, dryRun: dry_run, ...sedeOpts });

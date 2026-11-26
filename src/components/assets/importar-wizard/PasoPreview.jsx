@@ -65,11 +65,18 @@ export default function PasoPreview({ preview, esPdf, autoCreateLocations, onVol
 
       {/* Sedes a crear */}
       {sedesCrear.length > 0 && (
-        <div className="rounded-lg border-2 border-amber-500/50 bg-amber-500/10 p-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-amber-400 mb-1">
-            <AlertTriangle className="h-4 w-4" /> Estas sedes no existen y se van a crear ({sedesCrear.length}):
+        <div className={autoCreateLocations ? 'rounded-lg border-2 border-amber-500/50 bg-amber-500/10 p-3' : 'rounded-lg border-2 border-red-500/50 bg-red-500/10 p-3'}>
+          <div className={autoCreateLocations ? 'flex items-center gap-2 text-sm font-semibold text-amber-400 mb-1' : 'flex items-center gap-2 text-sm font-semibold text-red-400 mb-1'}>
+            <AlertTriangle className="h-4 w-4" />
+            {autoCreateLocations
+              ? `Estas sedes no existen y se van a crear (${sedesCrear.length}):`
+              : `Estas sedes no existen: sus filas no se van a importar (${sedesCrear.length}):`}
           </div>
-          <p className="text-xs text-muted-foreground mb-2">Revisalas antes de confirmar. Si alguna es un error de tipeo, volvé y corregí el archivo.</p>
+          <p className="text-xs text-muted-foreground mb-2">
+            {autoCreateLocations
+              ? 'Revisalas antes de confirmar. Si alguna es un error de tipeo, volvé y corregí el archivo.'
+              : 'Corregí el nombre en el archivo, elegí una sede arriba, o volvé y encendé "Crear sedes faltantes".'}
+          </p>
           <div className="flex flex-wrap gap-1.5">
             {sedesCrear.map((s, i) => (
               <span key={i} className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30">
