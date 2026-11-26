@@ -723,7 +723,7 @@ export default function CrearOT() {
               <div className="space-y-1.5">
                 <p className="text-sm font-medium">Sede *</p>
                 <SedeBuscador
-                  options={sedesBapro.map(s => ({ value: s.id, label: s.nombre }))}
+                  options={sedesBapro.map(s => ({ value: s.id, label: s.nombre, tipo: s.tipo_sede }))}
                   value={sedeId}
                   placeholder="Elegir sede"
                   onChange={(v) => {

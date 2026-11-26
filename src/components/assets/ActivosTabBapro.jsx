@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useContext } from 'react';
+import { AuthContext } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
@@ -29,6 +30,7 @@ export default function ActivosTabBapro() {
   const [importOpen, setImportOpen] = useState(false);
   const [qrAsset, setQrAsset] = useState(null);
   const qc = useQueryClient();
+  const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const { data: assets = [], isLoading } = useActivosVisibles();
@@ -53,7 +55,7 @@ export default function ActivosTabBapro() {
 
   const opciones = useMemo(() => [
     { value: 'all', label: 'Todas las sedes', count: base.length },
-    ...sedes.map(s => ({ value: s.id, label: s.nombre, count: conteos[s.id] || 0 })),
+    ...sedes.map(s => ({ value: s.id, label: s.nombre, count: conteos[s.id] || 0, tipo: s.tipo_sede })),
   ], [sedes, conteos, base.length]);
 
   const hayFiltros = !!f.q || f.tipo !== 'all' || f.estado !== 'all';
@@ -67,7 +69,9 @@ export default function ActivosTabBapro() {
     <div className="space-y-5">
       <BaproStats activos={activosSede} sedeNombre={sedeSel?.nombre} />
       <div className="flex gap-5">
-        <SedesPanelBapro options={opciones} value={f.sede} onChange={sede => actualizar({ sede })} />
+        <SedesPanelBapro options={opciones} value={f.sede} onChange={sede => actualizar({ sede })}
+          puedeEditarTipo={user?.role === 'admin'}
+          onCambiarTipo={async (id, tipo_sede) => { await base44.entities.Edificio.update(id, { tipo_sede }); qc.invalidateQueries({ queryKey: ['edificios'] }); qc.invalidateQueries({ queryKey: ['edificios-mapa-bapro'] }); }} />
         <div className="min-w-0 flex-1 space-y-4">
           <div className="lg:hidden">
             <SedeBuscador options={opciones} value={f.sede} onChange={sede => actualizar({ sede })} />

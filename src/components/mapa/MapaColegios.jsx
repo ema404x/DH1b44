@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Search, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import useEsBapro from '@/hooks/useEsBapro';
+import { colorTipoSede, SedeDot } from '@/components/assets/bapro/tipoSede';
 import { isPast, parseISO } from 'date-fns';
 
 const COMUNA_COLORS = {
@@ -34,8 +35,8 @@ const getSemaforoColor = (establecimiento, pendientes, emergencias) => {
   return '#10b981'; // verde
 };
 
-const createSchoolIcon = (comuna, isSelected = false, semaforoColor = null, emoji = '🏫') => {
-  const color = COMUNA_COLORS[comuna] || '#64748b';
+const createSchoolIcon = (comuna, isSelected = false, semaforoColor = null, emoji = '🏫', colorOverride = null) => {
+  const color = colorOverride || COMUNA_COLORS[comuna] || '#64748b';
   const size = isSelected ? 40 : 32;
   const semaforo = semaforoColor || color;
   return L.divIcon({
@@ -69,6 +70,17 @@ export default function MapaColegios() {
     queryKey: ['locationData'],
     queryFn: () => base44.entities.LocationData.list('-created_date', 500),
   });
+
+  const { data: edificiosBapro = [] } = useQuery({
+    queryKey: ['edificios-mapa-bapro'],
+    queryFn: () => base44.entities.Edificio.list('-updated_date', 500),
+    enabled: esBapro,
+  });
+  const tipoPorLocation = useMemo(() => {
+    const m = {};
+    edificiosBapro.forEach(e => { if (e.location_id) m[e.location_id] = e.tipo_sede; });
+    return m;
+  }, [edificiosBapro]);
 
   const { data: direcciones = [] } = useQuery({
     queryKey: ['direcciones'],
@@ -277,7 +289,7 @@ export default function MapaColegios() {
                   <Marker
                     key={loc.id}
                     position={[loc.gps_latitude, loc.gps_longitude]}
-                    icon={createSchoolIcon(loc.comuna, selected?.id === loc.id, semColor, esBapro ? '🏦' : '🏫')}
+                    icon={createSchoolIcon(loc.comuna, selected?.id === loc.id, semColor, esBapro ? '🏦' : '🏫', esBapro ? colorTipoSede(tipoPorLocation[loc.id]) : null)}
                     eventHandlers={{ click: () => setSelected(loc) }}
                   >
                     <Popup>
@@ -346,7 +358,10 @@ export default function MapaColegios() {
                     <div className="flex items-start gap-2">
                       <span className="text-base mt-0.5">{esBapro ? '🏦' : '🏫'}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{loc.establecimiento}</p>
+                        <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                          {esBapro && <SedeDot tipo={tipoPorLocation[loc.id]} />}
+                          <span className="truncate">{loc.establecimiento}</span>
+                        </p>
                         {dir?.direccion && (
                           <p className="text-xs text-muted-foreground truncate">{dir.direccion}</p>
                         )}
