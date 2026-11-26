@@ -13,6 +13,8 @@ import SeccionInspeccion from '@/components/inspeccion/SeccionInspeccion';
 import InformeViewer from '@/components/inspeccion/InformeViewer';
 import { format } from 'date-fns';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import useEsBapro from '@/hooks/useEsBapro';
+import SedeInspeccionField from '@/components/inspeccion/SedeInspeccionField';
 
 const SECCIONES_DEFAULT = [
   'Fachada y accesos', 'Aulas', 'Baños', 'Cocina / Comedor',
@@ -29,8 +31,15 @@ const STATUS_CFG = {
   completado:  { label: 'Completado', dot: 'bg-emerald-400', badge: 'bg-emerald-900/60 text-emerald-300 border-emerald-700' },
 };
 
-function buildSecciones() {
-  return SECCIONES_DEFAULT.map((nombre, i) => ({
+const SECCIONES_BAPRO = [
+  'Fachada y accesos', 'Hall y atención al público', 'Línea de cajas',
+  'Tesoro / Bóveda', 'Cajeros automáticos (ATM)', 'Oficinas', 'Baños',
+  'Instalaciones eléctricas', 'Instalaciones de agua / Plomería', 'Climatización',
+  'Seguridad e incendio', 'Techo / Cubierta', 'Observaciones generales', 'Otro',
+];
+
+function buildSecciones(lista = SECCIONES_DEFAULT) {
+  return lista.map((nombre, i) => ({
     id: `sec_${i}`, nombre, transcripcion: '', notas_libres: '', fotos: [], completada: false,
   }));
 }
@@ -105,6 +114,14 @@ function InspeccionCard({ insp, onOpen, onDelete }) {
 export default function InspeccionColegioPage() {
   const { displayName, currentUser, employeeSector } = useCurrentUser();
   const queryClient = useQueryClient();
+  const esBapro = useEsBapro();
+  const seccionesBase = esBapro ? SECCIONES_BAPRO : SECCIONES_DEFAULT;
+  const { data: sedesBapro = [] } = useQuery({
+    queryKey: ['edificios-inspeccion'],
+    queryFn: () => base44.entities.Edificio.list('nombre', 500),
+    enabled: esBapro,
+    staleTime: 60_000,
+  });
 
   const [vista, setVista] = useState('lista');
   const [inspeccionActiva, setInspeccionActiva] = useState(null);
@@ -164,6 +181,12 @@ export default function InspeccionColegioPage() {
       const calle = match ? getDireccionCalle(match) : p.direccion;
       return { ...p, establecimiento: val, direccion: calle || p.direccion, comuna: match?.comuna || p.comuna };
     });
+  };
+
+  // BAPRO: al elegir una sede se completa la dirección (editable).
+  const handleSedeChange = (edificio) => {
+    if (!edificio) return;
+    setFormNueva(p => ({ ...p, establecimiento: edificio.nombre, direccion: edificio.direccion || p.direccion }));
   };
 
   // Reordenamiento de secciones drag & drop (nativo HTML5)
@@ -399,7 +422,7 @@ export default function InspeccionColegioPage() {
   }, [flushPendingNow]);
 
   const handleCrearNueva = async () => {
-    if (!formNueva.establecimiento) return toast.error('Ingresá el establecimiento');
+    if (!formNueva.establecimiento) return toast.error(esBapro ? 'Elegí la sede' : 'Ingresá el establecimiento');
     setCreando(true);
     try {
       const nueva = await base44.entities.InspeccionColegio.create({
@@ -409,7 +432,7 @@ export default function InspeccionColegioPage() {
         // Estampar sector_id en el create — elimina la race condition de RLS.
         ...(resolvedSector ? { sector_id: resolvedSector } : {}),
         estado: 'en_progreso',
-        secciones: buildSecciones(),
+        secciones: buildSecciones(seccionesBase),
       });
       queryClient.invalidateQueries({ queryKey: ['inspeccion-module-data'] });
       // Asegurar que el sector_id esté en el objeto local (el backend puede
@@ -557,7 +580,7 @@ export default function InspeccionColegioPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Buscar establecimiento..."
+              placeholder={esBapro ? 'Buscar sede...' : 'Buscar establecimiento...'}
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
               className="pl-9 h-10 text-sm"
@@ -646,16 +669,19 @@ export default function InspeccionColegioPage() {
         </button>
         <div>
           <h2 className="text-lg font-bold">Nueva inspección</h2>
-          <p className="text-xs text-muted-foreground">{SECCIONES_DEFAULT.length} secciones predefinidas</p>
+          <p className="text-xs text-muted-foreground">{seccionesBase.length} secciones predefinidas</p>
         </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="bg-muted/40 border-b border-border px-4 py-3">
-          <p className="text-sm font-semibold">Datos del establecimiento</p>
+          <p className="text-sm font-semibold">{esBapro ? 'Datos de la sede' : 'Datos del establecimiento'}</p>
         </div>
         <div className="p-4 space-y-4">
-          <div>
+          {esBapro && (
+            <SedeInspeccionField sedes={sedesBapro} value={formNueva.establecimiento} onChange={handleSedeChange} />
+          )}
+          {!esBapro && <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Establecimiento *</label>
             <Input
               list="establecimientos-list"
@@ -671,15 +697,16 @@ export default function InspeccionColegioPage() {
                 No tenés colegios asignados. Contactá a tu superior o escribí el nombre manualmente.
               </p>
             )}
-          </div>
+          </div>}
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Dirección</label>
             <Input
-              list="direcciones-list"
-              placeholder="Dirección del establecimiento"
+              list={esBapro ? undefined : 'direcciones-list'}
+              placeholder={esBapro ? 'Dirección de la sede' : 'Dirección del establecimiento'}
               value={formNueva.direccion}
               onChange={e => {
                 const val = e.target.value;
+                if (esBapro) { setFormNueva(p => ({ ...p, direccion: val })); return; }
                 setFormNueva(p => {
                   const dirObj = direccionesData.find(d => d.direccion === val);
                   if (dirObj) {
@@ -713,7 +740,7 @@ export default function InspeccionColegioPage() {
               />
             </div>
           </div>
-          <div>
+          {!esBapro && <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Comuna</label>
             <select
               value={formNueva.comuna}
@@ -725,12 +752,12 @@ export default function InspeccionColegioPage() {
               <option value="8B">8B</option>
               <option value="10A">10A</option>
             </select>
-          </div>
+          </div>}
         </div>
         <div className="border-t border-border px-4 py-4 bg-muted/20">
           <p className="text-xs text-muted-foreground mb-3">Secciones incluidas:</p>
           <div className="flex flex-wrap gap-1.5 mb-4">
-            {SECCIONES_DEFAULT.map(s => (
+            {seccionesBase.map(s => (
               <span key={s} className="text-[11px] bg-secondary text-secondary-foreground px-2 py-1 rounded-full">{s}</span>
             ))}
           </div>

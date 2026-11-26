@@ -11,7 +11,8 @@
       "enum": [
         "8A",
         "8B",
-        "10A"
+        "10A",
+        "Otra"
       ],
       "description": "Comuna a la que pertenece"
     },

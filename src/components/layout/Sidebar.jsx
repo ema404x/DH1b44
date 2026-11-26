@@ -14,6 +14,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useForoNotificaciones } from '@/hooks/useForoNotificaciones';
 import { useAprobacionPendientes } from '@/hooks/useAprobacionPendientes';
 import { hasModulePermission } from '@/lib/roles';
+import useEsBapro from '@/hooks/useEsBapro';
 
 const navGroups = [
   {
@@ -188,6 +189,7 @@ const NavItem = React.memo(function NavItem({ item, collapsed, active, onClick, 
 export default function Sidebar({ open, onOpenChange }) {
   const location = useLocation();
   const { user, userPermissions } = useAuth();
+  const esBapro = useEsBapro();
   const [collapsed, setCollapsed] = useState(false);
   const [internalMobileOpen, setInternalMobileOpen] = useState(false);
   const mobileOpen = open !== undefined ? open : internalMobileOpen;
@@ -245,7 +247,9 @@ export default function Sidebar({ open, onOpenChange }) {
     const isAdmin = user?.role === 'admin';
     return navGroups.map(group => ({
       ...group,
-      items: group.items.filter(item => {
+      items: group.items.map(item => (
+        esBapro && item.path === '/inspeccion-colegio' ? { ...item, label: 'Inspección' } : item
+      )).filter(item => {
         if (isAdmin) return true;
         if (!userPermissions) {
           // Mientras los permisos no llegan: no protegido + Dashboard + MisOrdenes.
@@ -258,7 +262,7 @@ export default function Sidebar({ open, onOpenChange }) {
         return hasModulePermission(userPermissions[moduleKey], 'read', moduleKey, userPermissions._employeeRole);
       })
     })).filter(group => group.items.length > 0);
-  }, [user, userPermissions]);
+  }, [user, userPermissions, esBapro]);
 
   const handleCloseMobile = useCallback(() => setMobileOpen(false), [setMobileOpen]);
 

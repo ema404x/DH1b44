@@ -109,10 +109,14 @@ export default async function(req) {
       return `=== ${s.nombre.toUpperCase()} ===\n${partes.join('\n\n') || 'Sin observaciones.'}`;
     }).join('\n\n');
 
-    const prompt = `Sos un ingeniero senior del GCBA especializado en inspección de establecimientos educativos. Redactá un INFORME TÉCNICO DE INSPECCIÓN EDILICIA profesional y completo.
+    const esBapro = sector === 'bapro';
+    const rolPrompt = esBapro
+      ? 'Sos un ingeniero senior especializado en inspección de sucursales bancarias. Todo el informe se refiere a una sucursal bancaria (usá "sede" o "sucursal"; nunca "colegio", "escuela" ni "establecimiento educativo")'
+      : 'Sos un ingeniero senior del GCBA especializado en inspección de establecimientos educativos';
+    const prompt = `${rolPrompt}. Redactá un INFORME TÉCNICO DE INSPECCIÓN EDILICIA profesional y completo.
 
 DATOS:
-- Establecimiento: ${inspeccion.establecimiento}
+- ${esBapro ? 'Sede / sucursal' : 'Establecimiento'}: ${inspeccion.establecimiento}
 - Dirección: ${inspeccion.direccion || 'No especificada'}
 - Inspector: ${user.full_name || inspeccion.jefe_sitio}
 - Jefe de sitio: ${inspeccion.jefe_sitio}

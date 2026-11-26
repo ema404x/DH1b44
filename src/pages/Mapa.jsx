@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useUbicaciones } from '@/hooks/useUbicaciones';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import useEsBapro from '@/hooks/useEsBapro';
 import ExportarQRsDialog from '@/components/mapa/ExportarQRsDialog';
 import MapaFichajes from '@/components/mapa/MapaFichajes';
 import LocationsManager from '@/components/mapa/LocationsManager';
@@ -44,6 +45,7 @@ export default function Mapa() {
   // Admin y gerente ven todas. Combina asignación manual (jefe_sitio_email)
   // con asignación existente (assigned_employees).
   const { isSuperAdmin, employeeName, currentUser } = useCurrentUser();
+  const esBapro = useEsBapro();
   // Revisar ubicaciones: su función de servidor exige admin, así que la pestaña también.
   const esAdmin = currentUser?.role === 'admin';
   const visibleLocations = useMemo(() => {
@@ -194,7 +196,7 @@ export default function Mapa() {
             <List className="h-4 w-4" /> Gestión de Ubicaciones
           </TabsTrigger>
           <TabsTrigger value="colegios" className="gap-2">
-            <School className="h-4 w-4" /> Colegios
+            <School className="h-4 w-4" /> {esBapro ? 'Sedes' : 'Colegios'}
           </TabsTrigger>
           <TabsTrigger value="asignaciones" className="gap-2">
             <Users className="h-4 w-4" /> Asignaciones

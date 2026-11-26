@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { Search, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import useEsBapro from '@/hooks/useEsBapro';
 import { isPast, parseISO } from 'date-fns';
 
 const COMUNA_COLORS = {
@@ -53,6 +54,9 @@ const createSchoolIcon = (comuna, isSelected = false, semaforoColor = null) => {
 
 
 export default function MapaColegios() {
+  const esBapro = useEsBapro();
+  const sing = esBapro ? 'sede' : 'colegio';
+  const plur = esBapro ? 'sedes' : 'colegios';
   const mapRef = useRef(null);
   const [search, setSearch] = useState('');
   const [selectedComuna, setSelectedComuna] = useState('all');
@@ -155,7 +159,7 @@ export default function MapaColegios() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Total Colegios', value: locations.length, color: 'text-primary' },
+          { label: esBapro ? 'Total sedes' : 'Total Colegios', value: locations.length, color: 'text-primary' },
           { label: 'En el mapa', value: locationsWithCoords.length, color: 'text-emerald-600' },
           { label: 'Sin ubicar', value: pending.length, color: 'text-amber-600' },
         ].map((s, i) => (
@@ -173,8 +177,8 @@ export default function MapaColegios() {
             {geocoding ? <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" /> : <Loader2 className="h-4 w-4 flex-shrink-0 opacity-50" />}
             <span>
               {geocoding
-                ? 'Geocodificando colegios... esto puede tardar unos minutos.'
-                : <><strong>{pending.length}</strong> colegios sin coordenadas GPS. Geocodificá para verlos en el mapa.</>}
+                ? `Geocodificando ${plur}... esto puede tardar unos minutos.`
+                : <><strong>{pending.length}</strong> {plur} sin coordenadas GPS. Geocodificá para verlos en el mapa.</>}
             </span>
           </div>
           {!geocoding && (
@@ -190,7 +194,7 @@ export default function MapaColegios() {
       {geocodingDone && (
         <div className="flex items-center gap-2 text-sm bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-2.5 rounded-lg">
           <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-          <span>Geocodificación completada. Los colegios ya aparecen en el mapa.</span>
+          <span>Geocodificación completada. {esBapro ? 'Las sedes ya aparecen en el mapa.' : 'Los colegios ya aparecen en el mapa.'}</span>
         </div>
       )}
 
@@ -209,8 +213,8 @@ export default function MapaColegios() {
         ))}
       </div>
 
-      {/* Filtros por comuna */}
-      <div className="flex gap-2 flex-wrap items-center">
+      {/* Filtros por comuna (solo CABA: no aplica a BAPRO) */}
+      {!esBapro && <div className="flex gap-2 flex-wrap items-center">
         <span className="text-xs text-muted-foreground font-medium">Comunas:</span>
         {comunas.map(c => (
           <button
@@ -230,7 +234,7 @@ export default function MapaColegios() {
             Ver todas
           </button>
         )}
-      </div>
+      </div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Mapa */}
@@ -273,7 +277,7 @@ export default function MapaColegios() {
                         {emgActiva && <p className="text-xs text-red-600 font-semibold mb-1">🚨 Emergencia activa: {emgActiva.tipo}</p>}
                         {pendEstab.length > 0 && <p className="text-xs text-amber-600 mb-1">⚠️ {pendEstab.length} pendiente(s) activo(s)</p>}
                         <div className="flex gap-2 flex-wrap text-xs mt-2">
-                          {loc.comuna && (
+                          {loc.comuna && !esBapro && (
                             <span className="px-2 py-0.5 rounded-full text-white font-semibold"
                               style={{ background: COMUNA_COLORS[loc.comuna] || '#64748b' }}>
                               {loc.comuna}
@@ -290,7 +294,7 @@ export default function MapaColegios() {
             </MapContainer>
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-              {geocoding ? 'Geocodificando...' : 'Sin colegios con coordenadas disponibles'}
+              {geocoding ? 'Geocodificando...' : `Sin ${plur} con coordenadas disponibles`}
             </div>
           )}
         </div>
@@ -300,13 +304,13 @@ export default function MapaColegios() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar colegio..."
+              placeholder={`Buscar ${sing}...`}
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-9"
             />
           </div>
-          <p className="text-xs text-muted-foreground">{filtered.length} colegios</p>
+          <p className="text-xs text-muted-foreground">{filtered.length} {plur}</p>
           <div className="overflow-y-auto rounded-lg border bg-card divide-y" style={{ maxHeight: '460px' }}>
             {filtered.length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">
@@ -330,7 +334,7 @@ export default function MapaColegios() {
                         {dir?.direccion && (
                           <p className="text-xs text-muted-foreground truncate">{dir.direccion}</p>
                         )}
-                        {loc.comuna && (
+                        {loc.comuna && !esBapro && (
                           <span className="mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded-full text-white font-semibold"
                             style={{ background: COMUNA_COLORS[loc.comuna] || '#64748b' }}>
                             {loc.comuna}
