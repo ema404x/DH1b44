@@ -152,9 +152,9 @@ export default function MapaProyectosOTs() {
 
       {/* Mapa + Detalle */}
       {ordersWithGPS.length > 0 ? (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[500px]">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:h-[500px]">
           {/* Mapa */}
-          <div className="lg:col-span-2 rounded-lg overflow-hidden shadow-lg border border-slate-200">
+          <div className="lg:col-span-2 rounded-lg overflow-hidden shadow-lg border border-slate-200 h-[45vh] min-h-[280px] lg:h-auto">
             <MapContainer center={center} zoom={12} style={{ height: '100%', width: '100%' }}>
               <TileLayer
                 url={MAP_TILE_URL}

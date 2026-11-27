@@ -159,7 +159,7 @@ export default function MapaFichajes({ locations, logs, logsLoading, onLocationU
       </div>
 
       {/* Map */}
-      <div className="rounded-xl overflow-hidden border border-border shadow-lg bg-white" style={{ height: '520px' }}>
+      <div className="rounded-xl overflow-hidden border border-border shadow-lg bg-white h-[45vh] min-h-[280px] lg:h-[520px]">
         {logsLoading ? (
           <div className="h-full flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

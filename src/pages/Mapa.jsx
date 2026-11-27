@@ -185,7 +185,9 @@ export default function Mapa() {
       />
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="h-10">
+        {/* En el celular las pestañas no entran: se deslizan de costado. */}
+        <div className="-mx-4 px-4 overflow-x-auto scrollbar-thin lg:mx-0 lg:px-0">
+        <TabsList className="h-10 w-max">
           <TabsTrigger value="proyectos-ots" className="gap-2">
             <Globe className="h-4 w-4" /> Proyectos & OTs
           </TabsTrigger>
@@ -213,6 +215,7 @@ export default function Mapa() {
             </TabsTrigger>
           )}
         </TabsList>
+        </div>
 
         <TabsContent value="proyectos-ots" className="mt-5">
           <MapaProyectosOTs />

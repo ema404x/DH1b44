@@ -266,7 +266,7 @@ export default function MapaColegios() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Mapa */}
-        <div className="lg:col-span-2 rounded-xl overflow-hidden border shadow-sm" style={{ height: '520px' }}>
+        <div className="lg:col-span-2 rounded-xl overflow-hidden border shadow-sm h-[45vh] min-h-[280px] lg:h-[520px]">
           {filtered.length > 0 ? (
             <MapContainer ref={mapRef} center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
               <TileLayer

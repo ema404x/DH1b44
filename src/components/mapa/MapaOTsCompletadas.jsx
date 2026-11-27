@@ -153,7 +153,7 @@ export default function MapaOTsCompletadas() {
           <p className="text-sm">No hay OTs completadas con ubicación GPS para los filtros seleccionados.</p>
         </div>
       ) : (
-        <div className="rounded-xl overflow-hidden border border-border" style={{ height: 500 }}>
+        <div className="rounded-xl overflow-hidden border border-border h-[45vh] min-h-[280px] lg:h-[500px]">
           <MapContainer
             key={center.join(',')}
             center={center}
