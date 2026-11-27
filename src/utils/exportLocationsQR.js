@@ -90,7 +90,7 @@ export async function exportarQRsUbicacionesPDF(locations, mode = 'ot', { jefe =
 
     // QR
     if (it.dataUrl) {
-      doc.addImage(it.dataUrl, 'PNG', x + 5, y + 10, qrSize, qrSize);
+      doc.addImage(it.dataUrl, 'PNG', x + 5, y + 10, qrSize, qrSize, undefined, 'FAST');
     } else {
       doc.setFontSize(8);
       doc.setTextColor(200, 0, 0);

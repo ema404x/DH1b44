@@ -1,5 +1,5 @@
 // ZIP sin compresión: mantiene cada PDF como un archivo independiente.
-export default async function downloadPdfArchive(files, name) {
+export async function buildPdfArchive(files) {
   const encoder = new TextEncoder();
   const parts = [], directory = [];
   let offset = 0, directorySize = 0;
@@ -31,7 +31,11 @@ export default async function downloadPdfArchive(files, name) {
   e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true);
   e.setUint16(10, files.length, true); e.setUint32(12, directorySize, true);
   e.setUint32(16, offset, true);
-  const url = URL.createObjectURL(new Blob([...parts, ...directory, end], { type: 'application/zip' }));
+  return new Blob([...parts, ...directory, end], { type: 'application/zip' });
+}
+
+export default async function downloadPdfArchive(files, name) {
+  const url = URL.createObjectURL(await buildPdfArchive(files));
   const link = document.createElement('a'); link.href = url; link.download = name;
   document.body.appendChild(link); link.click(); link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);

@@ -8,7 +8,25 @@ import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Drawer as VaulDrawer } from "vaul"
 
-const Select = SelectPrimitive.Root
+// Estado abierto/cerrado compartido con SelectContent. En mobile el bottom
+// sheet (Vaul) solo debe montarse con la lista ABIERTA: Radix renderiza el
+// contenido aunque el Select esté cerrado (para leer los ítems), y un Drawer
+// con open={true} montado ahí bloqueaba toques y scroll en toda la pantalla.
+const SelectOpenContext = React.createContext(false)
+
+function Select({ open: openProp, defaultOpen, onOpenChange, ...props }) {
+  const [innerOpen, setInnerOpen] = React.useState(defaultOpen ?? false)
+  const open = openProp ?? innerOpen
+  const handleOpenChange = React.useCallback((value) => {
+    if (openProp === undefined) setInnerOpen(value)
+    onOpenChange?.(value)
+  }, [openProp, onOpenChange])
+  return (
+    <SelectOpenContext.Provider value={open}>
+      <SelectPrimitive.Root open={open} onOpenChange={handleOpenChange} {...props} />
+    </SelectOpenContext.Provider>
+  )
+}
 
 const SelectGroup = SelectPrimitive.Group
 
@@ -53,6 +71,19 @@ SelectScrollDownButton.displayName =
 
 const SelectContent = React.forwardRef(({ className, children, position = "popper", ...props }, ref) => {
   const isMobile = useIsMobile()
+  const open = React.useContext(SelectOpenContext)
+
+  if (isMobile && !open) {
+    // Cerrado: solo los ítems (Radix los necesita para mostrar el valor
+    // elegido), sin Drawer ni overlay.
+    return (
+      <SelectPrimitive.Portal>
+        <SelectPrimitive.Content ref={ref} position="item-aligned" className="select-mobile-wrapper" {...props}>
+          <SelectPrimitive.Viewport>{children}</SelectPrimitive.Viewport>
+        </SelectPrimitive.Content>
+      </SelectPrimitive.Portal>
+    )
+  }
 
   if (isMobile) {
     return (
@@ -73,9 +104,10 @@ const SelectContent = React.forwardRef(({ className, children, position = "poppe
             }}
           >
             <VaulDrawer.Portal>
-              <VaulDrawer.Overlay className="pointer-events-auto" />
+              {/* z-[100]: por encima de los Dialog (z-50), si no la lista queda tapada. */}
+              <VaulDrawer.Overlay className="pointer-events-auto fixed inset-0 z-[100] bg-black/60" />
               <VaulDrawer.Content
-                className="pointer-events-auto max-h-[80vh] rounded-t-[10px] border bg-background"
+                className="pointer-events-auto fixed inset-x-0 bottom-0 z-[100] flex max-h-[80vh] flex-col rounded-t-[10px] border bg-background outline-none"
                 style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
               >
                 <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
