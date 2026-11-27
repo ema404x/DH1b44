@@ -89,19 +89,34 @@ export default async function(req) {
       }
 
       // 4) Solo BAPRO: las OT se guardan con sede_id/sede_nombre (Edificio).
+      //    El nombre del QR y el de la sede no siempre coinciden letra por letra
+      //    ("Sede Mataderos" vs "Mataderos"), así que se comparan sin prefijos
+      //    genéricos. Si la OT no tiene sector_id (el flujo que lo estampa no
+      //    corrió), se acepta igual cuando está atada a una sede de este sector.
       if (locSector === 'bapro' && location.name) {
-        const locNameNorm = normalize(location.name);
-        const edificios = await sb.entities.Edificio.list('-updated_date', 500).catch(() => []);
-        const edificio = edificios.find(e => e.sector_id === locSector && normalize(e.nombre) === locNameNorm);
-        const [porSedeId, porSedeNombre] = await Promise.all([
-          edificio ? sb.entities.WorkOrder.filter({ sede_id: edificio.id }).catch(() => []) : [],
-          sb.entities.WorkOrder.filter({ sede_nombre: location.name }).catch(() => []),
+        const claveSede = (s) => normalize(s)
+          .replace(/[^a-z0-9 ]/g, ' ')
+          .replace(/\b(sede|sucursal|suc|filial|agencia|banco provincia|bapro)\b/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        const locClave = claveSede(location.name);
+        const edificios = await sb.entities.Edificio.list('-updated_date', 1000).catch(() => []);
+        const sedes = edificios.filter(e =>
+          (e.sector_id === locSector || !e.sector_id) &&
+          locClave && claveSede(e.nombre) === locClave);
+        const sedeIds = new Set(sedes.map(e => e.id));
+        const nombres = [...new Set([location.name, ...sedes.map(e => e.nombre)].filter(Boolean))];
+        const resultados = await Promise.all([
+          ...[...sedeIds].map(id => sb.entities.WorkOrder.filter({ sede_id: id }).catch(() => [])),
+          ...nombres.map(n => sb.entities.WorkOrder.filter({ sede_nombre: n }).catch(() => [])),
         ]);
         const ids = new Set(activeOrders.map(o => o.id));
-        for (const o of [...porSedeId, ...porSedeNombre]) {
+        for (const o of resultados.flat()) {
           if (ids.has(o.id)) continue;
-          if (['completada', 'cancelada'].includes(o.status) || !sameSector(o)) continue;
-          if (!(edificio && o.sede_id === edificio.id) && normalize(o.sede_nombre) !== locNameNorm) continue;
+          if (['completada', 'cancelada'].includes(o.status)) continue;
+          const atadaASede = sedeIds.has(o.sede_id) || (locClave && claveSede(o.sede_nombre) === locClave);
+          if (!atadaASede) continue;
+          if (!(sameSector(o) || (!o.sector_id && sedeIds.has(o.sede_id)))) continue;
           ids.add(o.id);
           activeOrders.push(o);
         }
