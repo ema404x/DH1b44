@@ -183,9 +183,10 @@ const ADMIN_MOBILE_MODULES = new Set([
 /**
  * Módulos de secciones que el drawer mobile no muestra (Recursos, etc.) y que
  * igual se agregan al final de Operaciones. Respetan el mismo filtro de permisos.
- * Propuestas de OT ya está en Operaciones.
+ * Propuestas de OT ya está en Operaciones. /mapa se incluye para poder
+ * exportar los QRs de ubicaciones (OT y fichaje) desde el celular.
  */
-export const MOBILE_DRAWER_EXTRA = ['/control-personal'];
+export const MOBILE_DRAWER_EXTRA = ['/control-personal', '/mapa'];
 
 export function getMobileSection(path) {
   if (!isMobileOptimized(path)) return 'desktop';
